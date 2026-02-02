@@ -1,0 +1,65 @@
+:root {
+  --font-family-base: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --font-weight-medium: 500;
+  --font-size-sm: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --gap-sm: 4px;
+  --gap-md: 8px;
+  --gap-lg: 12px;
+  --gap-xl: 16px;
+  --height-sm: 20px;
+  --height-md: 40px;
+  --height-lg: 48px;
+
+  --color-text: #333333;
+  --color-text-strong: #212529;
+  --color-text-muted: #666666;
+  --color-text-subtle: #999999;
+  --color-text-inverse: #ffffff;
+  --color-background: #ffffff;
+  --color-surface: #f9f9f9;
+  --color-surface-alt: #f5f5f5;
+  --color-border: #dddddd;
+  --color-border-strong: #999999;
+
+  --color-primary: #007bff;
+  --color-primary-hover: #0056b3;
+  --color-primary-alpha: rgba(0, 123, 255, 0.1);
+  --color-secondary: #6c757d;
+  --color-secondary-hover: #545b62;
+  --color-secondary-alpha: rgba(108, 117, 125, 0.1);
+  --color-success: #28a745;
+  --color-success-hover: #218838;
+  --color-success-alpha: rgba(40, 167, 69, 0.1);
+  --color-danger: #dc3545;
+  --color-danger-hover: #c82333;
+  --color-danger-alpha: rgba(220, 53, 69, 0.1);
+  --color-warning: #ffc107;
+  --color-warning-alpha: rgba(255, 193, 7, 0.1);
+  --color-info: #17a2b8;
+  --color-info-alpha: rgba(23, 162, 184, 0.1);
+  --color-light: #f8f9fa;
+  --color-dark: #343a40;
+  --color-accent-1: #8b5cf6;
+  --color-accent-2: #ec4899;
+  --color-accent-3: #14b8a6;
+  --color-accent-4: #f97316;
+  --color-white-alpha-10: rgba(255, 255, 255, 0.1);
+  --color-white-alpha-20: rgba(255, 255, 255, 0.2);
+  --color-white-alpha-30: rgba(255, 255, 255, 0.3);
+  --color-white-alpha-80: rgba(255, 255, 255, 0.8);
+  --color-black-alpha-10: rgba(0, 0, 0, 0.1);
+  --color-black-alpha-06: rgba(0, 0, 0, 0.06);
+  --color-black-alpha-20: rgba(0, 0, 0, 0.2);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 3px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 15px 25px rgba(0, 0, 0, 0.15), 0 5px 10px rgba(0, 0, 0, 0.05);
+  --shadow-xxl: 0 20px 40px rgba(0, 0, 0, 0.2), 0 10px 20px rgba(0, 0, 0, 0.1);
+}

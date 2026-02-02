@@ -1,0 +1,223 @@
+.input-wrapper {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: inherit;
+  width: auto;
+}
+
+.input-wrapper--full-width {
+  width: 100%;
+}
+
+/* Sizes */
+.input-wrapper--small {
+  font-size: var(--font-size-sm);
+}
+
+.input-wrapper--medium {
+  font-size: var(--font-size-md);
+}
+
+.input-wrapper--large {
+  font-size: var(--font-size-lg);
+}
+
+/* Label */
+.input__label {
+  font-weight: 500;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.input__required {
+  color: var(--color-danger);
+}
+
+/* Input Container */
+.input__container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* Input/Textarea */
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: inherit;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  transition: all 0.2s ease;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* Size-specific padding */
+.input-wrapper--small .input {
+  padding: 6px 10px;
+}
+
+.input-wrapper--medium .input {
+  padding: 10px 12px;
+}
+
+.input-wrapper--large .input {
+  padding: 14px 16px;
+}
+
+/* Icon positioning */
+.input--with-icon-left {
+  padding-left: 40px;
+}
+
+.input--with-icon-right {
+  padding-right: 40px;
+}
+
+.input__icon {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.input__icon--left {
+  left: 12px;
+}
+
+.input__icon--right {
+  right: 12px;
+}
+
+/* Clear button */
+.input__clear {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.input__clear:hover {
+  background-color: var(--color-border);
+}
+
+/* States */
+.input:hover:not(:disabled):not(:read-only) {
+  border-color: var(--color-border-strong);
+}
+
+.input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+.input-wrapper--focused .input {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+.input--disabled {
+  background-color: var(--color-surface-alt);
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+}
+
+.input--readonly {
+  background-color: var(--color-surface);
+}
+
+/* Status styles */
+.input-wrapper--error .input {
+  border-color: var(--color-danger);
+}
+
+.input-wrapper--error .input:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-alpha);
+}
+
+.input-wrapper--success .input {
+  border-color: var(--color-success);
+}
+
+.input-wrapper--success .input:focus {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 3px var(--color-success-alpha);
+}
+
+.input-wrapper--warning .input {
+  border-color: var(--color-warning);
+}
+
+.input-wrapper--warning .input:focus {
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 3px var(--color-warning-alpha);
+}
+
+/* Messages */
+.input__message {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.input__message--error {
+  color: var(--color-danger);
+}
+
+.input__message--success {
+  color: var(--color-success);
+}
+
+.input__message--warning {
+  color: var(--color-warning);
+}
+
+.input__message--info {
+  color: var(--color-text-muted);
+}
+
+/* Textarea specific */
+textarea.input {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+/* Password toggle feature */
+.input__password-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input__password-toggle:hover {
+  color: var(--color-text);
+}
