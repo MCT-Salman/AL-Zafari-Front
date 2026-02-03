@@ -1,6 +1,41 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Users, DollarSign, AlertCircle } from "lucide-react";
+import CardWithData from "../components/CardWithData/CardWithData";
+import IconCommon from "../components/IconCommon/IconCommon";
+
+
+const cardData = [
+  {
+    id: 1,
+    title: "الإيرادات • Revenue",
+    contentTitle: "$12,345",
+    contentDesc: "+12% من الشهر الماضي",
+    icon: <IconCommon icon={TrendingUp} />
+  },
+  {
+    id: 2,
+    title: "المستخدمون • Users",
+    contentTitle: "1,234",
+    contentDesc: "+5% من الشهر الماضي",
+    icon: <IconCommon icon={Users} className="text-secondary-t" size={40}/>
+  },
+  {
+    id: 3,
+    title: "الأرباح • Profit",
+    contentTitle: "$8,901",
+    contentDesc: "+8% من الشهر الماضي",
+    icon: <IconCommon icon={DollarSign} />
+  },
+  {
+    id: 4,
+    title: "التنبيهات • Alerts",
+    contentTitle: "3",
+    contentDesc: "تتطلب اهتمامك",
+    icon: <IconCommon icon={AlertCircle} />
+  }
+]
+
 
 // Dashboard page | صفحة لوحة التحكم
 export default function Dashboard() {
@@ -14,57 +49,13 @@ export default function Dashboard() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-surface border border-border hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-text-strong">
-              <TrendingUp className="text-secondary-f" size={20} />
-              الإيرادات • Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-text-strong">$12,345</div>
-            <p className="text-sm text-text-subtle mt-1">+12% من الشهر الماضي</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-surface border border-border hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-text-strong">
-              <Users className="text-secondary-f" size={20} />
-              المستخدمون • Users
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-text-strong">1,234</div>
-            <p className="text-sm text-text-subtle mt-1">+5% من الشهر الماضي</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-surface border border-border hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-text-strong">
-              <DollarSign className="text-secondary-f" size={20} />
-              الأرباح • Profit
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-text-strong">$8,901</div>
-            <p className="text-sm text-text-subtle mt-1">+8% من الشهر الماضي</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-surface border border-border hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-text-strong">
-              <AlertCircle className="text-secondary-f" size={20} />
-              التنبيهات • Alerts
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-text-strong">3</div>
-            <p className="text-sm text-text-subtle mt-1">تتطلب اهتمامك</p>
-          </CardContent>
-        </Card>
+        {
+          cardData.map((card)=>{
+            return(
+              <CardWithData key={card.id} title={card.title} contentTitle={card.contentTitle} contentDesc={card.contentDesc} icon={card.icon} />
+            )
+          })
+        }
       </div>
 
       {/* Recent Activity */}

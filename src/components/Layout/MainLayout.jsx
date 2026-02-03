@@ -9,6 +9,7 @@ import { Navigate } from "react-router-dom";
 // تخطيط رئيسي يحتوي على هيدر ثابت وسايدبار ثابت مع محتوى قابل للتمرير
 function MainLayout() {
   const { user, loading } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
@@ -19,7 +20,6 @@ function MainLayout() {
   }
   // Mobile sidebar state
   // حالة السايدبار على الشاشات الصغيرة
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const toggleSidebar = () => setIsSidebarOpen((v) => !v);
   const closeSidebar = () => setIsSidebarOpen(false);

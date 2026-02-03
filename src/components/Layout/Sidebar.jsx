@@ -2,6 +2,7 @@
 import { sideData } from "@/data/sidebarData";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import IconCommon from "../IconCommon/IconCommon";
 
 // Sidebar | الشريط الجانبي ثابت مع عناصر متجاوبة
 // - شعار ثابت بالأعلى
@@ -31,20 +32,28 @@ const Sidebar = () => {
               key={item.id}
               to={item.link}
               className={({ isActive }) =>
-                `group flex items-center gap-3 px-5 py-3 mx-3 mb-1 rounded-lg transition-all duration-200 cursor-pointer ${
-                  isActive 
-                    ? 'bg-secondary-s text-primary-s' 
-                    : 'hover:bg-primary-alpha'
+                `group flex items-center gap-3 px-5 py-3 mx-3 mb-1 rounded-lg transition-all duration-200 cursor-pointer ${isActive
+                  ? 'bg-secondary-s text-primary-s'
+                  : 'hover:bg-primary-alpha'
                 }`
               }
             >
-              {/* Icon */}
-              <div className={`icon transition-transform group-hover:scale-110 `}>
-                {item.logo && <item.logo size={20} strokeWidth={1.75} />} 
-              </div>
-
-              {/* Title */}
-              <div className="title font-medium flex-1">{item.title}</div>
+              {({ isActive }) => (
+                <>
+                  {/* Icon */}
+                  <div className={`icon transition-transform group-hover:scale-110`}>
+                    {item.logo && (
+                      <IconCommon
+                        icon={item.logo}
+                        className={isActive ? 'text-primary-s' : ''}
+                        size={20}
+                      />
+                    )}
+                  </div>
+                  {/* Title */}
+                  <div className="title font-medium flex-1">{item.title}</div>
+                </>
+              )}
             </NavLink>
           ))}
         </div>
