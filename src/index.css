@@ -23,7 +23,7 @@ body {
   --height-sm: 20px;
   --height-md: 40px;
   --height-lg: 48px;
- lor-border-strong: #999999;
+  --color-border-strong: #999999;
   
   /* Primary Colors */
   --color-primary-f: #004563;
@@ -48,7 +48,7 @@ body {
 
   --color-secondary-hover: #545b62;
   --color-secondary-alpha: rgba(108, 117, 125, 0.1);
-  -black-alpha-20: rgba(0, 0, 0, 0.2);
+  --color-black-alpha-20: rgba(0, 0, 0, 0.2);
   
   /* Border Radius */
   --radius-sm: 4px;
