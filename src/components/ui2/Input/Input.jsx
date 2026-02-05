@@ -35,10 +35,10 @@ const Input = forwardRef(({
   ...props
 }, ref) => {
   const [isFocused, setIsFocused] = useState(false);
-  const [internalValue, setInternalValue] = useState(defaultValue || '');
+  const [internalValue, setInternalValue] = useState(defaultValue ?? '');
 
   const isControlled = value !== undefined;
-  const currentValue = isControlled ? value : internalValue;
+  const currentValue = isControlled ? (value ?? '') : internalValue;
 
   const handleChange = (e) => {
     if (!isControlled) {

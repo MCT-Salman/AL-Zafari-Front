@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+const baseURL = import.meta.env.VITE_API_URL;
+
+console.log('API Base URL:', baseURL);
+
 const axiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://api.example.com',
+  baseURL: baseURL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -15,17 +19,39 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log('API Request:', {
+      method: config.method,
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: config.baseURL + config.url,
+      hasToken: !!token,
+    });
     return config;
   },
   (error) => {
+    console.error('Request Error:', error);
     return Promise.reject(error);
   }
 );
 
 // رد interceptor للتعامل مع الأخطاء
 axiosInstance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API Response Success:', {
+      status: response.status,
+      url: response.config.url,
+      data: response.data,
+    });
+    return response;
+  },
   async (error) => {
+    console.error('API Response Error:', {
+      status: error.response?.status,
+      url: error.config?.url,
+      message: error.message,
+      data: error.response?.data,
+    });
+
     const originalRequest = error.config;
 
     // تجديد التوكن إذا كان منتهي الصلاحية
@@ -34,7 +60,7 @@ axiosInstance.interceptors.response.use(
       
       try {
         const refreshToken = localStorage.getItem('refreshToken');
-        const response = await axios.post('/auth/refresh', { refreshToken });
+        const response = await axiosInstance.post('/auth/refresh', { refreshToken });
         const { accessToken } = response.data;
         
         localStorage.setItem('accessToken', accessToken);

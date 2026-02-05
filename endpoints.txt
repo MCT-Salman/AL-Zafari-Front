@@ -1,0 +1,728 @@
+auth
+POST
+login
+{{autolocal}}/auth/login
+Body
+raw (json)
+json
+{
+    "username": "admin",
+    "password": "Admin@12345"
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/auth/login' \
+--data-raw '{
+    "username": "0599000000",
+    "password": "Admin@123"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تسجيل الدخول بنجاح",
+  "data": {
+    "userWithoutPassword": {
+      "id": 1,
+      "phone": "0599000000",
+      "username": "admin",
+      "full_name": "System Administrator",
+      "role": "admin",
+      "country": null,
+      "countryCode": null,
+      "is_active": true,
+      "currentSessionId": "cml4y5hxr0003vpz8eak80z2v",
+      "fcmToken": null,
+      "notes": null,
+      "created_at": "2026-01-31",
+      "updated_at": "2026-02-02"
+    },
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwic2lkIjoiY21sNHk1enR2MDAwNXZwejgxMmJvbHJiciIsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzAwMjMyOTAsImV4cCI6MTc3MDAyNDE5MCwiYXVkIjoiYXV0b21hdGlvbi1jbGllbnQiLCJpc3MiOiJhdXRvbWF0aW9uLWFwaSJ9.T_xnsAyaH8SW1eef2pnroZ2BH4GzS5wn4BcFF1szeH4",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwic2lkIjoiY21sNHk1enR2MDAwNXZwejgxMmJvbHJiciIsInR5cGUiOiJyZWZyZXNoIiwiaWF0IjoxNzcwMDIzMjkwLCJleHAiOjE3NzA2MjgwOTAsImF1ZCI6ImF1dG9tYXRpb24tY2xpZW50IiwiaXNzIjoiYXV0b21hdGlvbi1hcGkifQ.RS1nZClLSvlr0hx57MrW-g2Ob437I34aimtWx7tZ_oA",
+    "expiresIn": 900
+  }
+}
+POST
+validate-token
+{{autolocal}}/auth/validate-token
+Body
+raw (json)
+View More
+json
+{
+    "token" : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwic2lkIjoiY21sNHloZzIxMDAwMXZwbDB4cnVpMm16NyIsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzAwMjM4MjQsImV4cCI6MTc3MDAyNDcyNCwiYXVkIjoiYXV0b21hdGlvbi1jbGllbnQiLCJpc3MiOiJhdXRvbWF0aW9uLWFwaSJ9.MPtER6AkJocyc5Ej6bL378cbmRE9ZOzNL92jGVTApl0"
+}
+Example Request
+true
+View More
+curl
+curl --location -g '{{autolocal}}/auth/validate-token' \
+--data '{
+    "token" : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwic2lkIjoiY21sNHloZzIxMDAwMXZwbDB4cnVpMm16NyIsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzAwMjM4MjQsImV4cCI6MTc3MDAyNDcyNCwiYXVkIjoiYXV0b21hdGlvbi1jbGllbnQiLCJpc3MiOiJhdXRvbWF0aW9uLWFwaSJ9.MPtER6AkJocyc5Ej6bL378cbmRE9ZOzNL92jGVTApl0"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "Token is valid",
+  "data": {
+    "userId": 1,
+    "sessionId": "cml4yhg210001vpl0xrui2mz7",
+    "role": "admin"
+  }
+}
+POST
+Refresh Token
+{{autolocal}}/auth/refresh
+Body
+raw (json)
+View More
+json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwic2lkIjoiY21sNHk1enR2MDAwNXZwejgxMmJvbHJiciIsInR5cGUiOiJyZWZyZXNoIiwiaWF0IjoxNzcwMDIzMzAyLCJleHAiOjE3NzA2MjgxMDIsImF1ZCI6ImF1dG9tYXRpb24tY2xpZW50IiwiaXNzIjoiYXV0b21hdGlvbi1hcGkifQ.E9AOSxHtqkpS6f9xjGAU1Ld32L9I4Lmw3aDPUgZY0uI"
+}
+Example Request
+true
+View More
+curl
+curl --location -g '{{autolocal}}/auth/refresh' \
+--data '{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwic2lkIjoiY21sNHk1enR2MDAwNXZwejgxMmJvbHJiciIsInR5cGUiOiJyZWZyZXNoIiwiaWF0IjoxNzcwMDIzMzAyLCJleHAiOjE3NzA2MjgxMDIsImF1ZCI6ImF1dG9tYXRpb24tY2xpZW50IiwiaXNzIjoiYXV0b21hdGlvbi1hcGkifQ.E9AOSxHtqkpS6f9xjGAU1Ld32L9I4Lmw3aDPUgZY0uI"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+View More
+{
+  "success": true,
+  "message": "تم تجديد التوكن بنجاح",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwic2lkIjoiY21sNHk1enR2MDAwNXZwejgxMmJvbHJiciIsInJvbGUiOiJhZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzAwMjMzMjksImV4cCI6MTc3MDAyNDIyOSwiYXVkIjoiYXV0b21hdGlvbi1jbGllbnQiLCJpc3MiOiJhdXRvbWF0aW9uLWFwaSJ9.b5Cafioyhcpm43sbhMUsVtpWAqsmBUPNy0CLlIVOHfU",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwic2lkIjoiY21sNHk1enR2MDAwNXZwejgxMmJvbHJiciIsInR5cGUiOiJyZWZyZXNoIiwiaWF0IjoxNzcwMDIzMzI5LCJleHAiOjE3NzA2MjgxMjksImF1ZCI6ImF1dG9tYXRpb24tY2xpZW50IiwiaXNzIjoiYXV0b21hdGlvbi1hcGkifQ.MSlanesidPjfVxkZiXcodPKp4kqwV1IKM6sg0RFQy9o",
+    "expiresIn": 900
+  }
+}
+POST
+logout
+{{autolocal}}/auth/logout
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request POST '{{autolocal}}/auth/logout'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تسجيل الخروج بنجاح",
+  "data": {}
+}
+POST
+Forgot Password
+{{autolocal}}/auth/forgot-password
+Body
+raw (json)
+json
+{
+  "phone": "0599000000"
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/auth/forgot-password' \
+--data '{
+  "phone": "0599000000"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم إرسال رمز التحقق إلى رقم هاتفك",
+  "data": {
+    "expiresIn": 600
+  }
+}
+POST
+otp
+{{autolocal}}/auth/verify-otp
+Body
+raw (json)
+json
+{
+  "phone": "0599000000",
+  "otp" : "555511"
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/auth/verify-otp' \
+--data '{
+  "phone": "0599000000",
+  "otp" : "555511"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم التحقق من الرمز بنجاح",
+  "data": {
+    "resetToken": "0599000000:caacf268088a6ed97d084e35a81170db796191f882660aede5728fda3cb20741:1770026332112"
+  }
+}
+POST
+Reset Password
+{{autolocal}}/auth/reset-password
+Body
+raw (json)
+json
+{
+     "resetToken": "0599000000:caacf268088a6ed97d084e35a81170db796191f882660aede5728fda3cb20741:1770026332112",
+     "newPassword": "Admin@12345"
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/auth/reset-password' \
+--data-raw '{
+     "resetToken": "0599000000:caacf268088a6ed97d084e35a81170db796191f882660aede5728fda3cb20741:1770026332112",
+     "newPassword": "Admin@12345"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تغيير كلمة المرور بنجاح",
+  "data": {}
+}
+GET
+Profile
+{{autolocal}}/auth/profile
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/auth/profile'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب البيانات بنجاح",
+  "data": {
+    "id": 1,
+    "phone": "0599000000",
+    "username": "admin",
+    "full_name": "System Administrator",
+    "role": "admin",
+    "country": null,
+    "countryCode": null,
+    "is_active": true,
+    "currentSessionId": "cml4zvpxe0001vpggc0l465wm",
+    "fcmToken": null,
+    "notes": null,
+    "created_at": "2026-01-31",
+    "updated_at": "2026-02-02"
+  }
+}
+
+PUT
+update profile
+{{autolocal}}/auth/profile
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "phone" : "+963599000000",
+    "full_name" : "Administrator",
+    "username" : "admin"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/auth/profile' \
+--data '{
+    "phone" : "+963599000000",
+    "full_name" : "Administrator",
+    "username" : "admin"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+View More
+{
+  "success": true,
+  "message": "تم تحديث الملف الشخصي بنجاح",
+  "data": {
+    "id": 1,
+    "phone": "+963599000000",
+    "username": "admin",
+    "full_name": "Administrator",
+    "role": "admin",
+    "country": null,
+    "countryCode": null,
+    "is_active": true,
+    "currentSessionId": "cml4zvpxe0001vpggc0l465wm",
+    "fcmToken": null,
+    "notes": null,
+    "created_at": "2026-01-31",
+    "updated_at": "2026-02-02"
+  }
+}
+***************************************************
+***************************************************
+***************************************************
+***************************************************
+users
+GET
+get users
+{{autolocal}}/user
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/user'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب المستخدمين بنجاح",
+  "data": [
+    {
+      "id": 3,
+      "phone": "+966501234567",
+      "username": "user123",
+      "full_name": "أحمد محمد",
+      "role": "sales",
+      "country": "SA",
+      "countryCode": "+966",
+      "is_active": true,
+      "created_at": "2026-02-02T11:05:01.983Z",
+      "updated_at": "2026-02-03T11:41:36.865Z",
+      "notes": null
+    },
+    {
+      "id": 1,
+      "phone": "+966599000000",
+      "username": "admin",
+      "full_name": "Administrator",
+      "role": "admin",
+      "country": null,
+      "countryCode": null,
+      "is_active": true,
+      "created_at": "2026-01-31T12:33:54.335Z",
+      "updated_at": "2026-02-03T11:41:42.478Z",
+      "notes": null
+    }
+  ],
+  "total": 2
+}
+GET
+get userbyid
+{{autolocal}}/user/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/user/1'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب بيانات المستخدم بنجاح",
+  "data": {
+    "id": 1,
+    "phone": "+963599000000",
+    "username": "admin",
+    "full_name": "Administrator",
+    "role": "admin",
+    "country": null,
+    "countryCode": null,
+    "is_active": true,
+    "created_at": "2026-01-31",
+    "updated_at": "2026-02-02",
+    "notes": null,
+    "fcmToken": null
+  }
+}
+
+POST
+create user
+{{autolocal}}/user
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "username": "user123",
+    "phone": "+966501234567",
+    "password": "User@123",
+    "full_name": "أحمد محمد",
+    "role": "sales"
+}
+Example Request
+create user
+curl
+curl --location -g '{{autolocal}}/user' \
+--data-raw '{
+    "username": "user123",
+    "phone": "+966501234567",
+    "password": "User@123",
+    "full_name": "أحمد محمد",
+    "role": "sales"
+}'
+201 Created
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم إنشاء المستخدم بنجاح",
+  "data": {
+    "id": 2,
+    "phone": "+966501234567",
+    "username": "user123",
+    "full_name": "أحمد محمد",
+    "role": "sales",
+    "country": "SA",
+    "countryCode": "+966",
+    "is_active": true,
+    "created_at": "2026-02-02",
+    "notes": null
+  }
+}
+PUT
+put user
+{{autolocal}}/user/3
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "username": "user123",
+    "phone": "+966501234567",
+    "password": "User@12345",
+    "full_name": "أحمد محمد",
+    "role": "sales"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/user/2' \
+--data-raw '{
+    "username": "user123",
+    "phone": "+966501234567",
+    "password": "User@123",
+    "full_name": "أحمد محمد",
+    "role": "sales"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تحديث بيانات المستخدم بنجاح",
+  "data": {
+    "id": 2,
+    "phone": "+966501234567",
+    "username": "user123",
+    "full_name": "أحمد محمد",
+    "role": "sales",
+    "country": "SA",
+    "countryCode": "+966",
+    "is_active": true,
+    "created_at": "2026-02-02",
+    "updated_at": "2026-02-02",
+    "notes": null
+  }
+}
+
+PATCH
+toggle-status
+{{autolocal}}/user/3/toggle-status
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request PATCH '{{autolocal}}/user/3/toggle-status'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تفعيل المستخدم بنجاح",
+  "data": {
+    "id": 3,
+    "phone": "+966501234567",
+    "username": "user123",
+    "full_name": "أحمد محمد",
+    "role": "sales",
+    "is_active": true,
+    "created_at": "2026-02-02",
+    "updated_at": "2026-02-02"
+  }
+}
+
+***************************************************
+***************************************************
+***************************************************
+***************************************************
+
+
+setting
+GET
+get setting
+{{autolocal}}/setting/
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/setting/'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب الإعدادات بنجاح",
+  "data": [
+    {
+      "id": 1,
+      "key": "exchange.rate",
+      "value": "12000",
+      "description": "سعر صرف الدولار",
+      "createdAt": "2026-02-03T10:25:49.154Z",
+      "updatedAt": "2026-02-03T10:30:34.577Z"
+    }
+  ],
+  "total": 1
+}
+GET
+get settingbykey
+{{autolocal}}/setting/key/exchange.rate
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/setting/key/exchange.rate'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب الإعداد بنجاح",
+  "data": {
+    "id": 1,
+    "key": "exchange.rate",
+    "value": "12000",
+    "description": "سعر صرف الدولار",
+    "createdAt": "2026-02-03T10:25:49.154Z",
+    "updatedAt": "2026-02-03T10:25:49.154Z"
+  }
+}
+POST
+create setting
+{{autolocal}}/setting/
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "key": "exchange.rate",
+  "value": "12000",
+  "description": "سعر صرف الدولار"
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/setting/' \
+--data '{
+  "key": "exchange.rate",
+  "value": "12000",
+  "description": "سعر صرف الدولار"
+}'
+201 Created
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم إنشاء الإعداد بنجاح",
+  "data": {
+    "id": 1,
+    "key": "exchange.rate",
+    "value": "12000",
+    "description": "سعر صرف الدولار",
+    "createdAt": "2026-02-03T10:25:49.154Z",
+    "updatedAt": "2026-02-03T10:25:49.154Z"
+  }
+}
+PUT
+put by id
+{{autolocal}}/setting/id/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "key": "exchange.rate",
+  "value": "12000",
+  "description": "سعر صرف الدولار"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/setting/id/1' \
+--data '{
+  "key": "exchange.rate",
+  "value": "12000",
+  "description": "سعر صرف الدولار"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تحديث الإعداد بنجاح",
+  "data": {
+    "id": 1,
+    "key": "exchange.rate",
+    "value": "12000",
+    "description": "سعر صرف الدولار",
+    "createdAt": "2026-02-03T10:25:49.154Z",
+    "updatedAt": "2026-02-03T10:29:31.339Z"
+  }
+}
+PUT
+put by key
+{{autolocal}}/setting/key/exchange.rate
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "value": "12000",
+  "description": "سعر صرف الدولار"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/setting/key/exchange.rate' \
+--data '{
+  "value": "12000",
+  "description": "سعر صرف الدولار"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تحديث الإعداد بنجاح",
+  "data": {
+    "id": 1,
+    "key": "exchange.rate",
+    "value": "12000",
+    "description": "سعر صرف الدولار",
+    "createdAt": "2026-02-03T10:25:49.154Z",
+    "updatedAt": "2026-02-03T10:30:34.577Z"
+  }
+}
+
+DELETE
+del setting
+{{autolocal}}/setting/id/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/setting/id/2'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم حذف الإعداد بنجاح",
+  "data": {}
+} 

@@ -1,0 +1,83 @@
+/**
+ * FormModal Component
+ * Reusable modal dialog for forms (create/edit)
+ * 
+ * Usage:
+ * <FormModal
+ *   isOpen={showModal}
+ *   title="إضافة مستخدم جديد"
+ *   onClose={() => setShowModal(false)}
+ *   onSubmit={handleSubmit}
+ *   loading={formLoading}
+ * >
+ *   {/* form fields here */
+//  * </FormModal>
+//  */
+
+import { Button } from '../ui/button';
+
+const FormModal = ({
+  isOpen = false,
+  title = "نموذج",
+  subtitle = "",
+  onClose = () => {},
+  onSubmit = () => {},
+  loading = false,
+  children,
+  submitLabel = "حفظ",
+  cancelLabel = "إلغاء",
+  maxWidth = "max-w-2xl"
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className={`bg-white rounded-lg shadow-xl w-full ${maxWidth}`}>
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b">
+          <div>
+            <h2 className="text-xl font-bold">{title}</h2>
+            {subtitle && (
+              <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+            disabled={loading}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Content */}
+        <form onSubmit={onSubmit} className="p-6">
+          {children}
+        </form>
+
+        {/* Footer - Actions */}
+        <div className="flex gap-3 p-6 border-t bg-gray-50">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1"
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            type="submit"
+            disabled={loading}
+            className="flex-1 bg-blue-600 hover:bg-blue-700"
+            onClick={onSubmit}
+          >
+            {loading ? "جاري الحفظ..." : submitLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default FormModal;

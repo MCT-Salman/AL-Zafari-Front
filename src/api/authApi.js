@@ -37,5 +37,62 @@ export const authApi = {
     } catch (error) {
       throw error.response?.data || { message: 'حدث خطأ في جلب البيانات' };
     }
+  },
+
+  updateProfile: async (profileData) => {
+    try {
+      const response = await axiosInstance.put('/auth/profile', profileData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في تحديث الملف الشخصي' };
+    }
+  },
+
+  validateToken: async (token) => {
+    try {
+      const response = await axiosInstance.post('/auth/validate-token', { token });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل التحقق من التوكن' };
+    }
+  },
+
+  refreshToken: async (refreshToken) => {
+    try {
+      const response = await axiosInstance.post('/auth/refresh', { refreshToken });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل تجديد التوكن' };
+    }
+  },
+
+  forgotPassword: async (phone) => {
+    try {
+      const response = await axiosInstance.post('/auth/forgot-password', { phone });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل في إرسال رمز التحقق' };
+    }
+  },
+
+  verifyOtp: async (phone, otp) => {
+    try {
+      const response = await axiosInstance.post('/auth/verify-otp', { phone, otp });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل التحقق من الرمز' };
+    }
+  },
+
+  resetPassword: async (resetToken, newPassword) => {
+    try {
+      const response = await axiosInstance.post('/auth/reset-password', { 
+        resetToken, 
+        newPassword 
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل في تغيير كلمة المرور' };
+    }
   }
 };

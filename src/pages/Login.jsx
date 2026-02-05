@@ -122,7 +122,7 @@ export default function Login() {
   const handleLoginSubmit = async (formData) => {
     setError(""); // تصفير الأخطاء السابقة
     try {
-      await login(formData.identifier, formData.password);
+      await login(formData.username, formData.password);
       // النجاح: التوجيه سيتم عبر useEffect أو هنا مباشرة
     } catch (err) {
       // استخراج رسالة الخطأ
