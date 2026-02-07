@@ -1,3 +1,4 @@
+// src\pages\SettingsManagement.jsx
 import { useState, useEffect } from "react";
 import { settingApi } from "../api/settingApi";
 import { Button } from "../components/ui/button";
@@ -10,17 +11,19 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Pagination,
 } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
 import { Plus } from "lucide-react";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog/DeleteConfirmDialog";
-import CrudIconsCall from "../../CallComponents/CrudIconsCall";
+import CrudActions from "../components/common/CrudActions";
 import StatsCard from "../components/common/StatsCard";
 import SearchInput from "../components/common/SearchInput";
 import MessageAlert from "../components/common/MessageAlert";
 import PageHeader from "../components/common/PageHeader";
 import LoadingState from "../components/common/LoadingState";
 import EmptyState from "../components/common/EmptyState";
+import { usePagination } from "../hooks/usePagination";
 
 export default function SettingsManagement() {
   const [settings, setSettings] = useState([]);
@@ -157,6 +160,9 @@ export default function SettingsManagement() {
     setting.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Pagination
+  const { currentPage, totalPages, paginatedData, handlePageChange, totalItems } = usePagination(filteredSettings, 10);
+
   // Calculate stats
   const stats = {
     total: settings.length,
@@ -227,46 +233,56 @@ export default function SettingsManagement() {
           ) : filteredSettings.length === 0 ? (
             <EmptyState message="لا توجد إعدادات" icon="⚙️" />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>المفتاح</TableHead>
-                    <TableHead>القيمة</TableHead>
-                    <TableHead>الوصف</TableHead>
-                    <TableHead>تاريخ التحديث</TableHead>
-                    <TableHead>الإجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSettings.map((setting) => (
-                    <TableRow key={setting.id}>
-                      <TableCell className="font-medium">
-                        <Badge variant="outline">{setting.key}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">
-                          {setting.value}
-                        </code>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {setting.description || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-600">
-                        {new Date(setting.updatedAt).toLocaleDateString("ar-SA")}
-                      </TableCell>
-                      <TableCell>
-                        <CrudIconsCall
-                          onEdit={() => handleEditSetting(setting)}
-                          onDelete={() => handleDeleteSetting(setting.id)}
-                          size="md"
-                        />
-                      </TableCell>
+            <>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>المفتاح</TableHead>
+                      <TableHead>القيمة</TableHead>
+                      <TableHead>الوصف</TableHead>
+                      <TableHead>تاريخ التحديث</TableHead>
+                      <TableHead>الإجراءات</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedData.map((setting) => (
+                      <TableRow key={setting.id}>
+                        <TableCell className="font-medium">
+                          <Badge variant="outline">{setting.key}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">
+                            {setting.value}
+                          </code>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {setting.description || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-600">
+                          {new Date(setting.updatedAt).toLocaleDateString("ar-SA")}
+                        </TableCell>
+                        <TableCell>
+                          <CrudActions
+                            onEdit={() => handleEditSetting(setting)}
+                            onDelete={() => handleDeleteSetting(setting.id)}
+                            size="md"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                itemsPerPage={10}
+                onPageChange={handlePageChange}
+              />
+            </>
           )}
         </Card>
       </div>

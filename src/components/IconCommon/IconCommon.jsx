@@ -1,3 +1,4 @@
+// src\components\IconCommon\IconCommon.jsx
 
 const IconCommon = ({ icon: IconComponent, size = 20, className = "" }) => {
   return (

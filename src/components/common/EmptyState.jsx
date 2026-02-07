@@ -1,3 +1,4 @@
+// src\components\common\EmptyState.jsx
 /**
  * EmptyState Component
  * Reusable empty/no data state display
@@ -17,9 +18,12 @@ const EmptyState = ({
   action = null // Optional button or action component
 }) => {
   return (
-    <div className="py-12 text-center">
-      <div className="text-5xl mb-4">{icon}</div>
-      <p className="text-gray-500 text-lg">{message}</p>
+    <div className="py-16 px-4 text-center animate-fade-in">
+      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-6">
+        <span className="text-4xl">{icon}</span>
+      </div>
+      <p className="text-gray-600 text-lg font-medium mb-2">{message}</p>
+      <p className="text-gray-400 text-sm mb-6">جاري البحث عن بيانات...</p>
       {action && (
         <div className="mt-6">
           {action}

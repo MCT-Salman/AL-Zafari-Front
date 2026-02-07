@@ -726,3 +726,477 @@ Headers (19)
   "message": "تم حذف الإعداد بنجاح",
   "data": {}
 } 
+
+***************************************************
+***************************************************
+***************************************************
+***************************************************
+
+
+constant type
+GET
+get constant type
+{{autolocal}}/constant-type
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/constant-type'
+200 OK
+Example Response
+Body
+Headers (20)
+{
+  "success": true,
+  "message": "تم جلب الأنواع الثابتة بنجاح",
+  "data": [
+    {
+      "constant_type_id": 6,
+      "constants_Type_name": "مصدر الطلب",
+      "type": "source_order",
+      "notes": "ملاحظات",
+      "values": [
+        {
+          "constant_value_id": 9,
+          "constant_type_id": 6,
+          "value": "مستودع خام",
+          "unit": null,
+          "label": null,
+          "isDefault": true,
+          "notes": "ملاحظات"
+        },
+        {
+          "constant_value_id": 10,
+          "constant_type_id": 6,
+          "value": "مستودع مبيعات",
+          "unit": null,
+          "label": null,
+          "isDefault": true,
+          "notes": "ملاحظات"
+        }
+      ]
+    },
+    {
+      "constant_type_id": 5,
+      "constants_Type_name": "نوع الطلب",
+      "type": "type_order",
+      "notes": "ملاحظات",
+      "values": [
+        {
+          "constant_value_id": 7,
+          "constant_type_id": 5,
+          "value": "كوي",
+          "unit": null,
+          "label": null,
+          "isDefault": true,
+          "notes": "ملاحظات"
+        },
+        {
+          "constant_value_id": 8,
+          "constant_type_id": 5,
+          "value": "مكنة",
+          "unit": null,
+          "label": null,
+          "isDefault": true,
+          "notes": "ملاحظات"
+        }
+      ]
+    },
+    {
+      "constant_type_id": 4,
+      "constants_Type_name": "سماكة",
+      "type": "thickness",
+      "notes": "ملاحظات",
+      "values": [
+        {
+          "constant_value_id": 6,
+          "constant_type_id": 4,
+          "value": "0.6",
+          "unit": "سم",
+          "label": " 0.6 سم",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        }
+      ]
+    },
+    {
+      "constant_type_id": 3,
+      "constants_Type_name": "طول",
+      "type": "height",
+      "notes": "ملاحظات",
+      "values": [
+        {
+          "constant_value_id": 4,
+          "constant_type_id": 3,
+          "value": "100",
+          "unit": "م",
+          "label": " 100 م",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        },
+        {
+          "constant_value_id": 5,
+          "constant_type_id": 3,
+          "value": "150",
+          "unit": "م",
+          "label": " 150 م",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        }
+      ]
+    },
+    {
+      "constant_type_id": 2,
+      "constants_Type_name": "عرض",
+      "type": "width",
+      "notes": "ملاحظات",
+      "values": [
+        {
+          "constant_value_id": 1,
+          "constant_type_id": 2,
+          "value": "22",
+          "unit": "مم",
+          "label": " مم22",
+          "isDefault": false,
+          "notes": "ملاحظات"
+        },
+        {
+          "constant_value_id": 3,
+          "constant_type_id": 2,
+          "value": "66",
+          "unit": "مم",
+          "label": " 66 مم",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        }
+      ]
+    }
+  ],
+  "total": 5
+}
+GET
+get typebyid
+{{autolocal}}/constant-type/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/constant-type/2'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب النوع الثابت بنجاح",
+  "data": {
+    "constant_type_id": 2,
+    "constants_Type_name": "عرض",
+    "type": "width",
+    "notes": "ملاحظات",
+    "values": [
+      {
+        "constant_value_id": 1,
+        "constant_type_id": 2,
+        "value": "22",
+        "unit": "مم",
+        "label": " مم22",
+        "isDefault": false,
+        "notes": "ملاحظات"
+      },
+      {
+        "constant_value_id": 3,
+        "constant_type_id": 2,
+        "value": "66",
+        "unit": "مم",
+        "label": " 66 مم",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      }
+    ]
+  }
+}
+
+POST
+create type
+{{autolocal}}/constant-type
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "constants_Type_name": "عرض",
+    "type": "width",
+    "notes": "ملاحظات"
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/constant-type' \
+--data '{
+    "constants_Type_name": "عرض",
+    "type": "width",
+    "notes": "ملاحظات"
+}'
+201 Created
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم إنشاء النوع الثابت بنجاح",
+  "data": {
+    "constant_type_id": 1,
+    "constants_Type_name": "عرض",
+    "type": "width",
+    "notes": "ملاحظات"
+  }
+}
+
+PUT
+put type
+{{autolocal}}/constant-type/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "constants_Type_name": "عرض",
+    "type": "width",
+    "notes": "ملاحظات"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/constant-type/1' \
+--data '{
+    "constants_Type_name": "عرض",
+    "type": "width",
+    "notes": "ملاحظات"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تحديث النوع الثابت بنجاح",
+  "data": {
+    "constant_type_id": 1,
+    "constants_Type_name": "عرض",
+    "type": "width",
+    "notes": "ملاحظات"
+  }
+}
+
+DELETE
+Del type
+{{autolocal}}/constant-type/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/constant-type/1'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم حذف النوع الثابت بنجاح",
+  "data": {}
+}
+
+*********************************************************
+*********************************************************
+*********************************************************
+*********************************************************
+
+constant value
+GET
+get valuebytype
+{{autolocal}}/constant-value/by-type/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/constant-value/by-type/2'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب القيم الثابتة بنجاح",
+  "data": [
+    {
+      "constant_value_id": 1,
+      "constant_type_id": 2,
+      "value": "22",
+      "unit": "مم",
+      "label": " مم22",
+      "isDefault": false,
+      "notes": "ملاحظات",
+      "type": {
+        "constant_type_id": 2,
+        "constants_Type_name": "عرض",
+        "type": "width",
+        "notes": "ملاحظات"
+      }
+    },
+    {
+      "constant_value_id": 3,
+      "constant_type_id": 2,
+      "value": "66",
+      "unit": "مم",
+      "label": " 66 مم",
+      "isDefault": true,
+      "notes": "ملاحظات",
+      "type": {
+        "constant_type_id": 2,
+        "constants_Type_name": "عرض",
+        "type": "width",
+        "notes": "ملاحظات"
+      }
+    }
+  ]
+}
+POST
+create value
+{{autolocal}}/constant-value
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "constant_type_id": 2,
+    "value": "66",
+    "unit": "مم",
+    "label": " 66 مم",
+    "isDefault": true,
+    "notes": "ملاحظات"
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/constant-value' \
+--data '{
+    "constant_type_id": 2,
+    "value": "66",
+    "unit": "مم",
+    "label": " 66 مم",
+    "isDefault": true,
+    "notes": "ملاحظات"
+}'
+201 Created
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم إنشاء القيمة الثابتة بنجاح",
+  "data": {
+    "constant_value_id": 3,
+    "constant_type_id": 2,
+    "value": "66",
+    "unit": "مم",
+    "label": " 66 مم",
+    "isDefault": true,
+    "notes": "ملاحظات"
+  }
+}
+PUT
+put value
+{{autolocal}}/constant-value/3
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "value": "66",
+    "unit": "مم",
+    "label": " 66 مم",
+    "isDefault": true,
+    "notes": "ملاحظات"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/constant-value/3' \
+--data '{
+    "value": "66",
+    "unit": "مم",
+    "label": " 66 مم",
+    "isDefault": true,
+    "notes": "ملاحظات"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تحديث القيمة الثابتة بنجاح",
+  "data": {
+    "constant_value_id": 3,
+    "constant_type_id": 2,
+    "value": "66",
+    "unit": "مم",
+    "label": " 66 مم",
+    "isDefault": true,
+    "notes": "ملاحظات"
+  }
+}
+DELETE
+Del value
+{{autolocal}}/constant-value/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+false
+curl
+curl --location -g --request DELETE '{{autolocal}}/constant-value/2'
+500 Internal Server Error
+Example Response
+Body
+Headers (19)
+{
+  "success": false,
+  "error": "خطأ في الخادم",
+  "details": "القيمة الثابتة غير موجودة"
+}

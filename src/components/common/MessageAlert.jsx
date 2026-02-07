@@ -1,3 +1,4 @@
+// src\components\common\MessageAlert.jsx
 /**
  * MessageAlert Component
  * Reusable alert/message display with auto-dismiss
@@ -21,37 +22,37 @@ const MessageAlert = ({
 
   const styles = {
     success: {
-      bg: 'bg-green-50',
-      border: 'border-green-200',
-      text: 'text-green-800',
+      bg: 'var(--color-success-bg)',
+      border: 'var(--color-success-border)',
+      text: 'var(--color-success-text)',
       icon: '✓'
     },
     error: {
-      bg: 'bg-red-50',
-      border: 'border-red-200',
-      text: 'text-red-800',
+      bg: 'var(--color-error-bg)',
+      border: 'var(--color-error-border)',
+      text: 'var(--color-error-text)',
       icon: '✕'
     },
     warning: {
-      bg: 'bg-yellow-50',
-      border: 'border-yellow-200',
-      text: 'text-yellow-800',
+      bg: 'var(--color-warning-bg)',
+      border: 'var(--color-warning-border)',
+      text: 'var(--color-warning-text)',
       icon: '!'
     },
     info: {
-      bg: 'bg-blue-50',
-      border: 'border-blue-200',
-      text: 'text-blue-800',
+      bg: 'var(--color-info-bg)',
+      border: 'var(--color-info-border)',
+      text: 'var(--color-info-text)',
       icon: 'ⓘ'
     }
   };
 
-  const style = styles[type] || styles.success;
+  const s = styles[type] || styles.success;
 
   return (
-    <div className={`${style.bg} ${style.border} ${style.text} border rounded p-4 flex items-start gap-3 mb-4 ${className}`}>
+    <div style={{ background: s.bg, borderColor: s.border, color: s.text }} className={`border rounded p-4 flex items-start gap-3 mb-4 ${className}`}>
       <span className="font-bold text-lg flex-shrink-0">
-        {style.icon}
+        {s.icon}
       </span>
       <div className="flex-1">
         {message}

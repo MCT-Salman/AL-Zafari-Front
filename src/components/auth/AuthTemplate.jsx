@@ -1,4 +1,4 @@
-// src/components/auth/AuthTemplate.jsx
+// src\components\auth\AuthTemplate.jsx
 import { useState } from "react";
 import { Eye, EyeOff, Lock, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";

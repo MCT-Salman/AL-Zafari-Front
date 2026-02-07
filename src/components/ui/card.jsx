@@ -1,3 +1,4 @@
+// src\components\ui\card.jsx
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -10,7 +11,7 @@ function Card({
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        "bg-white text-card-foreground flex flex-col gap-6 rounded-lg border border-gray-200 py-6 shadow-md hover:shadow-lg transition-shadow duration-300",
         className
       )}
       {...props} />

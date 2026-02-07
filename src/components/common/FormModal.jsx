@@ -1,3 +1,4 @@
+// src\components\common\FormModal.jsx
 /**
  * FormModal Component
  * Reusable modal dialog for forms (create/edit)
@@ -31,19 +32,19 @@ const FormModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className={`bg-white rounded-lg shadow-xl w-full ${maxWidth}`}>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className={`bg-white rounded-lg shadow-2xl w-full ${maxWidth} animate-fade-in border border-gray-200`}>
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b">
+        <div className="flex justify-between items-start p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
           <div>
-            <h2 className="text-xl font-bold">{title}</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
             {subtitle && (
               <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+            className="text-gray-400 hover:text-gray-600 text-2xl leading-none transition-colors duration-200 hover:bg-gray-100 rounded-full p-1"
             disabled={loading}
           >
             ✕
@@ -56,7 +57,7 @@ const FormModal = ({
         </form>
 
         {/* Footer - Actions */}
-        <div className="flex gap-3 p-6 border-t bg-gray-50">
+        <div className="flex gap-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-lg">
           <Button
             type="button"
             variant="outline"
@@ -69,7 +70,7 @@ const FormModal = ({
           <Button
             type="submit"
             disabled={loading}
-            className="flex-1 bg-blue-600 hover:bg-blue-700"
+            className="flex-1"
             onClick={onSubmit}
           >
             {loading ? "جاري الحفظ..." : submitLabel}

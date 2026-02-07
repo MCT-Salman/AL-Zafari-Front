@@ -1,3 +1,4 @@
+// src\components\common\PageHeader.jsx
 import { Plus } from 'lucide-react';
 import { Button } from '../ui/button';
 
@@ -22,9 +23,9 @@ const PageHeader = ({
   className = ''
 }) => {
   return (
-    <div className={`mb-8 flex justify-between items-start ${className}`}>
-      <div>
-        <h1 className="text-3xl font-bold">{title}</h1>
+    <div className={`mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-lg shadow-md border border-gray-200 ${className}`}>
+      <div className="mb-4 sm:mb-0">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">{title}</h1>
         {subtitle && (
           <p className="text-gray-600 mt-2">{subtitle}</p>
         )}
@@ -32,9 +33,11 @@ const PageHeader = ({
       {actionLabel && onAction && (
         <Button
           onClick={onAction}
-          className="bg-green-600 hover:bg-green-700"
+          variant="default"
+          size="lg"
+          className="gap-2 w-full sm:w-auto"
         >
-          <Plus className="w-4 h-4 ml-2" />
+          <Plus className="w-5 h-5" />
           {actionLabel}
         </Button>
       )}

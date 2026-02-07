@@ -1,3 +1,4 @@
+// src\api\settingApi.js
 import axiosInstance from './axiosConfig';
 
 export const settingApi = {

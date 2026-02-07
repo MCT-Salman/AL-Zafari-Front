@@ -1,3 +1,4 @@
+/* src\index.css */
 @import "./styles/theme.css";
 @import "tailwindcss";
 
@@ -35,6 +36,53 @@ body {
   --color-secondary-s: #67122F;
   --color-secondary-t: #0FAEDD;
   --color-secondary-fo: #878787;
+
+  /* Brand palette (used by components) */
+  --brand-1: var(--color-primary-f);
+  --brand-2: #0FAEDD; /* accent */
+  --brand-3: #F7A823; /* accent 2 */
+
+  /* Alerts */
+  --color-success-bg: #ecfdf5;
+  --color-success-border: #bbf7d0;
+  --color-success-text: #166534;
+
+  --color-error-bg: #fff1f2;
+  --color-error-border: #fecaca;
+  --color-error-text: #991b1b;
+
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fef3c7;
+  --color-warning-text: #92400e;
+
+  --color-info-bg: #eff6ff;
+  --color-info-border: #bfdbfe;
+  --color-info-text: #1e3a8a;
+
+  /* Stats card gradients */
+  --card-blue-start: #ecfeff;
+  --card-blue-end: #e6f4ff;
+  --card-blue-text: var(--brand-1);
+
+  --card-green-start: #f0fdf4;
+  --card-green-end: #ecfdf5;
+  --card-green-text: #059669;
+
+  --card-red-start: #fff1f2;
+  --card-red-end: #ffe4e6;
+  --card-red-text: #b91c1c;
+
+  --card-purple-start: #f5f3ff;
+  --card-purple-end: #eef2ff;
+  --card-purple-text: #6d28d9;
+
+  --card-orange-start: #fff7ed;
+  --card-orange-end: #fff1e6;
+  --card-orange-text: #b45309;
+
+  --card-pink-start: #fff1f2;
+  --card-pink-end: #fff0f6;
+  --card-pink-text: #be185d;
 
     /* Alpha Variants for hover states */
   --color-primary-f-alpha: rgba(0, 69, 99, 0.1);
@@ -81,6 +129,31 @@ body {
 
 .shadow-3xl {
   box-shadow: 0 25px 50px -12px rgba(0, 69, 99, 0.25);
+}
+
+/* Page transitions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Smooth hover and transition utilities */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.group:hover .group-hover\:shadow-lift {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
 /* Custom Scrollbar */

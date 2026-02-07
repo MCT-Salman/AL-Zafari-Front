@@ -1,3 +1,4 @@
+// src\pages\Users.jsx
 import { useState, useEffect } from "react";
 import { userApi } from "../api/userApi";
 import { Button } from "../components/ui/button";
@@ -9,14 +10,15 @@ import {
   TableCell, 
   TableHead, 
   TableHeader, 
-  TableRow 
+  TableRow,
+  Pagination 
 } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
 import { ToggleLeft, ToggleRight } from "lucide-react";
 import UserModal from "../components/UserModal/UserModal";
 import UserDetailModal from "../components/UserDetailModal/UserDetailModal";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog/DeleteConfirmDialog";
-import CrudIconsCall from "../../CallComponents/CrudIconsCall";
+import CrudActions from "../components/common/CrudActions";
 import StatsCard from "../components/common/StatsCard";
 import SearchInput from "../components/common/SearchInput";
 import FilterSelect from "../components/common/FilterSelect";
@@ -25,6 +27,7 @@ import PageHeader from "../components/common/PageHeader";
 import LoadingState from "../components/common/LoadingState";
 import EmptyState from "../components/common/EmptyState";
 import ResultsCounter from "../components/common/ResultsCounter";
+import { usePagination } from "../hooks/usePagination";
 
 const roleLabels = {
   admin: "مسؤول",
@@ -157,6 +160,9 @@ export default function Users() {
     }
   );
 
+  // Pagination
+  const { currentPage, totalPages, paginatedData, handlePageChange, totalItems } = usePagination(filteredUsers, 10);
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto">
@@ -258,72 +264,82 @@ export default function Users() {
           ) : filteredUsers.length === 0 ? (
             <EmptyState message="لا توجد مستخدمين" icon="👥" />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>الاسم</TableHead>
-                    <TableHead>اسم المستخدم</TableHead>
-                    <TableHead>رقم الهاتف</TableHead>
-                    <TableHead>الدور</TableHead>
-                    <TableHead>الحالة</TableHead>
-                    <TableHead>الإجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">
-                        {user.full_name}
-                      </TableCell>
-                      <TableCell>{user.username}</TableCell>
-                      <TableCell>{user.phone}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {user.role === 'admin'
-                            ? 'مسؤول'
-                            : user.role === 'sales'
-                            ? 'مبيعات'
-                            : user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={user.is_active ? 'default' : 'destructive'}
-                        >
-                          {user.is_active ? 'نشط' : 'معطل'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <CrudIconsCall
-                            onView={() => {
-                              setSelectedUserId(user.id);
-                              setShowDetailModal(true);
-                            }}
-                            onEdit={() => handleEditUser(user)}
-                            onDelete={() => handleDeleteUser(user.id)}
-                            size="md"
-                          />
-                          <Button
-                            size="sm"
-                            variant={user.is_active ? 'outline' : 'default'}
-                            onClick={() => handleToggleStatus(user.id)}
-                            className="ml-1"
+            <>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>الاسم</TableHead>
+                      <TableHead>اسم المستخدم</TableHead>
+                      <TableHead>رقم الهاتف</TableHead>
+                      <TableHead>الدور</TableHead>
+                      <TableHead>الحالة</TableHead>
+                      <TableHead>الإجراءات</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedData.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          {user.full_name}
+                        </TableCell>
+                        <TableCell>{user.username}</TableCell>
+                        <TableCell>{user.phone}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {user.role === 'admin'
+                              ? 'مسؤول'
+                              : user.role === 'sales'
+                              ? 'مبيعات'
+                              : user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={user.is_active ? 'default' : 'destructive'}
                           >
-                            {user.is_active ? (
-                              <ToggleRight className="w-4 h-4" />
-                            ) : (
-                              <ToggleLeft className="w-4 h-4" />
-                            )}
-                          </Button>
+                            {user.is_active ? 'نشط' : 'معطل'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <CrudActions
+                              onView={() => {
+                                setSelectedUserId(user.id);
+                                setShowDetailModal(true);
+                              }}
+                              onEdit={() => handleEditUser(user)}
+                              onDelete={() => handleDeleteUser(user.id)}
+                              size="md"
+                            />
+                            <Button
+                              size="sm"
+                              variant={user.is_active ? 'outline' : 'default'}
+                              onClick={() => handleToggleStatus(user.id)}
+                              className="ml-1"
+                            >
+                              {user.is_active ? (
+                                <ToggleRight className="w-4 h-4" />
+                              ) : (
+                                <ToggleLeft className="w-4 h-4" />
+                              )}
+                            </Button>
                         </div>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
+
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                itemsPerPage={10}
+                onPageChange={handlePageChange}
+              />
+            </>
           )}
         </Card>
       </div>

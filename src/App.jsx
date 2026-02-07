@@ -1,10 +1,12 @@
-﻿import { Routes, Route, Navigate } from "react-router-dom";
+﻿// src\App.jsx
+import { Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "@/components/Layout/MainLayout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
 import Users from "@/pages/Users";
+import Constants from "@/pages/Constants";
 import SettingsManagement from "@/pages/SettingsManagement";
 import ForgotPassword from "@/pages/ForgotPassword";
 import VerifyOtp from "@/pages/VerifyOtp";
@@ -27,6 +29,7 @@ const App = () => {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/constants" element={<Constants />} />
           <Route path="/settings-management" element={<SettingsManagement />} />
           <Route path="/users" element={<Users />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
