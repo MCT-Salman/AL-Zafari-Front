@@ -1,5 +1,6 @@
 // src\components\common\StatsCard.jsx
 import { Card } from '../ui/card';
+import { cn } from '@/lib/utils';
 
 /**
  * StatsCard Component
@@ -20,34 +21,29 @@ const StatsCard = ({
   icon = null,
   className = ''
 }) => {
-  const gradientVars = {
-    blue: ['--start', '--end', '--text', 'blue'],
-    green: ['--start', '--end', '--text', 'green'],
-    red: ['--start', '--end', '--text', 'red'],
-    purple: ['--start', '--end', '--text', 'purple'],
-    orange: ['--start', '--end', '--text', 'orange'],
-    pink: ['--start', '--end', '--text', 'pink'],
-  };
-
-  const v = variant in gradientVars ? variant : 'blue';
-  const start = `var(--card-${v}-start)`;
-  const end = `var(--card-${v}-end)`;
-  const text = `var(--card-${v}-text)`;
-
-  const style = {
-    background: `linear-gradient(135deg, ${start} 0%, ${end} 100%)`,
-    borderColor: 'rgba(0,0,0,0.04)',
+  // Define Tailwind gradient classes for each variant
+  const variantClasses = {
+    blue: 'bg-gradient-to-br from-blue-500 to-blue-700',
+    green: 'bg-gradient-to-br from-green-500 to-green-700',
+    red: 'bg-gradient-to-br from-red-500 to-red-700',
+    purple: 'bg-gradient-to-br from-purple-500 to-purple-700',
+    orange: 'bg-gradient-to-br from-orange-500 to-orange-700',
+    pink: 'bg-gradient-to-br from-pink-500 to-pink-700',
   };
 
   return (
-    <Card className={`p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${className}`} style={style}>
+    <Card className={cn(
+      "p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-0 text-white",
+      variantClasses[variant] || variantClasses.blue,
+      className
+    )}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex-1">
-          <p className="text-gray-600 text-sm font-medium mb-1">{label}</p>
-          <p className="text-4xl font-bold" style={{ color: text }}>{value}</p>
+          <p className="text-white/90 text-sm font-medium mb-1">{label}</p>
+          <p className="text-4xl font-bold">{value.toLocaleString()}</p>
         </div>
         {icon && (
-          <div style={{ color: text, opacity: 0.18 }} className="text-5xl">
+          <div className="text-5xl text-white/20">
             {icon}
           </div>
         )}

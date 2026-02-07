@@ -1,4 +1,3 @@
-// src\pages\SettingsManagement.jsx
 import { useState, useEffect } from "react";
 import { settingApi } from "../api/settingApi";
 import { Button } from "../components/ui/button";
@@ -23,7 +22,9 @@ import MessageAlert from "../components/common/MessageAlert";
 import PageHeader from "../components/common/PageHeader";
 import LoadingState from "../components/common/LoadingState";
 import EmptyState from "../components/common/EmptyState";
-import { usePagination } from "../hooks/usePagination";
+import RowsPerPageSelector from "../components/common/RowsPerPageSelector";
+import PaginationControls from "../components/common/PaginationControls";
+import StyledDialog from "../components/common/StyledDialog";
 
 export default function SettingsManagement() {
   const [settings, setSettings] = useState([]);
@@ -33,6 +34,8 @@ export default function SettingsManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editingSetting, setEditingSetting] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState({
     isOpen: false,
     settingId: null,
@@ -60,6 +63,11 @@ export default function SettingsManagement() {
       return () => clearTimeout(timer);
     }
   }, [error, message]);
+
+  useEffect(() => {
+    // Reset page when search changes
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const loadSettings = async () => {
     setLoading(true);
@@ -160,8 +168,11 @@ export default function SettingsManagement() {
     setting.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Pagination
-  const { currentPage, totalPages, paginatedData, handlePageChange, totalItems } = usePagination(filteredSettings, 10);
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredSettings.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedData = filteredSettings.slice(startIndex, endIndex);
 
   // Calculate stats
   const stats = {
@@ -234,6 +245,13 @@ export default function SettingsManagement() {
             <EmptyState message="لا توجد إعدادات" icon="⚙️" />
           ) : (
             <>
+              <div className="mb-4 flex justify-end">
+                <RowsPerPageSelector
+                  value={rowsPerPage}
+                  onChange={setRowsPerPage}
+                  options={[5, 10, 20, 50]}
+                />
+              </div>
               <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
@@ -275,12 +293,12 @@ export default function SettingsManagement() {
                 </Table>
               </div>
 
-              <Pagination
+              <PaginationControls
                 currentPage={currentPage}
                 totalPages={totalPages}
-                totalItems={totalItems}
-                itemsPerPage={10}
-                onPageChange={handlePageChange}
+                onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onPageChange={setCurrentPage}
               />
             </>
           )}
@@ -288,94 +306,66 @@ export default function SettingsManagement() {
       </div>
 
       {/* Settings Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-xl font-bold">
-                {editingSetting ? "تعديل الإعداد" : "إضافة إعداد جديد"}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-                disabled={formLoading}
-              >
-                ✕
-              </button>
-            </div>
+      <StyledDialog
+        isOpen={showModal}
+        onOpenChange={setShowModal}
+        title={editingSetting ? "تعديل الإعداد" : "إضافة إعداد جديد"}
+        isLoading={formLoading}
+        onConfirm={handleSaveSetting}
+        confirmLabel="حفظ"
+        cancelLabel="إلغاء"
+      >
+        {formError && (
+          <div className="p-3 bg-red-100 text-red-800 rounded text-sm mb-4">
+            {formError}
+          </div>
+        )}
 
-            <form onSubmit={handleSaveSetting} className="p-6 space-y-4">
-              {formError && (
-                <div className="p-3 bg-red-100 text-red-800 rounded text-sm">
-                  {formError}
-                </div>
-              )}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">المفتاح</label>
+            <Input
+              type="text"
+              name="key"
+              value={formData.key}
+              onChange={handleInputChange}
+              placeholder="exchange.rate"
+              disabled={formLoading || !!editingSetting}
+              title={editingSetting ? "لا يمكن تعديل المفتاح" : ""}
+            />
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">المفتاح</label>
-                <Input
-                  type="text"
-                  name="key"
-                  value={formData.key}
-                  onChange={handleInputChange}
-                  placeholder="exchange.rate"
-                  disabled={formLoading || !!editingSetting}
-                  title={editingSetting ? "لا يمكن تعديل المفتاح" : ""}
-                />
-              </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">القيمة</label>
+            <Input
+              type="text"
+              name="value"
+              value={formData.value}
+              onChange={handleInputChange}
+              placeholder="12000"
+              disabled={formLoading}
+            />
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">القيمة</label>
-                <Input
-                  type="text"
-                  name="value"
-                  value={formData.value}
-                  onChange={handleInputChange}
-                  placeholder="12000"
-                  disabled={formLoading}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">الوصف</label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  placeholder="سعر صرف الدولار"
-                  disabled={formLoading}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowModal(false)}
-                  disabled={formLoading}
-                  className="flex-1"
-                >
-                  إلغاء
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={formLoading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  {formLoading ? "جاري الحفظ..." : "حفظ"}
-                </Button>
-              </div>
-            </form>
+          <div>
+            <label className="block text-sm font-medium mb-1">الوصف</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
+              placeholder="سعر صرف الدولار"
+              disabled={formLoading}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows="3"
+            />
           </div>
         </div>
-      )}
+      </StyledDialog>
 
       {/* Delete Confirm Dialog */}
       <DeleteConfirmDialog

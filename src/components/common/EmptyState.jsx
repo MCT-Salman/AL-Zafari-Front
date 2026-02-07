@@ -12,9 +12,12 @@
  * />
  */
 
+import { FcEmptyFilter } from "react-icons/fc";
+import { PiEmpty } from "react-icons/pi";
+
 const EmptyState = ({
   message = "لا توجد بيانات",
-  icon = "📭",
+  icon = <FcEmptyFilter/>,
   action = null // Optional button or action component
 }) => {
   return (

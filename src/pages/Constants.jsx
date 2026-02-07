@@ -11,16 +11,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Pagination,
 } from "../components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
@@ -36,19 +27,24 @@ import MessageAlert from "../components/common/MessageAlert";
 import PageHeader from "../components/common/PageHeader";
 import LoadingState from "../components/common/LoadingState";
 import EmptyState from "../components/common/EmptyState";
-import { usePagination } from "../hooks/usePagination";
+import RowsPerPageSelector from "../components/common/RowsPerPageSelector";
+import PaginationControls from "../components/common/PaginationControls";
+import StyledDialog from "../components/common/StyledDialog";
 
 export default function Constants() {
   const [constantTypes, setConstantTypes] = useState([]);
-  const [constantValues, setConstantValues] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [selectedTab, setSelectedTab] = useState("");
-
-  // Modal states for values
+  
+  // Modal states
   const [showValueModal, setShowValueModal] = useState(false);
+  const [showTypeModal, setShowTypeModal] = useState(false);
   const [editingValue, setEditingValue] = useState(null);
+  const [editingType, setEditingType] = useState(null);
+  
+  // Form data states
   const [formValueData, setFormValueData] = useState({
     value: "",
     unit: "",
@@ -56,49 +52,30 @@ export default function Constants() {
     notes: "",
     isDefault: false,
   });
-
-  // Modal states for types
-  const [showTypeModal, setShowTypeModal] = useState(false);
-  const [editingType, setEditingType] = useState(null);
+  
   const [formTypeData, setFormTypeData] = useState({
     constants_Type_name: "",
     type: "",
     notes: "",
   });
-
+  
+  const [formLoading, setFormLoading] = useState(false);
+  
   // Delete confirmation
-  const [deleteConfirm, setDeleteConfirm] = useState({
-    isOpen: false,
+  const [deleteConfirm, setDeleteConfirm] = useState({ 
+    isOpen: false, 
     type: null, // 'value' or 'type'
-    id: null,
-    loading: false,
+    id: null, 
+    loading: false 
   });
-
-  // Search & filters (like Users page)
+  
+  // Search & filters
   const [searchTerm, setSearchTerm] = useState("");
   const [defaultFilter, setDefaultFilter] = useState("");
-
-  // Get current type values and apply filters
-  const currentType = constantTypes.find((t) => t.constant_type_id.toString() === selectedTab) || constantTypes[0];
-  const currentValuesList = constantValues[selectedTab]?.values || currentType?.values || [];
   
-  const filteredValues = currentValuesList.filter((v) => {
-    const matchesSearch =
-      !searchTerm ||
-      (v.value && v.value.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (v.label && v.label.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (v.notes && v.notes.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchesDefault =
-      defaultFilter === "" ||
-      (defaultFilter === "default" && v.isDefault) ||
-      (defaultFilter === "not_default" && !v.isDefault);
-
-    return matchesSearch && matchesDefault;
-  });
-
-  // Pagination for current tab values - call at top level only
-  const currentTabPagination = usePagination(filteredValues, 10);
+  // Pagination
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Load constant types on mount
   useEffect(() => {
@@ -124,10 +101,13 @@ export default function Constants() {
   const loadConstantValues = async (typeId) => {
     try {
       const response = await constantApi.getConstantValuesByType(typeId);
-      setConstantValues((prev) => ({
-        ...prev,
-        [typeId]: response.data || [],
-      }));
+      setConstantTypes(prev => 
+        prev.map(type => 
+          type.constant_type_id.toString() === typeId 
+            ? { ...type, values: response.data || [] }
+            : type
+        )
+      );
     } catch (err) {
       setError(err.message || "فشل في تحميل القيم الثابتة");
     }
@@ -135,13 +115,15 @@ export default function Constants() {
 
   const handleTabChange = (typeId) => {
     setSelectedTab(typeId);
-    if (!constantValues[typeId]) {
+    const currentType = constantTypes.find(t => t.constant_type_id.toString() === typeId);
+    if (currentType && (!currentType.values || currentType.values.length === 0)) {
       loadConstantValues(typeId);
     }
+    setCurrentPage(1); // Reset page when changing tabs
   };
 
   // Value CRUD handlers
-  const handleCreateValue = (typeId) => {
+  const handleCreateValue = () => {
     setEditingValue(null);
     setFormValueData({
       value: "",
@@ -171,6 +153,7 @@ export default function Constants() {
       return;
     }
 
+    setFormLoading(true);
     try {
       const typeId = parseInt(selectedTab);
       if (editingValue) {
@@ -198,10 +181,12 @@ export default function Constants() {
       await loadConstantValues(typeId);
     } catch (err) {
       setError(err.message || "حدث خطأ في حفظ القيمة");
+    } finally {
+      setFormLoading(false);
     }
   };
 
-  const handleDeleteValue = async (valueId) => {
+  const handleDeleteValue = (valueId) => {
     setDeleteConfirm({
       isOpen: true,
       type: "value",
@@ -246,20 +231,15 @@ export default function Constants() {
   };
 
   const handleSaveType = async () => {
-    if (
-      !formTypeData.constants_Type_name.trim() ||
-      !formTypeData.type.trim()
-    ) {
+    if (!formTypeData.constants_Type_name.trim() || !formTypeData.type.trim()) {
       setError("اسم النوع والنوع مطلوبان");
       return;
     }
 
+    setFormLoading(true);
     try {
       if (editingType) {
-        await constantApi.updateConstantType(
-          editingType.constant_type_id,
-          formTypeData
-        );
+        await constantApi.updateConstantType(editingType.constant_type_id, formTypeData);
         setMessage("تم تحديث نوع الثابت بنجاح");
       } else {
         await constantApi.createConstantType(formTypeData);
@@ -270,10 +250,12 @@ export default function Constants() {
       await loadConstantTypes();
     } catch (err) {
       setError(err.message || "حدث خطأ في حفظ النوع");
+    } finally {
+      setFormLoading(false);
     }
   };
 
-  const handleDeleteType = async (typeId) => {
+  const handleDeleteType = (typeId) => {
     setDeleteConfirm({
       isOpen: true,
       type: "type",
@@ -281,20 +263,6 @@ export default function Constants() {
       loading: false,
     });
   };
-
-  // Stats similar to Users page
-  const totalTypes = constantTypes.length;
-  const totalValues = constantTypes.reduce(
-    (acc, t) => acc + (t.values ? t.values.length : 0),
-    0
-  );
-  const totalDefaults = constantTypes.reduce(
-    (acc, t) => acc + (t.values ? t.values.filter((v) => v.isDefault).length : 0),
-    0
-  );
-  const uniqueUnits = new Set(
-    constantTypes.flatMap((t) => (t.values || []).map((v) => v.unit).filter(Boolean))
-  ).size;
 
   const confirmDeleteType = async () => {
     setDeleteConfirm((prev) => ({ ...prev, loading: true }));
@@ -309,6 +277,48 @@ export default function Constants() {
     }
   };
 
+  // Calculate stats
+  const stats = {
+    totalTypes: constantTypes.length,
+    totalValues: constantTypes.reduce((acc, t) => acc + (t.values ? t.values.length : 0), 0),
+    totalDefaults: constantTypes.reduce((acc, t) => 
+      acc + (t.values ? t.values.filter((v) => v.isDefault).length : 0), 0),
+    uniqueUnits: new Set(
+      constantTypes.flatMap((t) => (t.values || []).map((v) => v.unit).filter(Boolean))
+    ).size,
+  };
+
+  // Get current type and its values
+  const currentType = constantTypes.find((t) => t.constant_type_id.toString() === selectedTab);
+  const currentValues = currentType?.values || [];
+
+  // Filter values
+  const filteredValues = currentValues.filter((v) => {
+    const matchesSearch =
+      !searchTerm ||
+      (v.value && v.value.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (v.label && v.label.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (v.notes && v.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesDefault =
+      defaultFilter === "" ||
+      (defaultFilter === "default" && v.isDefault) ||
+      (defaultFilter === "not_default" && !v.isDefault);
+
+    return matchesSearch && matchesDefault;
+  });
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, defaultFilter]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredValues.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedValues = filteredValues.slice(startIndex, endIndex);
+
   if (loading) {
     return <LoadingState />;
   }
@@ -318,36 +328,56 @@ export default function Constants() {
       <div className="max-w-7xl mx-auto">
         <PageHeader
           title="إدارة الثوابت"
-          subtitle={`إجمالي الأنواع: ${totalTypes}`}
+          subtitle={`إجمالي الأنواع: ${stats.totalTypes}`}
           actionLabel="نوع جديد"
           onAction={handleCreateType}
         />
 
+        {/* Stats Cards - Similar to Users page */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <StatsCard label="إجمالي الأنواع" value={totalTypes} variant="blue" />
-          <StatsCard label="إجمالي القيم" value={totalValues} variant="green" />
-          <StatsCard label="قيمة افتراضية" value={totalDefaults} variant="purple" />
-          <StatsCard label="وحدات مميزة" value={uniqueUnits} variant="red" />
+          <StatsCard 
+            label="إجمالي الأنواع" 
+            value={stats.totalTypes} 
+            variant="blue" 
+          />
+          <StatsCard 
+            label="إجمالي القيم" 
+            value={stats.totalValues} 
+            variant="green" 
+          />
+          <StatsCard 
+            label="قيمة افتراضية" 
+            value={stats.totalDefaults} 
+            variant="purple" 
+          />
+          <StatsCard 
+            label="وحدات مميزة" 
+            value={stats.uniqueUnits} 
+            variant="red" 
+          />
         </div>
 
-        <Card className="p-6">
+        {/* Main Content Card - Similar to Users page */}
+        <Card className="p-6" >
           <div className="mb-6">
             <h2 className="text-xl font-bold">قائمة الثوابت</h2>
           </div>
 
-          {/* Messages */}
+          {/* Messages - Same as Users page */}
           <MessageAlert
             type="error"
             message={error}
-            onClose={() => setError("")}
+            onDismiss={() => setError("")}
+            dismissable={true}
           />
           <MessageAlert
             type="success"
             message={message}
-            onClose={() => setMessage("")}
+            onDismiss={() => setMessage("")}
+            dismissable={true}
           />
 
-          {/* Search */}
+          {/* Search - Same as Users page */}
           <div className="mb-6">
             <SearchInput
               placeholder="ابحث عن قيمة أو ملصق أو ملاحظة"
@@ -356,7 +386,7 @@ export default function Constants() {
             />
           </div>
 
-          {/* Filters */}
+          {/* Filters - Similar to Users page */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <FilterSelect
               label="الافتراضي"
@@ -369,153 +399,105 @@ export default function Constants() {
               ]}
             />
 
-            <ResultsCounter current={filteredValues.length} total={totalValues} />
+            <ResultsCounter 
+              current={filteredValues.length} 
+              total={currentValues.length} 
+            />
           </div>
 
-      {error && (
-        <MessageAlert
-          type="error"
-          message={error}
-          onClose={() => setError("")}
-        />
-      )}
-      {message && (
-        <MessageAlert
-          type="success"
-          message={message}
-          onClose={() => setMessage("")}
-        />
-      )}
-
-      {constantTypes.length === 0 ? (
-        <Card className="p-8">
-          <EmptyState
-            title="لا توجد أنواع ثوابت"
-            description="قم بإنشاء نوع ثابت جديد للبدء"
-          />
-          <div className="mt-4 flex justify-center">
-            <Button onClick={handleCreateType} className="gap-2">
-              <Plus className="h-4 w-4" />
-              إنشاء نوع ثابت
-            </Button>
-          </div>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {/* Type Management Header */}
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">أنواع الثوابت</h3>
-            <Button onClick={handleCreateType} variant="default" size="sm" className="gap-2">
-              <Plus className="h-4 w-4" />
-              نوع جديد
-            </Button>
+          {/* Rows Per Page Selector - Same as Users page */}
+          <div className="mb-6 flex justify-end">
+            <RowsPerPageSelector
+              value={rowsPerPage}
+              onChange={setRowsPerPage}
+              options={[5, 10, 20, 50]}
+            />
           </div>
 
-          {/* Tabs for each constant type */}
-          <Tabs
-            value={selectedTab}
-            onValueChange={handleTabChange}
-            className="w-full"
-          >
-            <TabsList className="flex w-full overflow-x-auto">
-              {constantTypes.map((type) => (
-                <TabsTrigger
-                  key={type.constant_type_id}
-                  value={type.constant_type_id.toString()}
-                  className="min-w-max"
-                >
-                  {type.constants_Type_name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          {/* Empty State for No Types - Similar to Users page */}
+          {constantTypes.length === 0 ? (
+            <EmptyState 
+              message="لا توجد أنواع ثوابت" 
+              icon=""
+              actionLabel="إنشاء نوع جديد"
+              onAction={handleCreateType}
+            />
+          ) : (
+            <>
+              {/* Tabs for constant types */}
+              <Tabs value={selectedTab} onValueChange={handleTabChange} className="w-full">
+                <TabsList className="flex w-full overflow-x-auto">
+                  {constantTypes.map((type) => (
+                    <TabsTrigger
+                      key={type.constant_type_id}
+                      value={type.constant_type_id.toString()}
+                      className="min-w-max"
+                    >
+                      {type.constants_Type_name}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
 
-            {constantTypes.map((type) => (
-              <TabsContent
-                key={type.constant_type_id}
-                value={type.constant_type_id.toString()}
-              >
-                <Card className="p-6">
-                  {/* Type Info and Actions */}
-                  <div className="mb-6 flex items-center justify-between">
-                    <div>
-                      <h4 className="text-lg font-semibold">
-                        {type.constants_Type_name}
-                      </h4>
-                      <p className="text-sm text-gray-500">{type.notes}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => handleEditType(type)}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                        تعديل
-                      </Button>
-                      <Button
-                        onClick={() => handleDeleteType(type.constant_type_id)}
-                        variant="destructive"
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        حذف
-                      </Button>
-                    </div>
-                  </div>
+                {constantTypes.map((type) => (
+                  <TabsContent
+                    key={type.constant_type_id}
+                    value={type.constant_type_id.toString()}
+                  >
+                    <div className="space-y-4">
+                      {/* Type Header with Actions - Similar to Users table header */}
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h3 className="text-lg font-semibold">{type.constants_Type_name}</h3>
+                          {type.notes && (
+                            <p className="text-sm text-gray-500">{type.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleEditType(type)}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                            تعديل النوع
+                          </Button>
+                          <Button
+                            onClick={() => handleDeleteType(type.constant_type_id)}
+                            variant="destructive"
+                            size="sm"
+                            className="gap-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            حذف النوع
+                          </Button>
+                          <Button
+                            onClick={handleCreateValue}
+                            size="sm"
+                            className="gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            إضافة قيمة
+                          </Button>
+                        </div>
+                      </div>
 
-                  {/* Values Table */}
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h5 className="font-medium">القيم</h5>
-                      <Button
-                        onClick={() => handleCreateValue(type.constant_type_id)}
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        إضافة قيمة
-                      </Button>
-                    </div>
-
-                    {(() => {
-                      const valuesList = constantValues[type.constant_type_id] || type.values || [];
-                      const filteredValues = valuesList.filter((v) => {
-                        const matchesSearch =
-                          !searchTerm ||
-                          (v.value && v.value.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          (v.label && v.label.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                          (v.notes && v.notes.toLowerCase().includes(searchTerm.toLowerCase()));
-
-                        const matchesDefault =
-                          defaultFilter === "" ||
-                          (defaultFilter === "default" && v.isDefault) ||
-                          (defaultFilter === "not_default" && !v.isDefault);
-
-                        return matchesSearch && matchesDefault;
-                      });
-
-                      // Use top-level pagination only if this is the selected tab
-                      const isSelectedTab = type.constant_type_id.toString() === selectedTab;
-                      const displayData = isSelectedTab ? currentTabPagination.paginatedData : filteredValues;
-
-                      if (filteredValues.length === 0) {
-                        return (
-                          <EmptyState
-                            title="لا توجد قيم"
-                            description="لم تتم إضافة أي قيم لهذا النوع حتى الآن"
-                          />
-                        );
-                      }
-
-                      return (
-                        <div className="space-y-4">
+                      {/* Empty State for No Values - Similar to Users page */}
+                      {filteredValues.length === 0 ? (
+                        <EmptyState 
+                          message="لا توجد قيم لهذا النوع" 
+                          icon="📋"
+                          actionLabel="إضافة قيمة"
+                          onAction={handleCreateValue}
+                        />
+                      ) : (
+                        <>
+                          {/* Values Table - Similar to Users table */}
                           <div className="overflow-x-auto rounded-lg border">
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead className="text-right">القيمة</TableHead>
+                                  <TableHead>القيمة</TableHead>
                                   <TableHead>الوحدة</TableHead>
                                   <TableHead>الملصق</TableHead>
                                   <TableHead>ملاحظات</TableHead>
@@ -524,12 +506,16 @@ export default function Constants() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {displayData.map((value) => (
+                                {paginatedValues.map((value) => (
                                   <TableRow key={value.constant_value_id}>
-                                    <TableCell className="font-medium">{value.value}</TableCell>
+                                    <TableCell className="font-medium">
+                                      {value.value}
+                                    </TableCell>
                                     <TableCell>{value.unit || "-"}</TableCell>
                                     <TableCell>{value.label || "-"}</TableCell>
-                                    <TableCell className="text-sm text-gray-500">{value.notes || "-"}</TableCell>
+                                    <TableCell className="text-sm text-gray-500">
+                                      {value.notes || "-"}
+                                    </TableCell>
                                     <TableCell>
                                       {value.isDefault ? (
                                         <Badge variant="default">نعم</Badge>
@@ -541,6 +527,7 @@ export default function Constants() {
                                       <CrudActions
                                         onEdit={() => handleEditValue(value)}
                                         onDelete={() => handleDeleteValue(value.constant_value_id)}
+                                        size="md"
                                       />
                                     </TableCell>
                                   </TableRow>
@@ -549,178 +536,153 @@ export default function Constants() {
                             </Table>
                           </div>
 
-                          {isSelectedTab && (
-                            <Pagination
-                              currentPage={currentTabPagination.currentPage}
-                              totalPages={currentTabPagination.totalPages}
-                              totalItems={filteredValues.length}
-                              itemsPerPage={10}
-                              onPageChange={currentTabPagination.handlePageChange}
-                            />
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </Card>
-              </TabsContent>
-            ))}
-          </Tabs>
-        </div>
-      )}
-
+                          {/* Pagination Controls - Same as Users page */}
+                          <PaginationControls
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            onPageChange={setCurrentPage}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </>
+          )}
         </Card>
+      </div>
 
       {/* Value Modal */}
-      <Dialog open={showValueModal} onOpenChange={setShowValueModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingValue ? "تعديل قيمة" : "إضافة قيمة جديدة"}
-            </DialogTitle>
-            {currentType && (
-              <DialogDescription>
-                لنوع: {currentType.constants_Type_name}
-              </DialogDescription>
-            )}
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium">القيمة *</label>
-              <Input
-                value={formValueData.value}
-                onChange={(e) =>
-                  setFormValueData({ ...formValueData, value: e.target.value })
-                }
-                placeholder="أدخل القيمة"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">الوحدة</label>
-              <Input
-                value={formValueData.unit}
-                onChange={(e) =>
-                  setFormValueData({ ...formValueData, unit: e.target.value })
-                }
-                placeholder="مثال: سم، مم، م"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">الملصق</label>
-              <Input
-                value={formValueData.label}
-                onChange={(e) =>
-                  setFormValueData({ ...formValueData, label: e.target.value })
-                }
-                placeholder="مثال: 100 م"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">ملاحظات</label>
-              <Textarea
-                value={formValueData.notes}
-                onChange={(e) =>
-                  setFormValueData({ ...formValueData, notes: e.target.value })
-                }
-                placeholder="أضف ملاحظات"
-                rows={3}
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">افتراضي</label>
-              <Switch
-                checked={formValueData.isDefault}
-                onCheckedChange={(checked) =>
-                  setFormValueData({ ...formValueData, isDefault: checked })
-                }
-              />
-            </div>
+      <StyledDialog
+        isOpen={showValueModal}
+        onOpenChange={setShowValueModal}
+        title={editingValue ? "تعديل قيمة" : "إضافة قيمة جديدة"}
+        description={currentType ? `لنوع: ${currentType.constants_Type_name}` : ""}
+        onCancel={() => setShowValueModal(false)}
+        onConfirm={handleSaveValue}
+        confirmLabel="حفظ"
+        cancelLabel="إلغاء"
+        isLoading={formLoading}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">القيمة *</label>
+            <Input
+              value={formValueData.value}
+              onChange={(e) =>
+                setFormValueData({ ...formValueData, value: e.target.value })
+              }
+              placeholder="أدخل القيمة"
+            />
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowValueModal(false)}
-            >
-              إلغاء
-            </Button>
-            <Button onClick={handleSaveValue}>حفظ</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div>
+            <label className="text-sm font-medium">الوحدة</label>
+            <Input
+              value={formValueData.unit}
+              onChange={(e) =>
+                setFormValueData({ ...formValueData, unit: e.target.value })
+              }
+              placeholder="مثال: سم، مم، م"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">الملصق</label>
+            <Input
+              value={formValueData.label}
+              onChange={(e) =>
+                setFormValueData({ ...formValueData, label: e.target.value })
+              }
+              placeholder="مثال: 100 م"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">ملاحظات</label>
+            <Textarea
+              value={formValueData.notes}
+              onChange={(e) =>
+                setFormValueData({ ...formValueData, notes: e.target.value })
+              }
+              placeholder="أضف ملاحظات"
+              rows={3}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">افتراضي</label>
+            <Switch
+              checked={formValueData.isDefault}
+              onCheckedChange={(checked) =>
+                setFormValueData({ ...formValueData, isDefault: checked })
+              }
+            />
+          </div>
+        </div>
+      </StyledDialog>
 
       {/* Type Modal */}
-      <Dialog open={showTypeModal} onOpenChange={setShowTypeModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingType ? "تعديل النوع" : "إضافة نوع جديد"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium">اسم النوع *</label>
-              <Input
-                value={formTypeData.constants_Type_name}
-                onChange={(e) =>
-                  setFormTypeData({
-                    ...formTypeData,
-                    constants_Type_name: e.target.value,
-                  })
-                }
-                placeholder="مثال: سماكة"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">المفتاح (Slug) *</label>
-              <Input
-                value={formTypeData.type}
-                onChange={(e) =>
-                  setFormTypeData({
-                    ...formTypeData,
-                    type: e.target.value,
-                  })
-                }
-                placeholder="مثال: thickness"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">ملاحظات</label>
-              <Textarea
-                value={formTypeData.notes}
-                onChange={(e) =>
-                  setFormTypeData({
-                    ...formTypeData,
-                    notes: e.target.value,
-                  })
-                }
-                placeholder="أضف ملاحظات"
-                rows={3}
-              />
-            </div>
+      <StyledDialog
+        isOpen={showTypeModal}
+        onOpenChange={setShowTypeModal}
+        title={editingType ? "تعديل النوع" : "إضافة نوع جديد"}
+        onCancel={() => setShowTypeModal(false)}
+        onConfirm={handleSaveType}
+        confirmLabel="حفظ"
+        cancelLabel="إلغاء"
+        isLoading={formLoading}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">اسم النوع *</label>
+            <Input
+              value={formTypeData.constants_Type_name}
+              onChange={(e) =>
+                setFormTypeData({
+                  ...formTypeData,
+                  constants_Type_name: e.target.value,
+                })
+              }
+              placeholder="مثال: سماكة"
+            />
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowTypeModal(false)}
-            >
-              إلغاء
-            </Button>
-            <Button onClick={handleSaveType}>حفظ</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div>
+            <label className="text-sm font-medium">المفتاح (Slug) *</label>
+            <Input
+              value={formTypeData.type}
+              onChange={(e) =>
+                setFormTypeData({
+                  ...formTypeData,
+                  type: e.target.value,
+                })
+              }
+              placeholder="مثال: thickness"
+            />
+          </div>
 
-      {/* Delete Confirmation Dialog */}
+          <div>
+            <label className="text-sm font-medium">ملاحظات</label>
+            <Textarea
+              value={formTypeData.notes}
+              onChange={(e) =>
+                setFormTypeData({
+                  ...formTypeData,
+                  notes: e.target.value,
+                })
+              }
+              placeholder="أضف ملاحظات"
+              rows={3}
+            />
+          </div>
+        </div>
+      </StyledDialog>
+
+      {/* Delete Confirmation Dialog - Same as Users page */}
       <DeleteConfirmDialog
         isOpen={deleteConfirm.isOpen}
         title={
@@ -728,12 +690,16 @@ export default function Constants() {
             ? "حذف نوع الثابت"
             : "حذف القيمة الثابتة"
         }
-        description={
+        message={
           deleteConfirm.type === "type"
-            ? "هل أنت متأكد من حذف هذا النوع؟ سيتم حذف جميع القيم المرتبطة به"
+            ? "هل أنت متأكد من حذف هذا النوع؟ سيتم حذف جميع القيم المرتبطة به."
             : "هل أنت متأكد من حذف هذه القيمة؟"
         }
-        isloading={deleteConfirm.loading}
+        onConfirm={
+          deleteConfirm.type === "type"
+            ? confirmDeleteType
+            : confirmDeleteValue
+        }
         onCancel={() =>
           setDeleteConfirm({
             isOpen: false,
@@ -742,13 +708,8 @@ export default function Constants() {
             loading: false,
           })
         }
-        onConfirm={
-          deleteConfirm.type === "type"
-            ? confirmDeleteType
-            : confirmDeleteValue
-        }
+        loading={deleteConfirm.loading}
       />
-      </div>
     </div>
   );
 }

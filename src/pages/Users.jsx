@@ -1,17 +1,16 @@
-// src\pages\Users.jsx
 import { useState, useEffect } from "react";
 import { userApi } from "../api/userApi";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
   TableRow,
-  Pagination 
+  Pagination
 } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
 import { ToggleLeft, ToggleRight } from "lucide-react";
@@ -27,7 +26,9 @@ import PageHeader from "../components/common/PageHeader";
 import LoadingState from "../components/common/LoadingState";
 import EmptyState from "../components/common/EmptyState";
 import ResultsCounter from "../components/common/ResultsCounter";
-import { usePagination } from "../hooks/usePagination";
+import RowsPerPageSelector from "../components/common/RowsPerPageSelector";
+import PaginationControls from "../components/common/PaginationControls";
+import SwitchActive from "../components/common/SwitchActive";
 
 const roleLabels = {
   admin: "مسؤول",
@@ -55,6 +56,8 @@ export default function Users() {
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, userId: null, loading: false });
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Load users on mount
   useEffect(() => {
@@ -160,8 +163,16 @@ export default function Users() {
     }
   );
 
-  // Pagination
-  const { currentPage, totalPages, paginatedData, handlePageChange, totalItems } = usePagination(filteredUsers, 10);
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, statusFilter]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -258,6 +269,15 @@ export default function Users() {
             />
           </div>
 
+          {/* Rows Per Page Selector */}
+          <div className="mb-6 flex justify-end">
+            <RowsPerPageSelector
+              value={rowsPerPage}
+              onChange={setRowsPerPage}
+              options={[5, 10, 20, 50]}
+            />
+          </div>
+
           {/* Users Table */}
           {loading ? (
             <LoadingState message="جاري تحميل المستخدمين..." />
@@ -278,20 +298,20 @@ export default function Users() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedData.map((user) => (
+                    {paginatedUsers.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">
                           {user.full_name}
                         </TableCell>
                         <TableCell>{user.username}</TableCell>
-                        <TableCell>{user.phone}</TableCell>
+                        <TableCell><span dir="ltr">{user.phone}</span></TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {user.role === 'admin'
                               ? 'مسؤول'
                               : user.role === 'sales'
-                              ? 'مبيعات'
-                              : user.role}
+                                ? 'مبيعات'
+                                : user.role}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -303,6 +323,10 @@ export default function Users() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
+                            <SwitchActive
+                              isActive={user.is_active}
+                              onToggle={() => handleToggleStatus(user.id)}
+                            />
                             <CrudActions
                               onView={() => {
                                 setSelectedUserId(user.id);
@@ -312,32 +336,20 @@ export default function Users() {
                               onDelete={() => handleDeleteUser(user.id)}
                               size="md"
                             />
-                            <Button
-                              size="sm"
-                              variant={user.is_active ? 'outline' : 'default'}
-                              onClick={() => handleToggleStatus(user.id)}
-                              className="ml-1"
-                            >
-                              {user.is_active ? (
-                                <ToggleRight className="w-4 h-4" />
-                              ) : (
-                                <ToggleLeft className="w-4 h-4" />
-                              )}
-                            </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
 
-              <Pagination
+              <PaginationControls
                 currentPage={currentPage}
                 totalPages={totalPages}
-                totalItems={totalItems}
-                itemsPerPage={10}
-                onPageChange={handlePageChange}
+                onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onPageChange={setCurrentPage}
               />
             </>
           )}

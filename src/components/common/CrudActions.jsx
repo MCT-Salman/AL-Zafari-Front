@@ -1,6 +1,6 @@
 // src\components\common\CrudActions.jsx
 import React from 'react';
-import { Eye, Edit2, Trash2, Plus } from 'lucide-react';
+import { Eye, Trash2, Plus, Edit } from 'lucide-react';
 
 const CrudActions = ({
   onView = null,
@@ -36,9 +36,9 @@ const CrudActions = ({
           type="button"
           onClick={onView}
           disabled={disabled}
-          title="View"
+          title="عرض تفاصيل"
           aria-label="View"
-          className={`${btnBase} text-blue-600 hover:bg-blue-100 hover:text-blue-700`}
+          className={`${btnBase} `}
         >
           <Eye className={iconSize} />
         </button>
@@ -49,11 +49,11 @@ const CrudActions = ({
           type="button"
           onClick={onEdit}
           disabled={disabled}
-          title="Edit"
+          title="تعديل"
           aria-label="Edit"
-          className={`${btnBase} text-amber-600 hover:bg-amber-100 hover:text-amber-700`}
+          className={`${btnBase}`}
         >
-          <Edit2 className={iconSize} />
+          <Edit className={iconSize} />
         </button>
       )}
 
@@ -62,7 +62,7 @@ const CrudActions = ({
           type="button"
           onClick={onDelete}
           disabled={disabled}
-          title="Delete"
+          title="حذف"
           aria-label="Delete"
           className={`${btnBase} text-red-600 hover:bg-red-100 hover:text-red-700`}
         >
@@ -75,7 +75,7 @@ const CrudActions = ({
           type="button"
           onClick={onAdd}
           disabled={disabled}
-          title="Add"
+          title="إضافة"
           aria-label="Add"
           className={`${btnBase} text-green-600 hover:bg-green-100`}
         >

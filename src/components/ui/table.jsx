@@ -25,7 +25,7 @@ function TableHeader({
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={cn("[&_tr]:border-b !text-right", className)}
       {...props} />
   );
 }
@@ -77,7 +77,7 @@ function TableHead({
     <th
       data-slot="table-head"
       className={cn(
-        "h-12 px-4 text-left align-middle font-semibold text-gray-800 bg-gray-50 border-b border-gray-200 whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-12 px-4 text-right align-middle font-semibold text-gray-800 bg-gray-50 border-b border-gray-200 whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       {...props} />
