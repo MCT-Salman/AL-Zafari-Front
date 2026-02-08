@@ -1,4 +1,5 @@
 /* src\index.css */
+@import url('https://fonts.googleapis.com/css2?family=Lalezar&display=swap');
 @import "./styles/theme.css";
 @import "tailwindcss";
 

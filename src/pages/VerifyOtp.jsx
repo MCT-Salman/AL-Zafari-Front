@@ -1,3 +1,4 @@
+// src\pages\VerifyOtp.jsx
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { authApi } from "@/api/authApi";

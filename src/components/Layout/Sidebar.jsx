@@ -1,4 +1,4 @@
-﻿// import { NavLink } from "react-router-dom";
+﻿// src\components\Layout\Sidebar.jsx
 // import { sideData } from "@/data/sidebarData";
 // import { LogOut } from "lucide-react";
 // import { useAuth } from "@/context/AuthContext";
@@ -94,54 +94,66 @@ const Sidebar = ({ logo, title, items = [], footerItem }) => {
   const location = useLocation();
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-surface border-l border-border transition-all duration-300">
+    <div className="flex flex-col h-full bg-primary-s border-l-2 border-secondary-f transition-all duration-300">
       {/* Header */}
-      <div className={cn("h-20 flex items-center border-b border-border px-4", collapsed ? "justify-center" : "justify-between")}>
-        {!collapsed && (
-          <div className="flex flex-col items-center w-full">
-            <div className="text-xl font-bold text-primary-f">{title}</div>
-            <div className="text-xs text-text-muted">Management System</div>
+      <div className={cn("h-20 flex items-center border-b-2 border-secondary-f px-4", collapsed ? "justify-center" : "justify-between")}>
+        {/* اللوغو يظهر دائماً ويمكن النقر عليه للتبديل */}
+        <div
+          className="flex flex-col items-center  w-full  cursor-pointer"
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          <div className="text-xl font-bold  text-primary-f">
+            <img
+              src="/logo_alzafari/1-8.png"
+              width={collapsed ? 40 : 60}
+              className="transition-all duration-300"
+            />
           </div>
-        )}
-        <Button variant="ghost" size="icon" onClick={() => setCollapsed(!collapsed)} className="hidden md:flex text-text-muted cursor-pointer hover:bg-primary/10">
-           {collapsed ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-        </Button>
-        <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} className="md:hidden text-text-strong">
-          <X className="w-5 h-5" />
+          {/* النص يظهر فقط عندما لا يكون مطوياً */}
+          
+        </div>
+
+        {/* إلغاء زر السهم تماماً */}
+        {/* <Button variant="ghost" size="icon" onClick={() => setCollapsed(!collapsed)} className="hidden md:flex text-text-muted cursor-pointer hover:bg-primary/10">
+     {collapsed ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+  </Button> */}
+
+        <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} className="md:hidden text-text-strong hover:bg-secondary-f">
+          <X className="w-5 h-5 text-primary-s" />
         </Button>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-          {items.map((item, index) => {
-            const isActive = location.pathname === item.href;
-            const Icon = item.icon;
-            
-            return (
-              <Link
-                key={index}
-                to={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-lg transition-all text-sm font-medium",
-                  isActive 
-                    ? "bg-secondary-s text-primary-s" 
-                    : "text-text-strong hover:bg-primary-alpha",
-                  collapsed && "justify-center px-2"
-                )}
-              >
-                {/* هنا نستدعي الأيقونة كمكون */}
-                <Icon className={cn("w-5 h-5 flex-shrink-0", isActive ? "text-primary-s" : "")} />
-                
-                {!collapsed && <span>{item.title}</span>}
-              </Link>
-            );
-          })}
+        {items.map((item, index) => {
+          const isActive = location.pathname === item.href;
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={index}
+              to={item.href}
+              className={cn(
+                "flex items-center gap-3 px-3 py-3 rounded-lg transition-all text-sm font-medium",
+                isActive
+                  ? "bg-secondary-f text-primary-f text-lg"
+                  : "text-text-strong hover:bg-primary-alpha",
+                collapsed && "justify-center px-2"
+              )}
+            >
+              {/* هنا نستدعي الأيقونة كمكون */}
+              <Icon className={cn("w-5 h-5 flex-shrink-0", isActive ? "text-primary-f font-bold" : "")} />
+
+              {!collapsed && <span>{item.title}</span>}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* Footer (Logout) */}
       {footerItem && (
-        <div className="p-4 border-t border-border bg-white/50 backdrop-blur-sm">
-            {footerItem}
+        <div className="p-4 border-t-2 border-secondary-f bg-white/50 backdrop-blur-sm">
+          {footerItem}
         </div>
       )}
     </div>
@@ -150,7 +162,7 @@ const Sidebar = ({ logo, title, items = [], footerItem }) => {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside 
+      <aside
         className={cn(
           "hidden md:block fixed top-0 right-0 h-screen transition-all duration-300 z-40 bg-surface shadow-lg",
           collapsed ? "w-20" : "w-64"
@@ -162,10 +174,10 @@ const Sidebar = ({ logo, title, items = [], footerItem }) => {
       {/* Mobile Sidebar (Drawer) */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
-           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-           <div className="fixed inset-y-0 right-0 w-64 bg-surface animate-in slide-in-from-right shadow-2xl">
-             <SidebarContent />
-           </div>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <div className="fixed inset-y-0 right-0 w-64 bg-surface animate-in slide-in-from-right shadow-2xl">
+            <SidebarContent />
+          </div>
         </div>
       )}
     </>

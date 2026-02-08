@@ -1,4 +1,4 @@
-﻿// import { useState } from "react";
+﻿// src\components\Layout\Header.jsx
 // import { Search, Bell, User, Menu, LogOut } from "lucide-react";
 // import { Input } from "@/components/ui/input";
 // import { Button } from "@/components/ui/button";
@@ -87,7 +87,7 @@ const Header = ({ children, className }) => {
   return (
     <header 
       className={cn(
-        "h-20 fixed top-0 left-0 right-0 z-30 bg-primary-s border-b border-border flex items-center justify-between px-4 sm:px-6 transition-all duration-300",
+        "h-20 fixed top-0 left-0 right-0 z-30 bg-primary-f border-b-2 border-secondary-f flex items-center justify-between px-4 sm:px-6 transition-all duration-300",
         // Desktop handling: adjust width based on sidebar
         "md:mr-64", 
         collapsed && "md:mr-20",
@@ -99,10 +99,10 @@ const Header = ({ children, className }) => {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="md:hidden text-text-strong hover:bg-primary-alpha" 
+          className="md:hidden text-text-strong hover:bg-secondary-f" 
           onClick={() => setMobileMenuOpen(true)}
         >
-          <Menu className="w-6 h-6" />
+          <Menu className="w-6 h-6 text-primary-s " />
         </Button>
       </div>
 

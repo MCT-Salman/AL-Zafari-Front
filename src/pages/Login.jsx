@@ -94,8 +94,8 @@ import { useAuth } from "../hooks/useAuth"; // الـ Hook الخاص بك
 import { AuthTemplate } from "@/components/auth/AuthTemplate"; // المكون الجديد
 
 // Assets
-import logoImg from "/vite.svg";
-import heroImg from "/vite.svg"; 
+import logoImg from "/logo_alzafari/1-8.png";
+import heroImg from "/logo_alzafari/1-8.png"; 
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
@@ -139,8 +139,8 @@ export default function Login() {
       description="سجل دخولك للمتابعة إلى لوحة التحكم"
       logo={logoImg}
       heroImage={heroImg}
-      heroTitle="منصة تعلّم التعليمية"
-      heroDescription="نظام متكامل لإدارة العملية التعليمية ومتابعة الطلاب والمعلمين بكفاءة عالية."
+      heroTitle="الزفري للتجارة والانتاج"
+      heroDescription="نظام متكامل لإدارة العملية الانتاجية ومتابعة طلبات المبيعات (أحرف PVC، ألواح ديكور، ألواح فوم)"
       
       // الدوال والبيانات
       onSubmit={handleLoginSubmit}

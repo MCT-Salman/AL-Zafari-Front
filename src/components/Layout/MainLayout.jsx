@@ -1,4 +1,4 @@
-// import { useState } from "react";
+// src\components\Layout\MainLayout.jsx
 // import { Outlet } from "react-router-dom";
 // import Header from "@/components/Layout/Header";
 // import Sidebar from "@/components/Layout/Sidebar";
@@ -93,7 +93,7 @@ const LayoutContent = () => {
       onClick={logout}
       className={cn(
         "group flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 cursor-pointer w-full",
-        "bg-secondary-s/10 text-primary-s hover:bg-secondary-s hover:text-white"
+        "bg-secondary-s text-primary-s hover:bg-secondary-s/95 hover:text-white"
       )}
     >
       <LogOut size={20} className={cn("flex-shrink-0", collapsed ? "mx-auto" : "")} />
@@ -119,7 +119,7 @@ const LayoutContent = () => {
       >
         <Header>
            {/* محتوى الهيدر الخاص بك */}
-           <Button className="relative cursor-pointer p-2 bg-primary-s border-none shadow-none hover:bg-primary-alpha">
+           <Button className="relative cursor-pointer p-2 bg-primary-f border-none shadow-none hover:bg-secondary-f">
             <Bell size={20} className="text-text-muted" />
             <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-primary-s"></span>
           </Button>

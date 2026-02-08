@@ -1,3 +1,4 @@
+// src\components\Layout\LayoutContext.jsx
 import { createContext, useContext, useState } from "react";
 
 const LayoutContext = createContext({});
