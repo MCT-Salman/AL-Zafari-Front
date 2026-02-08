@@ -216,14 +216,14 @@ export default function UserModal({ user, onClose, onSave }) {
           <div>
             <label className="block text-sm font-medium mb-1">الدور</label>
             <Select value={formData.role || ""} onValueChange={handleRoleChange}>
-              <SelectTrigger disabled={loading}>
+              <SelectTrigger disabled={loading} >
                 <span>
                   {formData.role && roleLabels[formData.role] 
                     ? roleLabels[formData.role] 
                     : "اختر الدور"}
                 </span>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className={`bg-white ${loading ? "pointer-events-none opacity-50" : ""}`}>
                 <SelectItem value="admin">مسؤول</SelectItem>
                 <SelectItem value="accountant">محاسب</SelectItem>
                 <SelectItem value="cashier">أمين الصندوق</SelectItem>

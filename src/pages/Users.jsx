@@ -29,19 +29,7 @@ import ResultsCounter from "../components/common/ResultsCounter";
 import RowsPerPageSelector from "../components/common/RowsPerPageSelector";
 import PaginationControls from "../components/common/PaginationControls";
 import SwitchActive from "../components/common/SwitchActive";
-
-const roleLabels = {
-  admin: "مسؤول",
-  accountant: "محاسب",
-  cashier: "أمين الصندوق",
-  sales: "مبيعات",
-  production_manager: "مدير الإنتاج",
-  Warehouse_Keeper: "حارس المستودع",
-  Warehouse_Products: "منتجات المستودع",
-  Dissection_Technician: "فني التشريح",
-  Cutting_Technician: "فني القطع",
-  Gluing_Technician: "فني اللصق",
-};
+import { UserRole, UserRoleLabels } from "../enums";
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -247,7 +235,7 @@ export default function Users() {
                 { value: "", label: "جميع الأدوار" },
                 ...uniqueRoles.map((role) => ({
                   value: role,
-                  label: roleLabels[role] || role
+                  label: UserRoleLabels[role] || role
                 }))
               ]}
             />
@@ -307,11 +295,7 @@ export default function Users() {
                         <TableCell><span dir="ltr">{user.phone}</span></TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {user.role === 'admin'
-                              ? 'مسؤول'
-                              : user.role === 'sales'
-                                ? 'مبيعات'
-                                : user.role}
+                            {UserRoleLabels[user.role] || user.role}
                           </Badge>
                         </TableCell>
                         <TableCell>
