@@ -11,7 +11,7 @@ function Card({
     <div
       data-slot="card"
       className={cn(
-        "bg-white text-card-foreground flex flex-col gap-6 rounded-lg border border-gray-200 py-6 shadow-md hover:shadow-lg transition-shadow duration-300",
+        "bg-white text-card-foreground flex flex-col gap-6 rounded-2xl border border-gray-200 py-6 shadow-md hover:shadow-lg transition-shadow duration-300",
         className
       )}
       {...props} />

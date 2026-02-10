@@ -97,7 +97,7 @@ const SwitchActive = ({
       onClick={handleClick}
       disabled={disabled || loading}
       className={cn(
-        "flex items-center gap-2 transition-all duration-300 hover:scale-105",
+        "flex items-center gap-2 p-4 transition-all duration-300 hover:scale-105",
         getVariantStyles(),
         className
       )}

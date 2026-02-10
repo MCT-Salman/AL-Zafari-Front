@@ -64,7 +64,7 @@ const CrudActions = ({
           disabled={disabled}
           title="حذف"
           aria-label="Delete"
-          className={`${btnBase} text-red-600 hover:bg-red-100 hover:text-red-700`}
+          className={`${btnBase} text-secondary-s hover:bg-red-100 hover:text-secondary-s`}
         >
           <Trash2 className={iconSize} />
         </button>

@@ -27,7 +27,7 @@ const PaginationControls = ({
   const canGoNext = currentPage < totalPages;
 
   return (
-    <div className="flex items-center justify-between gap-4 mt-6 pt-4 border-t">
+    <div className="flex items-center justify-between gap-4 mt-6 pt-4 border-t-2 border-secondary-f">
       <div className="text-sm text-gray-600">
         الصفحة <span className="font-bold">{currentPage}</span> من <span className="font-bold">{totalPages}</span>
       </div>

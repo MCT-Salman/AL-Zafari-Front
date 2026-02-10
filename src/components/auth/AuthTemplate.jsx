@@ -181,7 +181,7 @@ export function AuthTemplate({
       <div className="hidden lg:flex lg:w-1/2 min-h-screen relative overflow-hidden">
         {/* طبقة الصورة الأساسية */}
         <div
-          className="absolute inset-0 bg-cover bg-center"
+          className="absolute inset-0 bg-contain bg-no-repeat scale-100"
           style={{ backgroundImage: `url(${heroImage})` }}
         />
 

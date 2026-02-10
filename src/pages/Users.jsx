@@ -14,7 +14,7 @@ import {
   Pagination
 } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { ToggleLeft, ToggleRight } from "lucide-react";
+import { ToggleLeft, ToggleRight, User } from "lucide-react";
 import UserModal from "../components/UserModal/UserModal";
 import UserDetailModal from "../components/UserDetailModal/UserDetailModal";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog/DeleteConfirmDialog";
@@ -163,9 +163,53 @@ export default function Users() {
   const endIndex = startIndex + rowsPerPage;
   const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
+  const mainStats = [
+  {
+    id: 1,
+    title: "إجمالي المستخدمين",
+    value: stats.total,
+    unit: "مستخدم",
+    icon: User,
+    iconColor: "text-secondary-f",
+    bgColor: "bg-primary-s",
+    borderColor: "border-secondary-f"
+  },
+  {
+    id: 2,
+    title: "إجمالي المستخدمين النشطين",
+    value: stats.active,
+    unit: "مستخدم",
+    icon: User,
+    iconColor: "text-primary-f",
+    bgColor: "bg-primary-s",
+    borderColor: "border-primary-f"
+  },
+  {
+    id: 3,
+    title: "إجمالي المستخدمين المعطلين",
+    value: stats.inactive,
+    unit: "مستخدم",
+    unit: "مستخدم",
+    icon: User,
+    iconColor: "text-secondary-s",
+    bgColor: "bg-primary-s",
+    borderColor: "border-secondary-s"
+  },
+  {
+    id: 4,
+  title: "عدد الأدوار الفريدة",
+    value: uniqueRoles.length,
+    unit: "دور",
+    icon: User,
+    iconColor: "text-secondary-t",
+    bgColor: "bg-primary-s",
+    borderColor: "border-secondary-t"
+  }
+];
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 space-y-8 p-2">
+      <div className=" mx-auto">
         <PageHeader
           title="إدارة المستخدمين"
           subtitle={`إجمالي المستخدمين: ${users.length}`}
@@ -174,28 +218,12 @@ export default function Users() {
         />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <StatsCard
-            label="إجمالي المستخدمين"
-            value={stats.total}
-            variant="blue"
-          />
-          <StatsCard
-            label="نشط"
-            value={stats.active}
-            variant="green"
-          />
-          <StatsCard
-            label="معطل"
-            value={stats.inactive}
-            variant="red"
-          />
-          <StatsCard
-            label="عدد الأدوار"
-            value={uniqueRoles.length}
-            variant="purple"
-          />
-        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        {mainStats.map((stat) => (
+          <StatsCard key={stat.id} {...stat} />
+        ))}
+      </div>
 
         {/* Users Table Card */}
         <Card className="p-6">
@@ -259,7 +287,7 @@ export default function Users() {
           </div>
 
           {/* Rows Per Page Selector */}
-          <div className="mb-6 flex justify-end">
+          <div className="mb-6 flex justify-start">
             <RowsPerPageSelector
               value={rowsPerPage}
               onChange={setRowsPerPage}
@@ -274,7 +302,7 @@ export default function Users() {
             <EmptyState message="لا توجد مستخدمين" icon="👥" />
           ) : (
             <>
-              <div className="overflow-x-auto rounded-lg border">
+              <div className="overflow-x-auto rounded-lg ">
                 <Table>
                   <TableHeader>
                     <TableRow>
