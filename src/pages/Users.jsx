@@ -14,7 +14,7 @@ import {
   Pagination
 } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { ToggleLeft, ToggleRight, User } from "lucide-react";
+import { Download, ToggleLeft, ToggleRight, User } from "lucide-react";
 import UserModal from "../components/UserModal/UserModal";
 import UserDetailModal from "../components/UserDetailModal/UserDetailModal";
 import DeleteConfirmDialog from "../components/DeleteConfirmDialog/DeleteConfirmDialog";
@@ -31,6 +31,7 @@ import RowsPerPageSelector from "../components/common/RowsPerPageSelector";
 import PaginationControls from "../components/common/PaginationControls";
 import SwitchActive from "../components/common/SwitchActive";
 import { UserRole, UserRoleLabels } from "../enums";
+import * as XLSX from "xlsx";
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -45,8 +46,10 @@ export default function Users() {
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, userId: null, loading: false });
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+  const [exportLoading, setExportLoading] = useState(false);
 
   // Load users on mount
   useEffect(() => {
@@ -63,6 +66,107 @@ export default function Users() {
       setError(err.message || "فشل في تحميل المستخدمين");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // EXPORT TO EXCEL FUNCTION
+  const exportToExcel = () => {
+    setExportLoading(true);
+    try {
+      // Prepare data for export (use filteredUsers to respect current filters)
+      const exportData = filteredUsers.map((user, index) => ({
+        "#": index + 1,
+        "الاسم الكامل": user.full_name,
+        "اسم المستخدم": user.username,
+        "رقم الهاتف": user.phone,
+        "الدور": UserRoleLabels[user.role] || user.role,
+        "الحالة": user.is_active ? "نشط" : "معطل",
+        "تاريخ الإنشاء": new Date(user.created_at).toLocaleDateString('ar-SA'),
+        "آخر تحديث": user.updated_at ? new Date(user.updated_at).toLocaleDateString('ar-SA') : "",
+      }));
+
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Set column widths for better readability
+      const columnWidths = [
+        { wch: 5 },   // م
+        { wch: 25 },  // الاسم
+        { wch: 20 },  // اسم المستخدم
+        { wch: 15 },  // الهاتف
+        { wch: 15 },  // الدور
+        { wch: 10 },  // الحالة
+        { wch: 15 },  // تاريخ الإنشاء
+        { wch: 15 },  // آخر تحديث
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "المستخدمين");
+
+      // Generate filename with current date
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `المستخدمين_${date}.xlsx`;
+
+      // Save file
+      XLSX.writeFile(workbook, filename);
+
+      setMessage("تم تصدير البيانات بنجاح");
+    } catch (err) {
+      setError("فشل في تصدير البيانات: " + err.message);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  // Alternative: Export with custom styling (using a more advanced approach)
+  const exportToExcelAdvanced = () => {
+    setExportLoading(true);
+    try {
+      // Create worksheet from filtered data
+      const worksheetData = [
+        // Header row
+        ["#", "الاسم الكامل", "اسم المستخدم", "رقم الهاتف", "الدور", "الحالة", "تاريخ الإنشاء"],
+        // Data rows
+        ...filteredUsers.map((user, index) => [
+          index + 1,
+          user.full_name,
+          user.username,
+          user.phone,
+          UserRoleLabels[user.role] || user.role,
+          user.is_active ? "نشط" : "معطل",
+          new Date(user.created_at).toLocaleDateString('en-US'),
+        ])
+      ];
+
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+
+      // Styling (note: xlsx library has limited styling support)
+      // For full styling, consider using 'xlsx-style' or 'exceljs'
+
+      // Set column widths
+      worksheet['!cols'] = [
+        { wch: 5 },
+        { wch: 25 },
+        { wch: 20 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 10 },
+        { wch: 15 },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "المستخدمين");
+
+      const date = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `المستخدمين_${date}.xlsx`);
+
+      setMessage(`تم تصدير ${filteredUsers.length} مستخدم بنجاح`);
+    } catch (err) {
+      setError("فشل في التصدير: " + err.message);
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -163,49 +267,87 @@ export default function Users() {
   const endIndex = startIndex + rowsPerPage;
   const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
+  const handleSort = (newSortConfig) => {
+    setSortConfig(newSortConfig);
+
+    if (!newSortConfig.key || !newSortConfig.direction) {
+      // إذا تم إلغاء الترتيب، عد للترتيب الافتراضي (حسب ID مثلاً)
+      setUsers([...users].sort((a, b) => a.id - b.id));
+      return;
+    }
+
+    const sorted = [...users].sort((a, b) => {
+      let aValue = a[newSortConfig.key];
+      let bValue = b[newSortConfig.key];
+
+      // معالجة التواريخ
+      if (newSortConfig.key === 'created_at') {
+        aValue = new Date(aValue);
+        bValue = new Date(bValue);
+        return newSortConfig.direction === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+
+      // معالجة النصوص العربية
+      if (typeof aValue === 'string') {
+        return newSortConfig.direction === 'asc'
+          ? aValue.localeCompare(bValue, 'ar')
+          : bValue.localeCompare(aValue, 'ar');
+      }
+
+      // معالجة الأرقام والقيم الأخرى
+      return newSortConfig.direction === 'asc'
+        ? aValue > bValue ? 1 : -1
+        : aValue < bValue ? 1 : -1;
+    });
+
+    setUsers(sorted);
+  };
+
   const mainStats = [
-  {
-    id: 1,
-    title: "إجمالي المستخدمين",
-    value: stats.total,
-    unit: "مستخدم",
-    icon: User,
-    iconColor: "text-secondary-f",
-    bgColor: "bg-primary-s",
-    borderColor: "border-secondary-f"
-  },
-  {
-    id: 2,
-    title: "إجمالي المستخدمين النشطين",
-    value: stats.active,
-    unit: "مستخدم",
-    icon: User,
-    iconColor: "text-primary-f",
-    bgColor: "bg-primary-s",
-    borderColor: "border-primary-f"
-  },
-  {
-    id: 3,
-    title: "إجمالي المستخدمين المعطلين",
-    value: stats.inactive,
-    unit: "مستخدم",
-    unit: "مستخدم",
-    icon: User,
-    iconColor: "text-secondary-s",
-    bgColor: "bg-primary-s",
-    borderColor: "border-secondary-s"
-  },
-  {
-    id: 4,
-  title: "عدد الأدوار الفريدة",
-    value: uniqueRoles.length,
-    unit: "دور",
-    icon: User,
-    iconColor: "text-secondary-t",
-    bgColor: "bg-primary-s",
-    borderColor: "border-secondary-t"
-  }
-];
+    {
+      id: 1,
+      title: "إجمالي المستخدمين",
+      value: stats.total,
+      unit: "مستخدم",
+      icon: User,
+      iconColor: "text-secondary-f",
+      bgColor: "bg-primary-s",
+      borderColor: "border-secondary-f"
+    },
+    {
+      id: 2,
+      title: "إجمالي المستخدمين النشطين",
+      value: stats.active,
+      unit: "مستخدم",
+      icon: User,
+      iconColor: "text-primary-f",
+      bgColor: "bg-primary-s",
+      borderColor: "border-primary-f"
+    },
+    {
+      id: 3,
+      title: "إجمالي المستخدمين المعطلين",
+      value: stats.inactive,
+      unit: "مستخدم",
+      unit: "مستخدم",
+      icon: User,
+      iconColor: "text-secondary-s",
+      bgColor: "bg-primary-s",
+      borderColor: "border-secondary-s"
+    },
+    {
+      id: 4,
+      title: "عدد الأدوار الفريدة",
+      value: uniqueRoles.length,
+      unit: "دور",
+      icon: User,
+      iconColor: "text-secondary-t",
+      bgColor: "bg-primary-s",
+      borderColor: "border-secondary-t"
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 space-y-8 p-2">
@@ -220,14 +362,14 @@ export default function Users() {
         {/* Stats Cards */}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        {mainStats.map((stat) => (
-          <StatsCard key={stat.id} {...stat} />
-        ))}
-      </div>
+          {mainStats.map((stat) => (
+            <StatsCard key={stat.id} {...stat} />
+          ))}
+        </div>
 
         {/* Users Table Card */}
         <Card className="p-6">
-          <div className="mb-6">
+          <div className="">
             <h2 className="text-xl font-bold">قائمة المستخدمين</h2>
           </div>
 
@@ -246,7 +388,7 @@ export default function Users() {
           />
 
           {/* Search */}
-          <div className="mb-6">
+          <div className="-my-4">
             <SearchInput
               placeholder="ابحث عن مستخدم (الاسم أو اسم المستخدم أو الهاتف)"
               value={searchTerm}
@@ -255,7 +397,7 @@ export default function Users() {
           </div>
 
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FilterSelect
               label="الدور"
               value={roleFilter}
@@ -286,8 +428,9 @@ export default function Users() {
             />
           </div>
 
+          <div className="flex justify-between">
           {/* Rows Per Page Selector */}
-          <div className="mb-6 flex justify-start">
+          <div className=" flex justify-start">
             <RowsPerPageSelector
               value={rowsPerPage}
               onChange={setRowsPerPage}
@@ -295,22 +438,44 @@ export default function Users() {
             />
           </div>
 
+          {/* Export Button */}
+          <Button
+            onClick={exportToExcel}
+            disabled={exportLoading || filteredUsers.length === 0}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white p-6 rounded-xl"
+          >
+            {exportLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                <span>جاري التصدير...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>تصدير Excel ({filteredUsers.length})</span>
+              </>
+            )}
+          </Button>
+          </div>
+
+
           {/* Users Table */}
           {loading ? (
             <LoadingState message="جاري تحميل المستخدمين..." />
           ) : filteredUsers.length === 0 ? (
-            <EmptyState message="لا توجد مستخدمين" icon="👥" />
+            <EmptyState message="لا توجد مستخدمين" />
           ) : (
             <>
               <div className="overflow-x-auto rounded-lg ">
-                <Table>
+                <Table onSort={handleSort}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>الاسم</TableHead>
-                      <TableHead>اسم المستخدم</TableHead>
-                      <TableHead>رقم الهاتف</TableHead>
-                      <TableHead>الدور</TableHead>
-                      <TableHead>الحالة</TableHead>
+                      <TableHead sortable sortKey="full_name">الاسم</TableHead>
+                      <TableHead sortable sortKey="username">اسم المستخدم</TableHead>
+                      <TableHead sortable sortKey="phone">رقم الهاتف</TableHead>
+                      <TableHead sortable sortKey="role">الدور</TableHead>
+                      <TableHead sortable sortKey="created_at">تاريخ الإنشاء</TableHead>
+                      <TableHead sortable sortKey="is_active">الحالة</TableHead>
                       <TableHead>الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -328,6 +493,11 @@ export default function Users() {
                           </Badge>
                         </TableCell>
                         <TableCell>
+                          <Badge variant="ghost">
+                            {new Date(user.created_at).toLocaleDateString('en-US')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <Badge
                             variant={user.is_active ? 'default' : 'destructive'}
                           >
@@ -336,9 +506,12 @@ export default function Users() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
+
                             <SwitchActive
                               isActive={user.is_active}
                               onToggle={() => handleToggleStatus(user.id)}
+                              mode="playPause"
+                              confirmBeforeToggle={true}
                             />
                             <CrudActions
                               onView={() => {

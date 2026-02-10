@@ -81,6 +81,14 @@ export function AuthTemplate({
                 {description}
               </CardDescription>
             </div>
+
+            {/* رسالة الخطأ */}
+            {error && (
+              <div className="rounded-lg lg:rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 lg:p-4 text-xs lg:text-sm text-red-600 dark:text-red-400 animate-in slide-in-from-top-2 flex items-center gap-2 shadow-sm">
+                <AlertCircle className="w-3.5 h-3.5 lg:w-4 lg:h-4 flex-shrink-0" />
+                <span className="font-medium">{error}</span>
+              </div>
+            )}
           </CardHeader>
 
           <CardContent className="px-4 sm:px-6 lg:px-8 pb-6 lg:pb-8">
@@ -146,13 +154,6 @@ export function AuthTemplate({
                 </div>
               </div>
 
-              {/* رسالة الخطأ */}
-              {error && (
-                <div className="rounded-lg lg:rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 lg:p-4 text-xs lg:text-sm text-red-600 dark:text-red-400 animate-in slide-in-from-top-2 flex items-center gap-2 shadow-sm">
-                  <AlertCircle className="w-3.5 h-3.5 lg:w-4 lg:h-4 flex-shrink-0" />
-                  <span className="font-medium">{error}</span>
-                </div>
-              )}
 
               {/* زر الدخول */}
               <Button

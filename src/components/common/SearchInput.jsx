@@ -32,7 +32,7 @@ const SearchInput = ({
         value={value}
         onChange={onChange}
         disabled={disabled}
-        className="pr-10 pl-4 py-6 shadow-sm hover:shadow-md transition-all duration-200"
+        className="pr-10 pl-4 py-6 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
       />
     </div>
   );

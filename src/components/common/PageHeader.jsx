@@ -34,15 +34,15 @@ const PageHeader = ({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-xl text-sm font-bold border border-white/30">
+          {/* <span className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-xl text-sm font-bold border border-white/30">
             {new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </span>
+          </span> */}
           {actionLabel && onAction && (
             <Button
               onClick={onAction}
               variant="default"
               size="lg"
-              className="gap-2 w-full sm:w-auto bg-secondary-f text-primary-f hover:bg-secondary-f-alpha hover:text-primary-s rounded-lg font-bold border-2 hover:bg-secondary-f-alpha"
+              className="gap-2 w-full sm:w-auto p-7 text-md rounded-xl bg-secondary-f text-primary-f hover:bg-secondary-f-alpha hover:text-primary-s font-bold border-2 hover:bg-secondary-f-alpha"
             >
               <Plus className="w-5 h-5" />
               {actionLabel}

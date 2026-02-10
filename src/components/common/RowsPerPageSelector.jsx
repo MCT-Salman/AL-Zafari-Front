@@ -11,7 +11,7 @@
  */
 
 const RowsPerPageSelector = ({
-  value = 10,
+  value = 20,
   onChange = () => {},
   options = [5, 10, 20, 50],
   label = "عدد الصفوف:"
@@ -22,7 +22,7 @@ const RowsPerPageSelector = ({
       <select
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value))}
-        className="px-3 py-1 border border-primary-f rounded-md text-sm focus:outline-none  focus:secondary-t"
+        className="px-3 cursor-pointer py-1 border border-primary-f rounded-md text-sm focus:outline-none  focus:secondary-t"
       >
         {options.map((option) => (
           <option key={option} value={option}>

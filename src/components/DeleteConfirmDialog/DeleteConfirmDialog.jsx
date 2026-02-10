@@ -74,7 +74,7 @@ export default function DeleteConfirmDialog({
     >
       <div
         className="
-          w-full max-w-1/2
+           
           rounded-2xl bg-primary-s
           shadow-2xl
           animate-in fade-in zoom-in-95 duration-200

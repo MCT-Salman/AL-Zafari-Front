@@ -1,13 +1,17 @@
-// src/components/common/SwitchActive.jsx
+import { useState } from "react";
 import { Button } from "../ui/button";
-import { ToggleLeft, ToggleRight, Power, PowerOff, Check, X } from "lucide-react";
+import { ToggleLeft, ToggleRight, Power, PowerOff, Check, X, Play, Pause } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ConfirmDialog from "./ConfirmDialog";
+
+
 
 const SwitchActive = ({
   isActive,
   onToggle,
   size = "sm",
-  variant = "default", // "default", "icon-only", "text-only", "badge"
+  variant = "default",
+  mode = "switch",
   showLabel = false,
   activeLabel = "نشط",
   inactiveLabel = "معطل",
@@ -17,22 +21,39 @@ const SwitchActive = ({
   className,
   ...props
 }) => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+
   const handleClick = (e) => {
     if (confirmBeforeToggle) {
-      const confirmMessage = isActive 
-        ? "هل أنت متأكد من تعطيل هذا العنصر؟"
-        : "هل أنت متأكد من تفعيل هذا العنصر؟";
-      
-      if (window.confirm(confirmMessage)) {
-        onToggle(e);
-      }
+      setIsDialogOpen(true);
       return;
     }
     onToggle(e);
   };
 
+  const handleConfirm = async () => {
+    setIsConfirming(true);
+    try {
+      await onToggle();
+    } finally {
+      setIsConfirming(false);
+      setIsDialogOpen(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (!isConfirming) {
+      setIsDialogOpen(false);
+    }
+  };
+
   // Icon based on variant
   const getIcon = () => {
+    if (mode === "playPause") {
+      return isActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />;
+    }
+
     if (variant === "badge") {
       return isActive ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />;
     }
@@ -91,20 +112,36 @@ const SwitchActive = ({
   };
 
   return (
-    <Button
-      size={variant === "badge" ? "default" : size}
-      variant={variant === "default" ? (isActive ? "outline" : "destructive") : "ghost"}
-      onClick={handleClick}
-      disabled={disabled || loading}
-      className={cn(
-        "flex items-center gap-2 p-4 transition-all duration-300 hover:scale-105",
-        getVariantStyles(),
-        className
-      )}
-      {...props}
-    >
-      {buttonContent()}
-    </Button>
+    <>
+      <Button
+        size={variant === "badge" ? "default" : size}
+        variant={variant === "default" ? (isActive ? "outline" : "destructive") : "ghost"}
+        onClick={handleClick}
+        disabled={disabled || loading}
+        title={isActive ? "تعطيل" : "تفعيل"}
+        className={cn(
+          "flex items-center gap-2 p-4 transition-all duration-300 hover:scale-105",
+          getVariantStyles(),
+          className
+        )}
+        {...props}
+      >
+        {buttonContent()}
+      </Button>
+
+      <ConfirmDialog
+        isOpen={isDialogOpen}
+        title={isActive ? "تأكيد التعطيل" : "تأكيد التفعيل"}
+        message={
+          isActive
+            ? "هل أنت متأكد من رغبتك في التعطيل؟ "
+            : "هل أنت متأكد من رغبتك في التفعيل؟ "
+        }
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+        loading={isConfirming}
+      />
+    </>
   );
 };
 

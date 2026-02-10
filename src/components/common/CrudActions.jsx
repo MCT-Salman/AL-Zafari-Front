@@ -27,7 +27,7 @@ const CrudActions = ({
   const iconSize = iconSizes[size] || iconSizes.md;
   const btnSize = buttonSizes[size] || buttonSizes.md;
 
-  const btnBase = `${btnSize} rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md active:scale-95`;
+  const btnBase = `${btnSize} cursor-pointer rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md active:scale-95`;
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
@@ -64,7 +64,7 @@ const CrudActions = ({
           disabled={disabled}
           title="حذف"
           aria-label="Delete"
-          className={`${btnBase} text-secondary-s hover:bg-red-100 hover:text-secondary-s`}
+          className={`${btnBase} bg-secondary-s text-primary-s hover:bg-red-100 hover:text-secondary-s`}
         >
           <Trash2 className={iconSize} />
         </button>
