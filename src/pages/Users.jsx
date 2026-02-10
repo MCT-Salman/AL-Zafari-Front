@@ -32,6 +32,7 @@ import PaginationControls from "../components/common/PaginationControls";
 import SwitchActive from "../components/common/SwitchActive";
 import { UserRole, UserRoleLabels } from "../enums";
 import * as XLSX from "xlsx";
+import toast from 'react-hot-toast';
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -63,7 +64,7 @@ export default function Users() {
       const response = await userApi.getUsers();
       setUsers(response.data || []);
     } catch (err) {
-      setError(err.message || "فشل في تحميل المستخدمين");
+       toast.error(err.message || "فشل في تحميل المستخدمين");
     } finally {
       setLoading(false);
     }
@@ -112,9 +113,9 @@ export default function Users() {
       // Save file
       XLSX.writeFile(workbook, filename);
 
-      setMessage("تم تصدير البيانات بنجاح");
+      toast.success(`تم تصدير ${filteredUsers.length} مستخدم بنجاح`);
     } catch (err) {
-      setError("فشل في تصدير البيانات: " + err.message);
+      toast.error("فشل في تصدير البيانات: " + err.message);
     } finally {
       setExportLoading(false);
     }
@@ -185,26 +186,26 @@ export default function Users() {
       if (editingUser) {
         // Update user
         await userApi.updateUser(editingUser.id, userData);
-        setMessage("تم تحديث المستخدم بنجاح");
+        toast.success("تم تحديث المستخدم بنجاح");
       } else {
         // Create user
         await userApi.createUser(userData);
-        setMessage("تم إنشاء المستخدم بنجاح");
+        toast.success("تم إنشاء المستخدم بنجاح");
       }
       setShowModal(false);
       loadUsers();
     } catch (err) {
-      setError(err.message || "فشل في حفظ المستخدم");
+      toast.error(err.message || "فشل في حفظ المستخدم");
     }
   };
 
   const handleToggleStatus = async (userId) => {
     try {
       await userApi.toggleUserStatus(userId);
-      setMessage("تم تغيير حالة المستخدم بنجاح");
+      toast.success("تم تغيير حالة المستخدم بنجاح");
       loadUsers();
     } catch (err) {
-      setError(err.message || "فشل في تغيير حالة المستخدم");
+      toast.error(err.message || "فشل في تغيير حالة المستخدم");
     }
   };
 
@@ -216,11 +217,11 @@ export default function Users() {
     setDeleteConfirm((prev) => ({ ...prev, loading: true }));
     try {
       await userApi.deleteUser(deleteConfirm.userId);
-      setMessage("تم حذف المستخدم بنجاح");
+      toast.success("تم حذف المستخدم بنجاح");
       setDeleteConfirm({ isOpen: false, userId: null, loading: false });
       loadUsers();
     } catch (err) {
-      setError(err.message || "فشل في حذف المستخدم");
+      toast.error(err.message || "فشل في حذف المستخدم");
       setDeleteConfirm({ isOpen: false, userId: null, loading: false });
     }
   };
