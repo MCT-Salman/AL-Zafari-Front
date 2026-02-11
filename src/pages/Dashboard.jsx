@@ -83,10 +83,10 @@ const mainStats = [
 
 // بيانات العمليات حسب نوع الهوية
 const operationStats = [
-  { id: 1, label: "المستودع الخام", value: "24", icon: Package, color: colors.primaryF },
-  { id: 2, label: "التشريح", value: "18", icon:  Factory, color: colors.secondaryS },
-  { id: 3, label: "القص", value: "32", icon: Scissors, color: colors.secondaryF },
-  { id: 4, label: "التغرية", value: "15", icon: ArrowUpRight, color: colors.secondaryT },
+  { id: 1, label: "المستودع الخام", value: "24", icon: Package, icon_color: "text-primary-f",num_color:"text-primary-f", subtitle_color: "text-secondary-fo" },
+  { id: 2, label: "التشريح", value: "18", icon:  Factory, icon_color: "text-secondary-s" ,num_color:"text-secondary-s", subtitle_color: "text-secondary-fo" },
+  { id: 3, label: "القص", value: "32", icon: Scissors, icon_color: "text-secondary-f" ,num_color:"text-secondary-f", subtitle_color: "text-secondary-fo" },
+  { id: 4, label: "التغرية", value: "15", icon: ArrowUpRight, icon_color: "text-secondary-t" ,num_color:"text-secondary-t", subtitle_color: "text-secondary-fo" },
 ];
 
 // بيانات طلبات الإنتاج
@@ -118,23 +118,15 @@ export default function Dashboard() {
       <Card className="border-2 border-[#E5E5E5] shadow-lg bg-white overflow-hidden">
         <div className="h-1.5 w-full" style={{ backgroundColor: colors.secondaryF }} />
         <CardHeader className="pb-2">
-          <CardTitle className="text-xl font-black flex items-center gap-2" style={{ color: colors.primaryF }}>
-            <Factory className="w-6 h-6" style={{ color: colors.secondaryF }} />
+          <CardTitle className="text-xl font-black flex items-center gap-2 text-primary-f" >
+            <Factory className="w-6 h-6 text-secondary-f"  />
             العمليات  
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-4">
             {operationStats.map((op) => (
-              <StatCircle 
-                key={op.id} 
-                value={op.value} 
-                label={op.label} 
-                icon={op.icon} 
-                icon_color={op.color}
-                subtitle_color={colors.secondaryFo}
-                num_color={colors.primaryF}
-              />
+              <StatCircle  key={op.id}  {...op} />
             ))}
           </div>
         </CardContent>
@@ -145,8 +137,8 @@ export default function Dashboard() {
         {/* طلبات الإنتاج */}
         <Card className="lg:col-span-1 border-2 border-[#E5E5E5] shadow-lg bg-white">
           <CardHeader className="border-b-2 border-primary-s">
-            <CardTitle className="text-lg font-black flex items-center gap-2" style={{ color: colors.primaryF }}>
-              <Package className="w-5 h-5" style={{ color: colors.secondaryF }} />
+            <CardTitle className="text-lg font-black flex items-center gap-2 text-primary-f">
+              <Package className="w-5 h-5 text-secondary-f" />
               طلبات الإنتاج
             </CardTitle>
           </CardHeader>
@@ -160,7 +152,7 @@ export default function Dashboard() {
                 )}
                 style={{ borderColor: order.borderColor.replace('border-[', '').replace(']', '') }}
               >
-                <span className="font-bold" style={{ color: colors.primaryF }}>{order.label}</span>
+                <span className="font-bold text-primary-f" >{order.label}</span>
                 <span className={cn("px-4 py-1.5 rounded-full text-sm font-black text-white", order.bgColor)}>
                   {order.value}
                 </span>
@@ -172,8 +164,8 @@ export default function Dashboard() {
         {/* النشاط الأخير */}
         <Card className="lg:col-span-2 border-2 border-[#E5E5E5] shadow-lg bg-white">
           <CardHeader className="border-b-2 border-primary-s flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-black flex items-center gap-2" style={{ color: colors.primaryF }}>
-              <Clock className="w-5 h-5" style={{ color: colors.secondaryF }} />
+            <CardTitle className="text-lg font-black flex items-center gap-2 text-primary-f">
+              <Clock className="w-5 h-5 text-secondary-f" />
               النشاط الأخير
             </CardTitle>
             <Button 
