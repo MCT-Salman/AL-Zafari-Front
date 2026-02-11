@@ -32,7 +32,7 @@ const colors = {
   primaryF: "#004563",
   primaryS: "#F6F6F6",
   secondaryF: "#F7A823",
-  secondaryS: "#67122F",
+  secondaryS: "#e94e1b",
   secondaryT: "#0FAEDD",
   secondaryFo: "#878787"
 };

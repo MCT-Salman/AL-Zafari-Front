@@ -205,7 +205,7 @@
 //                 className={cn(
 //                   "h-10 w-10 rounded-lg font-medium transition-all duration-200 border",
 //                   currentPage === page
-//                     ? "bg-[#004563] text-white border-[#004563] shadow-md"
+//                     ? "bg-primary-f text-white border-primary-f shadow-md"
 //                     : "border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
 //                 )}
 //               >
@@ -524,7 +524,7 @@ function Pagination({
                 className={cn(
                   "h-10 w-10 rounded-lg font-medium transition-all duration-200 border",
                   currentPage === page
-                    ? "bg-[#004563] text-white border-[#004563] shadow-md"
+                    ? "bg-primary-f text-white border-primary-f shadow-md"
                     : "border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
                 )}
               >

@@ -24,7 +24,7 @@ const colors = {
   primaryF: "#004563",
   primaryS: "#F6F6F6",
   secondaryF: "#F7A823",
-  secondaryS: "#67122F",
+  secondaryS: "#e94e1b",
   secondaryT: "#0FAEDD",
   secondaryFo: "#878787"
 };
@@ -99,7 +99,7 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F6F6] py-8 px-4 sm:px-6 lg:px-8" dir="rtl">
+    <div className="min-h-screen bg-primary-s py-8 px-4 sm:px-6 lg:px-8" dir="rtl">
       <div className="max-w-2xl mx-auto space-y-6">
         
         {/* Header Section */}
@@ -155,7 +155,7 @@ const Profile = () => {
             
             {/* Success Message */}
             {message && (
-              <div className="mb-6 p-4 rounded-xl border-2 flex items-center gap-3 bg-[#004563]/5" style={{ borderColor: colors.primaryF }}>
+              <div className="mb-6 p-4 rounded-xl border-2 flex items-center gap-3 bg-primary-f/5" style={{ borderColor: colors.primaryF }}>
                 <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: colors.primaryF }} />
                 <span className="font-bold text-sm" style={{ color: colors.primaryF }}>{message}</span>
               </div>
@@ -163,7 +163,7 @@ const Profile = () => {
 
             {/* Error Message */}
             {error && (
-              <div className="mb-6 p-4 rounded-xl border-2 flex items-center gap-3 bg-[#67122F]/5" style={{ borderColor: colors.secondaryS }}>
+              <div className="mb-6 p-4 rounded-xl border-2 flex items-center gap-3 bg-secondary-s/5" style={{ borderColor: colors.secondaryS }}>
                 <AlertCircle className="w-5 h-5 flex-shrink-0" style={{ color: colors.secondaryS }} />
                 <span className="font-bold text-sm" style={{ color: colors.secondaryS }}>{error}</span>
               </div>
@@ -189,7 +189,7 @@ const Profile = () => {
                     value={formData.full_name}
                     onChange={handleInputChange}
                     placeholder="أدخل اسمك الكامل"
-                    className="h-12 pr-12 pl-4 bg-[#F6F6F6] border-2 border-[#E5E5E5] rounded-xl focus:border-[#004563] focus:ring-4 focus:ring-[#004563]/10 transition-all duration-300 text-[#004563] placeholder:text-[#878787]"
+                    className="h-12 pr-12 pl-4 bg-primary-s border-2 border-[#E5E5E5] rounded-xl focus:border-primary-f focus:ring-4 focus:ring-primary-f/10 transition-all duration-300 text-primary-f placeholder:text-secondary-fo"
                     disabled={loading}
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -216,7 +216,7 @@ const Profile = () => {
                     value={formData.username}
                     onChange={handleInputChange}
                     placeholder="أدخل اسم المستخدم"
-                    className="h-12 pr-12 pl-4 bg-[#F6F6F6] border-2 border-[#E5E5E5] rounded-xl focus:border-[#004563] focus:ring-4 focus:ring-[#004563]/10 transition-all duration-300 text-[#004563] placeholder:text-[#878787]"
+                    className="h-12 pr-12 pl-4 bg-primary-s border-2 border-[#E5E5E5] rounded-xl focus:border-primary-f focus:ring-4 focus:ring-primary-f/10 transition-all duration-300 text-primary-f placeholder:text-secondary-fo"
                     disabled={loading}
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -243,7 +243,7 @@ const Profile = () => {
                     value={formData.phone}
                     onChange={handleInputChange}
                     placeholder="أدخل رقم الهاتف"
-                    className="h-12 pr-12 pl-4 bg-[#F6F6F6] border-2 border-[#E5E5E5] rounded-xl focus:border-[#004563] focus:ring-4 focus:ring-[#004563]/10 transition-all duration-300 text-[#004563] placeholder:text-[#878787]"
+                    className="h-12 pr-12 pl-4 bg-primary-s border-2 border-[#E5E5E5] rounded-xl focus:border-primary-f focus:ring-4 focus:ring-primary-f/10 transition-all duration-300 text-primary-f placeholder:text-secondary-fo"
                     disabled={loading}
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -276,7 +276,7 @@ const Profile = () => {
         </Card>
 
         {/* Info Card */}
-        {/* <Card className="border-2 border-[#E5E5E5] bg-[#F6F6F6]">
+        {/* <Card className="border-2 border-[#E5E5E5] bg-primary-s">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <div 

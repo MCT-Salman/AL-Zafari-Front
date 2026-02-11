@@ -60,7 +60,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from ".
 //         onValueChange={onChange}
 //         disabled={disabled}
 //       >
-//         <SelectTrigger className="w-full h-10 border border-gray-300 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#004563] focus:ring-offset-0 focus:border-[#004563] disabled:opacity-50 disabled:cursor-not-allowed text-gray-900">
+//         <SelectTrigger className="w-full h-10 border border-gray-300 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-f focus:ring-offset-0 focus:border-primary-f disabled:opacity-50 disabled:cursor-not-allowed text-gray-900">
 //           <SelectValue placeholder={placeholder} />
 //         </SelectTrigger>
 //         <SelectContent className="bg-white border border-gray-200 rounded-lg shadow-lg">

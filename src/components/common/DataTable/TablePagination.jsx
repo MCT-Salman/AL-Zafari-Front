@@ -68,7 +68,7 @@ export const TablePagination = ({
                 onClick={() => onPageChange(page)}
                 className={cn(
                   'w-10 h-10',
-                  currentPage === page && 'bg-[#004563] text-white'
+                  currentPage === page && 'bg-primary-f text-white'
                 )}
               >
                 {page}
