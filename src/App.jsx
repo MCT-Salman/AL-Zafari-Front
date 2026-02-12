@@ -13,6 +13,9 @@ import VerifyOtp from "@/pages/VerifyOtp";
 import ResetPassword from "@/pages/ResetPassword";
 import { AuthProvider } from "./context/AuthContext";
 import { Toaster } from 'react-hot-toast';
+import ConstantTabs from "./pages/Constant/ConstantTabs";
+import CustomerManagement from "./pages/Sales/CustomerManagement";
+import OrderManagement from "./pages/Sales/OrderManagement";
 
 const App = () => {
   return (
@@ -31,8 +34,10 @@ const App = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/constants" element={<Constants />} />
+            <Route path="/constants" element={<ConstantTabs />} />
             <Route path="/settings-management" element={<SettingsManagement />} />
+            <Route path="/customers" element={<CustomerManagement />} />
+            <Route path="/orders" element={<OrderManagement />} />
             <Route path="/users" element={<Users />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>

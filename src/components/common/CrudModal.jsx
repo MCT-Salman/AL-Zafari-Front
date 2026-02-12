@@ -52,11 +52,11 @@ export const CrudModal = ({
   }
 
   const sizeClasses = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
-    full: 'max-w-full',
+    sm: 'w-[50%]',
+    md: 'w-[50%]',
+    lg: 'w-[50%]',
+    xl: 'w-[50%]',
+    full: 'w-[50%]',
   };
 
   const handleSubmit = async (e) => {
@@ -92,7 +92,7 @@ export const CrudModal = ({
     }
     
     if (key.includes('date') || key.includes('_at')) {
-      return new Date(value).toLocaleDateString('ar-SA', {
+      return new Date(value).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -121,7 +121,7 @@ export const CrudModal = ({
         
         <div className={cn(
           'relative w-full bg-primary-s rounded-2xl shadow-2xl transform transition-all',
-          sizeClasses[size] || 'max-w-md'
+          sizeClasses[size] 
         )}>
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-primary-f/10">
@@ -243,7 +243,7 @@ export const CrudModal = ({
                         {field.label}
                       </p>
                       <div className="text-base font-semibold text-secondary-f">
-                        {defaultFormatValue(field.key, value)}
+                        {field.formatValue ? field.formatValue(field.key, value) : defaultFormatValue(field.key, value)}
                       </div>
                     </div>
                   </div>
@@ -255,7 +255,7 @@ export const CrudModal = ({
           </div>
 
           {/* Footer Actions */}
-          {(onSubmit || onDelete) && (
+          {/* {(onSubmit || onDelete) && (
             <div className="flex gap-3 p-6 border-t border-primary-f/10 bg-secondary-s/30 rounded-b-2xl">
               {onSubmit && (
                 <Button
@@ -280,7 +280,7 @@ export const CrudModal = ({
                 </Button>
               )}
             </div>
-          )}
+          )} */}
         </div>
       </div>
     );
@@ -311,7 +311,7 @@ export const CrudModal = ({
           <button
             onClick={onClose}
             disabled={loading}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-secondary-t hover:text-secondary-f hover:bg-secondary-s transition-all duration-200"
+            className="w-8 h-8 cursor-pointer rounded-full flex items-center justify-center text-secondary-t hover:text-secondary-f hover:bg-secondary-s transition-all duration-200"
           >
             <X className="w-5 h-5" />
           </button>

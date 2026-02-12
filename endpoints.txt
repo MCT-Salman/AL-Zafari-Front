@@ -1200,3 +1200,2530 @@ Headers (19)
   "error": "خطأ في الخادم",
   "details": "القيمة الثابتة غير موجودة"
 }
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+
+GET
+get materials
+{{autolocal}}/material
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/material'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب المواد بنجاح",
+  "data": [
+    {
+      "material_id": 2,
+      "material_name": "pvc",
+      "type": "Role",
+      "constant_height_id": 5,
+      "constant_width_id": 3,
+      "constant_thickness_id": 6,
+      "constant_value_unit": "متر",
+      "notes": "ملاحظات",
+      "height": {
+        "constant_value_id": 5,
+        "constant_type_id": 3,
+        "value": "150",
+        "unit": "م",
+        "label": " 150 م",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      },
+      "width": {
+        "constant_value_id": 3,
+        "constant_type_id": 2,
+        "value": "66",
+        "unit": "مم",
+        "label": " 66 مم",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      },
+      "thickness": {
+        "constant_value_id": 6,
+        "constant_type_id": 4,
+        "value": "0.6",
+        "unit": "سم",
+        "label": " 0.6 سم",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      },
+      "colors": [
+        {
+          "color_id": 2,
+          "material_id": 2,
+          "color_code": "RED002",
+          "color_name": "أحمر لولي",
+          "notes": "ملاحظات"
+        },
+        {
+          "color_id": 3,
+          "material_id": 2,
+          "color_code": "RED003",
+          "color_name": "أحمر غامق",
+          "notes": "ملاحظات"
+        }
+      ]
+    }
+  ],
+  "total": 1
+}
+
+GET
+get materialbyid
+{{autolocal}}/material/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/material/2'
+200 OK
+Example Response
+Body
+Headers (19)
+
+{
+  "success": true,
+  "message": "تم جلب المادة بنجاح",
+  "data": {
+    "material_id": 2,
+    "material_name": "pvc",
+    "type": "Role",
+    "constant_height_id": 5,
+    "constant_width_id": 3,
+    "constant_thickness_id": 6,
+    "constant_value_unit": "متر",
+    "notes": "ملاحظات",
+    "height": {
+      "constant_value_id": 5,
+      "constant_type_id": 3,
+      "value": "150",
+      "unit": "م",
+      "label": " 150 م",
+      "isDefault": true,
+      "notes": "ملاحظات"
+    },
+    "width": {
+      "constant_value_id": 3,
+      "constant_type_id": 2,
+      "value": "66",
+      "unit": "مم",
+      "label": " 66 مم",
+      "isDefault": true,
+      "notes": "ملاحظات"
+    },
+    "thickness": {
+      "constant_value_id": 6,
+      "constant_type_id": 4,
+      "value": "0.6",
+      "unit": "سم",
+      "label": " 0.6 سم",
+      "isDefault": true,
+      "notes": "ملاحظات"
+    },
+    "colors": [],
+    "batches": [],
+    "rulers": []
+  }
+}
+
+POST
+create material
+{{autolocal}}/material
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+
+{
+    "material_name": "pvc",
+    "type": "Role",
+    "constant_height_id": 5,
+    "constant_width_id": 3,
+    "constant_thickness_id": 6,
+    "constant_value_unit": "متر",
+    "notes": "ملاحظات"
+}
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/material' \
+--data '{
+    "material_name": "pvc",
+    "type": "Role",
+    "constant_height_id": 5,
+    "constant_width_id": 3,
+    "constant_thickness_id": 6,
+    "constant_value_unit": "متر",
+    "notes": "ملاحظات"
+}'
+201 Created
+Example Response
+Body
+Headers (19)
+
+{
+  "success": true,
+  "message": "تم إنشاء المادة بنجاح",
+  "data": {
+    "material_id": 2,
+    "material_name": "pvc",
+    "type": "Role",
+    "constant_height_id": 5,
+    "constant_width_id": 3,
+    "constant_thickness_id": 6,
+    "constant_value_unit": "متر",
+    "notes": "ملاحظات"
+  }
+}
+
+PUT
+put material
+{{autolocal}}/material/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "material_name": "pvc",
+    "type": "Role",
+    "constant_height_id": 5,
+    "constant_width_id": 3,
+    "constant_thickness_id": 6,
+    "constant_value_unit": "متر"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/material/2' \
+--data '{
+    "material_name": "pvc",
+    "type": "Role",
+    "constant_height_id": 5,
+    "constant_width_id": 3,
+    "constant_thickness_id": 6,
+    "constant_value_unit": "متر"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تحديث المادة بنجاح",
+  "data": {
+    "material_id": 2,
+    "material_name": "pvc",
+    "type": "Role",
+    "constant_height_id": 5,
+    "constant_width_id": 3,
+    "constant_thickness_id": 6,
+    "constant_value_unit": "متر",
+    "notes": "ملاحظات"
+  }
+}
+
+DELETE
+Del material
+{{autolocal}}/material/3
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/material/3'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم حذف المادة بنجاح",
+  "data": {}
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+color
+GET
+get color
+{{autolocal}}/color
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/color'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب الألوان بنجاح",
+  "data": [
+    {
+      "color_id": 3,
+      "material_id": 2,
+      "color_code": "RED003",
+      "color_name": "أحمر غامق",
+      "notes": "ملاحظات",
+      "material": {
+        "material_id": 2,
+        "material_name": "pvc",
+        "type": "Role",
+        "constant_height_id": 5,
+        "constant_width_id": 3,
+        "constant_thickness_id": 6,
+        "constant_value_unit": "متر",
+        "notes": "ملاحظات"
+      },
+      "prices": []
+    },
+    {
+      "color_id": 2,
+      "material_id": 2,
+      "color_code": "RED002",
+      "color_name": "أحمر لولي",
+      "notes": "ملاحظات",
+      "material": {
+        "material_id": 2,
+        "material_name": "pvc",
+        "type": "Role",
+        "constant_height_id": 5,
+        "constant_width_id": 3,
+        "constant_thickness_id": 6,
+        "constant_value_unit": "متر",
+        "notes": "ملاحظات"
+      },
+      "prices": [
+        {
+          "price_color_id": 1,
+          "color_id": 2,
+          "constant_value_id": 7,
+          "price_color_By": "isByMeter22",
+          "price_per_meter": "150",
+          "notes": "ملاحظات"
+        },
+        {
+          "price_color_id": 3,
+          "color_id": 2,
+          "constant_value_id": 8,
+          "price_color_By": "isByMeter44",
+          "price_per_meter": "150",
+          "notes": "ملاحظات"
+        }
+      ]
+    }
+  ],
+  "total": 2
+}
+GET
+get colorbyid
+{{autolocal}}/color/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/color/2'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب اللون بنجاح",
+  "data": {
+    "color_id": 2,
+    "material_id": 2,
+    "color_code": "RED002",
+    "color_name": "أحمر لولي",
+    "notes": "ملاحظات",
+    "material": {
+      "material_id": 2,
+      "material_name": "pvc",
+      "type": "Role",
+      "constant_height_id": 5,
+      "constant_width_id": 3,
+      "constant_thickness_id": 6,
+      "constant_value_unit": "متر",
+      "notes": "ملاحظات"
+    },
+    "prices": [],
+    "rulers": []
+  }
+}
+
+DELETE
+del color
+{{autolocal}}/color/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/color/1'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم حذف اللون بنجاح",
+  "data": {}
+}
+
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+
+PriceColor
+GET
+get PriceColor
+{{autolocal}}/price-color
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/price-color'
+200 OK
+Example Response
+Body
+Headers (20)
+
+{
+  "success": true,
+  "message": "تم جلب أسعار الألوان بنجاح",
+  "data": [
+    {
+      "price_color_id": 3,
+      "color_id": 2,
+      "constant_value_id": 8,
+      "price_color_By": "isByMeter44",
+      "price_per_meter": "150",
+      "notes": "ملاحظات",
+      "color": {
+        "color_id": 2,
+        "material_id": 2,
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "notes": "ملاحظات",
+        "material": {
+          "material_id": 2,
+          "material_name": "pvc",
+          "type": "Role",
+          "constant_height_id": 5,
+          "constant_width_id": 3,
+          "constant_thickness_id": 6,
+          "constant_value_unit": "متر",
+          "notes": "ملاحظات"
+        }
+      },
+      "constant_value": {
+        "constant_value_id": 8,
+        "constant_type_id": 5,
+        "value": "مكنة",
+        "unit": null,
+        "label": null,
+        "isDefault": true,
+        "notes": "ملاحظات",
+        "type": {
+          "constant_type_id": 5,
+          "constants_Type_name": "نوع الطلب",
+          "type": "type_order",
+          "notes": "ملاحظات"
+        }
+      }
+    },
+    {
+      "price_color_id": 1,
+      "color_id": 2,
+      "constant_value_id": 7,
+      "price_color_By": "isByMeter22",
+      "price_per_meter": "150",
+      "notes": "ملاحظات",
+      "color": {
+        "color_id": 2,
+        "material_id": 2,
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "notes": "ملاحظات",
+        "material": {
+          "material_id": 2,
+          "material_name": "pvc",
+          "type": "Role",
+          "constant_height_id": 5,
+          "constant_width_id": 3,
+          "constant_thickness_id": 6,
+          "constant_value_unit": "متر",
+          "notes": "ملاحظات"
+        }
+      },
+      "constant_value": {
+        "constant_value_id": 7,
+        "constant_type_id": 5,
+        "value": "كوي",
+        "unit": null,
+        "label": null,
+        "isDefault": true,
+        "notes": "ملاحظات",
+        "type": {
+          "constant_type_id": 5,
+          "constants_Type_name": "نوع الطلب",
+          "type": "type_order",
+          "notes": "ملاحظات"
+        }
+      }
+    }
+  ],
+  "total": 2
+}
+
+GET
+PriceColorbyid
+{{autolocal}}/price-color/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/price-color/1'
+200 OK
+Example Response
+Body
+Headers (19)
+
+{
+  "success": true,
+  "message": "تم جلب سعر اللون بنجاح",
+  "data": {
+    "price_color_id": 1,
+    "color_id": 2,
+    "constant_value_id": 7,
+    "price_color_By": "isByMeter22",
+    "price_per_meter": "150",
+    "notes": "ملاحظات",
+    "color": {
+      "color_id": 2,
+      "material_id": 2,
+      "color_code": "RED002",
+      "color_name": "أحمر لولي",
+      "notes": "ملاحظات",
+      "material": {
+        "material_id": 2,
+        "material_name": "pvc",
+        "type": "Role",
+        "constant_height_id": 5,
+        "constant_width_id": 3,
+        "constant_thickness_id": 6,
+        "constant_value_unit": "متر",
+        "notes": "ملاحظات"
+      }
+    },
+    "constant_value": {
+      "constant_value_id": 7,
+      "constant_type_id": 5,
+      "value": "كوي",
+      "unit": null,
+      "label": null,
+      "isDefault": true,
+      "notes": "ملاحظات",
+      "type": {
+        "constant_type_id": 5,
+        "constants_Type_name": "نوع الطلب",
+        "type": "type_order",
+        "notes": "ملاحظات"
+      }
+    }
+  }
+}
+
+
+PUT
+put PriceColor
+{{autolocal}}/price-color/3
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "color_id": 2,
+  "constant_value_id":8,
+  "price_color_By": "isByMeter44",
+  "price_per_meter": 150,
+  "notes": "ملاحظات"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/price-color/3' \
+--data '{
+  "color_id": 2,
+  "constant_value_id":8,
+  "price_color_By": "isByMeter44",
+  "price_per_meter": 150,
+  "notes": "ملاحظات"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+View More
+{
+  "success": true,
+  "message": "تم تحديث سعر اللون بنجاح",
+  "data": {
+    "price_color_id": 3,
+    "color_id": 2,
+    "constant_value_id": 8,
+    "price_color_By": "isByMeter44",
+    "price_per_meter": "150",
+    "notes": "ملاحظات"
+  }
+}
+DELETE
+del PriceColor
+{{autolocal}}/price-color/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/price-color/2'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم حذف سعر اللون بنجاح",
+  "data": {}
+}
+
+//////////////////////////////////////////////////////
+//////////////////////////////////////////////////////
+//////////////////////////////////////////////////////
+//////////////////////////////////////////////////////
+
+ruler
+GET
+get ruler
+{{autolocal}}/ruler
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/ruler'
+200 OK
+Example Response
+Body
+Headers (20)
+{
+  "success": true,
+  "message": "تم جلب المساطر بنجاح",
+  "data": [
+    {
+      "ruler_id": 2,
+      "ruler_type": "old",
+      "material_id": 2,
+      "color_id": 2,
+      "notes": "ملاحظات",
+      "material": {
+        "material_id": 2,
+        "material_name": "pvc",
+        "type": "Role",
+        "constant_height_id": 5,
+        "constant_width_id": 3,
+        "constant_thickness_id": 6,
+        "constant_value_unit": "متر",
+        "notes": "ملاحظات",
+        "height": {
+          "constant_value_id": 5,
+          "constant_type_id": 3,
+          "value": "150",
+          "unit": "م",
+          "label": " 150 م",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        },
+        "width": {
+          "constant_value_id": 3,
+          "constant_type_id": 2,
+          "value": "66",
+          "unit": "مم",
+          "label": " 66 مم",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        },
+        "thickness": {
+          "constant_value_id": 6,
+          "constant_type_id": 4,
+          "value": "0.6",
+          "unit": "سم",
+          "label": " 0.6 سم",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        }
+      },
+      "color": {
+        "color_id": 2,
+        "material_id": 2,
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "notes": "ملاحظات"
+      }
+    },
+    {
+      "ruler_id": 1,
+      "ruler_type": "new",
+      "material_id": 2,
+      "color_id": 2,
+      "notes": "ملاحظات",
+      "material": {
+        "material_id": 2,
+        "material_name": "pvc",
+        "type": "Role",
+        "constant_height_id": 5,
+        "constant_width_id": 3,
+        "constant_thickness_id": 6,
+        "constant_value_unit": "متر",
+        "notes": "ملاحظات",
+        "height": {
+          "constant_value_id": 5,
+          "constant_type_id": 3,
+          "value": "150",
+          "unit": "م",
+          "label": " 150 م",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        },
+        "width": {
+          "constant_value_id": 3,
+          "constant_type_id": 2,
+          "value": "66",
+          "unit": "مم",
+          "label": " 66 مم",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        },
+        "thickness": {
+          "constant_value_id": 6,
+          "constant_type_id": 4,
+          "value": "0.6",
+          "unit": "سم",
+          "label": " 0.6 سم",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        }
+      },
+      "color": {
+        "color_id": 2,
+        "material_id": 2,
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "notes": "ملاحظات"
+      }
+    }
+  ],
+  "total": 2
+}
+GET
+rulerbyid
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/ruler/1'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب المسطرة بنجاح",
+  "data": {
+    "ruler_id": 1,
+    "ruler_type": "new",
+    "material_id": 2,
+    "color_id": 2,
+    "notes": "ملاحظات",
+    "material": {
+      "material_id": 2,
+      "material_name": "pvc",
+      "type": "Role",
+      "constant_height_id": 5,
+      "constant_width_id": 3,
+      "constant_thickness_id": 6,
+      "constant_value_unit": "متر",
+      "notes": "ملاحظات",
+      "height": {
+        "constant_value_id": 5,
+        "constant_type_id": 3,
+        "value": "150",
+        "unit": "م",
+        "label": " 150 م",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      },
+      "width": {
+        "constant_value_id": 3,
+        "constant_type_id": 2,
+        "value": "66",
+        "unit": "مم",
+        "label": " 66 مم",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      },
+      "thickness": {
+        "constant_value_id": 6,
+        "constant_type_id": 4,
+        "value": "0.6",
+        "unit": "سم",
+        "label": " 0.6 سم",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      }
+    },
+    "color": {
+      "color_id": 2,
+      "material_id": 2,
+      "color_code": "RED002",
+      "color_name": "أحمر لولي",
+      "notes": "ملاحظات"
+    }
+  }
+}
+
+PUT
+put ruler
+{{autolocal}}/ruler/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "ruler_type": "old",
+  "material_id": 2,
+  "color_id": 2,
+  "notes": "ملاحظات"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/ruler/2' \
+--data '{
+  "ruler_type": "old",
+  "material_id": 2,
+  "color_id": 2,
+  "notes": "ملاحظات"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تحديث المسطرة بنجاح",
+  "data": {
+    "ruler_id": 2,
+    "ruler_type": "old",
+    "material_id": 2,
+    "color_id": 2,
+    "notes": "ملاحظات"
+  }
+}
+DELETE
+del ruler
+{{autolocal}}/ruler/3
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/ruler/3'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم حذف المسطرة بنجاح",
+  "data": {}
+}
+
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+
+batch
+GET
+get batch
+{{autolocal}}/batch
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/batch'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب الطبخات بنجاح",
+  "data": [
+    {
+      "batch_id": 1,
+      "batch_number": "BATCH-2024-001",
+      "entry_date": "2024-01-15T10:30:00.000Z",
+      "material_id": 2,
+      "notes": "ملاحظات",
+      "material": {
+        "material_id": 2,
+        "material_name": "pvc",
+        "type": "Role",
+        "constant_height_id": 5,
+        "constant_width_id": 3,
+        "constant_thickness_id": 6,
+        "constant_value_unit": "متر",
+        "notes": "ملاحظات",
+        "height": {
+          "constant_value_id": 5,
+          "constant_type_id": 3,
+          "value": "150",
+          "unit": "م",
+          "label": " 150 م",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        },
+        "width": {
+          "constant_value_id": 3,
+          "constant_type_id": 2,
+          "value": "66",
+          "unit": "مم",
+          "label": " 66 مم",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        },
+        "thickness": {
+          "constant_value_id": 6,
+          "constant_type_id": 4,
+          "value": "0.6",
+          "unit": "سم",
+          "label": " 0.6 سم",
+          "isDefault": true,
+          "notes": "ملاحظات"
+        }
+      }
+    }
+  ],
+  "total": 1
+}
+GET
+get batchbyid
+{{autolocal}}/batch/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/batch/1'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب الطبخة بنجاح",
+  "data": {
+    "batch_id": 1,
+    "batch_number": "BATCH-2024-001",
+    "entry_date": "2024-01-15T10:30:00.000Z",
+    "material_id": 2,
+    "notes": "ملاحظات",
+    "material": {
+      "material_id": 2,
+      "material_name": "pvc",
+      "type": "Role",
+      "constant_height_id": 5,
+      "constant_width_id": 3,
+      "constant_thickness_id": 6,
+      "constant_value_unit": "متر",
+      "notes": "ملاحظات",
+      "height": {
+        "constant_value_id": 5,
+        "constant_type_id": 3,
+        "value": "150",
+        "unit": "م",
+        "label": " 150 م",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      },
+      "width": {
+        "constant_value_id": 3,
+        "constant_type_id": 2,
+        "value": "66",
+        "unit": "مم",
+        "label": " 66 مم",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      },
+      "thickness": {
+        "constant_value_id": 6,
+        "constant_type_id": 4,
+        "value": "0.6",
+        "unit": "سم",
+        "label": " 0.6 سم",
+        "isDefault": true,
+        "notes": "ملاحظات"
+      }
+    }
+  }
+}
+
+DELETE
+del batch
+{{autolocal}}/batch/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/batch/3'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم حذف الطبخة بنجاح",
+  "data": {}
+}
+
+//////////////////////////////////////
+//////////////////////////////////////
+//////////////////////////////////////
+//////////////////////////////////////
+//////////////////////////////////////
+
+GET
+get customer
+{{autolocal}}/customer
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/customer'
+200 OK
+Example Response
+Body
+Headers (19)
+
+{
+  "success": true,
+  "message": "تم جلب العملاء بنجاح",
+  "data": [
+    {
+      "customer_id": 1,
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين",
+      "country": "SY",
+      "countryCode": "+963",
+      "is_active": true,
+      "fcmToken": null,
+      "notes": "ملاحظات",
+      "created_at": "2026-02-03T10:12:30.517Z"
+    }
+  ],
+  "total": 1
+}
+GET
+customerbyid
+{{autolocal}}/customer/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/customer/1'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم جلب العميل بنجاح",
+  "data": {
+    "customer_id": 1,
+    "name": "الزفري",
+    "phone": "+963912345678",
+    "customer_type": "customer",
+    "city": "دمشق",
+    "address": "عربين",
+    "country": "SY",
+    "countryCode": "+963",
+    "is_active": true,
+    "fcmToken": null,
+    "notes": "ملاحظات",
+    "created_at": "2026-02-03T10:12:30.517Z",
+    "orders": [],
+    "invoices": []
+  }
+}
+POST
+create customer
+{{autolocal}}/customer
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "name": "الزفري",
+  "phone": "+963912345678",
+  "customer_type": "customer",
+  "city": "دمشق",
+  "address": "عربين",
+  "is_active": true,
+  "notes": "ملاحظات"
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/customer' \
+--data '{
+  "name": "الزفري",
+  "phone": "+963912345678",
+  "customer_type": "customer",
+  "city": "دمشق",
+  "address": "عربين",
+  "is_active": true,
+  "notes": "ملاحظات"
+}'
+201 Created
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم إنشاء العميل بنجاح",
+  "data": {
+    "customer_id": 1,
+    "name": "الزفري",
+    "phone": "+963912345678",
+    "customer_type": "customer",
+    "city": "دمشق",
+    "address": "عربين",
+    "country": "SY",
+    "countryCode": "+963",
+    "is_active": true,
+    "fcmToken": null,
+    "notes": "ملاحظات",
+    "created_at": "2026-02-03T10:12:30.517Z"
+  }
+}
+
+PUT
+put customer
+{{autolocal}}/customer/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "name": "الزفري",
+  "phone": "+963912345678",
+  "customer_type": "customer",
+  "city": "دمشق",
+  "address": "عربين",
+  "is_active": true,
+  "notes": "ملاحظات"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/customer/1' \
+--data '{
+  "name": "الزفري",
+  "phone": "+963912345678",
+  "customer_type": "customer",
+  "city": "دمشق",
+  "address": "عربين",
+  "is_active": true,
+  "notes": "ملاحظات"
+}'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم تحديث العميل بنجاح",
+  "data": {
+    "customer_id": 1,
+    "name": "الزفري",
+    "phone": "+963912345678",
+    "customer_type": "customer",
+    "city": "دمشق",
+    "address": "عربين",
+    "country": "SY",
+    "countryCode": "+963",
+    "is_active": true,
+    "fcmToken": null,
+    "notes": "ملاحظات",
+    "created_at": "2026-02-03T10:12:30.517Z"
+  }
+}
+DELETE
+del customer
+{{autolocal}}/customer/2
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/customer/2'
+200 OK
+Example Response
+Body
+Headers (19)
+{
+  "success": true,
+  "message": "تم حذف العميل بنجاح",
+  "data": {}
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
+GET
+get orders
+{{autolocal}}/order/
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/order/'
+200 OK
+Example Response
+Body
+Headers (21)
+{
+  "success": true,
+  "message": "تم جلب الطلبات بنجاح",
+  "data": [
+    {
+      "order_id": 15,
+      "status": "pending",
+      "total_amount": "1250000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T12:14:38.993Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    },
+    {
+      "order_id": 14,
+      "status": "pending",
+      "total_amount": "1250000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T11:11:56.795Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    },
+    {
+      "order_id": 13,
+      "status": "pending",
+      "total_amount": "1250000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T11:11:16.262Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    },
+    {
+      "order_id": 12,
+      "status": "pending",
+      "total_amount": "1250000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T11:10:33.490Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    },
+    {
+      "order_id": 11,
+      "status": "pending",
+      "total_amount": "1250000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T11:09:55.289Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    },
+    {
+      "order_id": 10,
+      "status": "pending",
+      "total_amount": "1250000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T11:08:08.956Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    },
+    {
+      "order_id": 9,
+      "status": "pending",
+      "total_amount": "1500000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T11:07:12.044Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    },
+    {
+      "order_id": 8,
+      "status": "pending",
+      "total_amount": "1500000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T11:06:17.420Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    },
+    {
+      "order_id": 7,
+      "status": "pending",
+      "total_amount": "30000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T11:04:14.793Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    },
+    {
+      "order_id": 6,
+      "status": "pending",
+      "total_amount": "30000",
+      "count_items": 2,
+      "notes": "ملاحظات الطلب",
+      "created_at": "2026-02-05T11:00:44.442Z",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "balance": "0",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين"
+      },
+      "sales": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    }
+  ],
+  "total": 14
+}
+GET
+orderbyid
+{{autolocal}}/order/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/order/1'
+200 OK
+Example Response
+Body
+Headers (21)
+{
+  "success": true,
+  "message": "تم جلب الطلب بنجاح",
+  "data": {
+    "customer_id": 1,
+    "sales_user_id": 1,
+    "status": "completed",
+    "count_items": 5,
+    "total_amount": "1201500",
+    "created_at": "2026-02-03T13:17:30.945Z",
+    "notes": "تحديث ملاحظات الطلب",
+    "customer": {
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "balance": "0",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين"
+    },
+    "sales": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator"
+    },
+    "items": [
+      {
+        "order_id": 1,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "كوي",
+        "constant_width": "22",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 50,
+        "price_per_meter": "150",
+        "subtotal": "750000",
+        "notes": "تحديث ملاحظات العنصر"
+      },
+      {
+        "order_id": 1,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": "150000",
+        "notes": "عنصر جديد"
+      },
+      {
+        "order_id": 1,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": "1500",
+        "notes": "عنصر جديد"
+      },
+      {
+        "order_id": 1,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": "150000",
+        "notes": "عنصر جديد"
+      },
+      {
+        "order_id": 1,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": "150000",
+        "notes": "عنصر جديد"
+      }
+    ]
+  }
+}
+POST
+create order
+{{autolocal}}/order/
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+{
+    "customer_id": 1,
+    "status": "pending",
+    "notes": "ملاحظات الطلب",
+    "items": [
+        {
+            "type_item": 7,
+            "ruler_id": 2,
+            "constant_width": 22,
+            "length": 100.0,
+            "constant_thickness": 0.6,
+            "batch_id": 1,
+            "quantity": 50,
+            "notes": "ملاحظات العنصر"
+        },
+        {
+            "type_item": 7,
+            "ruler_id": 1,
+            "constant_width": 22,
+            "length": 100.0,
+            "constant_thickness": 0.6,
+            "batch_id": 1,
+            "quantity": 50,
+            "notes": "ملاحظات العنصر"
+        }
+    ]
+}
+curl --location -g '{{autolocal}}/order/' \
+--data '{
+    "customer_id": 1,
+    "status": "pending",
+    "notes": "ملاحظات الطلب",
+    "items": [
+        {
+            "type_item": 7,
+            "ruler_id": 2,
+            "constant_width": 22,
+            "length": 100.0,
+            "constant_thickness": 0.6,
+            "batch_id": 1,
+            "quantity": 50,
+            "notes": "ملاحظات العنصر"
+        },
+        {
+            "type_item": 7,
+            "ruler_id": 1,
+            "constant_width": 22,
+            "length": 100.0,
+            "constant_thickness": 0.6,
+            "batch_id": 1,
+            "quantity": 50,
+            "notes": "ملاحظات العنصر"
+        }
+    ]
+}
+
+Example Response
+Body
+Headers (21)
+{
+  "success": true,
+  "message": "تم إنشاء الطلب بنجاح",
+  "data": {
+    "customer_id": 1,
+    "sales_user_id": 1,
+    "status": "pending",
+    "count_items": 2,
+    "total_amount": "1492500",
+    "created_at": "2026-02-07T11:55:26.186Z",
+    "notes": "ملاحظات الطلب",
+    "customer": {
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "balance": "0",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين"
+    },
+    "sales": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator"
+    },
+    "items": [
+      {
+        "order_id": 19,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "كوي",
+        "constant_width": "22",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 50,
+        "price_per_meter": "150",
+        "subtotal": "746250",
+        "notes": "ملاحظات العنصر"
+      },
+      {
+        "order_id": 19,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "كوي",
+        "constant_width": "22",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 50,
+        "price_per_meter": "150",
+        "subtotal": "746250",
+        "notes": "ملاحظات العنصر"
+      }
+    ]
+  }
+}
+PUT
+put order
+{{autolocal}}/order/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+{
+  "customer_id": 1,
+  "status": "pending",
+  "notes": "تحديث ملاحظات الطلب",
+  "items": [
+    {
+      "type_item": 7,
+      "ruler_id": 1,
+      "constant_width": 22,
+      "length": 100,
+      "constant_thickness": 0.6,
+      "batch_id": 1,
+      "quantity": 50,
+      "notes": "تحديث ملاحظات العنصر"
+    },
+    {
+      "type_item": 8,
+      "ruler_id": 2,
+      "constant_width": 44,
+      "length": 100,
+      "constant_thickness": 0.6,
+      "batch_id": 1,
+      "quantity": 30,
+      "notes": "عنصر جديد"
+    }
+  ]
+}
+curl --location -g --request PUT '{{autolocal}}/order/1' \
+--data '{
+  "customer_id": 1,
+  "status": "pending",
+  "notes": "تحديث ملاحظات الطلب",
+  "items": [
+    {
+      "type_item": 7,
+      "ruler_id": 1,
+      "constant_width": 22,
+      "length": 100,
+      "constant_thickness": 0.6,
+      "batch_id": 1,
+      "quantity": 50,
+      "notes": "تحديث ملاحظات العنصر"
+    },
+    {
+      "type_item": 8,
+      "ruler_id": 2,
+      "constant_width": 44,
+      "length": 100,
+      "constant_thickness": 0.6,
+      "batch_id": 1,
+      "quantity": 30,
+      "notes": "عنصر جديد"
+    }
+  ]
+}'
+
+{
+  "success": true,
+  "message": "تم تحديث الطلب بنجاح",
+  "data": {
+    "customer_id": 1,
+    "sales_user_id": 1,
+    "status": "pending",
+    "count_items": 2,
+    "total_amount": "895500",
+    "created_at": "2026-02-03T13:17:30.945Z",
+    "notes": "تحديث ملاحظات الطلب",
+    "customer": {
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "balance": "0",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين"
+    },
+    "sales": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator"
+    },
+    "items": [
+      {
+        "order_id": 1,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "كوي",
+        "constant_width": "22",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 50,
+        "price_per_meter": "150",
+        "subtotal": "746250",
+        "notes": "تحديث ملاحظات العنصر"
+      },
+      {
+        "order_id": 1,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      }
+    ]
+  }
+}
+
+
+PATCH
+edit status
+{{autolocal}}/order/1/status
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "status" : "completed"// "preparing"//"canceled"
+}
+Example Request
+true
+curl
+curl --location -g --request PATCH '{{autolocal}}/order/1/status' \
+--data '{
+    "status" : "completed"// "preparing"//"canceled"
+}'
+200 OK
+Example Response
+Body
+Headers (21)
+{
+  "success": true,
+  "message": "تم تحديث حالة الطلب بنجاح",
+  "data": {
+    "customer_id": 1,
+    "sales_user_id": 1,
+    "status": "completed",
+    "count_items": 2,
+    "total_amount": "900000",
+    "created_at": "2026-02-03T13:17:30.945Z",
+    "notes": "تحديث ملاحظات الطلب",
+    "customer": {
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "balance": "0",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين"
+    },
+    "sales": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator"
+    },
+    "items": [
+      {
+        "order_id": 1,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "كوي",
+        "constant_width": "22",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 50,
+        "price_per_meter": "150",
+        "subtotal": "750000",
+        "notes": "تحديث ملاحظات العنصر"
+      },
+      {
+        "order_id": 1,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": "150000",
+        "notes": "عنصر جديد"
+      }
+    ]
+  }
+}
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+
+
+POST
+add item
+{{autolocal}}/order/16/items
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "type_item": 8,
+    "ruler_id": 2,
+    "constant_width": 44,
+    "length": 100,
+    "constant_thickness": 0.6,
+    "batch_id": 1,
+    "quantity": 30,
+    "notes": "عنصر جديد"
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/order/16/items' \
+--data '{
+    "type_item": 8,
+    "ruler_id": 2,
+    "constant_width": 44,
+    "length": 100,
+    "constant_thickness": 0.6,
+    "batch_id": 1,
+    "quantity": 30,
+    "notes": "عنصر جديد"
+}'
+201 Created
+Example Response
+Body
+Headers (21)
+
+{
+  "success": true,
+  "message": "تم إضافة العنصر للطلب بنجاح",
+  "data": {
+    "order_id": 16,
+    "customer_id": 1,
+    "sales_user_id": 1,
+    "status": "pending",
+    "count_items": 7,
+    "total_amount": "1343250",
+    "created_at": "2026-02-05T14:07:45.216Z",
+    "notes": "ملاحظات الطلب",
+    "customer": {
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "balance": "0",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين"
+    },
+    "sales": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator"
+    },
+    "items": [
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "150",
+        "subtotal": "447750",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      }
+    ]
+  }
+}
+
+PUT
+put item
+{{autolocal}}/order/16/items/37
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "type_item": 8,
+    "ruler_id": 2,
+    "constant_width": 44,
+    "length": 100,
+    "constant_thickness": 0.6,
+    "batch_id": 1,
+    "quantity": 30,
+    "notes": "عنصر جديد"
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/order/16/items/37' \
+--data '{
+    "type_item": 8,
+    "ruler_id": 2,
+    "constant_width": 44,
+    "length": 100,
+    "constant_thickness": 0.6,
+    "batch_id": 1,
+    "quantity": 30,
+    "notes": "عنصر جديد"
+}'
+200 OK
+Example Response
+Body
+Headers (21)
+
+{
+  "success": true,
+  "message": "تم تحديث عنصر الطلب بنجاح",
+  "data": {
+    "order_id": 16,
+    "customer_id": 1,
+    "sales_user_id": 1,
+    "status": "pending",
+    "count_items": 7,
+    "total_amount": "1343250",
+    "created_at": "2026-02-05T14:07:45.216Z",
+    "notes": "ملاحظات الطلب",
+    "customer": {
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "balance": "0",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين"
+    },
+    "sales": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator"
+    },
+    "items": [
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "150",
+        "subtotal": "447750",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      },
+      {
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "constant_thickness": "0.6",
+        "quantity": 30,
+        "length": "100",
+        "price_per_meter": "50",
+        "subtotal": "149250",
+        "notes": "عنصر جديد"
+      }
+    ]
+  }
+}
+DELETE
+Del item
+{{autolocal}}/order/1/items/34
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/order/16/items/56'
+200 OK
+Example Response
+Body
+Headers (21)
+{
+  "success": true,
+  "message": "تم حذف عنصر الطلب بنجاح",
+  "data": {
+    "order_id": 16,
+    "customer_id": 1,
+    "sales_user_id": 1,
+    "status": "pending",
+    "count_items": 6,
+    "total_amount": "1194000",
+    "created_at": "2026-02-05T14:07:45.216Z",
+    "notes": "ملاحظات الطلب",
+    "customer": {
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "balance": "0",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين"
+    },
+    "sales": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator"
+    },
+    "items": [
+      {
+        "order_id": 16,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "150",
+        "subtotal": 447750,
+        "notes": "عنصر جديد"
+      },
+      {
+        "order_id": 16,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": 447750,
+        "notes": "عنصر جديد"
+      },
+      {
+        "order_id": 16,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": 447750,
+        "notes": "عنصر جديد"
+      },
+      {
+        "order_id": 16,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": 447750,
+        "notes": "عنصر جديد"
+      },
+      {
+        "order_id": 16,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": 447750,
+        "notes": "عنصر جديد"
+      },
+      {
+        "order_id": 16,
+        "material_name": "pvc",
+        "color_code": "RED002",
+        "color_name": "أحمر لولي",
+        "batch_number": "BATCH-2024-001",
+        "ruler_type": "new",
+        "type_item": "مكنة",
+        "constant_width": "44",
+        "length": "100",
+        "constant_thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 30,
+        "price_per_meter": "50",
+        "subtotal": 447750,
+        "notes": "عنصر جديد"
+      }
+    ]
+  }
+}
