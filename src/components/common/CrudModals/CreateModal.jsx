@@ -1,4 +1,4 @@
-// src/components/common/CrudModals/CreateModal.jsx
+// src\components\common\CrudModals\CreateModal.jsx
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';

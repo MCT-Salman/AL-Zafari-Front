@@ -1,4 +1,4 @@
-// // src\components\ui\table.jsx
+// src\components\ui\table.jsx
 // import * as React from "react"
 // import { ChevronLeft, ChevronRight } from "lucide-react"
 

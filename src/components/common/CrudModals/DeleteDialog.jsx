@@ -1,4 +1,4 @@
-// src/components/common/CrudModals/DeleteModal.jsx
+// src\components\common\CrudModals\DeleteDialog.jsx
 import { AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -16,15 +16,15 @@ export const DeleteModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50  flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-secondary-f/60 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={!loading ? onClose : undefined}
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-primary-s rounded-2xl shadow-2xl transform scale-100 animate-in zoom-in-95 duration-200 border border-red-200">
+      <div className="relative  bg-primary-s rounded-2xl shadow-2xl transform scale-100 animate-in zoom-in-95 duration-200 border border-red-200">
         {/* Header */}
         <div className="flex items-center gap-3 p-6 border-b border-red-100 bg-red-50/50 rounded-t-2xl">
           <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">

@@ -1,9 +1,12 @@
 // src\pages\Users.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { userApi } from "../api/userApi";
+import { useCrud } from "../hooks/useCrud";
+import { useExport } from "../hooks/useExport";
+import { CrudModal } from "../components/common/CrudModal";
+import UserForm from "../components/UserForm";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -11,13 +14,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Pagination
 } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
-import { Download, ToggleLeft, ToggleRight, User } from "lucide-react";
-import UserModal from "../components/UserModal/UserModal";
-import UserDetailModal from "../components/UserDetailModal/UserDetailModal";
-import DeleteConfirmDialog from "../components/DeleteConfirmDialog/DeleteConfirmDialog";
+import { Download, User } from "lucide-react";
 import CrudActions from "../components/common/CrudActions";
 import StatsCard from "../components/common/StatsCard";
 import SearchInput from "../components/common/SearchInput";
@@ -30,204 +29,171 @@ import ResultsCounter from "../components/common/ResultsCounter";
 import RowsPerPageSelector from "../components/common/RowsPerPageSelector";
 import PaginationControls from "../components/common/PaginationControls";
 import SwitchActive from "../components/common/SwitchActive";
-import { UserRole, UserRoleLabels } from "../enums";
-import * as XLSX from "xlsx";
-import toast from 'react-hot-toast';
+import { UserRoleLabels } from "../enums";
 
 export default function Users() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState(null);
-  const [editingUser, setEditingUser] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, userId: null, loading: false });
-  const [rowsPerPage, setRowsPerPage] = useState(20);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
-  const [exportLoading, setExportLoading] = useState(false);
+  // Create adapter to map generic CRUD method names to userApi method names
+  // Use useMemo to prevent recreating the adapter on every render
+  const userApiAdapter = useMemo(() => ({
+    getItems: (...args) => userApi.getUsers(...args),
+    getItemById: (...args) => userApi.getUserById(...args),
+    createItem: (...args) => userApi.createUser(...args),
+    updateItem: (...args) => userApi.updateUser(...args),
+    deleteItem: (...args) => userApi.deleteUser(...args),
+    toggleStatus: (...args) => userApi.toggleUserStatus(...args),
+  }), []);
+
+  // Use CRUD hook
+  const {
+    items: users,
+    loading,
+    error,
+    modalState,
+    selectedItem,
+    fetchItems,
+    openCreateModal,
+    openEditModal,
+    openViewModal,
+    openDeleteModal,
+    closeModal,
+    handleSave,
+    handleDelete,
+    toggleStatus,
+  } = useCrud(userApiAdapter, {
+    successMessages: {
+      create: "تم إنشاء المستخدم بنجاح",
+      update: "تم تحديث المستخدم بنجاح",
+      delete: "تم حذف المستخدم بنجاح",
+      toggle: "تم تغيير حالة المستخدم بنجاح",
+    },
+    errorMessages: {
+      create: "فشل في حفظ المستخدم",
+      update: "فشل في حفظ المستخدم",
+      delete: "فشل في حذف المستخدم",
+      toggle: "فشل في تغيير حالة المستخدم",
+      fetch: "فشل في تحميل المستخدمين",
+    },
+  });
+
+  // Form state for UserForm
+  const [formData, setFormData] = useState({
+    username: "",
+    full_name: "",
+    phone: "",
+    password: "",
+    role: "sales",
+  });
+  const [formError, setFormError] = useState("");
 
   // Load users on mount
   useEffect(() => {
-    loadUsers();
-  }, []);
+    fetchItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
-  const loadUsers = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const response = await userApi.getUsers();
-      setUsers(response.data || []);
-    } catch (err) {
-       toast.error(err.message || "فشل في تحميل المستخدمين");
-    } finally {
-      setLoading(false);
+  // Filter and pagination state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+
+  // Use export hook
+  const { exportToExcel, loading: exportLoading } = useExport({
+    columns: [
+      { key: 'full_name', header: 'الاسم الكامل' },
+      { key: 'username', header: 'اسم المستخدم' },
+      { key: 'phone', header: 'رقم الهاتف' },
+      { 
+        key: 'role', 
+        header: 'الدور',
+        format: (value) => UserRoleLabels[value] || value
+      },
+      { 
+        key: 'is_active', 
+        header: 'الحالة',
+        format: (value) => value ? 'نشط' : 'معطل'
+      },
+      { 
+        key: 'created_at', 
+        header: 'تاريخ الإنشاء',
+        format: (value) => new Date(value).toLocaleDateString('ar-SA')
+      },
+      { 
+        key: 'updated_at', 
+        header: 'آخر تحديث',
+        format: (value) => value ? new Date(value).toLocaleDateString('ar-SA') : ''
+      },
+    ],
+    columnWidths: [
+      { wch: 5 },   // #
+      { wch: 25 },  // الاسم الكامل
+      { wch: 20 },  // اسم المستخدم
+      { wch: 15 },  // رقم الهاتف
+      { wch: 15 },  // الدور
+      { wch: 10 },  // الحالة
+      { wch: 15 },  // تاريخ الإنشاء
+      { wch: 15 },  // آخر تحديث
+    ],
+    sheetName: 'المستخدمين',
+  });
+
+  // Handle export
+  const handleExport = () => {
+    exportToExcel(filteredUsers, 'المستخدمين');
+  };
+
+  // Handle save with validation
+  // Can be called as: handleSaveUser(userData) for create, or handleSaveUser(id, userData) for edit
+  const handleSaveUser = async (idOrUserData, userData) => {
+    setFormError("");
+    
+    // Determine if first argument is ID (edit mode) or userData (create mode)
+    const isEditMode = typeof idOrUserData === 'number' || typeof idOrUserData === 'string';
+    const actualUserData = isEditMode ? userData : idOrUserData;
+    
+    // Validation - check for required fields (trim to handle whitespace)
+    const username = actualUserData?.username?.trim();
+    const fullName = actualUserData?.full_name?.trim();
+    const phone = actualUserData?.phone?.trim();
+    
+    if (!username || !fullName || !phone) {
+      setFormError("يرجى ملء جميع الحقول المطلوبة");
+      return;
     }
-  };
 
-  // EXPORT TO EXCEL FUNCTION
-  const exportToExcel = () => {
-    setExportLoading(true);
-    try {
-      // Prepare data for export (use filteredUsers to respect current filters)
-      const exportData = filteredUsers.map((user, index) => ({
-        "#": index + 1,
-        "الاسم الكامل": user.full_name,
-        "اسم المستخدم": user.username,
-        "رقم الهاتف": user.phone,
-        "الدور": UserRoleLabels[user.role] || user.role,
-        "الحالة": user.is_active ? "نشط" : "معطل",
-        "تاريخ الإنشاء": new Date(user.created_at).toLocaleDateString('ar-SA'),
-        "آخر تحديث": user.updated_at ? new Date(user.updated_at).toLocaleDateString('ar-SA') : "",
-      }));
-
-      // Create worksheet
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-
-      // Set column widths for better readability
-      const columnWidths = [
-        { wch: 5 },   // م
-        { wch: 25 },  // الاسم
-        { wch: 20 },  // اسم المستخدم
-        { wch: 15 },  // الهاتف
-        { wch: 15 },  // الدور
-        { wch: 10 },  // الحالة
-        { wch: 15 },  // تاريخ الإنشاء
-        { wch: 15 },  // آخر تحديث
-      ];
-      worksheet['!cols'] = columnWidths;
-
-      // Create workbook
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "المستخدمين");
-
-      // Generate filename with current date
-      const date = new Date().toISOString().split('T')[0];
-      const filename = `المستخدمين_${date}.xlsx`;
-
-      // Save file
-      XLSX.writeFile(workbook, filename);
-
-      toast.success(`تم تصدير ${filteredUsers.length} مستخدم بنجاح`);
-    } catch (err) {
-      toast.error("فشل في تصدير البيانات: " + err.message);
-    } finally {
-      setExportLoading(false);
+    // Password is only required for new users (when not in edit mode)
+    if (!isEditMode && (!actualUserData.password || !actualUserData.password.trim())) {
+      setFormError("كلمة المرور مطلوبة للمستخدمين الجدد");
+      return;
     }
-  };
 
-  // Alternative: Export with custom styling (using a more advanced approach)
-  const exportToExcelAdvanced = () => {
-    setExportLoading(true);
-    try {
-      // Create worksheet from filtered data
-      const worksheetData = [
-        // Header row
-        ["#", "الاسم الكامل", "اسم المستخدم", "رقم الهاتف", "الدور", "الحالة", "تاريخ الإنشاء"],
-        // Data rows
-        ...filteredUsers.map((user, index) => [
-          index + 1,
-          user.full_name,
-          user.username,
-          user.phone,
-          UserRoleLabels[user.role] || user.role,
-          user.is_active ? "نشط" : "معطل",
-          new Date(user.created_at).toLocaleDateString('en-US'),
-        ])
-      ];
-
-      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-
-      // Styling (note: xlsx library has limited styling support)
-      // For full styling, consider using 'xlsx-style' or 'exceljs'
-
-      // Set column widths
-      worksheet['!cols'] = [
-        { wch: 5 },
-        { wch: 25 },
-        { wch: 20 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 10 },
-        { wch: 15 },
-      ];
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "المستخدمين");
-
-      const date = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(workbook, `المستخدمين_${date}.xlsx`);
-
-      setMessage(`تم تصدير ${filteredUsers.length} مستخدم بنجاح`);
-    } catch (err) {
-      setError("فشل في التصدير: " + err.message);
-    } finally {
-      setExportLoading(false);
+    // If password is provided (even in edit mode), validate its length
+    if (actualUserData.password && actualUserData.password.trim() && actualUserData.password.trim().length < 8) {
+      setFormError("يجب أن تكون كلمة المرور 8 أحرف على الأقل");
+      return;
     }
-  };
 
-  const handleCreateUser = () => {
-    setEditingUser(null);
-    setShowModal(true);
-  };
+    // Prepare data to send
+    const dataToSend = {
+      username: username,
+      full_name: fullName,
+      phone: phone,
+      role: actualUserData.role || "sales",
+    };
 
-  const handleEditUser = (user) => {
-    setEditingUser(user);
-    setShowModal(true);
-  };
-
-  const handleSaveUser = async (userData) => {
-    try {
-      if (editingUser) {
-        // Update user
-        await userApi.updateUser(editingUser.id, userData);
-        toast.success("تم تحديث المستخدم بنجاح");
-      } else {
-        // Create user
-        await userApi.createUser(userData);
-        toast.success("تم إنشاء المستخدم بنجاح");
-      }
-      setShowModal(false);
-      loadUsers();
-    } catch (err) {
-      toast.error(err.message || "فشل في حفظ المستخدم");
+    // Only include password if it's provided and not empty (for edit mode, empty password means don't change it)
+    if (actualUserData.password && actualUserData.password.trim()) {
+      dataToSend.password = actualUserData.password.trim();
     }
+
+    await handleSave(dataToSend);
   };
 
+  // Handle toggle status
   const handleToggleStatus = async (userId) => {
-    try {
-      await userApi.toggleUserStatus(userId);
-      toast.success("تم تغيير حالة المستخدم بنجاح");
-      loadUsers();
-    } catch (err) {
-      toast.error(err.message || "فشل في تغيير حالة المستخدم");
-    }
-  };
-
-  const handleDeleteUser = (userId) => {
-    setDeleteConfirm({ isOpen: true, userId, loading: false });
-  };
-
-  const confirmDelete = async () => {
-    setDeleteConfirm((prev) => ({ ...prev, loading: true }));
-    try {
-      await userApi.deleteUser(deleteConfirm.userId);
-      toast.success("تم حذف المستخدم بنجاح");
-      setDeleteConfirm({ isOpen: false, userId: null, loading: false });
-      loadUsers();
-    } catch (err) {
-      toast.error(err.message || "فشل في حذف المستخدم");
-      setDeleteConfirm({ isOpen: false, userId: null, loading: false });
-    }
-  };
-
-  const cancelDelete = () => {
-    setDeleteConfirm({ isOpen: false, userId: null, loading: false });
+    await toggleStatus(userId);
   };
 
   // Calculate stats
@@ -240,7 +206,7 @@ export default function Users() {
   // Get unique roles
   const uniqueRoles = [...new Set(users.map((u) => u.role))];
 
-  const filteredUsers = users.filter(
+  let filteredUsers = users.filter(
     (user) => {
       const matchesSearch =
         user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -257,6 +223,35 @@ export default function Users() {
     }
   );
 
+  // Apply sorting if sortConfig is set
+  if (sortConfig.key && sortConfig.direction) {
+    filteredUsers = [...filteredUsers].sort((a, b) => {
+      let aValue = a[sortConfig.key];
+      let bValue = b[sortConfig.key];
+
+      // معالجة التواريخ
+      if (sortConfig.key === 'created_at') {
+        aValue = new Date(aValue);
+        bValue = new Date(bValue);
+        return sortConfig.direction === 'asc'
+          ? aValue - bValue
+          : bValue - aValue;
+      }
+
+      // معالجة النصوص العربية
+      if (typeof aValue === 'string') {
+        return sortConfig.direction === 'asc'
+          ? aValue.localeCompare(bValue, 'ar')
+          : bValue.localeCompare(aValue, 'ar');
+      }
+
+      // معالجة الأرقام والقيم الأخرى
+      return sortConfig.direction === 'asc'
+        ? aValue > bValue ? 1 : -1
+        : aValue < bValue ? 1 : -1;
+    });
+  }
+
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
@@ -270,40 +265,6 @@ export default function Users() {
 
   const handleSort = (newSortConfig) => {
     setSortConfig(newSortConfig);
-
-    if (!newSortConfig.key || !newSortConfig.direction) {
-      // إذا تم إلغاء الترتيب، عد للترتيب الافتراضي (حسب ID مثلاً)
-      setUsers([...users].sort((a, b) => a.id - b.id));
-      return;
-    }
-
-    const sorted = [...users].sort((a, b) => {
-      let aValue = a[newSortConfig.key];
-      let bValue = b[newSortConfig.key];
-
-      // معالجة التواريخ
-      if (newSortConfig.key === 'created_at') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
-        return newSortConfig.direction === 'asc'
-          ? aValue - bValue
-          : bValue - aValue;
-      }
-
-      // معالجة النصوص العربية
-      if (typeof aValue === 'string') {
-        return newSortConfig.direction === 'asc'
-          ? aValue.localeCompare(bValue, 'ar')
-          : bValue.localeCompare(aValue, 'ar');
-      }
-
-      // معالجة الأرقام والقيم الأخرى
-      return newSortConfig.direction === 'asc'
-        ? aValue > bValue ? 1 : -1
-        : aValue < bValue ? 1 : -1;
-    });
-
-    setUsers(sorted);
   };
 
   const mainStats = [
@@ -332,7 +293,6 @@ export default function Users() {
       title: "إجمالي المستخدمين المعطلين",
       value: stats.inactive,
       unit: "مستخدم",
-      unit: "مستخدم",
       icon: User,
       iconColor: "text-secondary-s",
       bgColor: "bg-primary-s",
@@ -357,7 +317,7 @@ export default function Users() {
           title="إدارة المستخدمين"
           subtitle={`إجمالي المستخدمين: ${users.length}`}
           actionLabel="إضافة مستخدم جديد"
-          onAction={handleCreateUser}
+          onAction={openCreateModal}
         />
 
         {/* Stats Cards */}
@@ -375,18 +335,14 @@ export default function Users() {
           </div>
 
           {/* Messages */}
-          <MessageAlert
-            type="error"
-            message={error}
-            onDismiss={() => setError("")}
-            dismissable={true}
-          />
-          <MessageAlert
-            type="success"
-            message={message}
-            onDismiss={() => setMessage("")}
-            dismissable={true}
-          />
+          {error && (
+            <MessageAlert
+              type="error"
+              message={error}
+              onDismiss={() => {}}
+              dismissable={true}
+            />
+          )}
 
           {/* Search */}
           <div className="-my-4">
@@ -441,7 +397,7 @@ export default function Users() {
 
           {/* Export Button */}
           <Button
-            onClick={exportToExcel}
+            onClick={handleExport}
             disabled={exportLoading || filteredUsers.length === 0}
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white p-6 rounded-xl"
           >
@@ -515,12 +471,9 @@ export default function Users() {
                               confirmBeforeToggle={true}
                             />
                             <CrudActions
-                              onView={() => {
-                                setSelectedUserId(user.id);
-                                setShowDetailModal(true);
-                              }}
-                              onEdit={() => handleEditUser(user)}
-                              onDelete={() => handleDeleteUser(user.id)}
+                              onView={() => openViewModal(user.id)}
+                              onEdit={() => openEditModal(user)}
+                              onDelete={() => openDeleteModal(user)}
                               size="md"
                             />
                           </div>
@@ -543,35 +496,64 @@ export default function Users() {
         </Card>
       </div>
 
-      {/* User Modal */}
-      {showModal && (
-        <UserModal
-          user={editingUser}
-          onClose={() => setShowModal(false)}
-          onSave={handleSaveUser}
-        />
-      )}
-
-      {/* User Detail Modal */}
-      {showDetailModal && selectedUserId && (
-        <UserDetailModal
-          userId={selectedUserId}
-          onClose={() => {
-            setShowDetailModal(false);
-            setSelectedUserId(null);
-          }}
-        />
-      )}
-
-      {/* Delete Confirm Dialog */}
-      <DeleteConfirmDialog
-        isOpen={deleteConfirm.isOpen}
-        title="حذف المستخدم"
-        message="هل أنت متأكد من رغبتك في حذف هذا المستخدم؟ لا يمكن التراجع عن هذا الإجراء."
-        onConfirm={confirmDelete}
-        onCancel={cancelDelete}
-        loading={deleteConfirm.loading}
-      />
+      {/* Unified CRUD Modal */}
+      <CrudModal
+        isOpen={modalState.isOpen}
+        mode={modalState.mode}
+        onClose={() => {
+          closeModal();
+          setFormError("");
+          setFormData({
+            username: "",
+            full_name: "",
+            phone: "",
+            password: "",
+            role: "sales",
+          });
+        }}
+        onSubmit={handleSaveUser}
+        onDelete={handleDelete}
+        data={selectedItem}
+        title={
+          modalState.mode === 'create' 
+            ? 'إضافة مستخدم جديد' 
+            : modalState.mode === 'edit' 
+            ? 'تعديل المستخدم' 
+            : modalState.mode === 'view'
+            ? 'تفاصيل المستخدم'
+            : ''
+        }
+        loading={modalState.loading}
+        size="lg"
+        formData={formData}
+        setFormData={setFormData}
+        fields={
+          modalState.mode === 'view'
+            ? [
+                { key: 'full_name', label: 'الاسم الكامل' },
+                { key: 'username', label: 'اسم المستخدم' },
+                { key: 'phone', label: 'رقم الهاتف' },
+                { key: 'role', label: 'الدور', formatValue: (key, value) => UserRoleLabels[value] || value },
+                { key: 'is_active', label: 'الحالة' },
+                { key: 'created_at', label: 'تاريخ الإنشاء' },
+                { key: 'updated_at', label: 'آخر تحديث' },
+              ]
+            : []
+        }
+        deleteTitle="حذف المستخدم"
+        deleteMessage="هل أنت متأكد من رغبتك في حذف هذا المستخدم؟ لا يمكن التراجع عن هذا الإجراء."
+        itemName={selectedItem?.full_name || selectedItem?.username}
+      >
+        {(modalState.mode === 'create' || modalState.mode === 'edit') && (
+          <UserForm
+            user={selectedItem}
+            formData={formData}
+            setFormData={setFormData}
+            loading={modalState.loading}
+            error={formError}
+          />
+        )}
+      </CrudModal>
     </div>
   );
 }

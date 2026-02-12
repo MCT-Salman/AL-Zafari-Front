@@ -1,3 +1,4 @@
+// src\components\examples\PaginationTableExample.jsx
 /**
  * PAGINATION COMPONENT EXAMPLE
  * 
