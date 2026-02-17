@@ -16,6 +16,16 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Label } from "../../components/ui/label";
 import { Download, Palette, Package, DollarSign } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
 import StatsCard from "../../components/common/StatsCard";
@@ -54,16 +64,17 @@ export default function Color() {
     handleSave,
     handleDelete,
   } = useCrud(colorApiAdapter, {
+    idField: 'color_id',
     successMessages: {
-      create: "?? ????? ????? ?????",
-      update: "?? ????? ????? ?????",
-      delete: "?? ??? ????? ?????",
+      create: "تم إنشاء اللون بنجاح",
+      update: "تم تحديث اللون بنجاح",
+      delete: "تم حذف اللون بنجاح",
     },
     errorMessages: {
-      create: "??? ?? ??? ?????",
-      update: "??? ?? ??? ?????",
-      delete: "??? ?? ??? ?????",
-      fetch: "??? ?? ????? ???????",
+      create: "فشل في حفظ اللون",
+      update: "فشل في حفظ اللون",
+      delete: "فشل في حذف اللون",
+      fetch: "فشل في تحميل الألوان",
     },
   });
 
@@ -105,41 +116,41 @@ export default function Color() {
   // Use export hook
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
-      { key: "color_name", header: "??? ?????" },
-      { key: "color_code", header: "??? ?????" },
-      { key: "material_name", header: "??????" },
-      { key: "prices_count", header: "??? ???????", format: (item) => colorApi.getPricesCount(item) },
-      { key: "rulers_count", header: "??? ???????", format: (item) => colorApi.getRulersCount(item) },
-      { key: "notes", header: "?????????" },
+      { key: "color_name", header: "اسم اللون" },
+      { key: "color_code", header: "كود اللون" },
+      { key: "material_name", header: "المادة" },
+      { key: "prices_count", header: "عدد الأسعار", format: (item) => colorApi.getPricesCount(item) },
+      { key: "rulers_count", header: "عدد المساطر", format: (item) => colorApi.getRulersCount(item) },
+      { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [
       { wch: 5 },   // #
-      { wch: 20 },  // ??? ?????
-      { wch: 15 },  // ??? ?????
-      { wch: 20 },  // ??????
-      { wch: 12 },  // ??? ???????
-      { wch: 12 },  // ??? ???????
-      { wch: 30 },  // ?????????
+      { wch: 20 },  // اسم اللون
+      { wch: 15 },  // كود اللون
+      { wch: 20 },  // المادة
+      { wch: 12 },  // عدد الأسعار
+      { wch: 12 },  // عدد المساطر
+      { wch: 30 },  // الملاحظات
     ],
-    sheetName: "???????",
+    sheetName: "الألوان",
   });
 
   // Handle export
   const handleExport = () => {
-    exportToExcel(filteredColors, "???????");
+    exportToExcel(filteredColors, "الألوان");
   };
 
   // Handle save with validation
   const handleSaveColor = async (data) => {
     setFormError("");
-    
+
     // Validation
     const materialId = data?.material_id;
     const colorCode = data?.color_code?.trim();
     const colorName = data?.color_name?.trim();
-    
+
     if (!materialId || !colorCode || !colorName) {
-      setFormError("???? ??? ???? ?????? ????????");
+      setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
@@ -212,9 +223,9 @@ export default function Color() {
   const mainStats = [
     {
       id: 1,
-      title: "?????? ???????",
+      title: "إجمالي الألوان",
       value: stats.total,
-      unit: "???",
+      unit: "لون",
       icon: Palette,
       iconColor: "text-secondary-f",
       bgColor: "bg-primary-s",
@@ -222,9 +233,9 @@ export default function Color() {
     },
     {
       id: 2,
-      title: "????? ??? ?????",
+      title: "ألوان لها أسعار",
       value: stats.withPrices,
-      unit: "???",
+      unit: "لون",
       icon: DollarSign,
       iconColor: "text-primary-f",
       bgColor: "bg-primary-s",
@@ -232,9 +243,9 @@ export default function Color() {
     },
     {
       id: 3,
-      title: "????? ??? ?????",
+      title: "ألوان لها مساطر",
       value: stats.withRulers,
-      unit: "???",
+      unit: "لون",
       icon: Package,
       iconColor: "text-secondary-s",
       bgColor: "bg-primary-s",
@@ -246,9 +257,9 @@ export default function Color() {
     <div className="min-h-screen bg-gray-50 space-y-8 p-2">
       <div className=" mx-auto">
         <PageHeader
-          title="????? ???????"
-          subtitle={`?????? ???????: ${colors.length}`}
-          actionLabel="????? ??? ????"
+          title="إدارة الألوان"
+          subtitle={`إجمالي الألوان: ${colors.length}`}
+          actionLabel="إضافة لون جديد"
           onAction={openCreateModal}
         />
 
@@ -262,7 +273,7 @@ export default function Color() {
         {/* Colors Table Card */}
         <Card className="p-6">
           <div className="">
-            <h2 className="text-xl font-bold">????? ???????</h2>
+            <h2 className="text-xl font-bold">قائمة الألوان</h2>
           </div>
 
           {/* Messages */}
@@ -270,7 +281,7 @@ export default function Color() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -278,7 +289,7 @@ export default function Color() {
           {/* Search */}
           <div className="-my-4">
             <SearchInput
-              placeholder="???? ?? ??? (????? ?? ????? ?? ?????? ?? ?????????)"
+              placeholder="ابحث عن لون (الاسم أو الكود أو المادة أو الملاحظات)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -311,12 +322,12 @@ export default function Color() {
               {exportLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                  <span>???? ???????...</span>
+                  <span>جاري التصدير...</span>
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  <span>????? Excel ({filteredColors.length})</span>
+                  <span>تصدير Excel ({filteredColors.length})</span>
                 </>
               )}
             </Button>
@@ -324,22 +335,22 @@ export default function Color() {
 
           {/* Colors Table */}
           {loading ? (
-            <LoadingState message="???? ????? ???????..." />
+            <LoadingState message="جاري تحميل الألوان..." />
           ) : filteredColors.length === 0 ? (
-            <EmptyState message="?? ???? ?????" />
+            <EmptyState message="لا توجد ألوان" />
           ) : (
             <>
               <div className="overflow-x-auto rounded-lg ">
                 <Table onSort={handleSort}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead sortable sortKey="color_name">??? ?????</TableHead>
-                      <TableHead sortable sortKey="color_code">??? ?????</TableHead>
-                      <TableHead>??????</TableHead>
-                      <TableHead>???????</TableHead>
-                      <TableHead>???????</TableHead>
-                      <TableHead>?????????</TableHead>
-                      <TableHead>?????????</TableHead>
+                      <TableHead sortable sortKey="color_name">اسم اللون</TableHead>
+                      <TableHead sortable sortKey="color_code">كود اللون</TableHead>
+                      <TableHead>المادة</TableHead>
+                      <TableHead>عدد الأسعار</TableHead>
+                      <TableHead>عدد المساطر</TableHead>
+                      <TableHead>الملاحظات</TableHead>
+                      <TableHead>الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -347,7 +358,7 @@ export default function Color() {
                       <TableRow key={color.color_id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
-                            <div 
+                            <div
                               className="w-4 h-4 rounded-full border"
                               style={{ backgroundColor: color.color_code || "#ccc" }}
                             />
@@ -423,13 +434,13 @@ export default function Color() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === "create" 
-            ? "????? ??? ????" 
-            : modalState.mode === "edit" 
-            ? "????? ?????" 
-            : modalState.mode === "view"
-            ? "?????? ?????"
-            : ""
+          modalState.mode === "create"
+            ? "إضافة لون جديد"
+            : modalState.mode === "edit"
+              ? "تعديل اللون"
+              : modalState.mode === "view"
+                ? "تفاصيل اللون"
+                : ""
         }
         loading={modalState.loading}
         size="lg"
@@ -438,23 +449,27 @@ export default function Color() {
         fields={
           modalState.mode === "view"
             ? [
-                { key: "color_name", label: "??? ?????" },
-                { key: "color_code", label: "??? ?????" },
-                { key: "material_name", label: "??????", formatValue: (key, value) => colorApi.getMaterialName(selectedItem) },
-                { key: "prices", label: "???????", formatValue: (key, value) => {
-                  if (!value || value.length === 0) return "?? ???? ?????";
-                  return `${value.length} ???`;
-                }},
-                { key: "rulers", label: "???????", formatValue: (key, value) => {
-                  if (!value || value.length === 0) return "?? ???? ?????";
-                  return `${value.length} ?????`;
-                }},
-                { key: "notes", label: "?????????" },
-              ]
+              { key: "color_name", label: "اسم اللون" },
+              { key: "color_code", label: "كود اللون" },
+              { key: "material_name", label: "المادة", formatValue: (key, value) => colorApi.getMaterialName(selectedItem) },
+              {
+                key: "prices", label: "الأسعار", formatValue: (key, value) => {
+                  if (!value || value.length === 0) return "لا توجد أسعار";
+                  return `${value.length} سعر`;
+                }
+              },
+              {
+                key: "rulers", label: "المساطر", formatValue: (key, value) => {
+                  if (!value || value.length === 0) return "لا توجد مساطر";
+                  return `${value.length} مسطرة`;
+                }
+              },
+              { key: "notes", label: "الملاحظات" },
+            ]
             : []
         }
-        deleteTitle="??? ?????"
-        deleteMessage="?? ??? ????? ?? ????? ?? ??? ??? ?????? ?? ???? ??????? ?? ??? ???????."
+        deleteTitle="حذف اللون"
+        deleteMessage="هل أنت متأكد من رغبتك في حذف هذا اللون؟ لا يمكن التراجع عن هذا الإجراء."
         itemName={selectedItem?.color_name}
       >
         {(modalState.mode === "create" || modalState.mode === "edit") && (
@@ -462,59 +477,60 @@ export default function Color() {
             {formError && (
               <MessageAlert
                 type="error"
-                message={formError}
                 dismissable={false}
               />
             )}
             <div className="space-y-2">
-              <label className="text-sm font-medium">?????? <span className="text-red-500">*</span></label>
-              <select
-                className="w-full p-2 border rounded-md"
-                value={formData.material_id}
-                onChange={(e) => setFormData({...formData, material_id: e.target.value})}
+              <Label>المادة <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.material_id?.toString()}
+                onValueChange={(value) => setFormData({ ...formData, material_id: value })}
               >
-                <option value="">???? ??????</option>
-                {materials.map((material) => (
-                  <option key={material.material_id} value={material.material_id}>
-                    {material.material_name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر المادة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materials.map((material) => (
+                    <SelectItem key={material.material_id} value={material.material_id.toString()}>
+                      {material.material_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">??? ????? <span className="text-red-500">*</span></label>
-              <input
+              <Label>اسم اللون <span className="text-red-500">*</span></Label>
+              <Input
                 type="text"
-                className="w-full p-2 border rounded-md"
                 value={formData.color_name}
-                onChange={(e) => setFormData({...formData, color_name: e.target.value})}
-                placeholder="????: ???? ????"
+                onChange={(e) => setFormData({ ...formData, color_name: e.target.value })}
+                placeholder="مثال: أحمر"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">??? ????? <span className="text-red-500">*</span></label>
+              <Label>كود اللون <span className="text-red-500">*</span></Label>
               <div className="flex gap-2">
-                <input
+                <Input
                   type="text"
-                  className="flex-1 p-2 border rounded-md"
                   value={formData.color_code}
-                  onChange={(e) => setFormData({...formData, color_code: e.target.value})}
-                  placeholder="????: #FF0000 ?? RED001"
+                  onChange={(e) => setFormData({ ...formData, color_code: e.target.value })}
+                  placeholder="#FF0000"
                 />
-                <div 
-                  className="w-10 h-10 rounded border border-gray-300 flex-shrink-0"
-                  style={{ backgroundColor: formData.color_code || "#ccc" }}
+                <Input
+                  type="color"
+                  className="w-12 p-1 h-10 border rounded-md cursor-pointer"
+                  value={formData.color_code || "#000000"}
+                  onChange={(e) => setFormData({ ...formData, color_code: e.target.value })}
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">?????????</label>
-              <textarea
-                className="w-full p-2 border rounded-md"
+              <Label>الملاحظات</Label>
+              <Textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                placeholder="??????? ??????..."
+                placeholder="ملاحظات إضافية..."
               />
             </div>
           </div>

@@ -16,6 +16,16 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Label } from "../../components/ui/label";
 import { Download, Package, Calendar, Tag } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
 import StatsCard from "../../components/common/StatsCard";
@@ -54,16 +64,17 @@ export default function Batch() {
     handleSave,
     handleDelete,
   } = useCrud(batchApiAdapter, {
+    idField: 'batch_id',
     successMessages: {
-      create: "?? ????? ?????? ?????",
-      update: "?? ????? ?????? ?????",
-      delete: "?? ??? ?????? ?????",
+      create: "تم إنشاء التشغيلة بنجاح",
+      update: "تم تحديث التشغيلة بنجاح",
+      delete: "تم حذف التشغيلة بنجاح",
     },
     errorMessages: {
-      create: "??? ?? ??? ??????",
-      update: "??? ?? ??? ??????",
-      delete: "??? ?? ??? ??????",
-      fetch: "??? ?? ????? ???????",
+      create: "فشل في حفظ التشغيلة",
+      update: "فشل في حفظ التشغيلة",
+      delete: "فشل في حذف التشغيلة",
+      fetch: "فشل في تحميل التشغيلات",
     },
   });
 
@@ -105,41 +116,41 @@ export default function Batch() {
   // Use export hook
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
-      { key: "batch_number", header: "??? ??????" },
-      { key: "entry_date", header: "????? ???????", format: (item) => batchApi.formatEntryDate(item) },
-      { key: "material_name", header: "??????", format: (item) => batchApi.getMaterialName(item) },
-      { key: "material_type", header: "??? ??????", format: (item) => batchApi.getMaterialType(item) },
-      { key: "dimensions", header: "???????", format: (item) => batchApi.formatMaterialDimensions(item) },
-      { key: "notes", header: "?????????" },
+      { key: "batch_number", header: "رقم التشغيلة" },
+      { key: "entry_date", header: "تاريخ الإدخال", format: (item) => batchApi.formatEntryDate(item) },
+      { key: "material_name", header: "المادة", format: (item) => batchApi.getMaterialName(item) },
+      { key: "material_type", header: "نوع المادة", format: (item) => batchApi.getMaterialType(item) },
+      { key: "dimensions", header: "الأبعاد", format: (item) => batchApi.formatMaterialDimensions(item) },
+      { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [
       { wch: 5 },   // #
-      { wch: 20 },  // ??? ??????
-      { wch: 20 },  // ????? ???????
-      { wch: 15 },  // ??????
-      { wch: 12 },  // ??? ??????
-      { wch: 25 },  // ???????
-      { wch: 30 },  // ?????????
+      { wch: 20 },  // رقم التشغيلة
+      { wch: 20 },  // تاريخ الإدخال
+      { wch: 15 },  // المادة
+      { wch: 12 },  // نوع المادة
+      { wch: 25 },  // الأبعاد
+      { wch: 30 },  // الملاحظات
     ],
-    sheetName: "???????",
+    sheetName: "التشغيلات",
   });
 
   // Handle export
   const handleExport = () => {
-    exportToExcel(filteredBatches, "???????");
+    exportToExcel(filteredBatches, "التشغيلات");
   };
 
   // Handle save with validation
   const handleSaveBatch = async (data) => {
     setFormError("");
-    
+
     // Validation
     const batchNumber = data?.batch_number?.trim();
     const entryDate = data?.entry_date;
     const materialId = data?.material_id;
-    
+
     if (!batchNumber || !entryDate || !materialId) {
-      setFormError("???? ??? ???? ?????? ????????");
+      setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
@@ -160,8 +171,8 @@ export default function Batch() {
     thisMonth: batches.filter((b) => {
       const batchDate = new Date(b.entry_date);
       const now = new Date();
-      return batchDate.getMonth() === now.getMonth() && 
-             batchDate.getFullYear() === now.getFullYear();
+      return batchDate.getMonth() === now.getMonth() &&
+        batchDate.getFullYear() === now.getFullYear();
     }).length,
     uniqueMaterials: [...new Set(batches.map(b => b.material_id))].length,
   };
@@ -193,14 +204,14 @@ export default function Batch() {
         return sortConfig.direction === "asc" ? aDate - bDate : bDate - aDate;
       }
 
-      // ?????? ?????? ???????
+      // معالجة النصوص العربية
       if (typeof aValue === "string") {
         return sortConfig.direction === "asc"
           ? aValue.localeCompare(bValue, "ar")
           : bValue.localeCompare(aValue, "ar");
       }
 
-      // ?????? ??????? ?????? ??????
+      // معالجة الأرقام والقيم الأخرى
       return sortConfig.direction === "asc"
         ? aValue > bValue ? 1 : -1
         : aValue < bValue ? 1 : -1;
@@ -225,9 +236,9 @@ export default function Batch() {
   const mainStats = [
     {
       id: 1,
-      title: "?????? ???????",
+      title: "إجمالي التشغيلات",
       value: stats.total,
-      unit: "????",
+      unit: "تشغيلة",
       icon: Package,
       iconColor: "text-secondary-f",
       bgColor: "bg-primary-s",
@@ -235,9 +246,9 @@ export default function Batch() {
     },
     {
       id: 2,
-      title: "????? ??? ?????",
+      title: "تشغيلات هذا الشهر",
       value: stats.thisMonth,
-      unit: "????",
+      unit: "تشغيلة",
       icon: Calendar,
       iconColor: "text-primary-f",
       bgColor: "bg-primary-s",
@@ -245,9 +256,9 @@ export default function Batch() {
     },
     {
       id: 3,
-      title: "???? ???????",
+      title: "عدد المواد المختلفة",
       value: stats.uniqueMaterials,
-      unit: "????",
+      unit: "مادة",
       icon: Tag,
       iconColor: "text-secondary-s",
       bgColor: "bg-primary-s",
@@ -259,9 +270,9 @@ export default function Batch() {
     <div className="min-h-screen bg-gray-50 space-y-8 p-2">
       <div className=" mx-auto">
         <PageHeader
-          title="????? ???????"
-          subtitle={`?????? ???????: ${batches.length}`}
-          actionLabel="????? ???? ?????"
+          title="إدارة التشغيلات"
+          subtitle={`إجمالي التشغيلات: ${batches.length}`}
+          actionLabel="إضافة تشغيلة جديدة"
           onAction={openCreateModal}
         />
 
@@ -275,7 +286,7 @@ export default function Batch() {
         {/* Batches Table Card */}
         <Card className="p-6">
           <div className="">
-            <h2 className="text-xl font-bold">????? ???????</h2>
+            <h2 className="text-xl font-bold">قائمة التشغيلات</h2>
           </div>
 
           {/* Messages */}
@@ -283,7 +294,7 @@ export default function Batch() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -291,7 +302,7 @@ export default function Batch() {
           {/* Search */}
           <div className="-my-4">
             <SearchInput
-              placeholder="???? ?? ???? (????? ?? ?????? ?? ?????????)"
+              placeholder="ابحث عن تشغيلة (الرقم أو المادة أو النوع أو التاريخ أو الملاحظات)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -324,12 +335,12 @@ export default function Batch() {
               {exportLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                  <span>???? ???????...</span>
+                  <span>جاري التصدير...</span>
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  <span>????? Excel ({filteredBatches.length})</span>
+                  <span>تصدير Excel ({filteredBatches.length})</span>
                 </>
               )}
             </Button>
@@ -337,21 +348,21 @@ export default function Batch() {
 
           {/* Batches Table */}
           {loading ? (
-            <LoadingState message="???? ????? ???????..." />
+            <LoadingState message="جاري تحميل التشغيلات..." />
           ) : filteredBatches.length === 0 ? (
-            <EmptyState message="?? ???? ?????" />
+            <EmptyState message="لا توجد تشغيلات" />
           ) : (
             <>
               <div className="overflow-x-auto rounded-lg ">
                 <Table onSort={handleSort}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead sortable sortKey="batch_number">??? ??????</TableHead>
-                      <TableHead sortable sortKey="entry_date">????? ???????</TableHead>
-                      <TableHead>??????</TableHead>
-                      <TableHead>???????</TableHead>
-                      <TableHead>?????????</TableHead>
-                      <TableHead>?????????</TableHead>
+                      <TableHead sortable sortKey="batch_number">رقم التشغيلة</TableHead>
+                      <TableHead sortable sortKey="entry_date">تاريخ الإدخال</TableHead>
+                      <TableHead>المادة</TableHead>
+                      <TableHead>الأبعاد</TableHead>
+                      <TableHead>الملاحظات</TableHead>
+                      <TableHead>الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -431,13 +442,13 @@ export default function Batch() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === "create" 
-            ? "????? ???? ?????" 
-            : modalState.mode === "edit" 
-            ? "????? ??????" 
-            : modalState.mode === "view"
-            ? "?????? ??????"
-            : ""
+          modalState.mode === "create"
+            ? "إضافة تشغيلة جديدة"
+            : modalState.mode === "edit"
+              ? "تعديل التشغيلة"
+              : modalState.mode === "view"
+                ? "تفاصيل التشغيلة"
+                : ""
         }
         loading={modalState.loading}
         size="lg"
@@ -446,17 +457,17 @@ export default function Batch() {
         fields={
           modalState.mode === "view"
             ? [
-                { key: "batch_number", label: "??? ??????" },
-                { key: "entry_date", label: "????? ???????", formatValue: (key, value) => batchApi.formatEntryDate(selectedItem) },
-                { key: "material_name", label: "??????", formatValue: (key, value) => batchApi.getMaterialName(selectedItem) },
-                { key: "material_type", label: "??? ??????", formatValue: (key, value) => batchApi.getMaterialType(selectedItem) },
-                { key: "dimensions", label: "???????", formatValue: (key, value) => batchApi.formatMaterialDimensions(selectedItem) },
-                { key: "notes", label: "?????????" },
-              ]
+              { key: "batch_number", label: "رقم التشغيلة" },
+              { key: "entry_date", label: "تاريخ الإدخال", formatValue: (key, value) => batchApi.formatEntryDate(selectedItem) },
+              { key: "material_name", label: "المادة", formatValue: (key, value) => batchApi.getMaterialName(selectedItem) },
+              { key: "material_type", label: "نوع المادة", formatValue: (key, value) => batchApi.getMaterialType(selectedItem) },
+              { key: "dimensions", label: "الأبعاد", formatValue: (key, value) => batchApi.formatMaterialDimensions(selectedItem) },
+              { key: "notes", label: "الملاحظات" },
+            ]
             : []
         }
-        deleteTitle="??? ??????"
-        deleteMessage="?? ??? ????? ?? ????? ?? ??? ??? ??????? ?? ???? ??????? ?? ??? ???????."
+        deleteTitle="حذف التشغيلة"
+        deleteMessage="هل أنت متأكد من رغبتك في حذف هذه التشغيلة؟ لا يمكن التراجع عن هذا الإجراء."
         itemName={batchApi.formatBatchInfo(selectedItem)}
       >
         {(modalState.mode === "create" || modalState.mode === "edit") && (
@@ -469,48 +480,51 @@ export default function Batch() {
               />
             )}
             <div className="space-y-2">
-              <label className="text-sm font-medium">??? ?????? <span className="text-red-500">*</span></label>
-              <input
+              <Label>رقم التشغيلة <span className="text-red-500">*</span></Label>
+              <Input
                 type="text"
-                className="w-full p-2 border rounded-md"
                 value={formData.batch_number}
-                onChange={(e) => setFormData({...formData, batch_number: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
                 placeholder={batchApi.generateBatchNumber()}
               />
-              <p className="text-xs text-gray-500">????? ???? ?????? ?????? ??? ??????</p>
+              <p className="text-xs text-gray-500">اتركه فارغاً لتوليد رقم تشغيلة تلقائي</p>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">????? ??????? <span className="text-red-500">*</span></label>
-              <input
+              <Label>تاريخ الإدخال <span className="text-red-500">*</span></Label>
+              <Input
                 type="datetime-local"
-                className="w-full p-2 border rounded-md"
                 value={formData.entry_date}
-                onChange={(e) => setFormData({...formData, entry_date: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">?????? <span className="text-red-500">*</span></label>
-              <select
-                className="w-full p-2 border rounded-md"
-                value={formData.material_id}
-                onChange={(e) => setFormData({...formData, material_id: e.target.value})}
+              <Label>المادة <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.material_id?.toString()}
+                onValueChange={(value) => setFormData({ ...formData, material_id: value })}
               >
-                <option value="">???? ??????</option>
-                {materials.map((material) => (
-                  <option key={material.material_id} value={material.material_id}>
-                    {material.material_name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر المادة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materials.map((material) => (
+                    <SelectItem
+                      key={material.material_id}
+                      value={material.material_id.toString()}
+                    >
+                      {material.material_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">?????????</label>
-              <textarea
-                className="w-full p-2 border rounded-md"
+              <Label>الملاحظات</Label>
+              <Textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                placeholder="??????? ??????..."
+                placeholder="ملاحظات إضافية..."
               />
             </div>
           </div>

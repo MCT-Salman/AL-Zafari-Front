@@ -17,6 +17,16 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Label } from "../../components/ui/label";
 import { Download, Ruler as RulerIcon, Package, Palette } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
 import StatsCard from "../../components/common/StatsCard";
@@ -55,6 +65,7 @@ export default function Ruler() {
     handleSave,
     handleDelete,
   } = useCrud(rulerApiAdapter, {
+    idField: 'ruler_id',
     successMessages: {
       create: "تم إنشاء المسطرة بنجاح",
       update: "تم تحديث المسطرة بنجاح",
@@ -145,12 +156,12 @@ export default function Ruler() {
   // Handle save with validation
   const handleSaveRuler = async (data) => {
     setFormError("");
-    
+
     // Validation
     const rulerType = data?.ruler_type?.trim();
     const materialId = data?.material_id;
     const colorId = data?.color_id;
-    
+
     if (!rulerType || !materialId || !colorId) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
@@ -284,7 +295,7 @@ export default function Ruler() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -359,7 +370,7 @@ export default function Ruler() {
                     {paginatedRulers.map((ruler) => (
                       <TableRow key={ruler.ruler_id}>
                         <TableCell className="font-medium">
-                          <Badge 
+                          <Badge
                             variant={ruler.ruler_type === "new" ? "default" : "secondary"}
                             className={ruler.ruler_type === "new" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}
                           >
@@ -373,7 +384,7 @@ export default function Ruler() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div 
+                            <div
                               className="w-4 h-4 rounded-full border"
                               style={{ backgroundColor: rulerApi.getColorCode(ruler) || "#ccc" }}
                             />
@@ -437,13 +448,13 @@ export default function Ruler() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === "create" 
-            ? "إضافة مسطرة جديدة" 
-            : modalState.mode === "edit" 
-            ? "تعديل المسطرة" 
-            : modalState.mode === "view"
-            ? "تفاصيل المسطرة"
-            : ""
+          modalState.mode === "create"
+            ? "إضافة مسطرة جديدة"
+            : modalState.mode === "edit"
+              ? "تعديل المسطرة"
+              : modalState.mode === "view"
+                ? "تفاصيل المسطرة"
+                : ""
         }
         loading={modalState.loading}
         size="lg"
@@ -452,13 +463,13 @@ export default function Ruler() {
         fields={
           modalState.mode === "view"
             ? [
-                { key: "ruler_type", label: "نوع المسطرة", formatValue: (key, value) => value === "new" ? "جديدة" : "قديمة" },
-                { key: "material_name", label: "المادة", formatValue: (key, value) => rulerApi.getMaterialName(selectedItem) },
-                { key: "color_name", label: "اللون", formatValue: (key, value) => rulerApi.getColorName(selectedItem) },
-                { key: "color_code", label: "كود اللون", formatValue: (key, value) => rulerApi.getColorCode(selectedItem) },
-                { key: "dimensions", label: "الأبعاد", formatValue: (key, value) => rulerApi.formatMaterialDimensions(selectedItem) },
-                { key: "notes", label: "الملاحظات" },
-              ]
+              { key: "ruler_type", label: "نوع المسطرة", formatValue: (key, value) => value === "new" ? "جديدة" : "قديمة" },
+              { key: "material_name", label: "المادة", formatValue: (key, value) => rulerApi.getMaterialName(selectedItem) },
+              { key: "color_name", label: "اللون", formatValue: (key, value) => rulerApi.getColorName(selectedItem) },
+              { key: "color_code", label: "كود اللون", formatValue: (key, value) => rulerApi.getColorCode(selectedItem) },
+              { key: "dimensions", label: "الأبعاد", formatValue: (key, value) => rulerApi.formatMaterialDimensions(selectedItem) },
+              { key: "notes", label: "الملاحظات" },
+            ]
             : []
         }
         deleteTitle="حذف المسطرة"
@@ -475,53 +486,61 @@ export default function Ruler() {
               />
             )}
             <div className="space-y-2">
-              <label className="text-sm font-medium">نوع المسطرة <span className="text-red-500">*</span></label>
-              <select
-                className="w-full p-2 border rounded-md"
+              <Label>نوع المسطرة <span className="text-red-500">*</span></Label>
+              <Select
                 value={formData.ruler_type}
-                onChange={(e) => setFormData({...formData, ruler_type: e.target.value})}
+                onValueChange={(value) => setFormData({ ...formData, ruler_type: value })}
               >
-                <option value="">اختر نوع المسطرة</option>
-                <option value="new">جديدة</option>
-                <option value="old">قديمة</option>
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر نوع المسطرة" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">جديدة</SelectItem>
+                  <SelectItem value="old">قديمة</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">المادة <span className="text-red-500">*</span></label>
-              <select
-                className="w-full p-2 border rounded-md"
-                value={formData.material_id}
-                onChange={(e) => setFormData({...formData, material_id: e.target.value})}
+              <Label>المادة <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.material_id?.toString()}
+                onValueChange={(value) => setFormData({ ...formData, material_id: value })}
               >
-                <option value="">اختر المادة</option>
-                {materials.map((material) => (
-                  <option key={material.material_id} value={material.material_id}>
-                    {material.material_name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر المادة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materials.map((material) => (
+                    <SelectItem key={material.material_id} value={material.material_id.toString()}>
+                      {material.material_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">اللون <span className="text-red-500">*</span></label>
-              <select
-                className="w-full p-2 border rounded-md"
-                value={formData.color_id}
-                onChange={(e) => setFormData({...formData, color_id: e.target.value})}
+              <Label>اللون <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.color_id?.toString()}
+                onValueChange={(value) => setFormData({ ...formData, color_id: value })}
               >
-                <option value="">اختر اللون</option>
-                {colors.map((color) => (
-                  <option key={color.color_id} value={color.color_id}>
-                    {color.color_name} ({color.color_code})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر اللون" />
+                </SelectTrigger>
+                <SelectContent>
+                  {colors.map((color) => (
+                    <SelectItem key={color.color_id} value={color.color_id.toString()}>
+                      {color.color_name} ({color.color_code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">الملاحظات</label>
-              <textarea
-                className="w-full p-2 border rounded-md"
+              <Label>الملاحظات</Label>
+              <Textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
                 placeholder="ملاحظات إضافية..."
               />

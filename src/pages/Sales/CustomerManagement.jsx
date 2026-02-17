@@ -14,6 +14,10 @@ import {
   TableHeader,
   TableRow,
 } from "../../components/ui/table";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Switch } from "../../components/ui/switch";
 import { Badge } from "../../components/ui/badge";
 import { Download, User, Phone, MapPin, Mail } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
@@ -26,6 +30,8 @@ import EmptyState from "../../components/common/EmptyState";
 import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
+
+import FilterSelect from "../../components/common/FilterSelect";
 
 export default function CustomerManagement() {
   // Create adapter to map generic CRUD method names to customerApi method names
@@ -53,6 +59,7 @@ export default function CustomerManagement() {
     handleSave,
     handleDelete,
   } = useCrud(customerApiAdapter, {
+    idField: 'customer_id',
     successMessages: {
       create: "تم إنشاء العميل بنجاح",
       update: "تم تحديث العميل بنجاح",
@@ -81,6 +88,8 @@ export default function CustomerManagement() {
 
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -125,13 +134,13 @@ export default function CustomerManagement() {
   // Handle save with validation
   const handleSaveCustomer = async (data) => {
     setFormError("");
-    
+
     // Validation
     const name = data?.name?.trim();
     const phone = data?.phone?.trim();
     const city = data?.city?.trim();
     const address = data?.address?.trim();
-    
+
     if (!name || !phone || !city || !address) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
@@ -144,14 +153,13 @@ export default function CustomerManagement() {
       return;
     }
 
-    // Prepare data to send
+    // Prepare data to send (country is set automatically by backend from phone)
     const dataToSend = {
       name: name,
       phone: phone,
       customer_type: data.customer_type || "customer",
       city: city,
       address: address,
-      country: data.country || "SY",
       is_active: data.is_active !== undefined ? data.is_active : true,
       notes: data.notes || "",
     };
@@ -177,7 +185,13 @@ export default function CustomerManagement() {
         customer.customer_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.notes?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      return matchesSearch;
+      const matchesType = typeFilter === "" || customer.customer_type === typeFilter;
+      const matchesStatus =
+        statusFilter === "" ||
+        (statusFilter === "active" && customer.is_active) ||
+        (statusFilter === "inactive" && !customer.is_active);
+
+      return matchesSearch && matchesType && matchesStatus;
     }
   );
 
@@ -204,7 +218,7 @@ export default function CustomerManagement() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, typeFilter, statusFilter]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
@@ -277,7 +291,7 @@ export default function CustomerManagement() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -291,8 +305,30 @@ export default function CustomerManagement() {
             />
           </div>
 
-          {/* Filters and Results */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FilterSelect
+              label="نوع العميل"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              options={[
+                { value: "", label: "جميع الأنواع" },
+                { value: "customer", label: "عميل" },
+                { value: "supplier", label: "مورد" },
+              ]}
+            />
+
+            <FilterSelect
+              label="الحالة"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={[
+                { value: "", label: "جميع العملاء" },
+                { value: "active", label: "نشط فقط" },
+                { value: "inactive", label: "غير نشط فقط" },
+              ]}
+            />
+
             <ResultsCounter
               current={filteredCustomers.length}
               total={customers.length}
@@ -376,7 +412,7 @@ export default function CustomerManagement() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge 
+                          <Badge
                             variant={customer.is_active ? "default" : "secondary"}
                             className={customer.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
                           >
@@ -436,13 +472,13 @@ export default function CustomerManagement() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === "create" 
-            ? "إضافة عميل جديد" 
-            : modalState.mode === "edit" 
-            ? "تعديل العميل" 
-            : modalState.mode === "view"
-            ? "تفاصيل العميل"
-            : ""
+          modalState.mode === "create"
+            ? "إضافة عميل جديد"
+            : modalState.mode === "edit"
+              ? "تعديل العميل"
+              : modalState.mode === "view"
+                ? "تفاصيل العميل"
+                : ""
         }
         loading={modalState.loading}
         size="lg"
@@ -451,15 +487,15 @@ export default function CustomerManagement() {
         fields={
           modalState.mode === "view"
             ? [
-                { key: "name", label: "اسم العميل" },
-                { key: "phone", label: "رقم الهاتف" },
-                { key: "customer_type", label: "نوع العميل" },
-                { key: "city", label: "المدينة" },
-                { key: "address", label: "العنوان" },
-                { key: "country", label: "البلد" },
-                { key: "is_active", label: "الحالة", formatValue: (key, value) => value ? "نشط" : "غير نشط" },
-                { key: "notes", label: "الملاحظات" },
-              ]
+              { key: "name", label: "اسم العميل" },
+              { key: "phone", label: "رقم الهاتف" },
+              { key: "customer_type", label: "نوع العميل" },
+              { key: "city", label: "المدينة" },
+              { key: "address", label: "العنوان" },
+              { key: "country", label: "البلد" },
+              { key: "is_active", label: "الحالة", formatValue: (key, value) => value ? "نشط" : "غير نشط" },
+              { key: "notes", label: "الملاحظات" },
+            ]
             : []
         }
         deleteTitle="حذف العميل"
@@ -478,21 +514,19 @@ export default function CustomerManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">اسم العميل <span className="text-red-500">*</span></label>
-                <input
+                <Input
                   type="text"
-                  className="w-full p-2 border rounded-md"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="مثال: محمد أحمد"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">رقم الهاتف <span className="text-red-500">*</span></label>
-                <input
+                <Input
                   type="tel"
-                  className="w-full p-2 border rounded-md"
                   value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="مثال: +963912345678"
                 />
               </div>
@@ -500,47 +534,53 @@ export default function CustomerManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">نوع العميل</label>
-                <select
-                  className="w-full p-2 border rounded-md"
+                <Select
                   value={formData.customer_type}
-                  onChange={(e) => setFormData({...formData, customer_type: e.target.value})}
+                  onValueChange={(value) => setFormData({ ...formData, customer_type: value })}
                 >
-                  <option value="customer">عميل</option>
-                  <option value="supplier">مورد</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر نوع العميل" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer">عميل</SelectItem>
+                    <SelectItem value="supplier">مورد</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">البلد</label>
-                <select
-                  className="w-full p-2 border rounded-md"
+                <Select
                   value={formData.country}
-                  onChange={(e) => setFormData({...formData, country: e.target.value})}
+                  onValueChange={(value) => setFormData({ ...formData, country: value })}
                 >
-                  <option value="SY">سوريا</option>
-                  <option value="LB">لبنان</option>
-                  <option value="JO">الأردن</option>
-                  <option value="IQ">العراق</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر البلد" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SY">سوريا</SelectItem>
+                    <SelectItem value="LB">لبنان</SelectItem>
+                    <SelectItem value="JO">الأردن</SelectItem>
+                    <SelectItem value="IQ">العراق</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">المدينة <span className="text-red-500">*</span></label>
-                <input
+                <Input
                   type="text"
-                  className="w-full p-2 border rounded-md"
                   value={formData.city}
-                  onChange={(e) => setFormData({...formData, city: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   placeholder="مثال: دمشق"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">العنوان <span className="text-red-500">*</span></label>
-                <input
+                <Input
                   type="text"
-                  className="w-full p-2 border rounded-md"
                   value={formData.address}
-                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="مثال: شارع العرض، حي الميدان"
                 />
               </div>
@@ -548,21 +588,19 @@ export default function CustomerManagement() {
             <div className="space-y-2">
               <label className="text-sm font-medium">الحالة</label>
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Switch
                   checked={formData.is_active}
-                  onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                  className="w-4 h-4"
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                 />
                 <span>عميل نشط</span>
               </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">الملاحظات</label>
-              <textarea
-                className="w-full p-2 border rounded-md"
+              <Textarea
+                className="w-full"
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
                 placeholder="ملاحظات إضافية..."
               />

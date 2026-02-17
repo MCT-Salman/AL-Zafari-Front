@@ -52,6 +52,7 @@ export const useCrud = (api, options = {}) => {
   const {
     onSuccess,
     onError,
+    idField = 'id',
     successMessages = {
       create: 'تم الإنشاء بنجاح',
       update: 'تم التحديث بنجاح',
@@ -264,18 +265,18 @@ export const useCrud = (api, options = {}) => {
   // Handle save (create or update)
   const handleSave = useCallback(async (data) => {
     if (modalState.mode === 'edit' && selectedItem) {
-      await updateItem(selectedItem.id, data);
+      await updateItem(selectedItem[idField], data);
     } else {
       await createItem(data);
     }
-  }, [modalState.mode, selectedItem, createItem, updateItem]);
+  }, [modalState.mode, selectedItem, createItem, updateItem, idField]);
 
   // Handle delete confirmation
   const handleDelete = useCallback(async () => {
     if (selectedItem) {
-      await deleteItem(selectedItem.id);
+      await deleteItem(selectedItem[idField]);
     }
-  }, [selectedItem, deleteItem]);
+  }, [selectedItem, deleteItem, idField]);
 
   return {
     // Data

@@ -77,10 +77,12 @@ import { cn } from "@/lib/utils";
 // 1. مكون داخلي للمحتوى (لأننا نحتاج لاستخدام useLayout داخله)
 const LayoutContent = () => {
   const { collapsed } = useLayout();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   // تحويل بيانات الـ Sidebar الخاصة بك لتناسب المكون الجديد
-  const navItems = sideData.map(item => ({
+  // إذا كان للعنصر role معيّن، لن يظهر إلا للمستخدم الذي يملك نفس الدور
+  const filteredSideData = sideData.filter(item => !item.role || item.role === user?.role);
+  const navItems = filteredSideData.map(item => ({
     title: item.title,
     href: item.link,
     // خدعة: نمرر الأيقونة كمكون (Function Component)

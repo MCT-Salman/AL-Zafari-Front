@@ -53,6 +53,7 @@ export default function ConstantType() {
     handleSave,
     handleDelete,
   } = useCrud(constantTypeApiAdapter, {
+    idField: 'constant_type_id',
     successMessages: {
       create: "تم إنشاء نوع الثابت بنجاح",
       update: "تم تحديث نوع الثابت بنجاح",
@@ -92,8 +93,8 @@ export default function ConstantType() {
       { key: 'constants_Type_name', header: 'اسم النوع' },
       { key: 'type', header: 'المعرف الفني' },
       { key: 'notes', header: 'الملاحظات' },
-      { 
-        key: 'values', 
+      {
+        key: 'values',
         header: 'عدد القيم',
         format: (value) => value?.length || 0
       },
@@ -116,15 +117,15 @@ export default function ConstantType() {
   // Handle save with validation
   const handleSaveType = async (idOrTypeData, typeData) => {
     setFormError("");
-    
+
     // Determine if first argument is ID (edit mode) or typeData (create mode)
     const isEditMode = typeof idOrTypeData === 'number' || typeof idOrTypeData === 'string';
     const actualTypeData = isEditMode ? typeData : idOrTypeData;
-    
+
     // Validation - check for required fields (trim to handle whitespace)
     const typeName = actualTypeData?.constants_Type_name?.trim();
     const typeKey = actualTypeData?.type?.trim();
-    
+
     if (!typeName || !typeKey) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
@@ -254,7 +255,7 @@ export default function ConstantType() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -388,13 +389,13 @@ export default function ConstantType() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === 'create' 
-            ? 'إضافة نوع ثابت جديد' 
-            : modalState.mode === 'edit' 
-            ? 'تعديل نوع الثابت' 
-            : modalState.mode === 'view'
-            ? 'تفاصيل نوع الثابت'
-            : ''
+          modalState.mode === 'create'
+            ? 'إضافة نوع ثابت جديد'
+            : modalState.mode === 'edit'
+              ? 'تعديل نوع الثابت'
+              : modalState.mode === 'view'
+                ? 'تفاصيل نوع الثابت'
+                : ''
         }
         loading={modalState.loading}
         size="lg"
@@ -403,18 +404,18 @@ export default function ConstantType() {
         fields={
           modalState.mode === 'view'
             ? [
-                { key: 'constants_Type_name', label: 'اسم النوع' },
-                { key: 'type', label: 'المعرف الفني' },
-                { key: 'notes', label: 'الملاحظات' },
-                { 
-                  key: 'values', 
-                  label: 'القيم المرتبطة',
-                  formatValue: (key, value) => {
-                    if (!value || value.length === 0) return 'لا توجد قيم';
-                    return value.map(v => v.value).join('، ');
-                  }
-                },
-              ]
+              { key: 'constants_Type_name', label: 'اسم النوع' },
+              { key: 'type', label: 'المعرف الفني' },
+              { key: 'notes', label: 'الملاحظات' },
+              {
+                key: 'values',
+                label: 'القيم المرتبطة',
+                formatValue: (key, value) => {
+                  if (!value || value.length === 0) return 'لا توجد قيم';
+                  return value.map(v => v.value).join('، ');
+                }
+              },
+            ]
             : []
         }
         deleteTitle="حذف نوع الثابت"
@@ -436,7 +437,7 @@ export default function ConstantType() {
                 type="text"
                 className="w-full p-2 border rounded-md"
                 value={formData.constants_Type_name}
-                onChange={(e) => setFormData({...formData, constants_Type_name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, constants_Type_name: e.target.value })}
                 placeholder="مثال: عرض"
               />
             </div>
@@ -446,7 +447,7 @@ export default function ConstantType() {
                 type="text"
                 className="w-full p-2 border rounded-md"
                 value={formData.type}
-                onChange={(e) => setFormData({...formData, type: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 placeholder="مثال: width"
               />
               <p className="text-xs text-gray-500">يجب أن يكون فريداً وباللغة الإنجليزية بدون مسافات</p>
@@ -456,7 +457,7 @@ export default function ConstantType() {
               <textarea
                 className="w-full p-2 border rounded-md"
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
                 placeholder="ملاحظات إضافية..."
               />

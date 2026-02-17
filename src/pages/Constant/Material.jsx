@@ -15,6 +15,16 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Label } from "../../components/ui/label";
 import { Download, Package, Ruler, Palette } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
 import StatsCard from "../../components/common/StatsCard";
@@ -53,6 +63,7 @@ export default function Material() {
     handleSave,
     handleDelete,
   } = useCrud(materialApiAdapter, {
+    idField: 'material_id',
     successMessages: {
       create: "تم إنشاء المادة بنجاح",
       update: "تم تحديث المادة بنجاح",
@@ -147,7 +158,7 @@ export default function Material() {
   // Handle save with validation
   const handleSaveMaterial = async (data) => {
     setFormError("");
-    
+
     // Validation
     const materialName = data?.material_name?.trim();
     const materialType = data?.type?.trim();
@@ -155,7 +166,7 @@ export default function Material() {
     const widthId = data?.constant_width_id;
     const thicknessId = data?.constant_thickness_id;
     const unit = data?.constant_value_unit?.trim();
-    
+
     if (!materialName || !materialType || !heightId || !widthId || !thicknessId || !unit) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
@@ -290,7 +301,7 @@ export default function Material() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -449,13 +460,13 @@ export default function Material() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === 'create' 
-            ? 'إضافة مادة جديدة' 
-            : modalState.mode === 'edit' 
-            ? 'تعديل المادة' 
-            : modalState.mode === 'view'
-            ? 'تفاصيل المادة'
-            : ''
+          modalState.mode === 'create'
+            ? 'إضافة مادة جديدة'
+            : modalState.mode === 'edit'
+              ? 'تعديل المادة'
+              : modalState.mode === 'view'
+                ? 'تفاصيل المادة'
+                : ''
         }
         loading={modalState.loading}
         size="lg"
@@ -464,20 +475,24 @@ export default function Material() {
         fields={
           modalState.mode === 'view'
             ? [
-                { key: 'material_name', label: 'اسم المادة' },
-                { key: 'type', label: 'النوع' },
-                { key: 'dimensions', label: 'الأبعاد', formatValue: (key, value) => materialApi.formatDimensions(selectedItem) },
-                { key: 'constant_value_unit', label: 'وحدة القيمة' },
-                { key: 'colors', label: 'الألوان', formatValue: (key, value) => {
+              { key: 'material_name', label: 'اسم المادة' },
+              { key: 'type', label: 'النوع' },
+              { key: 'dimensions', label: 'الأبعاد', formatValue: (key, value) => materialApi.formatDimensions(selectedItem) },
+              { key: 'constant_value_unit', label: 'وحدة القيمة' },
+              {
+                key: 'colors', label: 'الألوان', formatValue: (key, value) => {
                   if (!value || value.length === 0) return 'لا توجد ألوان';
                   return value.map(c => c.color_name).join('، ');
-                }},
-                { key: 'batches', label: 'الدفعات', formatValue: (key, value) => {
+                }
+              },
+              {
+                key: 'batches', label: 'الدفعات', formatValue: (key, value) => {
                   if (!value || value.length === 0) return 'لا توجد دفعات';
                   return `${value.length} دفعة`;
-                }},
-                { key: 'notes', label: 'الملاحظات' },
-              ]
+                }
+              },
+              { key: 'notes', label: 'الملاحظات' },
+            ]
             : []
         }
         deleteTitle="حذف المادة"
@@ -494,88 +509,97 @@ export default function Material() {
               />
             )}
             <div className="space-y-2">
-              <label className="text-sm font-medium">اسم المادة <span className="text-red-500">*</span></label>
-              <input
+              <Label>اسم المادة <span className="text-red-500">*</span></Label>
+              <Input
                 type="text"
-                className="w-full p-2 border rounded-md"
                 value={formData.material_name}
-                onChange={(e) => setFormData({...formData, material_name: e.target.value})}
-                placeholder="مثال: PVC"
+                onChange={(e) => setFormData({ ...formData, material_name: e.target.value })}
+                placeholder="مثال: خشب بلوط"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">النوع <span className="text-red-500">*</span></label>
-              <input
+              <Label>النوع <span className="text-red-500">*</span></Label>
+              <Input
                 type="text"
-                className="w-full p-2 border rounded-md"
-                value={formData.type}
-                onChange={(e) => setFormData({...formData, type: e.target.value})}
-                placeholder="مثال: Roll"
+                value={formData.material_type}
+                onChange={(e) => setFormData({ ...formData, material_type: e.target.value })}
+                placeholder="مثال: طبيعي"
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            {/* Dimensions */}
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">الارتفاع <span className="text-red-500">*</span></label>
-                <select
-                  className="w-full p-2 border rounded-md"
-                  value={formData.constant_height_id}
-                  onChange={(e) => setFormData({...formData, constant_height_id: e.target.value})}
+                <Label>الارتفاع <span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.height?.toString()}
+                  onValueChange={(value) => setFormData({ ...formData, height: value })}
                 >
-                  <option value="">اختر الارتفاع</option>
-                  {heightValues.map((height) => (
-                    <option key={height.constant_value_id} value={height.constant_value_id}>
-                      {height.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر الارتفاع" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {heightValues.map((val) => (
+                      <SelectItem key={val.constant_value_id} value={val.value.toString()}>
+                        {val.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">العرض <span className="text-red-500">*</span></label>
-                <select
-                  className="w-full p-2 border rounded-md"
-                  value={formData.constant_width_id}
-                  onChange={(e) => setFormData({...formData, constant_width_id: e.target.value})}
+                <Label>العرض <span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.width?.toString()}
+                  onValueChange={(value) => setFormData({ ...formData, width: value })}
                 >
-                  <option value="">اختر العرض</option>
-                  {widthValues.map((width) => (
-                    <option key={width.constant_value_id} value={width.constant_value_id}>
-                      {width.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر العرض" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {widthValues.map((val) => (
+                      <SelectItem key={val.constant_value_id} value={val.value.toString()}>
+                        {val.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">السمك <span className="text-red-500">*</span></label>
-                <select
-                  className="w-full p-2 border rounded-md"
-                  value={formData.constant_thickness_id}
-                  onChange={(e) => setFormData({...formData, constant_thickness_id: e.target.value})}
+                <Label>السمك <span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.thickness?.toString()}
+                  onValueChange={(value) => setFormData({ ...formData, thickness: value })}
                 >
-                  <option value="">اختر السمك</option>
-                  {thicknessValues.map((thickness) => (
-                    <option key={thickness.constant_value_id} value={thickness.constant_value_id}>
-                      {thickness.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر السمك" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {thicknessValues.map((val) => (
+                      <SelectItem key={val.constant_value_id} value={val.value.toString()}>
+                        {val.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">وحدة القيمة <span className="text-red-500">*</span></label>
-              <input
+              <Label>وحدة القيمة <span className="text-red-500">*</span></Label>
+              <Input
                 type="text"
-                className="w-full p-2 border rounded-md"
-                value={formData.constant_value_unit}
-                onChange={(e) => setFormData({...formData, constant_value_unit: e.target.value})}
-                placeholder="مثال: متر"
+                value={formData.unit}
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                placeholder="مثال: سم"
               />
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">الملاحظات</label>
-              <textarea
-                className="w-full p-2 border rounded-md"
+              <Label>الملاحظات</Label>
+              <Textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
                 placeholder="ملاحظات إضافية..."
               />

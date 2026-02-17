@@ -87,7 +87,7 @@ export default function ConstantValue() {
       return { success: true, data: [] };
     },
     getItemById: async (id) => {
-      const found = constantValues.find(v => 
+      const found = constantValues.find(v =>
         (v.constant_value_id === id || v.id === id || v.constant_value_id === parseInt(id))
       );
       if (found) return { success: true, data: found };
@@ -133,6 +133,7 @@ export default function ConstantValue() {
     handleSave,
     handleDelete,
   } = useCrud(constantValueApiAdapter, {
+    idField: 'constant_value_id',
     successMessages: {
       create: "تم إنشاء القيمة الثابتة بنجاح",
       update: "تم تحديث القيمة الثابتة بنجاح",
@@ -189,14 +190,14 @@ export default function ConstantValue() {
       { key: 'value', header: 'القيمة' },
       { key: 'unit', header: 'الوحدة' },
       { key: 'label', header: 'العنوان' },
-      { 
-        key: 'isDefault', 
+      {
+        key: 'isDefault',
         header: 'افتراضي',
         format: (value) => value ? 'نعم' : 'لا'
       },
       { key: 'notes', header: 'الملاحظات' },
-      { 
-        key: 'type', 
+      {
+        key: 'type',
         header: 'نوع الثابت',
         format: (value) => value?.constants_Type_name || ''
       },
@@ -221,15 +222,15 @@ export default function ConstantValue() {
   // Handle save with validation
   const handleSaveValue = async (idOrValueData, valueData) => {
     setFormError("");
-    
+
     const isEditMode = typeof idOrValueData === 'number' || typeof idOrValueData === 'string';
     const actualValueData = isEditMode ? valueData : idOrValueData;
-    
+
     // Validation
     const typeId = actualValueData?.constant_type_id;
     const value = actualValueData?.value?.toString().trim();
     const unit = actualValueData?.unit?.trim();
-    
+
     if (!typeId || typeId === "" || typeId === "undefined" || isNaN(parseInt(typeId))) {
       setFormError("يرجى اختيار نوع الثابت");
       return;
@@ -397,8 +398,8 @@ export default function ConstantValue() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>نوع الثابت</Label>
-              <Select 
-                value={selectedTypeId} 
+              <Select
+                value={selectedTypeId}
                 onValueChange={setSelectedTypeId}
                 disabled={typesLoading}
               >
@@ -407,8 +408,8 @@ export default function ConstantValue() {
                 </SelectTrigger>
                 <SelectContent>
                   {constantTypes.map((type) => (
-                    <SelectItem 
-                      key={type.constant_type_id} 
+                    <SelectItem
+                      key={type.constant_type_id}
                       value={type.constant_type_id.toString()}
                     >
                       {type.constants_Type_name}
@@ -444,7 +445,7 @@ export default function ConstantValue() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -615,13 +616,13 @@ export default function ConstantValue() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === 'create' 
-            ? 'إضافة قيمة جديدة' 
-            : modalState.mode === 'edit' 
-            ? 'تعديل القيمة' 
-            : modalState.mode === 'view'
-            ? 'تفاصيل القيمة'
-            : ''
+          modalState.mode === 'create'
+            ? 'إضافة قيمة جديدة'
+            : modalState.mode === 'edit'
+              ? 'تعديل القيمة'
+              : modalState.mode === 'view'
+                ? 'تفاصيل القيمة'
+                : ''
         }
         loading={modalState.loading}
         size="lg"
@@ -630,21 +631,21 @@ export default function ConstantValue() {
         fields={
           modalState.mode === 'view'
             ? [
-                { key: 'value', label: 'القيمة' },
-                { key: 'unit', label: 'الوحدة' },
-                { key: 'label', label: 'العنوان' },
-                { 
-                  key: 'isDefault', 
-                  label: 'افتراضي',
-                  formatValue: (key, value) => value ? 'نعم' : 'لا'
-                },
-                { key: 'notes', label: 'الملاحظات' },
-                { 
-                  key: 'type', 
-                  label: 'نوع الثابت',
-                  formatValue: (key, value) => value?.constants_Type_name || selectedTypeName
-                },
-              ]
+              { key: 'value', label: 'القيمة' },
+              { key: 'unit', label: 'الوحدة' },
+              { key: 'label', label: 'العنوان' },
+              {
+                key: 'isDefault',
+                label: 'افتراضي',
+                formatValue: (key, value) => value ? 'نعم' : 'لا'
+              },
+              { key: 'notes', label: 'الملاحظات' },
+              {
+                key: 'type',
+                label: 'نوع الثابت',
+                formatValue: (key, value) => value?.constants_Type_name || selectedTypeName
+              },
+            ]
             : []
         }
         deleteTitle="حذف القيمة"
@@ -660,22 +661,22 @@ export default function ConstantValue() {
                 dismissable={false}
               />
             )}
-            
+
             {/* Type Selector (only in create mode or if no type selected) */}
             {(!selectedTypeId || modalState.mode === 'create') && (
               <div className="space-y-2">
                 <Label>نوع الثابت <span className="text-red-500">*</span></Label>
-                <Select 
-                  value={formData.constant_type_id} 
-                  onValueChange={(value) => setFormData({...formData, constant_type_id: value})}
+                <Select
+                  value={formData.constant_type_id}
+                  onValueChange={(value) => setFormData({ ...formData, constant_type_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر نوع الثابت" />
                   </SelectTrigger>
                   <SelectContent>
                     {constantTypes.map((type) => (
-                      <SelectItem 
-                        key={type.constant_type_id} 
+                      <SelectItem
+                        key={type.constant_type_id}
                         value={type.constant_type_id.toString()}
                       >
                         {type.constants_Type_name}
@@ -689,9 +690,9 @@ export default function ConstantValue() {
             {/* القيمة - Select Box */}
             <div className="space-y-2">
               <Label>القيمة <span className="text-red-500">*</span></Label>
-              <Select 
-                value={formData.value} 
-                onValueChange={(value) => setFormData({...formData, value: value})}
+              <Select
+                value={formData.value}
+                onValueChange={(value) => setFormData({ ...formData, value: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="اختر القيمة" />
@@ -709,9 +710,9 @@ export default function ConstantValue() {
             {/* الوحدة - Select Box */}
             <div className="space-y-2">
               <Label>الوحدة <span className="text-red-500">*</span></Label>
-              <Select 
-                value={formData.unit} 
-                onValueChange={(value) => setFormData({...formData, unit: value})}
+              <Select
+                value={formData.unit}
+                onValueChange={(value) => setFormData({ ...formData, unit: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="اختر الوحدة" />
@@ -744,7 +745,7 @@ export default function ConstantValue() {
               <Checkbox
                 id="isDefault"
                 checked={formData.isDefault}
-                onCheckedChange={(checked) => setFormData({...formData, isDefault: checked})}
+                onCheckedChange={(checked) => setFormData({ ...formData, isDefault: checked })}
               />
               <Label htmlFor="isDefault" className="cursor-pointer select-none">
                 تعيين كقيمة افتراضية
@@ -757,7 +758,7 @@ export default function ConstantValue() {
               <Input
                 type="text"
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="ملاحظات إضافية..."
               />
             </div>

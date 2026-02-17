@@ -17,6 +17,16 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Label } from "../../components/ui/label";
 import { Download, DollarSign, Palette, Package } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
 import StatsCard from "../../components/common/StatsCard";
@@ -55,16 +65,17 @@ export default function PriceColor() {
     handleSave,
     handleDelete,
   } = useCrud(priceColorApiAdapter, {
+    idField: 'price_color_id',
     successMessages: {
-      create: "?? ????? ??? ????? ?????",
-      update: "?? ????? ??? ????? ?????",
-      delete: "?? ??? ??? ????? ?????",
+      create: "تم إنشاء سعر اللون بنجاح",
+      update: "تم تحديث سعر اللون بنجاح",
+      delete: "تم حذف سعر اللون بنجاح",
     },
     errorMessages: {
-      create: "??? ?? ??? ??? ?????",
-      update: "??? ?? ??? ??? ?????",
-      delete: "??? ?? ??? ??? ?????",
-      fetch: "??? ?? ????? ????? ???????",
+      create: "فشل في حفظ سعر اللون",
+      update: "فشل في حفظ سعر اللون",
+      delete: "فشل في حذف سعر اللون",
+      fetch: "فشل في تحميل أسعار الألوان",
     },
   });
 
@@ -119,50 +130,50 @@ export default function PriceColor() {
   // Use export hook
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
-      { key: "color_name", header: "?????", format: (item) => priceColorApi.getColorName(item) },
-      { key: "color_code", header: "??? ?????", format: (item) => priceColorApi.getColorCode(item) },
-      { key: "material_name", header: "??????", format: (item) => priceColorApi.getMaterialName(item) },
-      { key: "constant_value", header: "??? ?????", format: (item) => priceColorApi.getConstantValue(item) },
-      { key: "price_per_meter", header: "??????" },
-      { key: "price_color_By", header: "????? ??????" },
-      { key: "notes", header: "?????????" },
+      { key: "color_name", header: "اللون", format: (item) => priceColorApi.getColorName(item) },
+      { key: "color_code", header: "كود اللون", format: (item) => priceColorApi.getColorCode(item) },
+      { key: "material_name", header: "المادة", format: (item) => priceColorApi.getMaterialName(item) },
+      { key: "constant_value", header: "القيمة الثابتة", format: (item) => priceColorApi.getConstantValue(item) },
+      { key: "price_per_meter", header: "السعر" },
+      { key: "price_color_By", header: "طريقة التسعير" },
+      { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [
       { wch: 5 },   // #
-      { wch: 15 },  // ?????
-      { wch: 12 },  // ??? ?????
-      { wch: 15 },  // ??????
-      { wch: 15 },  // ??? ?????
-      { wch: 12 },  // ??????
-      { wch: 15 },  // ????? ??????
-      { wch: 25 },  // ?????????
+      { wch: 15 },  // اللون
+      { wch: 12 },  // كود اللون
+      { wch: 15 },  // المادة
+      { wch: 15 },  // القيمة الثابتة
+      { wch: 12 },  // السعر
+      { wch: 15 },  // طريقة التسعير
+      { wch: 25 },  // الملاحظات
     ],
-    sheetName: "????? ???????",
+    sheetName: "أسعار الألوان",
   });
 
   // Handle export
   const handleExport = () => {
-    exportToExcel(filteredPriceColors, "?????_???????");
+    exportToExcel(filteredPriceColors, "أسعار_الألوان");
   };
 
   // Handle save with validation
   const handleSavePriceColor = async (data) => {
     setFormError("");
-    
+
     // Validation
     const colorId = data?.color_id;
     const constantValueId = data?.constant_value_id;
     const priceColorBy = data?.price_color_By?.trim();
     const pricePerMeter = data?.price_per_meter;
-    
+
     if (!colorId || !constantValueId || !priceColorBy || !pricePerMeter) {
-      setFormError("???? ??? ???? ?????? ????????");
+      setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
     // Validate price is a number
     if (isNaN(pricePerMeter) || parseFloat(pricePerMeter) <= 0) {
-      setFormError("???? ????? ??? ????");
+      setFormError("يرجى إدخال سعر صالح");
       return;
     }
 
@@ -181,7 +192,7 @@ export default function PriceColor() {
   // Calculate stats
   const stats = {
     total: priceColors.length,
-    avgPrice: priceColors.length > 0 
+    avgPrice: priceColors.length > 0
       ? (priceColors.reduce((sum, pc) => sum + parseFloat(pc.price_per_meter || 0), 0) / priceColors.length).toFixed(2)
       : 0,
     uniqueColors: [...new Set(priceColors.map(pc => pc.color_id))].length,
@@ -240,9 +251,9 @@ export default function PriceColor() {
   const mainStats = [
     {
       id: 1,
-      title: "?????? ???????",
+      title: "إجمالي أسعار الألوان",
       value: stats.total,
-      unit: "???",
+      unit: "سعر",
       icon: DollarSign,
       iconColor: "text-secondary-f",
       bgColor: "bg-primary-s",
@@ -250,9 +261,9 @@ export default function PriceColor() {
     },
     {
       id: 2,
-      title: "????? ?????",
+      title: "متوسط السعر",
       value: stats.avgPrice,
-      unit: "????",
+      unit: "ريال",
       icon: DollarSign,
       iconColor: "text-primary-f",
       bgColor: "bg-primary-s",
@@ -260,9 +271,9 @@ export default function PriceColor() {
     },
     {
       id: 3,
-      title: "??????? ???????",
+      title: "عدد الألوان المميزة",
       value: stats.uniqueColors,
-      unit: "???",
+      unit: "لون",
       icon: Palette,
       iconColor: "text-secondary-s",
       bgColor: "bg-primary-s",
@@ -274,9 +285,9 @@ export default function PriceColor() {
     <div className="min-h-screen bg-gray-50 space-y-8 p-2">
       <div className=" mx-auto">
         <PageHeader
-          title="????? ????? ???????"
-          subtitle={`?????? ???????: ${priceColors.length}`}
-          actionLabel="????? ??? ????"
+          title="إدارة أسعار الألوان"
+          subtitle={`إجمالي أسعار الألوان: ${priceColors.length}`}
+          actionLabel="إضافة سعر جديد"
           onAction={openCreateModal}
         />
 
@@ -290,7 +301,7 @@ export default function PriceColor() {
         {/* Price Colors Table Card */}
         <Card className="p-6">
           <div className="">
-            <h2 className="text-xl font-bold">????? ????? ???????</h2>
+            <h2 className="text-xl font-bold">قائمة أسعار الألوان</h2>
           </div>
 
           {/* Messages */}
@@ -298,7 +309,7 @@ export default function PriceColor() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -306,7 +317,7 @@ export default function PriceColor() {
           {/* Search */}
           <div className="-my-4">
             <SearchInput
-              placeholder="???? ?? ??? (????? ?? ?????? ?? ????? ?? ?????)"
+              placeholder="ابحث عن سعر (اللون أو الكود أو المادة)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -339,12 +350,12 @@ export default function PriceColor() {
               {exportLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                  <span>???? ???????...</span>
+                  <span>جاري التصدير...</span>
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  <span>????? Excel ({filteredPriceColors.length})</span>
+                  <span>تصدير Excel ({filteredPriceColors.length})</span>
                 </>
               )}
             </Button>
@@ -352,22 +363,22 @@ export default function PriceColor() {
 
           {/* Price Colors Table */}
           {loading ? (
-            <LoadingState message="???? ????? ????? ???????..." />
+            <LoadingState message="جاري تحميل أسعار الألوان..." />
           ) : filteredPriceColors.length === 0 ? (
-            <EmptyState message="?? ???? ?????" />
+            <EmptyState message="لا توجد أسعار ألوان" />
           ) : (
             <>
               <div className="overflow-x-auto rounded-lg ">
                 <Table onSort={handleSort}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>?????</TableHead>
-                      <TableHead>??????</TableHead>
-                      <TableHead>??? ?????</TableHead>
-                      <TableHead sortable sortKey="price_per_meter">?????</TableHead>
-                      <TableHead>????? ??????</TableHead>
-                      <TableHead>?????????</TableHead>
-                      <TableHead>?????????</TableHead>
+                      <TableHead>اللون</TableHead>
+                      <TableHead>المادة</TableHead>
+                      <TableHead>القيمة الثابتة</TableHead>
+                      <TableHead sortable sortKey="price_per_meter">السعر</TableHead>
+                      <TableHead>طريقة التسعير</TableHead>
+                      <TableHead>الملاحظات</TableHead>
+                      <TableHead>الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -375,7 +386,7 @@ export default function PriceColor() {
                       <TableRow key={priceColor.price_color_id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
-                            <div 
+                            <div
                               className="w-4 h-4 rounded-full border"
                               style={{ backgroundColor: priceColorApi.getColorCode(priceColor) || "#ccc" }}
                             />
@@ -455,13 +466,13 @@ export default function PriceColor() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === "create" 
-            ? "????? ??? ????" 
-            : modalState.mode === "edit" 
-            ? "????? ?????" 
-            : modalState.mode === "view"
-            ? "?????? ?????"
-            : ""
+          modalState.mode === "create"
+            ? "إضافة سعر جديد"
+            : modalState.mode === "edit"
+              ? "تعديل سعر اللون"
+              : modalState.mode === "view"
+                ? "تفاصيل سعر اللون"
+                : ""
         }
         loading={modalState.loading}
         size="lg"
@@ -470,18 +481,18 @@ export default function PriceColor() {
         fields={
           modalState.mode === "view"
             ? [
-                { key: "color_name", label: "?????", formatValue: (key, value) => priceColorApi.getColorName(selectedItem) },
-                { key: "color_code", label: "??? ?????", formatValue: (key, value) => priceColorApi.getColorCode(selectedItem) },
-                { key: "material_name", label: "??????", formatValue: (key, value) => priceColorApi.getMaterialName(selectedItem) },
-                { key: "constant_value", label: "??? ?????", formatValue: (key, value) => priceColorApi.getConstantValue(selectedItem) },
-                { key: "price_per_meter", label: "?????" },
-                { key: "price_color_By", label: "????? ??????" },
-                { key: "notes", label: "?????????" },
-              ]
+              { key: "color_name", label: "اللون", formatValue: (key, value) => priceColorApi.getColorName(selectedItem) },
+              { key: "color_code", label: "كود اللون", formatValue: (key, value) => priceColorApi.getColorCode(selectedItem) },
+              { key: "material_name", label: "المادة", formatValue: (key, value) => priceColorApi.getMaterialName(selectedItem) },
+              { key: "constant_value", label: "القيمة الثابتة", formatValue: (key, value) => priceColorApi.getConstantValue(selectedItem) },
+              { key: "price_per_meter", label: "السعر" },
+              { key: "price_color_By", label: "طريقة التسعير" },
+              { key: "notes", label: "الملاحظات" },
+            ]
             : []
         }
-        deleteTitle="??? ?????"
-        deleteMessage="?? ??? ????? ?? ????? ?? ??? ??? ?????? ?? ???? ??????? ?? ??? ???????."
+        deleteTitle="حذف سعر اللون"
+        deleteMessage="هل أنت متأكد من رغبتك في حذف هذا السعر؟ لا يمكن التراجع عن هذا الإجراء."
         itemName={priceColorApi.formatPriceInfo(selectedItem)}
       >
         {(modalState.mode === "create" || modalState.mode === "edit") && (
@@ -494,65 +505,66 @@ export default function PriceColor() {
               />
             )}
             <div className="space-y-2">
-              <label className="text-sm font-medium">????? <span className="text-red-500">*</span></label>
-              <select
-                className="w-full p-2 border rounded-md"
-                value={formData.color_id}
-                onChange={(e) => setFormData({...formData, color_id: e.target.value})}
+              <Label>اللون <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.color_id?.toString()}
+                onValueChange={(value) => setFormData({ ...formData, color_id: value })}
               >
-                <option value="">???? ?????</option>
-                {colors.map((color) => (
-                  <option key={color.color_id} value={color.color_id}>
-                    {color.color_name} ({color.color_code})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر اللون" />
+                </SelectTrigger>
+                <SelectContent>
+                  {colors.map((color) => (
+                    <SelectItem key={color.color_id} value={color.color_id.toString()}>
+                      {color.color_name} ({color.color_code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">??? ????? <span className="text-red-500">*</span></label>
-              <select
-                className="w-full p-2 border rounded-md"
-                value={formData.constant_value_id}
-                onChange={(e) => setFormData({...formData, constant_value_id: e.target.value})}
+              <Label>القيمة الثابتة <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.constant_value_id?.toString()}
+                onValueChange={(value) => setFormData({ ...formData, constant_value_id: value })}
               >
-                <option value="">???? ??? ?????</option>
-                {constantValues.map((constantValue) => (
-                  <option key={constantValue.constant_value_id} value={constantValue.constant_value_id}>
-                    {constantValue.value}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر القيمة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {constantValues.map((val) => (
+                    <SelectItem key={val.constant_value_id} value={val.constant_value_id.toString()}>
+                      {val.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">????? ?????? <span className="text-red-500">*</span></label>
-              <input
+              <Label>طريقة التسعير <span className="text-red-500">*</span></Label>
+              <Input
                 type="text"
-                className="w-full p-2 border rounded-md"
-                value={formData.price_color_By}
-                onChange={(e) => setFormData({...formData, price_color_By: e.target.value})}
-                placeholder="????: isByMeter22"
+                value={formData.price_method}
+                onChange={(e) => setFormData({ ...formData, price_method: e.target.value })}
+                placeholder="مثال: لكل متر"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">????? <span className="text-red-500">*</span></label>
-              <input
+              <Label>السعر <span className="text-red-500">*</span></Label>
+              <Input
                 type="number"
-                step="0.01"
-                min="0"
-                className="w-full p-2 border rounded-md"
-                value={formData.price_per_meter}
-                onChange={(e) => setFormData({...formData, price_per_meter: e.target.value})}
-                placeholder="????: 150"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                placeholder="0.00"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">?????????</label>
-              <textarea
-                className="w-full p-2 border rounded-md"
+              <Label>الملاحظات</Label>
+              <Textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
-                placeholder="??????? ??????..."
+                placeholder="ملاحظات إضافية..."
               />
             </div>
           </div>

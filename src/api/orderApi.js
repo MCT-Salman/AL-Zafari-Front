@@ -165,12 +165,13 @@ export const orderApi = {
     }, 0);
   },
 
-  // Format currency
+  // Format currency - always display in ل.س
   formatCurrency: (amount) => {
     const num = parseFloat(amount) || 0;
-    return new Intl.NumberFormat('ar-SA', {
-      style: 'currency',
-      currency: 'SYP'
+    const formatted = new Intl.NumberFormat('ar-SA', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(num);
+    return `${formatted} ل.س`;
   }
 };

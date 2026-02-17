@@ -76,7 +76,7 @@ export const priceColorApi = {
     const materialName = priceColor.color?.material?.material_name || 'غير محدد';
     const constantValue = priceColor.constant_value?.value || 'غير محدد';
     const price = priceColor.price_per_meter || '0';
-    return `${colorName} - ${materialName} - ${constantValue}: ${price}`;
+    return `${colorName} - ${materialName} - ${constantValue}: ${price} ل.س`;
   },
 
   formatPriceDisplay: (priceColor) => {
@@ -84,6 +84,6 @@ export const priceColorApi = {
     
     const price = priceColor.price_per_meter || '0';
     const constantValue = priceColor.constant_value?.value || 'غير محدد';
-    return `${price} لكل ${constantValue}`;
+    return `${price} ل.س لكل ${constantValue}`;
   }
 };

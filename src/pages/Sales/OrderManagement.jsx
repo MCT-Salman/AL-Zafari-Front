@@ -15,6 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from "../../components/ui/table";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Badge } from "../../components/ui/badge";
 import { Download, ShoppingCart, User, Plus, Edit, Trash2, Eye } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
@@ -542,36 +545,43 @@ export default function OrderManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">العميل <span className="text-red-500">*</span></label>
-                <select
-                  className="w-full p-2 border rounded-md"
+                <Select
                   value={formData.customer_id}
-                  onChange={(e) => {
-                    const customerId = e.target.value;
+                  onValueChange={(value) => {
+                    const customerId = value;
                     const customer = customers.find(c => c.customer_id == customerId);
                     setSelectedCustomer(customer);
                     setFormData({...formData, customer_id: customerId});
                   }}
                 >
-                  <option value="">اختر العميل</option>
-                  {customers.map((customer) => (
-                    <option key={customer.customer_id} value={customer.customer_id}>
-                      {customer.name} ({customer.phone})
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر العميل" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.customer_id} value={String(customer.customer_id)}>
+                        {customer.name} ({customer.phone})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">حالة الطلب <span className="text-red-500">*</span></label>
-                <select
-                  className="w-full p-2 border rounded-md"
+                <Select
                   value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                  onValueChange={(value) => setFormData({...formData, status: value})}
                 >
-                  <option value="pending">قيد الانتظار</option>
-                  <option value="preparing">قيد التحضير</option>
-                  <option value="completed">مكتمل</option>
-                  <option value="canceled">ملغي</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر حالة الطلب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">قيد الانتظار</SelectItem>
+                    <SelectItem value="preparing">قيد التحضير</SelectItem>
+                    <SelectItem value="completed">مكتمل</SelectItem>
+                    <SelectItem value="canceled">ملغي</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -591,8 +601,8 @@ export default function OrderManagement() {
             {/* Order Notes */}
             <div className="space-y-2">
               <label className="text-sm font-medium">ملاحظات الطلب</label>
-              <textarea
-                className="w-full p-2 border rounded-md"
+              <Textarea
+                className="w-full"
                 value={formData.notes}
                 onChange={(e) => setFormData({...formData, notes: e.target.value})}
                 rows={3}
@@ -635,74 +645,74 @@ export default function OrderManagement() {
                     {currentItems.map((item, index) => (
                       <tr key={index} className="border-t">
                         <td className="px-4 py-2">
-                          <input
+                          <Input
                             type="text"
-                            className="w-full p-1 border rounded"
+                            className="w-full p-1"
                             value={item.type_item}
                             onChange={(e) => updateItem(index, "type_item", e.target.value)}
                             placeholder="النوع"
                           />
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <Input
                             type="text"
-                            className="w-full p-1 border rounded"
+                            className="w-full p-1"
                             value={item.ruler_id}
                             onChange={(e) => updateItem(index, "ruler_id", e.target.value)}
                             placeholder="المسطرة"
                           />
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <Input
                             type="number"
-                            className="w-full p-1 border rounded"
+                            className="w-full p-1"
                             value={item.constant_width}
                             onChange={(e) => updateItem(index, "constant_width", e.target.value)}
                             placeholder="العرض"
                           />
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <Input
                             type="number"
-                            className="w-full p-1 border rounded"
+                            className="w-full p-1"
                             value={item.length}
                             onChange={(e) => updateItem(index, "length", e.target.value)}
                             placeholder="الطول"
                           />
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <Input
                             type="number"
                             step="0.1"
-                            className="w-full p-1 border rounded"
+                            className="w-full p-1"
                             value={item.constant_thickness}
                             onChange={(e) => updateItem(index, "constant_thickness", e.target.value)}
                             placeholder="السماكة"
                           />
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <Input
                             type="text"
-                            className="w-full p-1 border rounded"
+                            className="w-full p-1"
                             value={item.batch_id}
                             onChange={(e) => updateItem(index, "batch_id", e.target.value)}
                             placeholder="الطبخة"
                           />
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <Input
                             type="number"
-                            className="w-full p-1 border rounded"
+                            className="w-full p-1"
                             value={item.quantity}
                             onChange={(e) => updateItem(index, "quantity", e.target.value)}
                             placeholder="الكمية"
                           />
                         </td>
                         <td className="px-4 py-2">
-                          <input
+                          <Input
                             type="number"
                             step="0.01"
-                            className="w-full p-1 border rounded"
+                            className="w-full p-1"
                             value={item.price_per_meter}
                             onChange={(e) => updateItem(index, "price_per_meter", e.target.value)}
                             placeholder="السعر/م"

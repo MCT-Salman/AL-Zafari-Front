@@ -5,13 +5,13 @@ import { customerApi } from "../../api/customerApi";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { 
-  ShoppingCart, 
-  Users, 
-  TrendingUp, 
-  DollarSign, 
-  Package, 
-  Calendar, 
+import {
+  ShoppingCart,
+  Users,
+  TrendingUp,
+  DollarSign,
+  Package,
+  Calendar,
   Plus,
   Eye
 } from "lucide-react";
@@ -34,7 +34,7 @@ export default function SalesDashboard() {
     try {
       setLoading(true);
       setError("");
-      
+
       // Load orders and customers in parallel
       const [ordersResponse, customersResponse] = await Promise.all([
         orderApi.getOrders({ limit: 10 }), // Get recent orders
@@ -117,7 +117,7 @@ export default function SalesDashboard() {
                 <h3 className="text-lg font-medium text-gray-900">إنشاء طلب جديد</h3>
                 <p className="text-sm text-gray-600 mt-1">بدء طلب مبيعات جديد</p>
               </div>
-              <Button 
+              <Button
                 className="bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => window.location.href = "/sales/orders/create"}
               >
@@ -132,7 +132,7 @@ export default function SalesDashboard() {
                 <h3 className="text-lg font-medium text-gray-900">البحث عن زبون و إضافته</h3>
                 <p className="text-sm text-gray-600 mt-1">البحث عن زبون أو إضافة زبون جديد</p>
               </div>
-              <Button 
+              <Button
                 className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={() => window.location.href = "/sales/customers"}
               >
@@ -147,7 +147,7 @@ export default function SalesDashboard() {
                 <h3 className="text-lg font-medium text-gray-900">عرض جميع الطلبات</h3>
                 <p className="text-sm text-gray-600 mt-1">عرض وإدارة جميع طلبات المبيعات</p>
               </div>
-              <Button 
+              <Button
                 className="bg-purple-600 hover:bg-purple-700 text-white"
                 onClick={() => window.location.href = "/sales/orders"}
               >
@@ -158,7 +158,7 @@ export default function SalesDashboard() {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
           <StatsCard
             id={1}
             title="إجمالي الطلبات"
@@ -225,7 +225,7 @@ export default function SalesDashboard() {
               <TrendingUp className="w-6 h-6 text-blue-600" />
             </div>
             <div className="text-3xl font-bold text-blue-600">
-              {stats.totalOrders > 0 
+              {stats.totalOrders > 0
                 ? formatCurrency(stats.totalRevenue / stats.totalOrders)
                 : "0"
               }
@@ -242,7 +242,7 @@ export default function SalesDashboard() {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">الطلبات الأخيرة</h3>
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => window.location.href = "/sales/orders"}
               >
@@ -294,7 +294,7 @@ export default function SalesDashboard() {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">العملاء الأخيرون</h3>
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => window.location.href = "/sales/customers"}
               >
@@ -341,9 +341,9 @@ export default function SalesDashboard() {
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-medium text-gray-900">حالة النظام</h3>
-              <div className="text-green-600">
-                <div className="animate-pulse w-2 h-2 bg-green-600 rounded-full mr-2"></div>
-              </div>
+            <div className="text-green-600">
+              <div className="animate-pulse w-2 h-2 bg-green-600 rounded-full mr-2"></div>
+            </div>
             <div className="text-3xl font-bold text-green-600">
               جميع الأنظمة تعمل بشكل طبيعي
             </div>

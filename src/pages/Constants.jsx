@@ -16,7 +16,7 @@ import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { Switch } from "../components/ui/switch";
-import { Edit2, Trash2, Plus } from "lucide-react";
+import { Edit2, Trash2, Plus, Layers, Hash, Star, Ruler } from "lucide-react";
 import CrudActions from "../components/common/CrudActions";
 import StatsCard from "../components/common/StatsCard";
 import SearchInput from "../components/common/SearchInput";
@@ -87,6 +87,7 @@ export default function Constants() {
     setError("");
     try {
       const response = await constantApi.getConstantTypes();
+      // GET /constant-type returns values embedded inside each type
       setConstantTypes(response.data || []);
       if (response.data && response.data.length > 0) {
         setSelectedTab(response.data[0].constant_type_id.toString());
@@ -98,12 +99,12 @@ export default function Constants() {
     }
   };
 
-  const loadConstantValues = async (typeId) => {
+  const reloadConstantValues = async (typeId) => {
     try {
       const response = await constantApi.getConstantValuesByType(typeId);
       setConstantTypes(prev => 
         prev.map(type => 
-          type.constant_type_id.toString() === typeId 
+          type.constant_type_id.toString() === typeId.toString() 
             ? { ...type, values: response.data || [] }
             : type
         )
@@ -115,10 +116,6 @@ export default function Constants() {
 
   const handleTabChange = (typeId) => {
     setSelectedTab(typeId);
-    const currentType = constantTypes.find(t => t.constant_type_id.toString() === typeId);
-    if (currentType && (!currentType.values || currentType.values.length === 0)) {
-      loadConstantValues(typeId);
-    }
     setCurrentPage(1); // Reset page when changing tabs
   };
 
@@ -156,6 +153,7 @@ export default function Constants() {
     setFormLoading(true);
     try {
       const typeId = parseInt(selectedTab);
+      const typeIdStr = selectedTab;
       if (editingValue) {
         await constantApi.updateConstantValue(editingValue.constant_value_id, {
           value: formValueData.value,
@@ -178,7 +176,7 @@ export default function Constants() {
       }
 
       setShowValueModal(false);
-      await loadConstantValues(typeId);
+      await reloadConstantValues(typeId);
     } catch (err) {
       setError(err.message || "حدث خطأ في حفظ القيمة");
     } finally {
@@ -201,7 +199,7 @@ export default function Constants() {
       const typeId = parseInt(selectedTab);
       await constantApi.deleteConstantValue(deleteConfirm.id);
       setMessage("تم حذف القيمة الثابتة بنجاح");
-      await loadConstantValues(typeId);
+      await reloadConstantValues(typeId);
       setDeleteConfirm({ isOpen: false, type: null, id: null, loading: false });
     } catch (err) {
       setError(err.message || "حدث خطأ في حذف القيمة");
@@ -319,13 +317,56 @@ export default function Constants() {
   const endIndex = startIndex + rowsPerPage;
   const paginatedValues = filteredValues.slice(startIndex, endIndex);
 
+  const mainStats = [
+    {
+      id: 1,
+      title: "إجمالي الأنواع",
+      value: stats.totalTypes,
+      unit: "نوع",
+      icon: Layers,
+      iconColor: "text-secondary-f",
+      bgColor: "bg-primary-s",
+      borderColor: "border-secondary-f"
+    },
+    {
+      id: 2,
+      title: "إجمالي القيم",
+      value: stats.totalValues,
+      unit: "قيمة",
+      icon: Hash,
+      iconColor: "text-primary-f",
+      bgColor: "bg-primary-s",
+      borderColor: "border-primary-f"
+    },
+    {
+      id: 3,
+      title: "قيمة افتراضية",
+      value: stats.totalDefaults,
+      unit: "قيمة",
+      icon: Star,
+      iconColor: "text-secondary-s",
+      bgColor: "bg-primary-s",
+      borderColor: "border-secondary-s"
+    },
+    {
+      id: 4,
+      title: "وحدات مميزة",
+      value: stats.uniqueUnits,
+      unit: "وحدة",
+      icon: Ruler,
+      iconColor: "text-secondary-t",
+      bgColor: "bg-primary-s",
+      borderColor: "border-secondary-t"
+    }
+  ];
+
   if (loading) {
     return <LoadingState />;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 space-y-8 p-2">
+      <div className=" mx-auto">
         <PageHeader
           title="إدارة الثوابت"
           subtitle={`إجمالي الأنواع: ${stats.totalTypes}`}
@@ -333,52 +374,39 @@ export default function Constants() {
           onAction={handleCreateType}
         />
 
-        {/* Stats Cards - Similar to Users page */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <StatsCard 
-            label="إجمالي الأنواع" 
-            value={stats.totalTypes} 
-            variant="blue" 
-          />
-          <StatsCard 
-            label="إجمالي القيم" 
-            value={stats.totalValues} 
-            variant="green" 
-          />
-          <StatsCard 
-            label="قيمة افتراضية" 
-            value={stats.totalDefaults} 
-            variant="purple" 
-          />
-          <StatsCard 
-            label="وحدات مميزة" 
-            value={stats.uniqueUnits} 
-            variant="red" 
-          />
+        {/* Stats Cards - Same as Users page */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+          {mainStats.map((stat) => (
+            <StatsCard key={stat.id} {...stat} />
+          ))}
         </div>
 
-        {/* Main Content Card - Similar to Users page */}
-        <Card className="p-6" >
-          <div className="mb-6">
+        {/* Main Content Card - Same as Users page */}
+        <Card className="p-6">
+          <div className="">
             <h2 className="text-xl font-bold">قائمة الثوابت</h2>
           </div>
 
-          {/* Messages - Same as Users page */}
-          <MessageAlert
-            type="error"
-            message={error}
-            onDismiss={() => setError("")}
-            dismissable={true}
-          />
-          <MessageAlert
-            type="success"
-            message={message}
-            onDismiss={() => setMessage("")}
-            dismissable={true}
-          />
+          {/* Messages */}
+          {error && (
+            <MessageAlert
+              type="error"
+              message={error}
+              onDismiss={() => setError("")}
+              dismissable={true}
+            />
+          )}
+          {message && (
+            <MessageAlert
+              type="success"
+              message={message}
+              onDismiss={() => setMessage("")}
+              dismissable={true}
+            />
+          )}
 
-          {/* Search - Same as Users page */}
-          <div className="mb-6">
+          {/* Search */}
+          <div className="-my-4">
             <SearchInput
               placeholder="ابحث عن قيمة أو ملصق أو ملاحظة"
               value={searchTerm}
@@ -386,8 +414,8 @@ export default function Constants() {
             />
           </div>
 
-          {/* Filters - Similar to Users page */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FilterSelect
               label="الافتراضي"
               value={defaultFilter}
@@ -405,13 +433,15 @@ export default function Constants() {
             />
           </div>
 
-          {/* Rows Per Page Selector - Same as Users page */}
-          <div className="mb-6 flex justify-end">
+          <div className="flex justify-between">
+          {/* Rows Per Page Selector */}
+          <div className=" flex justify-start">
             <RowsPerPageSelector
               value={rowsPerPage}
               onChange={setRowsPerPage}
               options={[5, 10, 20, 50]}
             />
+          </div>
           </div>
 
           {/* Empty State for No Types - Similar to Users page */}
