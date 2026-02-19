@@ -11,7 +11,7 @@ import Ruler from "./Ruler";
 
 
 const ConstantTabs = () => {
-  const [activeTab, setActiveTab] = useState("Specialization");
+  const [activeTab, setActiveTab] = useState("constant_type");
 
   const tabs = [
     { value: "constant_type", label: "أنواع الثوابت" },

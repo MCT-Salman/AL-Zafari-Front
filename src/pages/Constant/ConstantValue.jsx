@@ -366,10 +366,10 @@ export default function ConstantValue() {
   const selectedTypeName = constantTypes.find(t => t.constant_type_id === parseInt(selectedTypeId))?.constants_Type_name || "";
 
   const handleOpenCreate = () => {
-    if (!selectedTypeId) {
-      alert("يرجى اختيار نوع الثابت أولاً");
-      return;
-    }
+    // if (!selectedTypeId) {
+    //   alert("يرجى اختيار نوع الثابت أولاً");
+    //   return;
+    // }
     setFormData({
       constant_type_id: selectedTypeId,
       value: "",
@@ -418,7 +418,7 @@ export default function ConstantValue() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end">
+            <div className="flex items-center">
               <p className="text-sm text-gray-600">
                 {typesLoading ? "جاري تحميل الأنواع..." : `${constantTypes.length} نوع متاح`}
               </p>

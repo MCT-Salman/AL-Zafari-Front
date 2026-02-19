@@ -58,6 +58,15 @@ export const constantApi = {
     }
   },
 
+  getConstantValuesByTypeName: async (typeName) => {
+    try {
+      const response = await axiosInstance.get(`/constant-value/by-type-name/${typeName}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في جلب القيم الثابتة' };
+    }
+  },
+
   createConstantValue: async (data) => {
     try {
       const response = await axiosInstance.post('/constant-value', data);

@@ -105,20 +105,37 @@ export default function Material() {
   const loadConstantValues = async () => {
     try {
       // Load height values (assuming type_id 3 for height based on API example)
-      const heightResponse = await constantApi.getConstantValuesByType(3);
+      const heightResponse = await constantApi.getConstantValuesByTypeName('height');
       setHeightValues(heightResponse.data || []);
 
       // Load width values (assuming type_id 2 for width based on API example)
-      const widthResponse = await constantApi.getConstantValuesByType(2);
+      const widthResponse = await constantApi.getConstantValuesByTypeName('width');
       setWidthValues(widthResponse.data || []);
 
       // Load thickness values (assuming type_id 4 for thickness based on API example)
-      const thicknessResponse = await constantApi.getConstantValuesByType(4);
+      const thicknessResponse = await constantApi.getConstantValuesByTypeName('thickness');
       setThicknessValues(thicknessResponse.data || []);
     } catch (error) {
       console.error('Failed to load constant values:', error);
     }
   };
+  // const loadConstantValues = async () => {
+  //   try {
+  //     // Load height values (assuming type_id 3 for height based on API example)
+  //     const heightResponse = await constantApi.getConstantValuesByType(3);
+  //     setHeightValues(heightResponse.data || []);
+
+  //     // Load width values (assuming type_id 2 for width based on API example)
+  //     const widthResponse = await constantApi.getConstantValuesByType(2);
+  //     setWidthValues(widthResponse.data || []);
+
+  //     // Load thickness values (assuming type_id 4 for thickness based on API example)
+  //     const thicknessResponse = await constantApi.getConstantValuesByType(4);
+  //     setThicknessValues(thicknessResponse.data || []);
+  //   } catch (error) {
+  //     console.error('Failed to load constant values:', error);
+  //   }
+  // };
 
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
@@ -167,10 +184,10 @@ export default function Material() {
     const thicknessId = data?.constant_thickness_id;
     const unit = data?.constant_value_unit?.trim();
 
-    if (!materialName || !materialType || !heightId || !widthId || !thicknessId || !unit) {
-      setFormError("يرجى ملء جميع الحقول المطلوبة");
-      return;
-    }
+    // if (!materialName || !materialType || !heightId || !widthId || !thicknessId || !unit) {
+    //   setFormError("يرجى ملء جميع الحقول المطلوبة");
+    //   return;
+    // }
 
     // Prepare data to send
     const dataToSend = {

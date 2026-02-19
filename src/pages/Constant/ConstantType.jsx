@@ -7,6 +7,13 @@ import { CrudModal } from "../../components/common/CrudModal";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -432,6 +439,30 @@ export default function ConstantType() {
               />
             )}
             <div className="space-y-2">
+              <label className="text-sm font-medium">المعرف الفني <span className="text-red-500">*</span></label>
+               <Select
+                value={formData.type}
+                onValueChange={(value) => setFormData({ ...formData, type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر نوع الثابت" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem key="height" value="height"> الارتفاع</SelectItem>
+                    <SelectItem key="width" value="width"> العرض</SelectItem>
+                    <SelectItem key="thickness" value="thickness"> السماكة</SelectItem>
+                </SelectContent>
+              </Select>
+              {/* <input
+                type="text"
+                className="w-full p-2 border rounded-md"
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                placeholder="مثال: width"
+              />
+              <p className="text-xs text-gray-500">يجب أن يكون فريداً وباللغة الإنجليزية بدون مسافات</p> */}
+            </div>
+            <div className="space-y-2">
               <label className="text-sm font-medium">اسم النوع <span className="text-red-500">*</span></label>
               <input
                 type="text"
@@ -441,17 +472,7 @@ export default function ConstantType() {
                 placeholder="مثال: عرض"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">المعرف الفني <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                className="w-full p-2 border rounded-md"
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                placeholder="مثال: width"
-              />
-              <p className="text-xs text-gray-500">يجب أن يكون فريداً وباللغة الإنجليزية بدون مسافات</p>
-            </div>
+            
             <div className="space-y-2">
               <label className="text-sm font-medium">الملاحظات</label>
               <textarea
