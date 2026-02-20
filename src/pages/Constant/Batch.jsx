@@ -255,34 +255,34 @@ export default function Batch() {
   const mainStats = [
     {
       id: 1,
-      title: "إجمالي التشغيلات",
+      title: "إجمالي الطبخات",
       value: stats.total,
-      unit: "تشغيلة",
+      unit: "طبخة",
       icon: Package,
       iconColor: "text-secondary-f",
       bgColor: "bg-primary-s",
       borderColor: "border-secondary-f"
     },
-    {
-      id: 2,
-      title: "تشغيلات هذا الشهر",
-      value: stats.thisMonth,
-      unit: "تشغيلة",
-      icon: Calendar,
-      iconColor: "text-primary-f",
-      bgColor: "bg-primary-s",
-      borderColor: "border-primary-f"
-    },
-    {
-      id: 3,
-      title: "عدد المواد المختلفة",
-      value: stats.uniqueMaterials,
-      unit: "مادة",
-      icon: Tag,
-      iconColor: "text-secondary-s",
-      bgColor: "bg-primary-s",
-      borderColor: "border-secondary-s"
-    },
+    // {
+    //   id: 2,
+    //   title: "تشغيلات هذا الشهر",
+    //   value: stats.thisMonth,
+    //   unit: "تشغيلة",
+    //   icon: Calendar,
+    //   iconColor: "text-primary-f",
+    //   bgColor: "bg-primary-s",
+    //   borderColor: "border-primary-f"
+    // },
+    // {
+    //   id: 3,
+    //   title: "عدد المواد المختلفة",
+    //   value: stats.uniqueMaterials,
+    //   unit: "مادة",
+    //   icon: Tag,
+    //   iconColor: "text-secondary-s",
+    //   bgColor: "bg-primary-s",
+    //   borderColor: "border-secondary-s"
+    // },
   ];
 
   return (
@@ -296,11 +296,11 @@ export default function Batch() {
         />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        {/* <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {mainStats.map((stat) => (
             <StatsCard key={stat.id} {...stat} />
           ))}
-        </div>
+        </div> */}
 
         {/* Batches Table Card */}
         <Card className="p-6">
