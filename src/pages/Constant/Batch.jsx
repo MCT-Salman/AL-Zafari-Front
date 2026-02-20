@@ -97,6 +97,25 @@ export default function Batch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Synchronize formData with selectedItem when modal opens in edit mode
+  useEffect(() => {
+    if (modalState.isOpen && modalState.mode === "edit" && selectedItem) {
+      setFormData({
+        batch_number: selectedItem.batch_number || "",
+        entry_date: selectedItem.entry_date ? selectedItem.entry_date.substring(0, 16) : "",
+        material_id: selectedItem.material_id?.toString() || "",
+        notes: selectedItem.notes || "",
+      });
+    } else if (modalState.isOpen && modalState.mode === "create") {
+      setFormData({
+        batch_number: "",
+        entry_date: new Date().toISOString().substring(0, 16),
+        material_id: "",
+        notes: "",
+      });
+    }
+  }, [modalState.isOpen, modalState.mode, selectedItem]);
+
   // Load materials for dropdown
   const loadMaterials = async () => {
     try {
@@ -145,21 +164,21 @@ export default function Batch() {
     setFormError("");
 
     // Validation
-    const batchNumber = data?.batch_number?.trim();
-    const entryDate = data?.entry_date;
-    const materialId = data?.material_id;
+    const batchNumber = formData.batch_number?.trim();
+    const entryDate = formData.entry_date;
+    const materialId = formData.material_id;
 
-    if (!batchNumber || !entryDate || !materialId) {
+    if (!materialId || !entryDate) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
     // Prepare data to send
     const dataToSend = {
-      batch_number: batchNumber,
-      entry_date: entryDate,
+      batch_number: batchNumber || undefined, // API handles auto-generation if undefined
+      entry_date: new Date(entryDate).toISOString(),
       material_id: parseInt(materialId),
-      notes: data.notes || "",
+      notes: formData.notes || "",
     };
 
     await handleSave(dataToSend);

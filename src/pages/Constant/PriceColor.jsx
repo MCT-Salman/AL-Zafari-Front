@@ -101,6 +101,27 @@ export default function PriceColor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Synchronize formData with selectedItem when modal opens in edit mode
+  useEffect(() => {
+    if (modalState.isOpen && modalState.mode === "edit" && selectedItem) {
+      setFormData({
+        color_id: selectedItem.color_id?.toString() || "",
+        constant_value_id: selectedItem.constant_value_id?.toString() || "",
+        price_color_By: selectedItem.price_color_By || "",
+        price_per_meter: selectedItem.price_per_meter?.toString() || "",
+        notes: selectedItem.notes || "",
+      });
+    } else if (modalState.isOpen && modalState.mode === "create") {
+      setFormData({
+        color_id: "",
+        constant_value_id: "",
+        price_color_By: "",
+        price_per_meter: "",
+        notes: "",
+      });
+    }
+  }, [modalState.isOpen, modalState.mode, selectedItem]);
+
   // Load colors for dropdown
   const loadColors = async () => {
     try {
@@ -111,11 +132,13 @@ export default function PriceColor() {
     }
   };
 
-  // Load constant values for dropdown (assuming type_id 5 for order types based on API example)
+  // Load all constant values for dropdown
   const loadConstantValues = async () => {
     try {
-      const response = await constantApi.getConstantValuesByType(5);
-      setConstantValues(response.data || []);
+      // Same approach used in Material page: fetch values by type name
+      // For PriceColor we typically need width values (22/44/66)
+      const widthResponse = await constantApi.getConstantValuesByTypeName("width");
+      setConstantValues(widthResponse.data || []);
     } catch (error) {
       console.error("Failed to load constant values:", error);
     }
@@ -161,10 +184,10 @@ export default function PriceColor() {
     setFormError("");
 
     // Validation
-    const colorId = data?.color_id;
-    const constantValueId = data?.constant_value_id;
-    const priceColorBy = data?.price_color_By?.trim();
-    const pricePerMeter = data?.price_per_meter;
+    const colorId = formData.color_id;
+    const constantValueId = formData.constant_value_id;
+    const priceColorBy = formData.price_color_By?.trim();
+    const pricePerMeter = formData.price_per_meter;
 
     if (!colorId || !constantValueId || !priceColorBy || !pricePerMeter) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
@@ -183,7 +206,7 @@ export default function PriceColor() {
       constant_value_id: parseInt(constantValueId),
       price_color_By: priceColorBy,
       price_per_meter: parseFloat(pricePerMeter),
-      notes: data.notes || "",
+      notes: formData.notes || "",
     };
 
     await handleSave(dataToSend);
@@ -219,14 +242,12 @@ export default function PriceColor() {
       let aValue = a[sortConfig.key];
       let bValue = b[sortConfig.key];
 
-      // ?????? ?????? ???????
       if (typeof aValue === "string") {
         return sortConfig.direction === "asc"
           ? aValue.localeCompare(bValue, "ar")
           : bValue.localeCompare(aValue, "ar");
       }
 
-      // ?????? ??????? ?????? ??????
       return sortConfig.direction === "asc"
         ? aValue > bValue ? 1 : -1
         : aValue < bValue ? 1 : -1;
@@ -263,7 +284,7 @@ export default function PriceColor() {
       id: 2,
       title: "متوسط السعر",
       value: stats.avgPrice,
-      unit: "ريال",
+      unit: "سوري",
       icon: DollarSign,
       iconColor: "text-primary-f",
       bgColor: "bg-primary-s",
@@ -454,13 +475,6 @@ export default function PriceColor() {
         onClose={() => {
           closeModal();
           setFormError("");
-          setFormData({
-            color_id: "",
-            constant_value_id: "",
-            price_color_By: "",
-            price_per_meter: "",
-            notes: "",
-          });
         }}
         onSubmit={handleSavePriceColor}
         onDelete={handleDelete}
@@ -534,7 +548,7 @@ export default function PriceColor() {
                 <SelectContent>
                   {constantValues.map((val) => (
                     <SelectItem key={val.constant_value_id} value={val.constant_value_id.toString()}>
-                      {val.label}
+                      {val.label || val.value || val.constant_value}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -544,8 +558,8 @@ export default function PriceColor() {
               <Label>طريقة التسعير <span className="text-red-500">*</span></Label>
               <Input
                 type="text"
-                value={formData.price_method}
-                onChange={(e) => setFormData({ ...formData, price_method: e.target.value })}
+                value={formData.price_color_By}
+                onChange={(e) => setFormData({ ...formData, price_color_By: e.target.value })}
                 placeholder="مثال: لكل متر"
               />
             </div>
@@ -553,8 +567,8 @@ export default function PriceColor() {
               <Label>السعر <span className="text-red-500">*</span></Label>
               <Input
                 type="number"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                value={formData.price_per_meter}
+                onChange={(e) => setFormData({ ...formData, price_per_meter: e.target.value })}
                 placeholder="0.00"
               />
             </div>

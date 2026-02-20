@@ -1,15 +1,16 @@
 /* src\index.css */
-@import url('https://fonts.googleapis.com/css2?family=Lalezar&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&family=Lalezar&display=swap');
 @import "./styles/theme.css";
 @import "tailwindcss";
 
 body {
     direction: rtl;
+    font-family: var(--font-family-sans);
 }
 
 @theme {
   /* Fonts */
-  --font-family-sans: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --font-family-sans: "Cairo", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   --font-weight-medium: 500;
   --font-size-sm: 12px;
   --font-size-md: 14px;

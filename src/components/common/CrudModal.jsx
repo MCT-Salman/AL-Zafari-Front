@@ -30,7 +30,7 @@ export const CrudModal = ({
   setFormData: setExternalFormData,
 }) => {
   const [internalFormData, setInternalFormData] = useState({});
-  
+
   // Use external formData if provided, otherwise use internal
   const formData = externalFormData !== undefined ? externalFormData : internalFormData;
   const setFormData = setExternalFormData || setInternalFormData;
@@ -52,11 +52,11 @@ export const CrudModal = ({
   }
 
   const sizeClasses = {
-    sm: 'w-[50%]',
-    md: 'w-[50%]',
-    lg: 'w-[50%]',
-    xl: 'w-[50%]',
-    full: 'w-[50%]',
+    sm: 'max-w-md w-full',
+    md: 'max-w-2xl w-full',
+    lg: 'max-w-4xl w-full',
+    xl: 'max-w-6xl w-full',
+    full: 'max-w-[95vw] w-full',
   };
 
   const handleSubmit = async (e) => {
@@ -90,7 +90,7 @@ export const CrudModal = ({
     if (formatValue) {
       return formatValue(key, value);
     }
-    
+
     if (key.includes('date') || key.includes('_at')) {
       return new Date(value).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -114,14 +114,14 @@ export const CrudModal = ({
   if (mode === 'delete') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div 
+        <div
           className="absolute inset-0 bg-white/60 backdrop-blur-sm transition-opacity"
           onClick={!loading ? onClose : undefined}
         />
-        
+
         <div className={cn(
           'relative w-full bg-primary-s rounded-2xl shadow-2xl transform transition-all',
-          sizeClasses[size] 
+          sizeClasses[size]
         )}>
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-primary-f/10">
@@ -143,11 +143,11 @@ export const CrudModal = ({
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
             <p className="text-secondary-f leading-relaxed">
               {deleteMessage}
             </p>
-            
+
             <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
               <p className="text-sm text-red-700 font-medium flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
@@ -195,11 +195,11 @@ export const CrudModal = ({
   if (mode === 'view') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div 
+        <div
           className="absolute inset-0 bg-white/60 backdrop-blur-sm"
           onClick={onClose}
         />
-        
+
         <div className={cn(
           'relative w-full bg-primary-s rounded-2xl shadow-2xl',
           sizeClasses[size]
@@ -224,14 +224,14 @@ export const CrudModal = ({
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
             {fields.length > 0 ? (
               fields.map((field) => {
                 const Icon = getIcon(field.key);
                 const value = data[field.key];
-                
+
                 return (
-                  <div 
+                  <div
                     key={field.key}
                     className="flex items-start gap-4 p-4 rounded-xl bg-white border border-primary-f/10 hover:border-primary-f/30 transition-colors"
                   >
@@ -289,11 +289,11 @@ export const CrudModal = ({
   // Create/Edit Modal
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
+      <div
         className="absolute inset-0 bg-white/60 backdrop-blur-sm transition-opacity"
         onClick={!loading ? onClose : undefined}
       />
-      
+
       <div className={cn(
         'relative w-full bg-primary-s rounded-2xl shadow-2xl transform transition-all',
         sizeClasses[size]
@@ -318,42 +318,44 @@ export const CrudModal = ({
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {typeof children === 'function' 
-            ? children({ formData, setFormData })
-            : children
-          }
-          
-          {/* Footer */}
-          <div className="flex gap-3 pt-4 border-t border-primary-f/10">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 h-11 border-primary-f text-secondary-f hover:bg-secondary-s"
-            >
-              إلغاء
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex-1 h-11 bg-primary-f hover:bg-secondary-f text-white"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  {mode === 'edit' ? 'جاري التحديث...' : 'جاري الحفظ...'}
-                </span>
-              ) : (
-                mode === 'edit' ? 'تحديث' : 'حفظ'
-              )}
-            </Button>
-          </div>
-        </form>
+        <div className="overflow-y-auto max-h-[80vh]">
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            {typeof children === 'function'
+              ? children({ formData, setFormData })
+              : children
+            }
+
+            {/* Footer */}
+            <div className="flex gap-3 pt-4 border-t border-primary-f/10 sticky bottom-0 bg-primary-s pb-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={loading}
+                className="flex-1 h-11 border-primary-f text-secondary-f hover:bg-secondary-s"
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="flex-1 h-11 bg-primary-f hover:bg-secondary-f text-white"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    {mode === 'edit' ? 'جاري التحديث...' : 'جاري الحفظ...'}
+                  </span>
+                ) : (
+                  mode === 'edit' ? 'تحديث' : 'حفظ'
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

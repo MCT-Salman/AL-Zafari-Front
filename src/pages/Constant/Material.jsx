@@ -137,6 +137,31 @@ export default function Material() {
   //   }
   // };
 
+  // Synchronize formData with selectedItem when modal opens in edit mode
+  useEffect(() => {
+    if (modalState.isOpen && modalState.mode === "edit" && selectedItem) {
+      setFormData({
+        material_name: selectedItem.material_name || "",
+        type: selectedItem.type || "",
+        constant_height_id: selectedItem.constant_height_id?.toString() || "",
+        constant_width_id: selectedItem.constant_width_id?.toString() || "",
+        constant_thickness_id: selectedItem.constant_thickness_id?.toString() || "",
+        constant_value_unit: selectedItem.constant_value_unit || "",
+        notes: selectedItem.notes || "",
+      });
+    } else if (modalState.isOpen && modalState.mode === "create") {
+      setFormData({
+        material_name: "",
+        type: "",
+        constant_height_id: "",
+        constant_width_id: "",
+        constant_thickness_id: "",
+        constant_value_unit: "",
+        notes: "",
+      });
+    }
+  }, [modalState.isOpen, modalState.mode, selectedItem]);
+
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(20);
@@ -177,17 +202,17 @@ export default function Material() {
     setFormError("");
 
     // Validation
-    const materialName = data?.material_name?.trim();
-    const materialType = data?.type?.trim();
-    const heightId = data?.constant_height_id;
-    const widthId = data?.constant_width_id;
-    const thicknessId = data?.constant_thickness_id;
-    const unit = data?.constant_value_unit?.trim();
+    const materialName = formData.material_name?.trim();
+    const materialType = formData.type?.trim();
+    const heightId = formData.constant_height_id;
+    const widthId = formData.constant_width_id;
+    const thicknessId = formData.constant_thickness_id;
+    const unit = formData.constant_value_unit?.trim();
 
-    // if (!materialName || !materialType || !heightId || !widthId || !thicknessId || !unit) {
-    //   setFormError("يرجى ملء جميع الحقول المطلوبة");
-    //   return;
-    // }
+    if (!materialName || !materialType || !heightId || !widthId || !thicknessId || !unit) {
+      setFormError("يرجى ملء جميع الحقول المطلوبة");
+      return;
+    }
 
     // Prepare data to send
     const dataToSend = {
@@ -197,7 +222,7 @@ export default function Material() {
       constant_width_id: parseInt(widthId),
       constant_thickness_id: parseInt(thicknessId),
       constant_value_unit: unit,
-      notes: data.notes || "",
+      notes: formData.notes || "",
     };
 
     await handleSave(dataToSend);
@@ -538,8 +563,8 @@ export default function Material() {
               <Label>النوع <span className="text-red-500">*</span></Label>
               <Input
                 type="text"
-                value={formData.material_type}
-                onChange={(e) => setFormData({ ...formData, material_type: e.target.value })}
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 placeholder="مثال: طبيعي"
               />
             </div>
@@ -549,15 +574,15 @@ export default function Material() {
               <div className="space-y-2">
                 <Label>الارتفاع <span className="text-red-500">*</span></Label>
                 <Select
-                  value={formData.height?.toString()}
-                  onValueChange={(value) => setFormData({ ...formData, height: value })}
+                  value={formData.constant_height_id?.toString()}
+                  onValueChange={(value) => setFormData({ ...formData, constant_height_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر الارتفاع" />
                   </SelectTrigger>
                   <SelectContent>
                     {heightValues.map((val) => (
-                      <SelectItem key={val.constant_value_id} value={val.value.toString()}>
+                      <SelectItem key={val.constant_value_id} value={val.constant_value_id.toString()}>
                         {val.label}
                       </SelectItem>
                     ))}
@@ -567,15 +592,15 @@ export default function Material() {
               <div className="space-y-2">
                 <Label>العرض <span className="text-red-500">*</span></Label>
                 <Select
-                  value={formData.width?.toString()}
-                  onValueChange={(value) => setFormData({ ...formData, width: value })}
+                  value={formData.constant_width_id?.toString()}
+                  onValueChange={(value) => setFormData({ ...formData, constant_width_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر العرض" />
                   </SelectTrigger>
                   <SelectContent>
                     {widthValues.map((val) => (
-                      <SelectItem key={val.constant_value_id} value={val.value.toString()}>
+                      <SelectItem key={val.constant_value_id} value={val.constant_value_id.toString()}>
                         {val.label}
                       </SelectItem>
                     ))}
@@ -585,15 +610,15 @@ export default function Material() {
               <div className="space-y-2">
                 <Label>السمك <span className="text-red-500">*</span></Label>
                 <Select
-                  value={formData.thickness?.toString()}
-                  onValueChange={(value) => setFormData({ ...formData, thickness: value })}
+                  value={formData.constant_thickness_id?.toString()}
+                  onValueChange={(value) => setFormData({ ...formData, constant_thickness_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر السمك" />
                   </SelectTrigger>
                   <SelectContent>
                     {thicknessValues.map((val) => (
-                      <SelectItem key={val.constant_value_id} value={val.value.toString()}>
+                      <SelectItem key={val.constant_value_id} value={val.constant_value_id.toString()}>
                         {val.label}
                       </SelectItem>
                     ))}
@@ -606,8 +631,8 @@ export default function Material() {
               <Label>وحدة القيمة <span className="text-red-500">*</span></Label>
               <Input
                 type="text"
-                value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                value={formData.constant_value_unit}
+                onChange={(e) => setFormData({ ...formData, constant_value_unit: e.target.value })}
                 placeholder="مثال: سم"
               />
             </div>
