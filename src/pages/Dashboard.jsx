@@ -42,7 +42,7 @@ const mainStats = [
   {
     id: 1,
     title: "مجمل المبيعات اليومية",
-    value: "45,250",
+    value: "45,250,000",
     unit: "ل.س",
     icon: Wallet,
     iconColor: "text-secondary-f",
@@ -52,7 +52,7 @@ const mainStats = [
   {
     id: 2,
     title: "سعر تصريف الدولار اليوم",
-    value: "3.75",
+    value: "12,000",
     unit: "ل.س",
     icon: DollarSign,
     iconColor: "text-primary-f",

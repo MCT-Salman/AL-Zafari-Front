@@ -44,7 +44,8 @@ const AVAILABLE_VALUES = ["22", "44", "66"];
 // الوحدات المتاحة
 const AVAILABLE_UNITS = [
   { value: "مم", label: "مم (مليمتر)" },
-  { value: "سم", label: "سم (سنتيمتر)" }
+  { value: "سم", label: "سم (سنتيمتر)" },
+  { value: "متر", label: "متر" }
 ];
 
 export default function ConstantValue() {
@@ -80,7 +81,16 @@ export default function ConstantValue() {
       if (!selectedTypeId) {
         return { success: true, data: [] };
       }
-      const response = await constantApi.getConstantValuesByType(selectedTypeId);
+      const selectedType = constantTypes.find(
+        (t) => t.constant_type_id === parseInt(selectedTypeId)
+      );
+
+      const typeKey = selectedType?.type;
+
+      const response = typeKey
+        ? await constantApi.getConstantValuesByTypeName(typeKey)
+        : await constantApi.getConstantValuesByType(selectedTypeId);
+
       if (response.success && response.data) {
         return { success: true, data: response.data };
       }
@@ -115,7 +125,7 @@ export default function ConstantValue() {
       return await constantApi.updateConstantValue(id, payload);
     },
     deleteItem: (...args) => constantApi.deleteConstantValue(...args),
-  }), [selectedTypeId]);
+  }), [selectedTypeId, constantTypes]);
 
   // Use CRUD hook
   const {
@@ -687,24 +697,24 @@ export default function ConstantValue() {
               </div>
             )}
 
-            {/* القيمة - Select Box */}
+            {/* القيمة - Input Box */}
             <div className="space-y-2">
               <Label>القيمة <span className="text-red-500">*</span></Label>
-              <Select
+              <Input
+                type="text"
                 value={formData.value}
-                onValueChange={(value) => setFormData({ ...formData, value: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر القيمة" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AVAILABLE_VALUES.map((val) => (
-                    <SelectItem key={val} value={val}>
-                      {val}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                placeholder="اختر قيمة موجودة أو اكتب قيمة جديدة"
+                list="constant-values-suggestions"
+              />
+              <datalist id="constant-values-suggestions">
+                {Array.from(new Set([
+                  ...AVAILABLE_VALUES,
+                  ...constantValues.map((v) => v.value?.toString()).filter(Boolean),
+                ])).map((val) => (
+                  <option key={val} value={val} />
+                ))}
+              </datalist>
             </div>
 
             {/* الوحدة - Select Box */}

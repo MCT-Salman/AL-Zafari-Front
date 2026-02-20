@@ -82,7 +82,7 @@ export const ConstantTypeEnum = {
 
 export const ConstantTypeLabels = {
   [ConstantTypeEnum.width]: 'العرض',
-  [ConstantTypeEnum.height]: 'الارتفاع',
+  [ConstantTypeEnum.height]: 'طول',
   [ConstantTypeEnum.thickness]: 'السماكة',
   [ConstantTypeEnum.type_order]: 'ترتيب النوع',
   [ConstantTypeEnum.source_order]: 'ترتيب المصدر',

@@ -66,15 +66,15 @@ export default function Batch() {
   } = useCrud(batchApiAdapter, {
     idField: 'batch_id',
     successMessages: {
-      create: "تم إنشاء التشغيلة بنجاح",
-      update: "تم تحديث التشغيلة بنجاح",
-      delete: "تم حذف التشغيلة بنجاح",
+      create: "تم إنشاء الطبخة بنجاح",
+      update: "تم تحديث الطبخة بنجاح",
+      delete: "تم حذف الطبخة بنجاح",
     },
     errorMessages: {
-      create: "فشل في حفظ التشغيلة",
-      update: "فشل في حفظ التشغيلة",
-      delete: "فشل في حذف التشغيلة",
-      fetch: "فشل في تحميل التشغيلات",
+      create: "فشل في حفظ الطبخة",
+      update: "فشل في حفظ الطبخة",
+      delete: "فشل في حذف الطبخة",
+      fetch: "فشل في تحميل الطبخات",
     },
   });
 
@@ -135,7 +135,7 @@ export default function Batch() {
   // Use export hook
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
-      { key: "batch_number", header: "رقم التشغيلة" },
+      { key: "batch_number", header: "رقم الطبخة" },
       { key: "entry_date", header: "تاريخ الإدخال", format: (item) => batchApi.formatEntryDate(item) },
       { key: "material_name", header: "المادة", format: (item) => batchApi.getMaterialName(item) },
       { key: "material_type", header: "نوع المادة", format: (item) => batchApi.getMaterialType(item) },
@@ -144,19 +144,19 @@ export default function Batch() {
     ],
     columnWidths: [
       { wch: 5 },   // #
-      { wch: 20 },  // رقم التشغيلة
+      { wch: 20 },  // رقم الطبخة
       { wch: 20 },  // تاريخ الإدخال
       { wch: 15 },  // المادة
       { wch: 12 },  // نوع المادة
       { wch: 25 },  // الأبعاد
       { wch: 30 },  // الملاحظات
     ],
-    sheetName: "التشغيلات",
+    sheetName: "الطبخات",
   });
 
   // Handle export
   const handleExport = () => {
-    exportToExcel(filteredBatches, "التشغيلات");
+    exportToExcel(filteredBatches, "الطبخات");
   };
 
   // Handle save with validation
@@ -289,9 +289,9 @@ export default function Batch() {
     <div className="min-h-screen bg-gray-50 space-y-8 p-2">
       <div className=" mx-auto">
         <PageHeader
-          title="إدارة التشغيلات"
-          subtitle={`إجمالي التشغيلات: ${batches.length}`}
-          actionLabel="إضافة تشغيلة جديدة"
+          title="إدارة الطبخات"
+          subtitle={`إجمالي الطبخات: ${batches.length}`}
+          actionLabel="إضافة طبخة جديدة"
           onAction={openCreateModal}
         />
 
@@ -305,7 +305,7 @@ export default function Batch() {
         {/* Batches Table Card */}
         <Card className="p-6">
           <div className="">
-            <h2 className="text-xl font-bold">قائمة التشغيلات</h2>
+            <h2 className="text-xl font-bold">قائمة الطبخات</h2>
           </div>
 
           {/* Messages */}
@@ -321,7 +321,7 @@ export default function Batch() {
           {/* Search */}
           <div className="-my-4">
             <SearchInput
-              placeholder="ابحث عن تشغيلة (الرقم أو المادة أو النوع أو التاريخ أو الملاحظات)"
+              placeholder="ابحث عن طبخة (الرقم أو المادة أو النوع أو التاريخ أو الملاحظات)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -367,16 +367,16 @@ export default function Batch() {
 
           {/* Batches Table */}
           {loading ? (
-            <LoadingState message="جاري تحميل التشغيلات..." />
+            <LoadingState message="جاري تحميل الطبخات..." />
           ) : filteredBatches.length === 0 ? (
-            <EmptyState message="لا توجد تشغيلات" />
+            <EmptyState message="لا توجد طبخات" />
           ) : (
             <>
               <div className="overflow-x-auto rounded-lg ">
                 <Table onSort={handleSort}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead sortable sortKey="batch_number">رقم التشغيلة</TableHead>
+                      <TableHead sortable sortKey="batch_number">رقم الطبخة</TableHead>
                       <TableHead sortable sortKey="entry_date">تاريخ الإدخال</TableHead>
                       <TableHead>المادة</TableHead>
                       <TableHead>الأبعاد</TableHead>
@@ -462,11 +462,11 @@ export default function Batch() {
         data={selectedItem}
         title={
           modalState.mode === "create"
-            ? "إضافة تشغيلة جديدة"
+            ? "إضافة طبخة جديدة"
             : modalState.mode === "edit"
-              ? "تعديل التشغيلة"
+              ? "تعديل الطبخة"
               : modalState.mode === "view"
-                ? "تفاصيل التشغيلة"
+                ? "تفاصيل الطبخة"
                 : ""
         }
         loading={modalState.loading}
@@ -476,7 +476,7 @@ export default function Batch() {
         fields={
           modalState.mode === "view"
             ? [
-              { key: "batch_number", label: "رقم التشغيلة" },
+              { key: "batch_number", label: "رقم الطبخة" },
               { key: "entry_date", label: "تاريخ الإدخال", formatValue: (key, value) => batchApi.formatEntryDate(selectedItem) },
               { key: "material_name", label: "المادة", formatValue: (key, value) => batchApi.getMaterialName(selectedItem) },
               { key: "material_type", label: "نوع المادة", formatValue: (key, value) => batchApi.getMaterialType(selectedItem) },
@@ -485,8 +485,8 @@ export default function Batch() {
             ]
             : []
         }
-        deleteTitle="حذف التشغيلة"
-        deleteMessage="هل أنت متأكد من رغبتك في حذف هذه التشغيلة؟ لا يمكن التراجع عن هذا الإجراء."
+        deleteTitle="حذف الطبخة"
+        deleteMessage="هل أنت متأكد من رغبتك في حذف هذه الطبخة؟ لا يمكن التراجع عن هذا الإجراء."
         itemName={batchApi.formatBatchInfo(selectedItem)}
       >
         {(modalState.mode === "create" || modalState.mode === "edit") && (
@@ -499,14 +499,14 @@ export default function Batch() {
               />
             )}
             <div className="space-y-2">
-              <Label>رقم التشغيلة <span className="text-red-500">*</span></Label>
+              <Label>رقم الطبخة <span className="text-red-500">*</span></Label>
               <Input
                 type="text"
                 value={formData.batch_number}
                 onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
                 placeholder={batchApi.generateBatchNumber()}
               />
-              <p className="text-xs text-gray-500">اتركه فارغاً لتوليد رقم تشغيلة تلقائي</p>
+              <p className="text-xs text-gray-500">اتركه فارغاً لتوليد رقم طبخة تلقائي</p>
             </div>
             <div className="space-y-2">
               <Label>تاريخ الإدخال <span className="text-red-500">*</span></Label>

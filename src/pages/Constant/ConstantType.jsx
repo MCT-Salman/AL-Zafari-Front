@@ -448,7 +448,7 @@ export default function ConstantType() {
                   <SelectValue placeholder="اختر نوع الثابت" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem key="height" value="height"> الارتفاع</SelectItem>
+                    <SelectItem key="height" value="height"> الطول</SelectItem>
                     <SelectItem key="width" value="width"> العرض</SelectItem>
                     <SelectItem key="thickness" value="thickness"> السماكة</SelectItem>
                 </SelectContent>

@@ -172,7 +172,7 @@ export default function Material() {
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
       { key: 'material_name', header: 'اسم المادة' },
-      { key: 'type', header: 'النوع' },
+      // { key: 'type', header: 'النوع' },
       { key: 'dimensions', header: 'الأبعاد', format: (item) => materialApi.formatDimensions(item) },
       { key: 'constant_value_unit', header: 'وحدة القيمة' },
       { key: 'colors_count', header: 'عدد الألوان', format: (item) => materialApi.getColorsCount(item) },
@@ -182,7 +182,7 @@ export default function Material() {
     columnWidths: [
       { wch: 5 },   // #
       { wch: 20 },  // اسم المادة
-      { wch: 15 },  // النوع
+      // { wch: 15 },  // النوع
       { wch: 25 },  // الأبعاد
       { wch: 12 },  // وحدة القيمة
       { wch: 10 },  // عدد الألوان
@@ -203,13 +203,13 @@ export default function Material() {
 
     // Validation
     const materialName = formData.material_name?.trim();
-    const materialType = formData.type?.trim();
+    const materialType = formData.type?.trim() || "Role"
     const heightId = formData.constant_height_id;
     const widthId = formData.constant_width_id;
     const thicknessId = formData.constant_thickness_id;
     const unit = formData.constant_value_unit?.trim();
 
-    if (!materialName || !materialType || !heightId || !widthId || !thicknessId || !unit) {
+    if (!materialName ||  !heightId || !widthId || !thicknessId || !unit) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
@@ -407,7 +407,7 @@ export default function Material() {
                   <TableHeader>
                     <TableRow>
                       <TableHead sortable sortKey="material_name">اسم المادة</TableHead>
-                      <TableHead sortable sortKey="type">النوع</TableHead>
+                      {/* <TableHead sortable sortKey="type">النوع</TableHead> */}
                       <TableHead>الأبعاد</TableHead>
                       <TableHead>وحدة القيمة</TableHead>
                       <TableHead>الألوان</TableHead>
@@ -422,11 +422,11 @@ export default function Material() {
                         <TableCell className="font-medium">
                           {material.material_name}
                         </TableCell>
-                        <TableCell>
+                        {/* <TableCell>
                           <Badge variant="outline">
                             {material.type}
                           </Badge>
-                        </TableCell>
+                        </TableCell> */}
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Ruler className="w-4 h-4 text-gray-500" />
@@ -518,7 +518,7 @@ export default function Material() {
           modalState.mode === 'view'
             ? [
               { key: 'material_name', label: 'اسم المادة' },
-              { key: 'type', label: 'النوع' },
+              // { key: 'type', label: 'النوع' },
               { key: 'dimensions', label: 'الأبعاد', formatValue: (key, value) => materialApi.formatDimensions(selectedItem) },
               { key: 'constant_value_unit', label: 'وحدة القيمة' },
               {
@@ -559,7 +559,7 @@ export default function Material() {
                 placeholder="مثال: خشب بلوط"
               />
             </div>
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label>النوع <span className="text-red-500">*</span></Label>
               <Input
                 type="text"
@@ -567,18 +567,18 @@ export default function Material() {
                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 placeholder="مثال: طبيعي"
               />
-            </div>
+            </div> */}
 
             {/* Dimensions */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>الارتفاع <span className="text-red-500">*</span></Label>
+                <Label>الطول <span className="text-red-500">*</span></Label>
                 <Select
                   value={formData.constant_height_id?.toString()}
                   onValueChange={(value) => setFormData({ ...formData, constant_height_id: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="اختر الارتفاع" />
+                    <SelectValue placeholder="اختر الطول" />
                   </SelectTrigger>
                   <SelectContent>
                     {heightValues.map((val) => (
