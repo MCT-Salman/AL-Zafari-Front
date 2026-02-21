@@ -209,7 +209,7 @@ export default function Material() {
     const thicknessId = formData.constant_thickness_id;
     const unit = formData.constant_value_unit?.trim();
 
-    if (!materialName ||  !heightId || !widthId || !thicknessId || !unit) {
+    if (!materialName || !heightId || !widthId || !thicknessId || !unit) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
@@ -556,7 +556,7 @@ export default function Material() {
                 type="text"
                 value={formData.material_name}
                 onChange={(e) => setFormData({ ...formData, material_name: e.target.value })}
-                placeholder="مثال: خشب بلوط"
+                placeholder="مثال: لوح PVC"
               />
             </div>
             {/* <div className="space-y-2">
@@ -570,7 +570,7 @@ export default function Material() {
             </div> */}
 
             {/* Dimensions */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>الطول <span className="text-red-500">*</span></Label>
                 <Select
@@ -625,10 +625,10 @@ export default function Material() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+            </div> */}
 
             <div className="space-y-2">
-              <Label>وحدة القيمة <span className="text-red-500">*</span></Label>
+              <Label>واحدة المبيع <span className="text-red-500">*</span></Label>
               <Input
                 type="text"
                 value={formData.constant_value_unit}

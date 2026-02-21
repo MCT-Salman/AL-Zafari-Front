@@ -536,15 +536,7 @@ export default function Color() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>اسم اللون <span className="text-red-500">*</span></Label>
-              <Input
-                type="text"
-                value={formData.color_name}
-                onChange={(e) => setFormData({ ...formData, color_name: e.target.value })}
-                placeholder="مثال: أحمر"
-              />
-            </div>
+
             <div className="space-y-2">
               <Label>نوع المسطرة <span className="text-red-500">*</span></Label>
               <Select
@@ -560,6 +552,17 @@ export default function Color() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>اسم اللون <span className="text-red-500">*</span></Label>
+              <Input
+                type="text"
+                value={formData.color_name}
+                onChange={(e) => setFormData({ ...formData, color_name: e.target.value })}
+                placeholder="مثال: أحمر"
+              />
+            </div>
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>كود اللون <span className="text-red-500">*</span></Label>

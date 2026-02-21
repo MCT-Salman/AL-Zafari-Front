@@ -499,24 +499,6 @@ export default function Batch() {
               />
             )}
             <div className="space-y-2">
-              <Label>رقم الطبخة <span className="text-red-500">*</span></Label>
-              <Input
-                type="text"
-                value={formData.batch_number}
-                onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
-                placeholder={batchApi.generateBatchNumber()}
-              />
-              <p className="text-xs text-gray-500">اتركه فارغاً لتوليد رقم طبخة تلقائي</p>
-            </div>
-            <div className="space-y-2">
-              <Label>تاريخ الإدخال <span className="text-red-500">*</span></Label>
-              <Input
-                type="datetime-local"
-                value={formData.entry_date}
-                onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
               <Label>المادة <span className="text-red-500">*</span></Label>
               <Select
                 value={formData.material_id?.toString()}
@@ -537,6 +519,26 @@ export default function Batch() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>رقم الطبخة <span className="text-red-500">*</span></Label>
+              <Input
+                type="text"
+                value={formData.batch_number}
+                onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
+                placeholder={batchApi.generateBatchNumber()}
+              />
+              <p className="text-xs text-gray-500">اتركه فارغاً لتوليد رقم طبخة تلقائي</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>تاريخ الإدخال <span className="text-red-500">*</span></Label>
+              <Input
+                type="datetime-local"
+                value={formData.entry_date}
+                onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label>الملاحظات</Label>
               <Textarea

@@ -38,6 +38,7 @@ import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
 import SwitchActive from "../../components/common/SwitchActive";
+import { materialApi } from "../../api/materialApi";
 
 // القيم المتاحة للاختيار
 const AVAILABLE_VALUES = ["22", "44", "66"];
@@ -167,6 +168,21 @@ export default function ConstantValue() {
     notes: "",
   });
   const [formError, setFormError] = useState("");
+  const [materials, setMaterials] = useState([]);
+
+  useEffect(() => {
+    loadMaterials();
+  }, [])
+
+  // Load materials for dropdown
+  const loadMaterials = async () => {
+    try {
+      const response = await materialApi.getMaterials();
+      setMaterials(response.data || []);
+    } catch (error) {
+      console.error("Failed to load materials:", error);
+    }
+  };
 
   // تحديث الليبل تلقائياً عند تغيير القيمة أو الوحدة
   useEffect(() => {
@@ -672,6 +688,25 @@ export default function ConstantValue() {
               />
             )}
 
+            <div className="space-y-2">
+              <Label>المادة <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.material_id?.toString()}
+                onValueChange={(value) => setFormData({ ...formData, material_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر المادة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materials.map((material) => (
+                    <SelectItem key={material.material_id} value={material.material_id.toString()}>
+                      {material.material_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Type Selector (only in create mode or if no type selected) */}
             {(!selectedTypeId || modalState.mode === 'create') && (
               <div className="space-y-2">
@@ -697,6 +732,26 @@ export default function ConstantValue() {
               </div>
             )}
 
+            {/* الوحدة - Select Box */}
+            <div className="space-y-2">
+              <Label>الوحدة <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.unit}
+                onValueChange={(value) => setFormData({ ...formData, unit: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر الوحدة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AVAILABLE_UNITS.map((unit) => (
+                    <SelectItem key={unit.value} value={unit.value}>
+                      {unit.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* القيمة - Input Box */}
             <div className="space-y-2">
               <Label>القيمة <span className="text-red-500">*</span></Label>
@@ -717,25 +772,7 @@ export default function ConstantValue() {
               </datalist>
             </div>
 
-            {/* الوحدة - Select Box */}
-            <div className="space-y-2">
-              <Label>الوحدة <span className="text-red-500">*</span></Label>
-              <Select
-                value={formData.unit}
-                onValueChange={(value) => setFormData({ ...formData, unit: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر الوحدة" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AVAILABLE_UNITS.map((unit) => (
-                    <SelectItem key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
 
             {/* العنوان - يُنشأ تلقائياً */}
             <div className="space-y-2">

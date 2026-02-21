@@ -15,11 +15,11 @@ const ConstantTabs = () => {
 
   const tabs = [
     // { value: "constant_type", label: "أنواع الثوابت" },
-    { value: "constant_value", label: "قيم الثوابت" },
     { value: "material", label: "المواد" },
+    { value: "constant_value", label: "قيم الثوابت" },
+    { value: "ruler", label: "المساطر" },
     { value: "color", label: "الألوان" },
     // { value: "price_color", label: "السعر حسب اللون" },
-    // { value: "ruler", label: "المساطر" },
     { value: "batch", label: "الطبخات" }
   ];
 
@@ -47,7 +47,7 @@ const ConstantTabs = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" dir="rtl">
         {/* للشاشات المتوسطة والكبيرة - تبويبات عادية */}
-        <TabsList className="hidden md:grid md:grid-cols-4 gap-2 justify-center w-full bg-muted rounded-lg p-1">
+        <TabsList className="hidden md:grid md:grid-cols-5 gap-2 justify-center w-full bg-muted rounded-lg p-1">
           {tabs.map((tab) => (
             <TabsTrigger
               key={tab.value}

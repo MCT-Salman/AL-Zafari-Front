@@ -485,21 +485,7 @@ export default function Ruler() {
                 dismissable={false}
               />
             )}
-            <div className="space-y-2">
-              <Label>نوع المسطرة <span className="text-red-500">*</span></Label>
-              <Select
-                value={formData.ruler_type}
-                onValueChange={(value) => setFormData({ ...formData, ruler_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر نوع المسطرة" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="new">جديدة</SelectItem>
-                  <SelectItem value="old">قديمة</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
             <div className="space-y-2">
               <Label>المادة <span className="text-red-500">*</span></Label>
               <Select
@@ -518,7 +504,25 @@ export default function Ruler() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
+              <Label>اسم المسطرة <span className="text-red-500">*</span></Label>
+              <Input
+                type="text"
+                value={formData.ruler_type}
+                onChange={(e) => setFormData({ ...formData, ruler_type: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>تاريخ الإدخال <span className="text-red-500">*</span></Label>
+              <Input
+                type="datetime-local"
+                value={formData.entry_date}
+                onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
+              />
+            </div>
+            {/* <div className="space-y-2">
               <Label>اللون <span className="text-red-500">*</span></Label>
               <Select
                 value={formData.color_id?.toString()}
@@ -535,7 +539,7 @@ export default function Ruler() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </div> */}
             <div className="space-y-2">
               <Label>الملاحظات</Label>
               <Textarea
