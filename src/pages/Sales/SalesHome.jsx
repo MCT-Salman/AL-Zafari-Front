@@ -1,4 +1,4 @@
-// src/pages/Sales/SalesDashboard.jsx
+// src/pages/Sales/SalesHome.jsx
 import { useState, useEffect } from "react";
 import { orderApi } from "../../api/orderApi";
 import { customerApi } from "../../api/customerApi";
@@ -8,15 +8,19 @@ import { Badge } from "../../components/ui/badge";
 import {
   ShoppingCart,
   Users,
-  Package,
   TrendingUp,
+  DollarSign,
+  Package,
+  Calendar,
+  Plus,
+  Eye,
   ArrowRight
 } from "lucide-react";
 import StatsCard from "../../components/common/StatsCard";
 import MessageAlert from "../../components/common/MessageAlert";
 import LoadingState from "../../components/common/LoadingState";
 
-export default function SalesDashboard() {
+export default function SalesHome() {
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +38,7 @@ export default function SalesDashboard() {
 
       // Load orders and customers in parallel
       const [ordersResponse, customersResponse] = await Promise.all([
-        orderApi.getOrders({ limit: 10 }), // Get recent orders
+        orderApi.getOrders({ limit: 5 }), // Get recent orders
         customerApi.getCustomers()
       ]);
 
@@ -50,6 +54,7 @@ export default function SalesDashboard() {
   // Calculate statistics
   const stats = {
     totalOrders: orders.length,
+    pendingOrders: orders.filter(o => o.status === "pending").length,
     completedOrders: orders.filter(o => o.status === "completed").length,
     totalCustomers: customers.length,
     activeCustomers: customers.filter(c => c.is_active).length,
@@ -58,11 +63,16 @@ export default function SalesDashboard() {
       .reduce((total, order) => {
         return total + parseFloat(order.total_amount || 0);
       }, 0),
+    todayOrders: orders.filter(o => {
+      const orderDate = new Date(o.created_at).toDateString();
+      const today = new Date().toDateString();
+      return orderDate === today;
+    }).length,
   };
 
-  // Get recent orders and customers
-  const recentOrders = orders.slice(0, 5);
-  const recentCustomers = customers.slice(0, 5);
+  // Get recent orders
+  const recentOrders = orders.slice(0, 3);
+  const recentCustomers = customers.slice(0, 3);
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -86,8 +96,8 @@ export default function SalesDashboard() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">لوحة تحكم المبيعات</h1>
-          <p className="text-gray-600 mt-2">نظرة عامة على الطلبات والعملاء</p>
+          <h1 className="text-3xl font-bold text-gray-900">الرئيسية - المبيعات</h1>
+          <p className="text-gray-600 mt-2">نظرة عامة سريعة على المبيعات والعملاء</p>
         </div>
 
         {/* Error Message */}
@@ -99,6 +109,57 @@ export default function SalesDashboard() {
             dismissable={true}
           />
         )}
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">إنشاء طلب جديد</h3>
+                <p className="text-sm text-gray-600 mt-1">بدء طلب مبيعات جديد</p>
+              </div>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => window.location.href = "/sales/orders/create"}
+              >
+                <Plus className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">إدارة العملاء</h3>
+                <p className="text-sm text-gray-600 mt-1">البحث عن عميل أو إضافة عميل جديد</p>
+              </div>
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => window.location.href = "/sales/customers"}
+              >
+                <Users className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">عرض جميع الطلبات</h3>
+                <p className="text-sm text-gray-600 mt-1">إدارة وتتبع جميع طلبات المبيعات</p>
+              </div>
+              <Button
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={() => window.location.href = "/sales/orders"}
+              >
+                <Eye className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </Card>
+        </div>
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -155,39 +216,50 @@ export default function SalesDashboard() {
               <h3 className="text-lg font-medium text-gray-900">الطلبات الأخيرة</h3>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => window.location.href = "/sales/orders"}
               >
                 عرض الكل
-                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
 
             {recentOrders.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
+                <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                 لا توجد طلبات حديثة
               </div>
             ) : (
               <div className="space-y-4">
-                {recentOrders.map((order) => (
-                  <div key={order.order_id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium">طلب #{order.order_id}</div>
-                        <div className="text-sm text-gray-600">
-                          {orderApi.getCustomerName(order)}
+                {recentOrders.map((order) => {
+                  const statusBadge = orderApi.getStatusBadge(order.status);
+                  return (
+                    <div key={order.order_id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <div className="font-medium">طلب #{order.order_id}</div>
+                              <div className="text-sm text-gray-600">
+                                {orderApi.getCustomerName(order)}
+                              </div>
+                            </div>
+                          </div>
+                          <Badge className={statusBadge.className}>
+                            {statusBadge.label}
+                          </Badge>
                         </div>
-                      </div>
-                      <div className="text-left">
-                        <div className="font-medium">
-                          {formatCurrency(orderApi.getTotalAmount(order))}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {orderApi.getFormattedDate(order)}
+                        <div className="text-left">
+                          <div className="font-medium">
+                            {formatCurrency(orderApi.getTotalAmount(order))}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {orderApi.getFormattedDate(order)}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>
@@ -198,15 +270,16 @@ export default function SalesDashboard() {
               <h3 className="text-lg font-medium text-gray-900">العملاء الأخيرون</h3>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => window.location.href = "/sales/customers"}
               >
                 عرض الكل
-                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
 
             {recentCustomers.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                 لا يوجد عملاء حديثون
               </div>
             ) : (
@@ -235,28 +308,18 @@ export default function SalesDashboard() {
         {/* Revenue Summary */}
         {stats.totalRevenue > 0 && (
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">ملخص الإيرادات</h3>
-              <TrendingUp className="w-6 h-6 text-green-600" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">إجمالي الإيرادات</h3>
+                <p className="text-sm text-gray-600 mt-1">من الطلبات المكتملة</p>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-green-600">
                   {formatCurrency(stats.totalRevenue)}
                 </div>
-                <div className="text-sm text-gray-600">إجمالي الإيرادات</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {stats.completedOrders}
+                <div className="text-sm text-gray-600">
+                  متوسط {formatCurrency(stats.totalOrders > 0 ? stats.totalRevenue / stats.totalOrders : 0)} لكل طلب
                 </div>
-                <div className="text-sm text-gray-600">الطلبات المكتملة</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {stats.totalOrders > 0 ? formatCurrency(stats.totalRevenue / stats.totalOrders) : "0"}
-                </div>
-                <div className="text-sm text-gray-600">متوسط قيمة الطلب</div>
               </div>
             </div>
           </Card>

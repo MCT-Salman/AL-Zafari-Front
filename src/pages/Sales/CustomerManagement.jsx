@@ -31,6 +31,8 @@ import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
 
+import SwitchActive from "../../components/common/SwitchActive";
+
 import FilterSelect from "../../components/common/FilterSelect";
 
 export default function CustomerManagement() {
@@ -85,6 +87,9 @@ export default function CustomerManagement() {
     notes: "",
   });
   const [formError, setFormError] = useState("");
+
+  // Success state for toggle operations
+  const [success, setSuccess] = useState("");
 
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
@@ -165,6 +170,49 @@ export default function CustomerManagement() {
     };
 
     await handleSave(dataToSend);
+  };
+
+  // Handle toggle customer status
+  const handleToggleStatus = async (customerId) => {
+    try {
+      console.log('=== STARTING TOGGLE ===');
+      console.log('Toggling customer status for ID:', customerId);
+
+      const customer = customers.find(c => c.customer_id === customerId);
+      console.log('Found customer:', customer);
+      console.log('Customer is_active before toggle:', customer?.is_active);
+
+      if (!customer) {
+        console.error('Customer not found with ID:', customerId);
+        throw new Error('Customer not found');
+      }
+
+      const newStatus = !customer.is_active;
+      console.log('Will send is_active:', newStatus, '(current:', customer.is_active, ')');
+
+      // Call API
+      console.log('Calling API with:', { is_active: newStatus });
+      const response = await customerApi.updateCustomer(customerId, { is_active: newStatus });
+      console.log('API response:', response);
+
+      // Show success message
+      const action = newStatus ? 'تفعيل' : 'تعطيل';
+      console.log('Success message:', `تم ${action} العميل بنجاح`);
+      setSuccess(`تم ${action} العميل بنجاح`);
+      setTimeout(() => setSuccess(""), 3000);
+
+      // Refresh data
+      console.log('Refreshing data...');
+      await fetchItems();
+      console.log('Data refreshed successfully');
+
+      console.log('=== TOGGLE COMPLETED ===');
+    } catch (err) {
+      console.error('=== TOGGLE ERROR ===');
+      console.error('Toggle error:', err);
+      console.error('Error response:', err.response?.data);
+      setError(err.message || "فشل في تغيير حالة العميل");
+    }
   };
 
   // Calculate stats
@@ -292,6 +340,14 @@ export default function CustomerManagement() {
               type="error"
               message={error}
               onDismiss={() => { }}
+              dismissable={true}
+            />
+          )}
+          {success && (
+            <MessageAlert
+              type="success"
+              message={success}
+              onDismiss={() => setSuccess("")}
               dismissable={true}
             />
           )}
@@ -424,6 +480,12 @@ export default function CustomerManagement() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
+                            <SwitchActive
+                              isActive={customer.is_active}
+                              onToggle={() => handleToggleStatus(customer.customer_id)}
+                              mode="playPause"
+                              confirmBeforeToggle={true}
+                            />
                             <CrudActions
                               onView={() => openViewModal(customer.customer_id)}
                               onEdit={() => openEditModal(customer)}

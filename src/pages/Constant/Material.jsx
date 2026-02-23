@@ -80,82 +80,28 @@ export default function Material() {
   // Form state
   const [formData, setFormData] = useState({
     material_name: "",
-    type: "",
-    constant_height_id: "",
-    constant_width_id: "",
-    constant_thickness_id: "",
     constant_value_unit: "",
     notes: "",
   });
   const [formError, setFormError] = useState("");
 
-  // Constant values for dropdowns
-  const [heightValues, setHeightValues] = useState([]);
-  const [widthValues, setWidthValues] = useState([]);
-  const [thicknessValues, setThicknessValues] = useState([]);
-
-  // Load materials and constant values on mount
+  // Load materials on mount
   useEffect(() => {
     fetchItems();
-    loadConstantValues();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Load constant values for dropdowns
-  const loadConstantValues = async () => {
-    try {
-      // Load height values (assuming type_id 3 for height based on API example)
-      const heightResponse = await constantApi.getConstantValuesByTypeName('height');
-      setHeightValues(heightResponse.data || []);
-
-      // Load width values (assuming type_id 2 for width based on API example)
-      const widthResponse = await constantApi.getConstantValuesByTypeName('width');
-      setWidthValues(widthResponse.data || []);
-
-      // Load thickness values (assuming type_id 4 for thickness based on API example)
-      const thicknessResponse = await constantApi.getConstantValuesByTypeName('thickness');
-      setThicknessValues(thicknessResponse.data || []);
-    } catch (error) {
-      console.error('Failed to load constant values:', error);
-    }
-  };
-  // const loadConstantValues = async () => {
-  //   try {
-  //     // Load height values (assuming type_id 3 for height based on API example)
-  //     const heightResponse = await constantApi.getConstantValuesByType(3);
-  //     setHeightValues(heightResponse.data || []);
-
-  //     // Load width values (assuming type_id 2 for width based on API example)
-  //     const widthResponse = await constantApi.getConstantValuesByType(2);
-  //     setWidthValues(widthResponse.data || []);
-
-  //     // Load thickness values (assuming type_id 4 for thickness based on API example)
-  //     const thicknessResponse = await constantApi.getConstantValuesByType(4);
-  //     setThicknessValues(thicknessResponse.data || []);
-  //   } catch (error) {
-  //     console.error('Failed to load constant values:', error);
-  //   }
-  // };
 
   // Synchronize formData with selectedItem when modal opens in edit mode
   useEffect(() => {
     if (modalState.isOpen && modalState.mode === "edit" && selectedItem) {
       setFormData({
         material_name: selectedItem.material_name || "",
-        type: selectedItem.type || "",
-        constant_height_id: selectedItem.constant_height_id?.toString() || "",
-        constant_width_id: selectedItem.constant_width_id?.toString() || "",
-        constant_thickness_id: selectedItem.constant_thickness_id?.toString() || "",
         constant_value_unit: selectedItem.constant_value_unit || "",
         notes: selectedItem.notes || "",
       });
     } else if (modalState.isOpen && modalState.mode === "create") {
       setFormData({
         material_name: "",
-        type: "",
-        constant_height_id: "",
-        constant_width_id: "",
-        constant_thickness_id: "",
         constant_value_unit: "",
         notes: "",
       });
@@ -172,21 +118,12 @@ export default function Material() {
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
       { key: 'material_name', header: 'اسم المادة' },
-      // { key: 'type', header: 'النوع' },
-      { key: 'dimensions', header: 'الأبعاد', format: (item) => materialApi.formatDimensions(item) },
       { key: 'constant_value_unit', header: 'وحدة القيمة' },
-      { key: 'colors_count', header: 'عدد الألوان', format: (item) => materialApi.getColorsCount(item) },
-      { key: 'batches_count', header: 'عدد الدفعات', format: (item) => materialApi.getBatchesCount(item) },
       { key: 'notes', header: 'الملاحظات' },
     ],
     columnWidths: [
-      { wch: 5 },   // #
       { wch: 20 },  // اسم المادة
-      // { wch: 15 },  // النوع
-      { wch: 25 },  // الأبعاد
       { wch: 12 },  // وحدة القيمة
-      { wch: 10 },  // عدد الألوان
-      { wch: 10 },  // عدد الدفعات
       { wch: 30 },  // الملاحظات
     ],
     sheetName: 'المواد',
@@ -203,13 +140,9 @@ export default function Material() {
 
     // Validation
     const materialName = formData.material_name?.trim();
-    const materialType = formData.type?.trim() || "Role"
-    const heightId = formData.constant_height_id;
-    const widthId = formData.constant_width_id;
-    const thicknessId = formData.constant_thickness_id;
     const unit = formData.constant_value_unit?.trim();
 
-    if (!materialName || !heightId || !widthId || !thicknessId || !unit) {
+    if (!materialName || !unit) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
@@ -217,10 +150,6 @@ export default function Material() {
     // Prepare data to send
     const dataToSend = {
       material_name: materialName,
-      type: materialType,
-      constant_height_id: parseInt(heightId),
-      constant_width_id: parseInt(widthId),
-      constant_thickness_id: parseInt(thicknessId),
       constant_value_unit: unit,
       notes: formData.notes || "",
     };
@@ -231,7 +160,7 @@ export default function Material() {
   // Calculate stats
   const stats = {
     total: materials.length,
-    withColors: materials.filter((m) => m.colors && m.colors.length > 0).length,
+    withColors: materials.filter((m) => m.constant_values && m.constant_values.length > 0).length,
     withBatches: materials.filter((m) => m.batches && m.batches.length > 0).length,
   };
 
@@ -240,7 +169,6 @@ export default function Material() {
     (material) => {
       const matchesSearch =
         material.material_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        material.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         material.notes?.toLowerCase().includes(searchTerm.toLowerCase());
 
       return matchesSearch;
@@ -351,7 +279,7 @@ export default function Material() {
           {/* Search */}
           <div className="-my-4">
             <SearchInput
-              placeholder="ابحث عن مادة (الاسم أو النوع أو الملاحظات)"
+              placeholder="ابحث عن مادة (الاسم أو الملاحظات)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -407,11 +335,7 @@ export default function Material() {
                   <TableHeader>
                     <TableRow>
                       <TableHead sortable sortKey="material_name">اسم المادة</TableHead>
-                      {/* <TableHead sortable sortKey="type">النوع</TableHead> */}
-                      <TableHead>الأبعاد</TableHead>
                       <TableHead>وحدة القيمة</TableHead>
-                      <TableHead>الألوان</TableHead>
-                      <TableHead>الدفعات</TableHead>
                       <TableHead>الملاحظات</TableHead>
                       <TableHead>الإجراءات</TableHead>
                     </TableRow>
@@ -422,32 +346,9 @@ export default function Material() {
                         <TableCell className="font-medium">
                           {material.material_name}
                         </TableCell>
-                        {/* <TableCell>
-                          <Badge variant="outline">
-                            {material.type}
-                          </Badge>
-                        </TableCell> */}
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Ruler className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm">
-                              {materialApi.formatDimensions(material)}
-                            </span>
-                          </div>
-                        </TableCell>
                         <TableCell>
                           <Badge variant="secondary">
                             {material.constant_value_unit}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-blue-50">
-                            {materialApi.getColorsCount(material)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-green-50">
-                            {materialApi.getBatchesCount(material)}
                           </Badge>
                         </TableCell>
                         <TableCell className="max-w-xs truncate">
@@ -490,10 +391,6 @@ export default function Material() {
           setFormError("");
           setFormData({
             material_name: "",
-            type: "",
-            constant_height_id: "",
-            constant_width_id: "",
-            constant_thickness_id: "",
             constant_value_unit: "",
             notes: "",
           });
@@ -518,21 +415,7 @@ export default function Material() {
           modalState.mode === 'view'
             ? [
               { key: 'material_name', label: 'اسم المادة' },
-              // { key: 'type', label: 'النوع' },
-              { key: 'dimensions', label: 'الأبعاد', formatValue: (key, value) => materialApi.formatDimensions(selectedItem) },
               { key: 'constant_value_unit', label: 'وحدة القيمة' },
-              {
-                key: 'colors', label: 'الألوان', formatValue: (key, value) => {
-                  if (!value || value.length === 0) return 'لا توجد ألوان';
-                  return value.map(c => c.color_name).join('، ');
-                }
-              },
-              {
-                key: 'batches', label: 'الدفعات', formatValue: (key, value) => {
-                  if (!value || value.length === 0) return 'لا توجد دفعات';
-                  return `${value.length} دفعة`;
-                }
-              },
               { key: 'notes', label: 'الملاحظات' },
             ]
             : []

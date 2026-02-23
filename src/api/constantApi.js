@@ -49,18 +49,21 @@ export const constantApi = {
   },
 
   // Constant Values
-  getConstantValuesByType: async (typeId) => {
+  getConstantValuesByType: async (type) => {
     try {
-      const response = await axiosInstance.get(`/constant-value/by-type/${typeId}`);
+      const response = await axiosInstance.get(`/constant-value/by-type/${type}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'حدث خطأ في جلب القيم الثابتة' };
     }
   },
 
-  getConstantValuesByTypeName: async (typeName) => {
+  getConstantValuesByMaterial: async (materialId, type = null) => {
     try {
-      const response = await axiosInstance.get(`/constant-value/by-type-name/${typeName}`);
+      const url = type
+        ? `/constant-value/material/${materialId}?type=${type}`
+        : `/constant-value/material/${materialId}`;
+      const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'حدث خطأ في جلب القيم الثابتة' };

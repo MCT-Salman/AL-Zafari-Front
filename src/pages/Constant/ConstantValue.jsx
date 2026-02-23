@@ -54,43 +54,21 @@ export default function ConstantValue() {
   const [constantTypes, setConstantTypes] = useState([]);
   const [typesLoading, setTypesLoading] = useState(false);
 
-  // Selected type for filtering
-  const [selectedTypeId, setSelectedTypeId] = useState("");
-
-  // Load constant types on mount
-  useEffect(() => {
-    loadConstantTypes();
-  }, []);
-
-  const loadConstantTypes = async () => {
-    setTypesLoading(true);
-    try {
-      const response = await constantApi.getConstantTypes();
-      if (response.success) {
-        setConstantTypes(response.data || []);
-      }
-    } catch (error) {
-      console.error("Failed to load constant types:", error);
-    } finally {
-      setTypesLoading(false);
-    }
-  };
+  // State for materials and type selection
+  const [selectedMaterialId, setSelectedMaterialId] = useState("");
+  const [selectedType, setSelectedType] = useState("");
 
   // Create adapter for constant values
   const constantValueApiAdapter = useMemo(() => ({
     getItems: async () => {
-      if (!selectedTypeId) {
+      if (!selectedMaterialId) {
         return { success: true, data: [] };
       }
-      const selectedType = constantTypes.find(
-        (t) => t.constant_type_id === parseInt(selectedTypeId)
+
+      const response = await constantApi.getConstantValuesByMaterial(
+        selectedMaterialId,
+        selectedType || null
       );
-
-      const typeKey = selectedType?.type;
-
-      const response = typeKey
-        ? await constantApi.getConstantValuesByTypeName(typeKey)
-        : await constantApi.getConstantValuesByType(selectedTypeId);
 
       if (response.success && response.data) {
         return { success: true, data: response.data };
@@ -106,7 +84,8 @@ export default function ConstantValue() {
     },
     createItem: async (data) => {
       const payload = {
-        constant_type_id: parseInt(data.constant_type_id),
+        material_id: parseInt(data.material_id),
+        type: data.type,
         value: data.value.toString(),
         unit: data.unit || "",
         label: data.label || `${data.value} ${data.unit || ""}`.trim(),
@@ -117,6 +96,8 @@ export default function ConstantValue() {
     },
     updateItem: async (id, data) => {
       const payload = {
+        material_id: parseInt(data.material_id),
+        type: data.type,
         value: data.value.toString(),
         unit: data.unit || "",
         label: data.label || `${data.value} ${data.unit || ""}`.trim(),
@@ -126,7 +107,7 @@ export default function ConstantValue() {
       return await constantApi.updateConstantValue(id, payload);
     },
     deleteItem: (...args) => constantApi.deleteConstantValue(...args),
-  }), [selectedTypeId, constantTypes]);
+  }), [selectedMaterialId, selectedType]);
 
   // Use CRUD hook
   const {
@@ -158,9 +139,10 @@ export default function ConstantValue() {
     },
   });
 
-  // Form state for ConstantValueForm
+  // Form state for ConstantValue
   const [formData, setFormData] = useState({
-    constant_type_id: "",
+    material_id: "",
+    type: "",
     value: "",
     unit: "",
     label: "",
@@ -195,13 +177,12 @@ export default function ConstantValue() {
     }
   }, [formData.value, formData.unit]);
 
-  // Load values when type changes
+  // Load values when material or type changes
   useEffect(() => {
-    if (selectedTypeId) {
+    if (selectedMaterialId) {
       fetchItems();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTypeId]);
+  }, [selectedMaterialId, selectedType]);
 
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
@@ -213,8 +194,10 @@ export default function ConstantValue() {
   // Use export hook
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
+      { key: 'material_name', header: 'المادة' },
       { key: 'value', header: 'القيمة' },
       { key: 'unit', header: 'الوحدة' },
+      { key: 'type', header: 'النوع' },
       { key: 'label', header: 'العنوان' },
       {
         key: 'isDefault',
@@ -222,27 +205,28 @@ export default function ConstantValue() {
         format: (value) => value ? 'نعم' : 'لا'
       },
       { key: 'notes', header: 'الملاحظات' },
-      {
-        key: 'type',
-        header: 'نوع الثابت',
-        format: (value) => value?.constants_Type_name || ''
-      },
     ],
     columnWidths: [
-      { wch: 5 },
-      { wch: 15 },
-      { wch: 10 },
-      { wch: 20 },
-      { wch: 10 },
-      { wch: 25 },
-      { wch: 20 },
+      { wch: 20 },  // المادة
+      { wch: 10 },  // القيمة
+      { wch: 10 },  // الوحدة
+      { wch: 15 },  // النوع
+      { wch: 20 },  // العنوان
+      { wch: 10 },  // افتراضي
+      { wch: 25 },  // الملاحظات
     ],
     sheetName: 'القيم الثابتة',
   });
 
   // Handle export
   const handleExport = () => {
-    exportToExcel(filteredValues, 'القيم_الثابتة');
+    // Add material name to each value for export
+    const exportData = filteredValues.map(value => ({
+      ...value,
+      material_name: materials.find(m => m.material_id === value.material_id)?.material_name || '',
+    }));
+
+    exportToExcel(exportData, 'القيم_الثابتة');
   };
 
   // Handle save with validation
@@ -253,17 +237,23 @@ export default function ConstantValue() {
     const actualValueData = isEditMode ? valueData : idOrValueData;
 
     // Validation
-    const typeId = actualValueData?.constant_type_id;
+    const materialId = actualValueData?.material_id;
+    const type = actualValueData?.type?.trim();
     const value = actualValueData?.value?.toString().trim();
     const unit = actualValueData?.unit?.trim();
 
-    if (!typeId || typeId === "" || typeId === "undefined" || isNaN(parseInt(typeId))) {
-      setFormError("يرجى اختيار نوع الثابت");
+    if (!materialId || materialId === "" || isNaN(parseInt(materialId))) {
+      setFormError("يرجى اختيار المادة");
+      return;
+    }
+
+    if (!type || type === "") {
+      setFormError("يرجى اختيار نوع القيمة");
       return;
     }
 
     if (!value || value === "") {
-      setFormError("يرجى اختيار القيمة");
+      setFormError("يرجى إدخال القيمة");
       return;
     }
 
@@ -273,7 +263,8 @@ export default function ConstantValue() {
     }
 
     const dataToSend = {
-      constant_type_id: parseInt(typeId),
+      material_id: parseInt(materialId),
+      type: type,
       value: value,
       unit: unit,
       label: actualValueData.label || `${value} ${unit}`.trim(),
@@ -344,7 +335,7 @@ export default function ConstantValue() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, defaultFilter, selectedTypeId]);
+  }, [searchTerm, defaultFilter, selectedMaterialId, selectedType]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredValues.length / rowsPerPage);
@@ -389,15 +380,12 @@ export default function ConstantValue() {
     },
   ];
 
-  const selectedTypeName = constantTypes.find(t => t.constant_type_id === parseInt(selectedTypeId))?.constants_Type_name || "";
+  const selectedMaterialName = materials.find(m => m.material_id === parseInt(selectedMaterialId))?.material_name || "";
 
   const handleOpenCreate = () => {
-    // if (!selectedTypeId) {
-    //   alert("يرجى اختيار نوع الثابت أولاً");
-    //   return;
-    // }
     setFormData({
-      constant_type_id: selectedTypeId,
+      material_id: selectedMaterialId,
+      type: selectedType,
       value: "",
       unit: "",
       label: "",
@@ -413,40 +401,56 @@ export default function ConstantValue() {
       <div className=" mx-auto">
         <PageHeader
           title="إدارة القيم الثابتة"
-          subtitle={selectedTypeName ? `نوع الثابت: ${selectedTypeName}` : "اختر نوع الثابت أولاً"}
+          subtitle={selectedMaterialName ? `المادة: ${selectedMaterialName}` : "اختر المادة أولاً"}
           actionLabel="إضافة قيمة جديدة"
           onAction={handleOpenCreate}
-          disabled={!selectedTypeId}
+          disabled={!selectedMaterialId}
         />
 
-        {/* Type Selector */}
+        {/* Material and Type Selector */}
         <Card className="p-4 mb-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>نوع الثابت</Label>
+              <Label>المادة</Label>
               <Select
-                value={selectedTypeId}
-                onValueChange={setSelectedTypeId}
-                disabled={typesLoading}
+                value={selectedMaterialId}
+                onValueChange={setSelectedMaterialId}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="اختر نوع الثابت" />
+                  <SelectValue placeholder="اختر المادة" />
                 </SelectTrigger>
                 <SelectContent>
-                  {constantTypes.map((type) => (
+                  {materials.map((material) => (
                     <SelectItem
-                      key={type.constant_type_id}
-                      value={type.constant_type_id.toString()}
+                      key={material.material_id}
+                      value={material.material_id.toString()}
                     >
-                      {type.constants_Type_name}
+                      {material.material_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>نوع القيمة (اختياري)</Label>
+              <Select
+                value={selectedType}
+                onValueChange={setSelectedType}
+                disabled={!selectedMaterialId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="جميع الأنواع" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="width">العرض</SelectItem>
+                  <SelectItem value="height">الطول</SelectItem>
+                  <SelectItem value="thickness">السماكة</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center">
               <p className="text-sm text-gray-600">
-                {typesLoading ? "جاري تحميل الأنواع..." : `${constantTypes.length} نوع متاح`}
+                {materials.length} مادة متاحة
               </p>
             </div>
           </div>
@@ -463,7 +467,7 @@ export default function ConstantValue() {
         <Card className="p-6">
           <div className="">
             <h2 className="text-xl font-bold">
-              {selectedTypeName ? `قيم ${selectedTypeName}` : "القيم الثابتة"}
+              {selectedMaterialName ? `قيم ${selectedMaterialName}` : "القيم الثابتة"}
             </h2>
           </div>
 
@@ -481,7 +485,7 @@ export default function ConstantValue() {
               placeholder="ابحث عن قيمة (القيمة أو العنوان أو الوحدة أو الملاحظات)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={!selectedTypeId}
+              disabled={!selectedMaterialId}
             />
           </div>
 
@@ -495,7 +499,7 @@ export default function ConstantValue() {
                 { value: "default", label: "افتراضي فقط" },
                 { value: "non-default", label: "غير افتراضي فقط" }
               ]}
-              disabled={!selectedTypeId}
+              disabled={!selectedMaterialId}
             />
 
             <ResultsCounter
@@ -515,7 +519,7 @@ export default function ConstantValue() {
 
             <Button
               onClick={handleExport}
-              disabled={exportLoading || filteredValues.length === 0 || !selectedTypeId}
+              disabled={exportLoading || filteredValues.length === 0 || !selectedMaterialId}
               className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white p-6 rounded-xl"
             >
               {exportLoading ? (
@@ -532,12 +536,12 @@ export default function ConstantValue() {
             </Button>
           </div>
 
-          {!selectedTypeId ? (
-            <EmptyState message="يرجى اختيار نوع الثابت أولاً لعرض القيم" />
+          {!selectedMaterialId ? (
+            <EmptyState message="يرجى اختيار المادة أولاً لعرض القيم" />
           ) : loading ? (
             <LoadingState message="جاري تحميل القيم الثابتة..." />
           ) : filteredValues.length === 0 ? (
-            <EmptyState message="لا توجد قيم ثابتة لهذا النوع" />
+            <EmptyState message="لا توجد قيم ثابتة لهذه المادة" />
           ) : (
             <>
               <div className="overflow-x-auto rounded-lg ">
@@ -546,6 +550,7 @@ export default function ConstantValue() {
                     <TableRow>
                       <TableHead sortable sortKey="value">القيمة</TableHead>
                       <TableHead sortable sortKey="unit">الوحدة</TableHead>
+                      <TableHead sortable sortKey="type">النوع</TableHead>
                       <TableHead sortable sortKey="label">العنوان</TableHead>
                       <TableHead sortable sortKey="isDefault">افتراضي</TableHead>
                       <TableHead sortable sortKey="notes">الملاحظات</TableHead>
@@ -564,6 +569,13 @@ export default function ConstantValue() {
                           </Badge>
                         </TableCell>
                         <TableCell>
+                          <Badge variant="secondary">
+                            {value.type === 'width' ? 'العرض' :
+                             value.type === 'height' ? 'الطول' :
+                             value.type === 'thickness' ? 'السمك' : value.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           {value.label || "-"}
                         </TableCell>
                         <TableCell>
@@ -578,19 +590,12 @@ export default function ConstantValue() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {/* <SwitchActive
-                              isActive={value.isDefault}
-                              onToggle={() => handleToggleDefault(value)}
-                              mode="toggle"
-                              confirmBeforeToggle={false}
-                              activeLabel="افتراضي"
-                              inactiveLabel="غير افتراضي"
-                            /> */}
                             <CrudActions
                               onView={() => openViewModal(value.constant_value_id || value.id)}
                               onEdit={() => {
                                 setFormData({
-                                  constant_type_id: value.constant_type_id?.toString() || selectedTypeId,
+                                  material_id: value.material_id?.toString() || selectedMaterialId,
+                                  type: value.type || "",
                                   value: value.value?.toString() || "",
                                   unit: value.unit || "",
                                   label: value.label || "",
@@ -630,7 +635,8 @@ export default function ConstantValue() {
           closeModal();
           setFormError("");
           setFormData({
-            constant_type_id: selectedTypeId || "",
+            material_id: selectedMaterialId || "",
+            type: selectedType || "",
             value: "",
             unit: "",
             label: "",
@@ -659,6 +665,7 @@ export default function ConstantValue() {
             ? [
               { key: 'value', label: 'القيمة' },
               { key: 'unit', label: 'الوحدة' },
+              { key: 'type', label: 'النوع' },
               { key: 'label', label: 'العنوان' },
               {
                 key: 'isDefault',
@@ -666,11 +673,6 @@ export default function ConstantValue() {
                 formatValue: (key, value) => value ? 'نعم' : 'لا'
               },
               { key: 'notes', label: 'الملاحظات' },
-              {
-                key: 'type',
-                label: 'نوع الثابت',
-                formatValue: (key, value) => value?.constants_Type_name || selectedTypeName
-              },
             ]
             : []
         }
@@ -707,30 +709,23 @@ export default function ConstantValue() {
               </Select>
             </div>
 
-            {/* Type Selector (only in create mode or if no type selected) */}
-            {(!selectedTypeId || modalState.mode === 'create') && (
-              <div className="space-y-2">
-                <Label>نوع الثابت <span className="text-red-500">*</span></Label>
-                <Select
-                  value={formData.constant_type_id}
-                  onValueChange={(value) => setFormData({ ...formData, constant_type_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر نوع الثابت" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {constantTypes.map((type) => (
-                      <SelectItem
-                        key={type.constant_type_id}
-                        value={type.constant_type_id.toString()}
-                      >
-                        {type.constants_Type_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {/* Type Selector */}
+            <div className="space-y-2">
+              <Label>نوع القيمة <span className="text-red-500">*</span></Label>
+              <Select
+                value={formData.type}
+                onValueChange={(value) => setFormData({ ...formData, type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر نوع القيمة" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="width">العرض</SelectItem>
+                  <SelectItem value="height">الطول</SelectItem>
+                  <SelectItem value="thickness">السماكة</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* الوحدة - Select Box */}
             <div className="space-y-2">
@@ -759,20 +754,9 @@ export default function ConstantValue() {
                 type="text"
                 value={formData.value}
                 onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                placeholder="اختر قيمة موجودة أو اكتب قيمة جديدة"
-                list="constant-values-suggestions"
+                placeholder="مثال: 22"
               />
-              <datalist id="constant-values-suggestions">
-                {Array.from(new Set([
-                  ...AVAILABLE_VALUES,
-                  ...constantValues.map((v) => v.value?.toString()).filter(Boolean),
-                ])).map((val) => (
-                  <option key={val} value={val} />
-                ))}
-              </datalist>
             </div>
-
-
 
             {/* العنوان - يُنشأ تلقائياً */}
             <div className="space-y-2">

@@ -81,22 +81,20 @@ export default function Ruler() {
 
   // Form state
   const [formData, setFormData] = useState({
-    ruler_type: "",
+    ruler_name: "",
     material_id: "",
-    color_id: "",
+    entry_date: "",
     notes: "",
   });
   const [formError, setFormError] = useState("");
 
-  // Materials and colors for dropdowns
+  // Materials for dropdowns
   const [materials, setMaterials] = useState([]);
-  const [colors, setColors] = useState([]);
 
-  // Load rulers, materials, and colors on mount
+  // Load rulers and materials on mount
   useEffect(() => {
     fetchItems();
     loadMaterials();
-    loadColors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -129,20 +127,15 @@ export default function Ruler() {
   // Use export hook
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
-      { key: "ruler_type", header: "نوع المسطرة" },
+      { key: "ruler_name", header: "اسم المسطرة" },
+      { key: "entry_date", header: "تاريخ الإدخال" },
       { key: "material_name", header: "المادة", format: (item) => rulerApi.getMaterialName(item) },
-      { key: "color_name", header: "اللون", format: (item) => rulerApi.getColorName(item) },
-      { key: "color_code", header: "كود اللون", format: (item) => rulerApi.getColorCode(item) },
-      { key: "dimensions", header: "الأبعاد", format: (item) => rulerApi.formatMaterialDimensions(item) },
       { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [
-      { wch: 5 },   // #
-      { wch: 15 },  // نوع المسطرة
+      { wch: 20 },  // اسم المسطرة
+      { wch: 20 },  // تاريخ الإدخال
       { wch: 20 },  // المادة
-      { wch: 15 },  // اللون
-      { wch: 12 },  // كود اللون
-      { wch: 25 },  // الأبعاد
       { wch: 25 },  // الملاحظات
     ],
     sheetName: "المساطر",
@@ -158,20 +151,20 @@ export default function Ruler() {
     setFormError("");
 
     // Validation
-    const rulerType = data?.ruler_type?.trim();
+    const rulerName = data?.ruler_name?.trim();
     const materialId = data?.material_id;
-    const colorId = data?.color_id;
+    const entryDate = data?.entry_date;
 
-    if (!rulerType || !materialId || !colorId) {
+    if (!rulerName || !materialId || !entryDate) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
     // Prepare data to send
     const dataToSend = {
-      ruler_type: rulerType,
+      ruler_name: rulerName,
       material_id: parseInt(materialId),
-      color_id: parseInt(colorId),
+      entry_date: entryDate,
       notes: data.notes || "",
     };
 
@@ -181,19 +174,16 @@ export default function Ruler() {
   // Calculate stats
   const stats = {
     total: rulers.length,
-    newType: rulers.filter((r) => r.ruler_type === "new").length,
-    oldType: rulers.filter((r) => r.ruler_type === "old").length,
   };
 
   // Filter rulers
   let filteredRulers = rulers.filter(
     (ruler) => {
       const matchesSearch =
-        ruler.ruler_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ruler.ruler_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         rulerApi.getMaterialName(ruler)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rulerApi.getColorName(ruler)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rulerApi.getColorCode(ruler)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ruler.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+        ruler.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ruler.entry_date?.toLowerCase().includes(searchTerm.toLowerCase());
 
       return matchesSearch;
     }
@@ -245,26 +235,6 @@ export default function Ruler() {
       bgColor: "bg-primary-s",
       borderColor: "border-secondary-f"
     },
-    {
-      id: 2,
-      title: "مساطر جديدة",
-      value: stats.newType,
-      unit: "مسطرة",
-      icon: Package,
-      iconColor: "text-primary-f",
-      bgColor: "bg-primary-s",
-      borderColor: "border-primary-f"
-    },
-    {
-      id: 3,
-      title: "مساطر قديمة",
-      value: stats.oldType,
-      unit: "مسطرة",
-      icon: Palette,
-      iconColor: "text-secondary-s",
-      bgColor: "bg-primary-s",
-      borderColor: "border-secondary-s"
-    },
   ];
 
   return (
@@ -303,7 +273,7 @@ export default function Ruler() {
           {/* Search */}
           <div className="-my-4">
             <SearchInput
-              placeholder="ابحث عن مسطرة (النوع أو المادة أو اللون أو الملاحظات)"
+              placeholder="ابحث عن مسطرة (الاسم أو المادة أو التاريخ أو الملاحظات)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -358,10 +328,9 @@ export default function Ruler() {
                 <Table onSort={handleSort}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead sortable sortKey="ruler_type">نوع المسطرة</TableHead>
+                      <TableHead sortable sortKey="ruler_name">اسم المسطرة</TableHead>
+                      <TableHead sortable sortKey="entry_date">تاريخ الإدخال</TableHead>
                       <TableHead>المادة</TableHead>
-                      <TableHead>اللون</TableHead>
-                      <TableHead>الأبعاد</TableHead>
                       <TableHead>الملاحظات</TableHead>
                       <TableHead>الإجراءات</TableHead>
                     </TableRow>
@@ -369,35 +338,12 @@ export default function Ruler() {
                   <TableBody>
                     {paginatedRulers.map((ruler) => (
                       <TableRow key={ruler.ruler_id}>
-                        <TableCell className="font-medium">
-                          <Badge
-                            variant={ruler.ruler_type === "new" ? "default" : "secondary"}
-                            className={ruler.ruler_type === "new" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}
-                          >
-                            {ruler.ruler_type === "new" ? "جديدة" : "قديمة"}
-                          </Badge>
-                        </TableCell>
+                        <TableCell className="font-medium">{ruler.ruler_name}</TableCell>
+                        <TableCell>{ruler.entry_date}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {rulerApi.getMaterialName(ruler)}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-4 h-4 rounded-full border"
-                              style={{ backgroundColor: rulerApi.getColorCode(ruler) || "#ccc" }}
-                            />
-                            <div>
-                              <div>{rulerApi.getColorName(ruler)}</div>
-                              <div className="text-xs text-gray-500">{rulerApi.getColorCode(ruler)}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {rulerApi.formatMaterialDimensions(ruler)}
-                          </div>
                         </TableCell>
                         <TableCell className="max-w-xs truncate">
                           {ruler.notes || "-"}
@@ -438,9 +384,9 @@ export default function Ruler() {
           closeModal();
           setFormError("");
           setFormData({
-            ruler_type: "",
+            ruler_name: "",
             material_id: "",
-            color_id: "",
+            entry_date: "",
             notes: "",
           });
         }}
@@ -463,11 +409,9 @@ export default function Ruler() {
         fields={
           modalState.mode === "view"
             ? [
-              { key: "ruler_type", label: "نوع المسطرة", formatValue: (key, value) => value === "new" ? "جديدة" : "قديمة" },
+              { key: "ruler_name", label: "اسم المسطرة" },
+              { key: "entry_date", label: "تاريخ الإدخال" },
               { key: "material_name", label: "المادة", formatValue: (key, value) => rulerApi.getMaterialName(selectedItem) },
-              { key: "color_name", label: "اللون", formatValue: (key, value) => rulerApi.getColorName(selectedItem) },
-              { key: "color_code", label: "كود اللون", formatValue: (key, value) => rulerApi.getColorCode(selectedItem) },
-              { key: "dimensions", label: "الأبعاد", formatValue: (key, value) => rulerApi.formatMaterialDimensions(selectedItem) },
               { key: "notes", label: "الملاحظات" },
             ]
             : []
@@ -509,8 +453,8 @@ export default function Ruler() {
               <Label>اسم المسطرة <span className="text-red-500">*</span></Label>
               <Input
                 type="text"
-                value={formData.ruler_type}
-                onChange={(e) => setFormData({ ...formData, ruler_type: e.target.value })}
+                value={formData.ruler_name}
+                onChange={(e) => setFormData({ ...formData, ruler_name: e.target.value })}
               />
             </div>
 
@@ -522,24 +466,7 @@ export default function Ruler() {
                 onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
               />
             </div>
-            {/* <div className="space-y-2">
-              <Label>اللون <span className="text-red-500">*</span></Label>
-              <Select
-                value={formData.color_id?.toString()}
-                onValueChange={(value) => setFormData({ ...formData, color_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر اللون" />
-                </SelectTrigger>
-                <SelectContent>
-                  {colors.map((color) => (
-                    <SelectItem key={color.color_id} value={color.color_id.toString()}>
-                      {color.color_name} ({color.color_code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div> */}
+
             <div className="space-y-2">
               <Label>الملاحظات</Label>
               <Textarea

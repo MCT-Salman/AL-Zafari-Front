@@ -48,43 +48,29 @@ export const rulerApi = {
     }
   },
 
+  getRulersByMaterial: async (materialId) => {
+    try {
+      const response = await axiosInstance.get(`/ruler/material/${materialId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في جلب المساطر' };
+    }
+  },
+
   // Helper functions
-  getRulerType: (ruler) => {
-    return ruler?.ruler_type || 'غير محدد';
+  getRulerName: (ruler) => {
+    return ruler?.ruler_name || 'غير محدد';
   },
 
   getMaterialName: (ruler) => {
     return ruler?.material?.material_name || 'غير محدد';
   },
 
-  getColorName: (ruler) => {
-    return ruler?.color?.color_name || 'غير محدد';
-  },
-
-  getColorCode: (ruler) => {
-    return ruler?.color?.color_code || 'غير محدد';
-  },
-
-  formatMaterialDimensions: (ruler) => {
-    if (!ruler?.material) return 'غير متوفر';
-    
-    const material = ruler.material;
-    const height = material.height?.label || material.height?.value;
-    const width = material.width?.label || material.width?.value;
-    const thickness = material.thickness?.label || material.thickness?.value;
-    
-    if (!height || !width || !thickness) return 'غير متوفر';
-    
-    return `${height} × ${width} × ${thickness}`;
-  },
-
   formatRulerInfo: (ruler) => {
     if (!ruler) return 'غير محدد';
     
-    const type = ruler.ruler_type || 'غير محدد';
+    const name = ruler.ruler_name || 'غير محدد';
     const materialName = ruler.material?.material_name || 'غير محدد';
-    const colorName = ruler.color?.color_name || 'غير محدد';
-    const colorCode = ruler.color?.color_code || 'غير محدد';
-    return `${type} - ${materialName} - ${colorName} (${colorCode})`;
+    return `${name} - ${materialName}`;
   }
 };
