@@ -61,4 +61,53 @@ export const settingApi = {
       throw error.response?.data || { message: 'فشل في حذف الإعداد' };
     }
   },
+
+  // --- Discounts Management ---
+
+  getDiscounts: async () => {
+    try {
+      const response = await axiosInstance.get('/setting/discounts');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل في جلب الخصومات' };
+    }
+  },
+
+  createDiscount: async (data) => {
+    try {
+      const response = await axiosInstance.post('/setting/discounts', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل في إنشاء الخصم' };
+    }
+  },
+
+  updateDiscount: async (id, data) => {
+    try {
+      const response = await axiosInstance.put(`/setting/discounts/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل في تحديث الخصم' };
+    }
+  },
+
+  deleteDiscount: async (id) => {
+    try {
+      const response = await axiosInstance.delete(`/setting/discounts/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل في حذف الخصم' };
+    }
+  },
+
+  // --- Logs ---
+
+  getExchangeRateLogs: async () => {
+    try {
+      const response = await axiosInstance.get('/setting/exchange-rate-log');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'فشل في جلب سجلات تبديل الصرف' };
+    }
+  },
 };

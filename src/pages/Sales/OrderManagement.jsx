@@ -2,6 +2,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { orderApi } from "../../api/orderApi";
 import { customerApi } from "../../api/customerApi";
+import { colorApi } from "../../api/colorApi";
+import { batchApi } from "../../api/batchApi";
+import { priceColorApi } from "../../api/priceColorApi";
 import { useCrud } from "../../hooks/useCrud";
 import { useExport } from "../../hooks/useExport";
 import { CrudModal } from "../../components/common/CrudModal";
@@ -79,8 +82,11 @@ export default function OrderManagement() {
   });
   const [formError, setFormError] = useState("");
 
-  // Customers for dropdown
+  // Customers, Colors, Batches for dropdowns
   const [customers, setCustomers] = useState([]);
+  const [colors, setColors] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [priceColors, setPriceColors] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   // Order items state
@@ -92,22 +98,79 @@ export default function OrderManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
-  // Load orders and customers on mount
+  // Load necessary data on mount
   useEffect(() => {
     fetchItems();
-    loadCustomers();
+    loadLookupData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load customers for dropdown
-  const loadCustomers = async () => {
+  // Load lookup data for dropdowns
+  const loadLookupData = async () => {
     try {
-      const response = await customerApi.getCustomers();
-      setCustomers(response.data || []);
+      const [custRes, colorRes, batchRes, priceRes] = await Promise.all([
+        customerApi.getCustomers(),
+        colorApi.getColors(),
+        batchApi.getBatches(),
+        priceColorApi.getPriceColors(),
+      ]);
+      setCustomers(custRes.data || custRes || []);
+      setColors(colorRes.data || colorRes || []);
+      setBatches(batchRes.data || batchRes || []);
+      setPriceColors(priceRes.data || priceRes || []);
     } catch (error) {
-      console.error("Failed to load customers:", error);
+      console.error("Failed to load lookup data:", error);
     }
   };
+
+  // Sync modal state with form data
+  useEffect(() => {
+    if (modalState.isOpen && (modalState.mode === "edit" || modalState.mode === "view") && selectedItem) {
+      setFormData({
+        customer_id: String(selectedItem.customer_id || selectedItem.customer?.customer_id || ""),
+        status: selectedItem.status || "pending",
+        notes: selectedItem.notes || "",
+        items: selectedItem.items || [],
+      });
+
+      // If editing, map items to internal state
+      if (selectedItem.items) {
+        setCurrentItems(selectedItem.items.map(item => ({
+          type_item: item.type_item,
+          color_id: String(item.color_id || ""),
+          width: item.width || "",
+          length: item.length || "",
+          thickness: item.thickness || "",
+          batch_id: String(item.batch_id || ""),
+          quantity: item.quantity || "",
+          notes: item.notes || "",
+          // Helper display fields
+          material_name: item.material_name,
+          color_name: item.color_name,
+          batch_number: item.batch_number,
+          price_per_meter: item.price_per_meter,
+          subtotal: item.subtotal
+        })));
+      }
+
+      // Find and set selected customer for display
+      const customerId = selectedItem.customer_id || selectedItem.customer?.customer_id;
+      if (customerId) {
+        const customer = customers.find(c => c.customer_id == customerId);
+        setSelectedCustomer(customer);
+      }
+    } else if (modalState.isOpen && modalState.mode === "create") {
+      // Reset for create mode
+      setFormData({
+        customer_id: "",
+        status: "pending",
+        notes: "",
+        items: [],
+      });
+      setCurrentItems([]);
+      setSelectedCustomer(null);
+    }
+  }, [modalState.isOpen, modalState.mode, selectedItem, customers]);
 
   // Use export hook
   const { exportToExcel, loading: exportLoading } = useExport({
@@ -143,11 +206,11 @@ export default function OrderManagement() {
   // Handle save with validation
   const handleSaveOrder = async (data) => {
     setFormError("");
-    
+
     // Validation
     const customerId = data?.customer_id;
     const status = data?.status?.trim();
-    
+
     if (!customerId || !status) {
       setFormError("يرجى اختيار العميل والحالة");
       return;
@@ -158,12 +221,36 @@ export default function OrderManagement() {
       return;
     }
 
+    // Item validation
+    for (let i = 0; i < currentItems.length; i++) {
+      const item = currentItems[i];
+      if (!item.color_id || !item.batch_id || !item.quantity || parseFloat(item.quantity) <= 0) {
+        setFormError(`يرجى إكمال بيانات العنصر رقم ${i + 1} (اللون، الطبخة، والكمية مطلوبة)`);
+        return;
+      }
+
+      if (!item.width || !item.length || !item.thickness) {
+        setFormError(`يرجى إكمال الأبعاد (العرض، الطول، والسمك) للعنصر رقم ${i + 1}`);
+        return;
+      }
+    }
+
     // Prepare data to send
     const dataToSend = {
       customer_id: parseInt(customerId),
       status: status,
       notes: data.notes || "",
-      items: currentItems,
+      items: currentItems.map(item => ({
+        type_item: item.type_item,
+        price_color_By: item.price_color_By,
+        color_id: parseInt(item.color_id),
+        width: parseFloat(item.width) || 0,
+        length: parseFloat(item.length) || 0,
+        thickness: parseFloat(item.thickness) || 0,
+        batch_id: parseInt(item.batch_id),
+        quantity: parseInt(item.quantity) || 0,
+        notes: item.notes || ""
+      })),
     };
 
     await handleSave(dataToSend);
@@ -171,14 +258,16 @@ export default function OrderManagement() {
 
   // Item management functions
   const addItem = () => {
+    setFormError("");
     const newItem = {
-      type_item: "",
-      ruler_id: "",
-      constant_width: "",
+      type_item: "Machine", // Default to Machine (مكنة)
+      price_color_By: "isByMeter22",
+      color_id: "",
+      width: "",
       length: "",
-      constant_thickness: "",
+      thickness: "",
       batch_id: "",
-      quantity: "",
+      quantity: 1,
       notes: "",
     };
     setCurrentItems([...currentItems, newItem]);
@@ -186,7 +275,26 @@ export default function OrderManagement() {
 
   const updateItem = (index, field, value) => {
     const updatedItems = [...currentItems];
-    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    const updatedItem = { ...updatedItems[index], [field]: value };
+
+    // Auto-select pricing option if color or type changes
+    if (field === "color_id" || field === "type_item") {
+      const availablePricing = priceColors.filter(pc =>
+        String(pc.color_id) === String(updatedItem.color_id) &&
+        pc.type_item === updatedItem.type_item
+      );
+
+      if (availablePricing.length > 0) {
+        // Check if current pricing is still valid
+        const isValid = availablePricing.some(p => p.price_color_By === updatedItem.price_color_By);
+        if (!isValid) {
+          // Auto-select the first available valid pricing
+          updatedItem.price_color_By = availablePricing[0].price_color_By;
+        }
+      }
+    }
+
+    updatedItems[index] = updatedItem;
     setCurrentItems(updatedItems);
   };
 
@@ -199,10 +307,27 @@ export default function OrderManagement() {
   const calculateOrderTotal = () => {
     return currentItems.reduce((total, item) => {
       const quantity = parseFloat(item.quantity) || 0;
-      const price = parseFloat(item.price_per_meter) || 0;
-      const width = parseFloat(item.constant_width) || 0;
+      const width = parseFloat(item.width) || 0;
       const length = parseFloat(item.length) || 0;
-      const subtotal = quantity * price * width * length / 10000; // Assuming price is per square meter
+
+      // Find price per meter for this item
+      const priceRecord = priceColors.find(pc =>
+        String(pc.color_id) === String(item.color_id) &&
+        pc.type_item === item.type_item &&
+        pc.price_color_By === item.price_color_By
+      );
+
+      const price = priceRecord ? parseFloat(priceRecord.price_per_meter) : 0;
+
+      let subtotal = 0;
+      if (item.price_color_By === "blanck") {
+        // Price per piece/blank
+        subtotal = quantity * price;
+      } else {
+        // Price per linear meter (Length is in cm, price is per meter)
+        subtotal = quantity * price * (length / 100);
+      }
+
       return total + subtotal;
     }, 0);
   };
@@ -341,7 +466,7 @@ export default function OrderManagement() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -500,13 +625,13 @@ export default function OrderManagement() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === "create" 
-            ? "إنشاء طلب جديد" 
-            : modalState.mode === "edit" 
-            ? "تعديل الطلب" 
-            : modalState.mode === "view"
-            ? "تفاصيل الطلب"
-            : ""
+          modalState.mode === "create"
+            ? "إنشاء طلب جديد"
+            : modalState.mode === "edit"
+              ? "تعديل الطلب"
+              : modalState.mode === "view"
+                ? "تفاصيل الطلب"
+                : ""
         }
         loading={modalState.loading}
         size="xl"
@@ -515,16 +640,18 @@ export default function OrderManagement() {
         fields={
           modalState.mode === "view"
             ? [
-                { key: "customer_name", label: "العميل", formatValue: (key, value) => orderApi.formatCustomerInfo(selectedItem) },
-                { key: "status", label: "الحالة", formatValue: (key, value) => {
+              { key: "customer_name", label: "العميل", formatValue: (key, value) => orderApi.formatCustomerInfo(selectedItem) },
+              {
+                key: "status", label: "الحالة", formatValue: (key, value) => {
                   const statusBadge = orderApi.getStatusBadge(value);
                   return statusBadge.label;
-                }},
-                { key: "count_items", label: "عدد العناصر" },
-                { key: "total_amount", label: "المبلغ الإجمالي", formatValue: (key, value) => orderApi.formatCurrency(value) },
-                { key: "created_at", label: "تاريخ الإنشاء", formatValue: (key, value) => orderApi.getFormattedDate(selectedItem) },
-                { key: "notes", label: "الملاحظات" },
-              ]
+                }
+              },
+              { key: "count_items", label: "عدد العناصر" },
+              { key: "total_amount", label: "المبلغ الإجمالي", formatValue: (key, value) => orderApi.formatCurrency(value) },
+              { key: "created_at", label: "تاريخ الإنشاء", formatValue: (key, value) => orderApi.getFormattedDate(selectedItem) },
+              { key: "notes", label: "الملاحظات" },
+            ]
             : []
         }
         deleteTitle="حذف الطلب"
@@ -540,7 +667,7 @@ export default function OrderManagement() {
                 dismissable={false}
               />
             )}
-            
+
             {/* Customer Selection */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -551,7 +678,7 @@ export default function OrderManagement() {
                     const customerId = value;
                     const customer = customers.find(c => c.customer_id == customerId);
                     setSelectedCustomer(customer);
-                    setFormData({...formData, customer_id: customerId});
+                    setFormData({ ...formData, customer_id: customerId });
                   }}
                 >
                   <SelectTrigger className="w-full">
@@ -570,7 +697,7 @@ export default function OrderManagement() {
                 <label className="text-sm font-medium">حالة الطلب <span className="text-red-500">*</span></label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value) => setFormData({...formData, status: value})}
+                  onValueChange={(value) => setFormData({ ...formData, status: value })}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="اختر حالة الطلب" />
@@ -587,13 +714,15 @@ export default function OrderManagement() {
 
             {/* Customer Info Display */}
             {selectedCustomer && (
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-medium mb-2">معلومات العميل</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                  <div><strong>الاسم:</strong> {selectedCustomer.name}</div>
-                  <div><strong>الهاتف:</strong> {selectedCustomer.phone}</div>
-                  <div><strong>المدينة:</strong> {selectedCustomer.city}</div>
-                  <div><strong>العنوان:</strong> {selectedCustomer.address}</div>
+              <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl">
+                <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2">
+                  <User className="w-4 h-4" /> معلومات العميل
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm text-blue-800">
+                  <div><span className="opacity-70">الاسم:</span> <span className="font-bold">{selectedCustomer.name}</span></div>
+                  <div><span className="opacity-70">الهاتف:</span> <span className="font-bold">{selectedCustomer.phone}</span></div>
+                  <div><span className="opacity-70">المدينة:</span> <span className="font-bold">{selectedCustomer.city}</span></div>
+                  <div><span className="opacity-70">العنوان:</span> <span className="font-bold">{selectedCustomer.address}</span></div>
                 </div>
               </div>
             )}
@@ -602,141 +731,267 @@ export default function OrderManagement() {
             <div className="space-y-2">
               <label className="text-sm font-medium">ملاحظات الطلب</label>
               <Textarea
-                className="w-full"
+                className="w-full resize-none"
                 value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                rows={3}
-                placeholder="ملاحظات إضافية..."
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={2}
+                placeholder="ملاحظات إضافية بخصوص الطلب..."
               />
             </div>
 
             {/* Order Items */}
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">عناصر الطلب</h3>
+              <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <ShoppingCart className="w-4 h-4" /> عناصر الطلب
+                </h3>
                 <Button
                   onClick={addItem}
-                  className="flex items-center gap-2"
+                  className="h-8 text-xs gap-1"
                   variant="outline"
+                  size="sm"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3 h-3" />
                   إضافة عنصر
                 </Button>
               </div>
 
               {/* Items Table */}
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
+              <div className="border rounded-lg overflow-x-auto">
+                <table className="w-full min-w-[700px]">
+                  <thead className="bg-gray-50 border-b">
                     <tr>
-                      <th className="px-4 py-2 text-right text-sm font-medium">النوع</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium">المسطرة</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium">العرض</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium">الطول</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium">السماكة</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium">الطبخة</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium">الكمية</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium">السعر/م</th>
-                      <th className="px-4 py-2 text-right text-sm font-medium">الإجمالي</th>
-                      <th className="px-4 py-2 text-center text-sm font-medium">الإجراءات</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600">النوع</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600">اللون</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600">التسعير</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600 w-20">العرض</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600 w-20">الطول</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600 w-16">سمك</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600">الطبخة</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600 w-16">الكمية</th>
+                      <th className="px-2 py-2 text-center text-xs font-bold text-gray-600">حذف</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-100">
                     {currentItems.map((item, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="px-4 py-2">
-                          <Input
-                            type="text"
-                            className="w-full p-1"
+                      <tr key={index} className="hover:bg-gray-50/50">
+                        <td className="px-2 py-2">
+                          <Select
                             value={item.type_item}
-                            onChange={(e) => updateItem(index, "type_item", e.target.value)}
-                            placeholder="النوع"
-                          />
+                            onValueChange={(val) => updateItem(index, "type_item", val)}
+                          >
+                            <SelectTrigger className="w-full h-8 text-xs border-none shadow-none focus:ring-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Machine">مكنة</SelectItem>
+                              <SelectItem value="Presser">كوي</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </td>
-                        <td className="px-4 py-2">
-                          <Input
-                            type="text"
-                            className="w-full p-1"
-                            value={item.ruler_id}
-                            onChange={(e) => updateItem(index, "ruler_id", e.target.value)}
-                            placeholder="المسطرة"
-                          />
+                        <td className="px-2 py-2">
+                          <Select
+                            value={String(item.color_id || "")}
+                            onValueChange={(val) => updateItem(index, "color_id", val)}
+                          >
+                            <SelectTrigger className="w-full h-8 text-xs border-none shadow-none focus:ring-1">
+                              <SelectValue placeholder="اللون" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {colors.map(c => (
+                                <SelectItem key={c.color_id} value={String(c.color_id)}>
+                                  {c.color_name} ({c.color_code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-2 py-2">
+                          <Select
+                            value={item.price_color_By}
+                            onValueChange={(val) => updateItem(index, "price_color_By", val)}
+                            disabled={!item.color_id}
+                          >
+                            <SelectTrigger className="w-full h-8 text-xs border-none shadow-none focus:ring-1">
+                              <SelectValue placeholder="التسعير" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {priceColors
+                                .filter(pc =>
+                                  String(pc.color_id) === String(item.color_id) &&
+                                  pc.type_item === item.type_item
+                                )
+                                .map(pc => (
+                                  <SelectItem key={pc.id} value={pc.price_color_By}>
+                                    {pc.price_color_By === "isByMeter22" ? "22 متر" :
+                                      pc.price_color_By === "isByMeter44" ? "44 متر" :
+                                        pc.price_color_By === "isByMeter66" ? "66 متر" :
+                                          pc.price_color_By === "blanck" ? "لوح" : pc.price_color_By}
+                                  </SelectItem>
+                                ))}
+                              {item.color_id && priceColors.filter(pc =>
+                                String(pc.color_id) === String(item.color_id) &&
+                                pc.type_item === item.type_item
+                              ).length === 0 && (
+                                  <SelectItem disabled value="none">لا يوجد تسعير متاح</SelectItem>
+                                )}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-2 py-2">
                           <Input
                             type="number"
-                            className="w-full p-1"
-                            value={item.constant_width}
-                            onChange={(e) => updateItem(index, "constant_width", e.target.value)}
-                            placeholder="العرض"
+                            className="w-full h-8 p-1 text-xs border-none shadow-none focus:ring-1"
+                            value={item.width}
+                            onChange={(e) => updateItem(index, "width", e.target.value)}
                           />
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-2 py-2">
                           <Input
                             type="number"
-                            className="w-full p-1"
+                            className="w-full h-8 p-1 text-xs border-none shadow-none focus:ring-1"
                             value={item.length}
                             onChange={(e) => updateItem(index, "length", e.target.value)}
-                            placeholder="الطول"
                           />
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-2 py-2">
                           <Input
                             type="number"
                             step="0.1"
-                            className="w-full p-1"
-                            value={item.constant_thickness}
-                            onChange={(e) => updateItem(index, "constant_thickness", e.target.value)}
-                            placeholder="السماكة"
+                            className="w-full h-8 p-1 text-xs border-none shadow-none focus:ring-1"
+                            value={item.thickness}
+                            onChange={(e) => updateItem(index, "thickness", e.target.value)}
                           />
                         </td>
-                        <td className="px-4 py-2">
-                          <Input
-                            type="text"
-                            className="w-full p-1"
-                            value={item.batch_id}
-                            onChange={(e) => updateItem(index, "batch_id", e.target.value)}
-                            placeholder="الطبخة"
-                          />
+                        <td className="px-2 py-2">
+                          <Select
+                            value={String(item.batch_id || "")}
+                            onValueChange={(val) => updateItem(index, "batch_id", val)}
+                          >
+                            <SelectTrigger className="w-full h-8 text-xs border-none shadow-none focus:ring-1">
+                              <SelectValue placeholder="الطبخة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {batches.map(b => (
+                                <SelectItem key={b.batch_id} value={String(b.batch_id)}>
+                                  {b.batch_number}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-2 py-2">
                           <Input
                             type="number"
-                            className="w-full p-1"
+                            className="w-full h-8 p-1 text-xs border-none shadow-none focus:ring-1 text-center font-bold"
                             value={item.quantity}
                             onChange={(e) => updateItem(index, "quantity", e.target.value)}
-                            placeholder="الكمية"
                           />
                         </td>
-                        <td className="px-4 py-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            className="w-full p-1"
-                            value={item.price_per_meter}
-                            onChange={(e) => updateItem(index, "price_per_meter", e.target.value)}
-                            placeholder="السعر/م"
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-center">
-                          {(() => {
-                            const quantity = parseFloat(item.quantity) || 0;
-                            const price = parseFloat(item.price_per_meter) || 0;
-                            const width = parseFloat(item.constant_width) || 0;
-                            const length = parseFloat(item.length) || 0;
-                            const subtotal = quantity * price * width * length / 10000;
-                            return orderApi.formatCurrency(subtotal);
-                          })()}
-                        </td>
-                        <td className="px-4 py-2 text-center">
+                        <td className="px-2 py-2 text-center">
                           <Button
                             onClick={() => removeItem(index)}
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="text-red-600 hover:text-red-700"
+                            className="text-red-500 hover:text-red-600 h-8 w-8 p-0"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {currentItems.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500 italic">
+                          لم يتم إضافة أي عناصر بعد. اضغط على "إضافة عنصر" للبدء.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Order Total */}
+              <div className="flex justify-between items-center p-4 bg-primary-s/30 rounded-xl border border-secondary-f/10">
+                <div className="text-sm font-bold text-gray-700 italic">إجمالي تقديري:</div>
+                <div className="text-xl font-black text-secondary-f">
+                  {orderApi.formatCurrency(calculateOrderTotal())}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {modalState.mode === "view" && selectedItem && (
+          <div className="space-y-6">
+            <div className="bg-gray-50 p-4 rounded-xl border flex flex-col gap-4">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">العميل</span>
+                  <div className="text-lg font-black text-primary-f flex items-center gap-2">
+                    <User className="w-5 h-5" /> {orderApi.getCustomerName(selectedItem)}
+                  </div>
+                  <div className="text-sm text-gray-600 flex items-center gap-2">
+                    <span>{orderApi.getCustomerPhone(selectedItem)}</span>
+                    <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                    <span>{orderApi.getCustomerCity(selectedItem)}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant="outline" className="px-3 py-1 font-bold text-sm bg-white shadow-sm">
+                    {orderApi.getFormattedDate(selectedItem)}
+                  </Badge>
+                  {orderApi.getStatusBadge(selectedItem.status).element}
+                </div>
+              </div>
+
+              {selectedItem.notes && (
+                <div className="pt-3 border-t text-sm text-gray-700 italic">
+                  <span className="font-bold block mb-1 text-xs opacity-50 not-italic">ملاحظات:</span>
+                  {selectedItem.notes}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold flex items-center gap-2 text-gray-700">
+                <ShoppingCart className="w-4 h-4" /> تفاصيل العناصر ({selectedItem.items?.length || 0})
+              </h3>
+              <div className="border rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-sm">
+                  <thead className="bg-white border-b">
+                    <tr>
+                      <th className="px-4 py-3 text-right font-bold text-gray-400 text-xs">النوع</th>
+                      <th className="px-4 py-3 text-right font-bold text-gray-400 text-xs">المادة / اللون</th>
+                      <th className="px-4 py-3 text-right font-bold text-gray-400 text-xs">الطبخة</th>
+                      <th className="px-4 py-3 text-right font-bold text-gray-400 text-xs">الأبعاد (سم)</th>
+                      <th className="px-4 py-3 text-right font-bold text-gray-400 text-xs">الكمية</th>
+                      <th className="px-4 py-3 text-left font-bold text-gray-400 text-xs">الإجمالي</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {selectedItem.items?.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-4 py-3 align-top">
+                          <Badge variant="secondary" className="text-[10px] font-bold">
+                            {item.type_item === 'Presser' ? 'كوي' : 'مكنة'}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="font-bold text-gray-900">{item.material_name}</div>
+                          <div className="text-[10px] text-gray-500 font-medium">{item.color_name} ({item.color_code})</div>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <Badge variant="outline" className="font-mono text-[10px] bg-blue-50/50 border-blue-100 text-blue-700">
+                            {item.batch_number}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 align-top whitespace-nowrap text-xs font-medium">
+                          {item.width} × {item.length} × {item.thickness}
+                        </td>
+                        <td className="px-4 py-3 align-top font-black text-primary-f">{item.quantity}</td>
+                        <td className="px-4 py-3 align-top text-left font-bold text-green-700">
+                          {orderApi.formatCurrency(item.subtotal)}
                         </td>
                       </tr>
                     ))}
@@ -744,11 +999,10 @@ export default function OrderManagement() {
                 </table>
               </div>
 
-              {/* Order Total */}
-              <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                <div className="text-lg font-medium">المبلغ الإجمالي:</div>
-                <div className="text-xl font-bold text-green-600">
-                  {orderApi.formatCurrency(calculateOrderTotal())}
+              <div className="flex justify-between items-center p-4 bg-primary-s rounded-xl border border-secondary-f/20 shadow-sm">
+                <div className="text-sm font-bold text-secondary-f opacity-80 italic">المبلغ الإجمالي النهائي:</div>
+                <div className="text-2xl font-black text-secondary-f">
+                  {orderApi.formatCurrency(selectedItem.total_amount)}
                 </div>
               </div>
             </div>

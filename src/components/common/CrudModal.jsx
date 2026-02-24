@@ -61,11 +61,7 @@ export const CrudModal = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (mode === 'create') {
-      await onSubmit(formData);
-    } else if (mode === 'edit') {
-      await onSubmit(data.id, formData);
-    }
+    await onSubmit(formData);
   };
 
   const handleDelete = async () => {

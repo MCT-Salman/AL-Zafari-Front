@@ -112,15 +112,17 @@ export const orderApi = {
   },
 
   getItemCount: (order) => {
-    return order?.count_items || 0;
+    return order?.count_items || order?.items?.length || 0;
   },
 
   getFormattedDate: (order) => {
     if (!order?.created_at) return 'غير محدد';
-    return new Date(order.created_at).toLocaleDateString('ar-SA', {
+    // Use ar-EG for standard Arabic digits if ar-SA shows Western Arabic digits or vice-versa depending on system
+    return new Date(order.created_at).toLocaleDateString('ar-EG', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+    }) + ' ' + new Date(order.created_at).toLocaleTimeString('ar-EG', {
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -128,7 +130,7 @@ export const orderApi = {
 
   formatOrderInfo: (order) => {
     if (!order) return 'غير محدد';
-    
+
     const orderId = order.order_id || 'غير محدد';
     const customerName = order.customer?.name || 'غير محدد';
     const status = order.status || 'غير محدد';
@@ -138,7 +140,7 @@ export const orderApi = {
 
   formatCustomerInfo: (order) => {
     if (!order?.customer) return 'غير محدد';
-    
+
     const name = order.customer.name || 'غير محدد';
     const phone = order.customer.phone || 'غير محدد';
     const city = order.customer.city || 'غير محدد';

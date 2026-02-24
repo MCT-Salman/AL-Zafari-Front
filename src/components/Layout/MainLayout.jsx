@@ -10,11 +10,11 @@
 // function MainLayout() {
 //   const { user, loading } = useAuth();
 //   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
+
 //   if (loading) {
 //     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
 //   }
-  
+
 //   if (!user) {
 //     return <Navigate to="/login" replace />;
 //   }
@@ -74,6 +74,8 @@ import { LogOut, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { UserRoleLabels } from "@/enums";
+
 // 1. مكون داخلي للمحتوى (لأننا نحتاج لاستخدام useLayout داخله)
 const LayoutContent = () => {
   const { collapsed } = useLayout();
@@ -86,7 +88,7 @@ const LayoutContent = () => {
     title: item.title,
     href: item.link,
     // خدعة: نمرر الأيقونة كمكون (Function Component)
-    icon: (props) => <IconCommon icon={item.logo} size={20} {...props} /> 
+    icon: (props) => <IconCommon icon={item.logo} size={20} {...props} />
   }));
 
   // زر الخروج
@@ -106,13 +108,13 @@ const LayoutContent = () => {
   return (
     <div className="min-h-screen bg-surface text-text-strong" dir="rtl">
       {/* تمرير البيانات للمكونات النظيفة */}
-      <Sidebar 
-        title="AL-Zafari" 
-        items={navItems} 
+      <Sidebar
+        title="AL-Zafari"
+        items={navItems}
         footerItem={LogoutBtn}
       />
 
-      <div 
+      <div
         className={cn(
           "flex-1 flex flex-col min-h-screen transition-all duration-300",
           "md:mr-64", // الهامش الافتراضي
@@ -120,23 +122,27 @@ const LayoutContent = () => {
         )}
       >
         <Header>
-           {/* محتوى الهيدر الخاص بك */}
-           <Button className="relative cursor-pointer p-2 bg-primary-f border-none shadow-none hover:bg-secondary-f">
-            <Bell size={20} className="text-text-muted" />
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-primary-s"></span>
-          </Button>
-          
-          {/* <div className="flex items-center gap-3 mr-4">
-             <div className="w-9 h-9 rounded-full bg-secondary-s flex items-center justify-center text-white font-bold shadow-sm">
-               A
-             </div>
-             <div className="hidden sm:block text-right">
-               <div className="text-sm font-bold text-text-strong">Admin User</div>
-               <div className="text-[10px] text-text-muted">Online</div>
-             </div>
-          </div> */}
+          {/* محتوى الهيدر الخاص بك */}
+          <div className="flex items-center gap-4">
+            <Button className="relative cursor-pointer p-2 bg-primary-f border-none shadow-none hover:bg-secondary-f">
+              <Bell size={20} className="text-text-muted" />
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-primary-s"></span>
+            </Button>
+
+            <div className="flex items-center gap-3 mr-4 border-r pr-4 border-secondary-f/30">
+              <div className="hidden sm:block text-right">
+                <div className="text-sm font-bold text-text-strong">{user?.username || user?.name || "مستخدم"}</div>
+                <div className="text-[10px] text-secondary-f font-bold">
+                  {UserRoleLabels[user?.role] || user?.role || "موظف"}
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-f to-primary-f/80 flex items-center justify-center text-white font-bold shadow-md border border-secondary-f/20">
+                {(user?.username?.[0] || user?.name?.[0] || "U").toUpperCase()}
+              </div>
+            </div>
+          </div>
         </Header>
-        
+
         {/* منطقة المحتوى المتغير */}
         <main className="flex-1 p-4 md:p-6 mt-20 overflow-x-hidden">
           <Outlet />

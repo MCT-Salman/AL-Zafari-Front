@@ -160,8 +160,8 @@ export default function PriceColor() {
 
   // Mapping for labels
   const typeItemOptions = [
-    { value: "Machine", label: "كوي" },
-    { value: "Presser", label: "مكنة" },
+    { value: "Machine", label: "مكنة" },
+    { value: "Presser", label: "كوي" },
   ];
 
   const pricingOptions = [
