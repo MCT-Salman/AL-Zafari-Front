@@ -96,4 +96,13 @@ export const constantApi = {
       throw error.response?.data || { message: 'حدث خطأ في حذف القيمة الثابتة' };
     }
   },
+
+  getConstantValueById: async (id) => {
+    try {
+      const response = await axiosInstance.get(`/constant-value/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في جلب القيمة الثابتة' };
+    }
+  },
 };

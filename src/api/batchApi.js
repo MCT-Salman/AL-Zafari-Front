@@ -58,12 +58,12 @@ export const batchApi = {
   },
 
   getMaterialType: (batch) => {
-    return batch?.material?.type || 'غير محدد';
+    return batch?.material?.constant_value_unit || 'غير محدد';
   },
 
   formatEntryDate: (batch) => {
     if (!batch?.entry_date) return 'غير محدد';
-    return new Date(batch.entry_date).toLocaleDateString('ar-SA', {
+    return new Date(batch.entry_date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -74,20 +74,20 @@ export const batchApi = {
 
   formatMaterialDimensions: (batch) => {
     if (!batch?.material) return 'غير متوفر';
-    
+
     const material = batch.material;
     const height = material.height?.label || material.height?.value;
     const width = material.width?.label || material.width?.value;
     const thickness = material.thickness?.label || material.thickness?.value;
-    
+
     if (!height || !width || !thickness) return 'غير متوفر';
-    
+
     return `${height} × ${width} × ${thickness}`;
   },
 
   formatBatchInfo: (batch) => {
     if (!batch) return 'غير محدد';
-    
+
     const batchNumber = batch.batch_number || 'غير محدد';
     const materialName = batch.material?.material_name || 'غير محدد';
     const entryDate = batch.entry_date ? new Date(batch.entry_date).toLocaleDateString('ar-SA') : 'غير محدد';
@@ -97,7 +97,9 @@ export const batchApi = {
   generateBatchNumber: () => {
     const now = new Date();
     const year = now.getFullYear();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `BATCH-${year}-${random}`;
+    return `${year}${month}${day}-${random}`;
   }
 };

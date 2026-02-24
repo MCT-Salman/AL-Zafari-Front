@@ -57,8 +57,12 @@ export const priceColorApi = {
     return priceColor?.color?.color_code || 'غير محدد';
   },
 
+  getRulerName: (priceColor) => {
+    return priceColor?.color?.ruler?.ruler_name || 'غير محدد';
+  },
+
   getMaterialName: (priceColor) => {
-    return priceColor?.color?.material?.material_name || 'غير محدد';
+    return priceColor?.color?.ruler?.material?.material_name || 'غير محدد';
   },
 
   getConstantValue: (priceColor) => {
@@ -71,19 +75,16 @@ export const priceColorApi = {
 
   formatPriceInfo: (priceColor) => {
     if (!priceColor) return 'غير محدد';
-    
+
     const colorName = priceColor.color?.color_name || 'غير محدد';
-    const materialName = priceColor.color?.material?.material_name || 'غير محدد';
-    const constantValue = priceColor.constant_value?.value || 'غير محدد';
+    const typeItem = priceColor.type_item || 'غير محدد';
+    const pricingBy = priceColor.price_color_By || 'غير محدد';
     const price = priceColor.price_per_meter || '0';
-    return `${colorName} - ${materialName} - ${constantValue}: ${price} ل.س`;
+    return `${colorName} - ${typeItem} (${pricingBy}): ${price} ل.س`;
   },
 
   formatPriceDisplay: (priceColor) => {
-    if (!priceColor) return '0 لكل غير محدد';
-    
-    const price = priceColor.price_per_meter || '0';
-    const constantValue = priceColor.constant_value?.value || 'غير محدد';
-    return `${price} ل.س لكل ${constantValue}`;
+    if (!priceColor) return '0';
+    return `${priceColor.price_per_meter || '0'} ل.س`;
   }
 };

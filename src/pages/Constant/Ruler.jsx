@@ -2,7 +2,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { rulerApi } from "../../api/rulerApi";
 import { materialApi } from "../../api/materialApi";
-import { colorApi } from "../../api/colorApi";
 import { useCrud } from "../../hooks/useCrud";
 import { useExport } from "../../hooks/useExport";
 import { CrudModal } from "../../components/common/CrudModal";
@@ -27,10 +26,11 @@ import {
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Label } from "../../components/ui/label";
-import { Download, Ruler as RulerIcon, Package, Palette } from "lucide-react";
+import { Download, Ruler as RulerIcon } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
 import StatsCard from "../../components/common/StatsCard";
 import SearchInput from "../../components/common/SearchInput";
+import FilterSelect from "../../components/common/FilterSelect";
 import MessageAlert from "../../components/common/MessageAlert";
 import PageHeader from "../../components/common/PageHeader";
 import LoadingState from "../../components/common/LoadingState";
@@ -108,18 +108,9 @@ export default function Ruler() {
     }
   };
 
-  // Load colors for dropdown
-  const loadColors = async () => {
-    try {
-      const response = await colorApi.getColors();
-      setColors(response.data || []);
-    } catch (error) {
-      console.error("Failed to load colors:", error);
-    }
-  };
-
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMaterialId, setSelectedMaterialId] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -147,7 +138,14 @@ export default function Ruler() {
   };
 
   // Handle save with validation
-  const handleSaveRuler = async (data) => {
+  const handleSaveRuler = async (arg1, arg2) => {
+    // Determine if it's an edit or create based on arguments
+    // CrudModal calls onSubmit(formData) for create
+    // and onSubmit(data.id, formData) for edit
+    const isEdit = arg2 !== undefined;
+    const data = isEdit ? arg2 : arg1;
+    const rulerId = isEdit ? arg1 : null;
+
     setFormError("");
 
     // Validation
@@ -155,20 +153,48 @@ export default function Ruler() {
     const materialId = data?.material_id;
     const entryDate = data?.entry_date;
 
-    if (!rulerName || !materialId || !entryDate) {
-      setFormError("يرجى ملء جميع الحقول المطلوبة");
+    if (!rulerName || rulerName === "") {
+      setFormError("يرجى إدخال اسم المسطرة");
       return;
+    }
+
+    if (!materialId || materialId === "") {
+      setFormError("يرجى اختيار المادة");
+      return;
+    }
+
+    if (!entryDate || entryDate === "") {
+      setFormError("يرجى إدخال تاريخ الإدخال");
+      return;
+    }
+
+    // Format entry_date to ensure it's a valid ISO-8601 DateTime
+    let formattedEntryDate = entryDate;
+    if (formattedEntryDate) {
+      // Ensure it has seconds if it's in datetime-local format (YYYY-MM-DDTHH:MM)
+      if (formattedEntryDate.includes('T') && formattedEntryDate.split(':').length === 2) {
+        formattedEntryDate += ':00';
+      }
+      // Convert to ISO string
+      const date = new Date(formattedEntryDate);
+      if (!isNaN(date.getTime())) {
+        formattedEntryDate = date.toISOString();
+      }
     }
 
     // Prepare data to send
     const dataToSend = {
       ruler_name: rulerName,
       material_id: parseInt(materialId),
-      entry_date: entryDate,
+      entry_date: formattedEntryDate,
       notes: data.notes || "",
     };
 
-    await handleSave(dataToSend);
+    if (isEdit) {
+      await handleSave(dataToSend); // handleSave already knows to use selectedItem[idField] if it's an edit
+    } else {
+      await handleSave(dataToSend);
+    }
   };
 
   // Calculate stats
@@ -179,13 +205,20 @@ export default function Ruler() {
   // Filter rulers
   let filteredRulers = rulers.filter(
     (ruler) => {
-      const matchesSearch =
-        ruler.ruler_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rulerApi.getMaterialName(ruler)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ruler.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ruler.entry_date?.toLowerCase().includes(searchTerm.toLowerCase());
+      const materialName = rulerApi.getMaterialName(ruler) || "";
+      const rulerName = ruler.ruler_name || "";
 
-      return matchesSearch;
+      const searchTerms = searchTerm.toLowerCase().split(' ');
+
+      const matchesSearch = searchTerms.every(term =>
+        rulerName.toLowerCase().includes(term) ||
+        materialName.toLowerCase().includes(term) ||
+        (ruler.notes || "").toLowerCase().includes(term)
+      );
+
+      const matchesMaterial = selectedMaterialId === "" || ruler.material_id?.toString() === selectedMaterialId;
+
+      return matchesSearch && matchesMaterial;
     }
   );
 
@@ -212,7 +245,7 @@ export default function Ruler() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, selectedMaterialId]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredRulers.length / rowsPerPage);
@@ -222,6 +255,45 @@ export default function Ruler() {
 
   const handleSort = (newSortConfig) => {
     setSortConfig(newSortConfig);
+  };
+
+  const handleEditModal = (ruler) => {
+    // Format entry_date for the input
+    let formattedEntryDate = "";
+    if (ruler.entry_date) {
+      try {
+        const date = new Date(ruler.entry_date);
+        if (!isNaN(date.getTime())) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          formattedEntryDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+      } catch (error) {
+        console.error('Error formatting date for edit:', error);
+        // Fallback to original value if parsing fails
+        formattedEntryDate = ruler.entry_date;
+      }
+    }
+
+    const initialFormData = {
+      ruler_name: ruler.ruler_name || "",
+      material_id: ruler.material_id?.toString() || "",
+      entry_date: formattedEntryDate,
+      notes: ruler.notes || "",
+    };
+
+    setFormData(initialFormData);
+    setFormError("");
+
+    // Pass the formatted data as the "item" to openEditModal
+    // This ensures CrudModal's useEffect(setFormData(item)) sets the correct values
+    openEditModal({
+      ...ruler,
+      ...initialFormData
+    });
   };
 
   const mainStats = [
@@ -280,7 +352,20 @@ export default function Ruler() {
           </div>
 
           {/* Filters and Results */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FilterSelect
+              label="المادة"
+              value={selectedMaterialId}
+              onChange={(e) => setSelectedMaterialId(e.target.value)}
+              options={[
+                { value: "", label: "جميع المواد" },
+                ...materials.map(material => ({
+                  value: material.material_id.toString(),
+                  label: material.material_name
+                }))
+              ]}
+            />
+
             <ResultsCounter
               current={filteredRulers.length}
               total={rulers.length}
@@ -339,7 +424,15 @@ export default function Ruler() {
                     {paginatedRulers.map((ruler) => (
                       <TableRow key={ruler.ruler_id}>
                         <TableCell className="font-medium">{ruler.ruler_name}</TableCell>
-                        <TableCell>{ruler.entry_date}</TableCell>
+                        <TableCell>
+                          {ruler.entry_date ? new Date(ruler.entry_date).toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '-'}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {rulerApi.getMaterialName(ruler)}
@@ -352,7 +445,7 @@ export default function Ruler() {
                           <div className="flex items-center gap-2">
                             <CrudActions
                               onView={() => openViewModal(ruler.ruler_id)}
-                              onEdit={() => openEditModal(ruler)}
+                              onEdit={() => handleEditModal(ruler)}
                               onDelete={() => openDeleteModal(ruler)}
                               size="md"
                             />

@@ -32,6 +32,7 @@ import StatsCard from "../../components/common/StatsCard";
 import SearchInput from "../../components/common/SearchInput";
 import MessageAlert from "../../components/common/MessageAlert";
 import PageHeader from "../../components/common/PageHeader";
+import FilterSelect from "../../components/common/FilterSelect";
 import LoadingState from "../../components/common/LoadingState";
 import EmptyState from "../../components/common/EmptyState";
 import ResultsCounter from "../../components/common/ResultsCounter";
@@ -100,16 +101,32 @@ export default function Batch() {
   // Synchronize formData with selectedItem when modal opens in edit mode
   useEffect(() => {
     if (modalState.isOpen && modalState.mode === "edit" && selectedItem) {
+      let formattedDate = "";
+      if (selectedItem.entry_date) {
+        // Handle both ISO strings and other formats to ensure YYYY-MM-DDTHH:MM
+        const date = new Date(selectedItem.entry_date);
+        if (!isNaN(date.getTime())) {
+          // Format as YYYY-MM-DDTHH:MM for datetime-local
+          const pad = (num) => String(num).padStart(2, '0');
+          const year = date.getFullYear();
+          const month = pad(date.getMonth() + 1);
+          const day = pad(date.getDate());
+          const hours = pad(date.getHours());
+          const minutes = pad(date.getMinutes());
+          formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+      }
+
       setFormData({
         batch_number: selectedItem.batch_number || "",
-        entry_date: selectedItem.entry_date ? selectedItem.entry_date.substring(0, 16) : "",
+        entry_date: formattedDate,
         material_id: selectedItem.material_id?.toString() || "",
         notes: selectedItem.notes || "",
       });
     } else if (modalState.isOpen && modalState.mode === "create") {
       setFormData({
         batch_number: "",
-        entry_date: new Date().toISOString().substring(0, 16),
+        entry_date: "",
         material_id: "",
         notes: "",
       });
@@ -120,7 +137,7 @@ export default function Batch() {
   const loadMaterials = async () => {
     try {
       const response = await materialApi.getMaterials();
-      setMaterials(response.data || []);
+      setMaterials(response.data || response || []);
     } catch (error) {
       console.error("Failed to load materials:", error);
     }
@@ -128,6 +145,7 @@ export default function Batch() {
 
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMaterialId, setSelectedMaterialId] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -138,18 +156,13 @@ export default function Batch() {
       { key: "batch_number", header: "رقم الطبخة" },
       { key: "entry_date", header: "تاريخ الإدخال", format: (item) => batchApi.formatEntryDate(item) },
       { key: "material_name", header: "المادة", format: (item) => batchApi.getMaterialName(item) },
-      { key: "material_type", header: "نوع المادة", format: (item) => batchApi.getMaterialType(item) },
-      { key: "dimensions", header: "الأبعاد", format: (item) => batchApi.formatMaterialDimensions(item) },
       { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [
-      { wch: 5 },   // #
-      { wch: 20 },  // رقم الطبخة
-      { wch: 20 },  // تاريخ الإدخال
-      { wch: 15 },  // المادة
-      { wch: 12 },  // نوع المادة
-      { wch: 25 },  // الأبعاد
-      { wch: 30 },  // الملاحظات
+      { wch: 15 },  // رقم الطبخة
+      { wch: 25 },  // تاريخ الإدخال
+      { wch: 20 },  // المادة
+      { wch: 40 },  // الملاحظات
     ],
     sheetName: "الطبخات",
   });
@@ -168,14 +181,14 @@ export default function Batch() {
     const entryDate = formData.entry_date;
     const materialId = formData.material_id;
 
-    if (!materialId || !entryDate) {
+    if (!materialId || !entryDate || !batchNumber) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
     // Prepare data to send
     const dataToSend = {
-      batch_number: batchNumber || undefined, // API handles auto-generation if undefined
+      batch_number: batchNumber,
       entry_date: new Date(entryDate).toISOString(),
       material_id: parseInt(materialId),
       notes: formData.notes || "",
@@ -187,26 +200,22 @@ export default function Batch() {
   // Calculate stats
   const stats = {
     total: batches.length,
-    thisMonth: batches.filter((b) => {
-      const batchDate = new Date(b.entry_date);
-      const now = new Date();
-      return batchDate.getMonth() === now.getMonth() &&
-        batchDate.getFullYear() === now.getFullYear();
-    }).length,
     uniqueMaterials: [...new Set(batches.map(b => b.material_id))].length,
   };
 
   // Filter batches
   let filteredBatches = batches.filter(
     (batch) => {
+      const materialName = batchApi.getMaterialName(batch);
       const matchesSearch =
         batch.batch_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        batchApi.getMaterialName(batch)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        batchApi.getMaterialType(batch)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        materialName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         batch.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         batchApi.formatEntryDate(batch)?.includes(searchTerm);
 
-      return matchesSearch;
+      const matchesMaterial = selectedMaterialId === "" || batch.material_id?.toString() === selectedMaterialId;
+
+      return matchesSearch && matchesMaterial;
     }
   );
 
@@ -216,21 +225,18 @@ export default function Batch() {
       let aValue = a[sortConfig.key];
       let bValue = b[sortConfig.key];
 
-      // Special handling for date sorting
       if (sortConfig.key === "entry_date") {
         const aDate = new Date(a.entry_date);
         const bDate = new Date(b.entry_date);
         return sortConfig.direction === "asc" ? aDate - bDate : bDate - aDate;
       }
 
-      // معالجة النصوص العربية
       if (typeof aValue === "string") {
         return sortConfig.direction === "asc"
           ? aValue.localeCompare(bValue, "ar")
           : bValue.localeCompare(aValue, "ar");
       }
 
-      // معالجة الأرقام والقيم الأخرى
       return sortConfig.direction === "asc"
         ? aValue > bValue ? 1 : -1
         : aValue < bValue ? 1 : -1;
@@ -240,7 +246,7 @@ export default function Batch() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, selectedMaterialId]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredBatches.length / rowsPerPage);
@@ -263,26 +269,16 @@ export default function Batch() {
       bgColor: "bg-primary-s",
       borderColor: "border-secondary-f"
     },
-    // {
-    //   id: 2,
-    //   title: "تشغيلات هذا الشهر",
-    //   value: stats.thisMonth,
-    //   unit: "تشغيلة",
-    //   icon: Calendar,
-    //   iconColor: "text-primary-f",
-    //   bgColor: "bg-primary-s",
-    //   borderColor: "border-primary-f"
-    // },
-    // {
-    //   id: 3,
-    //   title: "عدد المواد المختلفة",
-    //   value: stats.uniqueMaterials,
-    //   unit: "مادة",
-    //   icon: Tag,
-    //   iconColor: "text-secondary-s",
-    //   bgColor: "bg-primary-s",
-    //   borderColor: "border-secondary-s"
-    // },
+    {
+      id: 2,
+      title: "المواد المستخدمة",
+      value: stats.uniqueMaterials,
+      unit: "مادة",
+      icon: Tag,
+      iconColor: "text-primary-f",
+      bgColor: "bg-primary-s",
+      borderColor: "border-primary-f"
+    },
   ];
 
   return (
@@ -296,11 +292,11 @@ export default function Batch() {
         />
 
         {/* Stats Cards */}
-        {/* <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {mainStats.map((stat) => (
             <StatsCard key={stat.id} {...stat} />
           ))}
-        </div> */}
+        </div>
 
         {/* Batches Table Card */}
         <Card className="p-6">
@@ -321,18 +317,30 @@ export default function Batch() {
           {/* Search */}
           <div className="-my-4">
             <SearchInput
-              placeholder="ابحث عن طبخة (الرقم أو المادة أو النوع أو التاريخ أو الملاحظات)"
+              placeholder="ابحث عن طبخة (الرقم أو المادة أو الملاحظات)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
           {/* Filters and Results */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ResultsCounter
-              current={filteredBatches.length}
-              total={batches.length}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <FilterSelect
+              label="المادة"
+              value={selectedMaterialId}
+              onChange={(e) => setSelectedMaterialId(e.target.value)}
+              options={[
+                { value: "", label: "جميع المواد" },
+                ...materials.map(m => ({ value: (m.material_id || "").toString(), label: m.material_name }))
+              ]}
             />
+
+            <div className="md:col-start-4">
+              <ResultsCounter
+                current={filteredBatches.length}
+                total={batches.length}
+              />
+            </div>
           </div>
 
           <div className="flex justify-between">
@@ -379,7 +387,6 @@ export default function Batch() {
                       <TableHead sortable sortKey="batch_number">رقم الطبخة</TableHead>
                       <TableHead sortable sortKey="entry_date">تاريخ الإدخال</TableHead>
                       <TableHead>المادة</TableHead>
-                      <TableHead>الأبعاد</TableHead>
                       <TableHead>الملاحظات</TableHead>
                       <TableHead>الإجراءات</TableHead>
                     </TableRow>
@@ -398,19 +405,9 @@ export default function Batch() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div>
-                            <Badge variant="secondary">
-                              {batchApi.getMaterialName(batch)}
-                            </Badge>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {batchApi.getMaterialType(batch)}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {batchApi.formatMaterialDimensions(batch)}
-                          </div>
+                          <Badge variant="secondary">
+                            {batchApi.getMaterialName(batch)}
+                          </Badge>
                         </TableCell>
                         <TableCell className="max-w-xs truncate">
                           {batch.notes || "-"}
@@ -450,12 +447,6 @@ export default function Batch() {
         onClose={() => {
           closeModal();
           setFormError("");
-          setFormData({
-            batch_number: "",
-            entry_date: "",
-            material_id: "",
-            notes: "",
-          });
         }}
         onSubmit={handleSaveBatch}
         onDelete={handleDelete}
@@ -477,10 +468,8 @@ export default function Batch() {
           modalState.mode === "view"
             ? [
               { key: "batch_number", label: "رقم الطبخة" },
-              { key: "entry_date", label: "تاريخ الإدخال", formatValue: (key, value) => batchApi.formatEntryDate(selectedItem) },
-              { key: "material_name", label: "المادة", formatValue: (key, value) => batchApi.getMaterialName(selectedItem) },
-              { key: "material_type", label: "نوع المادة", formatValue: (key, value) => batchApi.getMaterialType(selectedItem) },
-              { key: "dimensions", label: "الأبعاد", formatValue: (key, value) => batchApi.formatMaterialDimensions(selectedItem) },
+              { key: "entry_date", label: "تاريخ الإدخال", formatValue: () => batchApi.formatEntryDate(selectedItem) },
+              { key: "material_name", label: "المادة", formatValue: () => batchApi.getMaterialName(selectedItem) },
               { key: "notes", label: "الملاحظات" },
             ]
             : []
@@ -498,43 +487,46 @@ export default function Batch() {
                 dismissable={false}
               />
             )}
-            <div className="space-y-2">
-              <Label>المادة <span className="text-red-500">*</span></Label>
-              <Select
-                value={formData.material_id?.toString()}
-                onValueChange={(value) => setFormData({ ...formData, material_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر المادة" />
-                </SelectTrigger>
-                <SelectContent>
-                  {materials.map((material) => (
-                    <SelectItem
-                      key={material.material_id}
-                      value={material.material_id.toString()}
-                    >
-                      {material.material_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>رقم الطبخة <span className="text-red-500">*</span></Label>
-              <Input
-                type="text"
-                value={formData.batch_number}
-                onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
-                placeholder={batchApi.generateBatchNumber()}
-              />
-              <p className="text-xs text-gray-500">اتركه فارغاً لتوليد رقم طبخة تلقائي</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>المادة <span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.material_id?.toString() || ""}
+                  onValueChange={(value) => setFormData({ ...formData, material_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر المادة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materials.map((material) => (
+                      <SelectItem
+                        key={material.material_id}
+                        value={material.material_id.toString()}
+                      >
+                        {material.material_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>رقم الطبخة <span className="text-red-500">*</span></Label>
+                <Input
+                  type="text"
+                  value={formData.batch_number || ""}
+                  onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
+                  placeholder={batchApi.generateBatchNumber()}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label>تاريخ الإدخال <span className="text-red-500">*</span></Label>
               <Input
                 type="datetime-local"
-                value={formData.entry_date}
+                value={formData.entry_date || ""}
                 onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
               />
             </div>
@@ -542,7 +534,7 @@ export default function Batch() {
             <div className="space-y-2">
               <Label>الملاحظات</Label>
               <Textarea
-                value={formData.notes}
+                value={formData.notes || ""}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
                 placeholder="ملاحظات إضافية..."

@@ -1,7 +1,6 @@
 // src\pages\Constant\Color.jsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { colorApi } from "../../api/colorApi";
-import { materialApi } from "../../api/materialApi";
 import { rulerApi } from "../../api/rulerApi";
 import { useCrud } from "../../hooks/useCrud";
 import { useExport } from "../../hooks/useExport";
@@ -27,10 +26,11 @@ import {
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Label } from "../../components/ui/label";
-import { Download, Palette, Package, DollarSign, ImagePlus } from "lucide-react";
+import { Download, Palette, Ruler as RulerIcon, DollarSign, ImagePlus, ImageIcon, X } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
 import StatsCard from "../../components/common/StatsCard";
 import SearchInput from "../../components/common/SearchInput";
+import FilterSelect from "../../components/common/FilterSelect";
 import MessageAlert from "../../components/common/MessageAlert";
 import PageHeader from "../../components/common/PageHeader";
 import LoadingState from "../../components/common/LoadingState";
@@ -39,7 +39,12 @@ import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
 
+// Base URL for images - Strip /api if it exists to get the server root
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+
 export default function Color() {
+  const fileInputRef = useRef(null);
+
   // Create adapter to map generic CRUD method names to colorApi method names
   const colorApiAdapter = useMemo(() => ({
     getItems: (...args) => colorApi.getColors(...args),
@@ -70,6 +75,7 @@ export default function Color() {
       create: "تم إنشاء اللون بنجاح",
       update: "تم تحديث اللون بنجاح",
       delete: "تم حذف اللون بنجاح",
+      fetch: "تم تحميل الألوان بنجاح",
     },
     errorMessages: {
       create: "فشل في حفظ اللون",
@@ -81,57 +87,81 @@ export default function Color() {
 
   // Form state
   const [formData, setFormData] = useState({
-    material_id: "",
+    ruler_id: "",
     color_code: "",
     color_name: "",
-    ruler_type: "مسطرة جديدة",
     notes: "",
+    imageFile: null,
+    imagePreview: null,
   });
   const [formError, setFormError] = useState("");
 
-  // Materials for dropdown
-  const [materials, setMaterials] = useState([]);
+  // Rulers for dropdown
+  const [rulers, setRulers] = useState([]);
 
-  // Load colors and materials on mount
+  // Load colors and rulers on mount
   useEffect(() => {
     fetchItems();
-    loadMaterials();
+    loadRulers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Synchronize formData with selectedItem when modal opens in edit mode
+  // Note: CrudModal also calls setFormData(data) which might overwrite this.
+  // We'll handle both by ensuring Select uses a string value.
   useEffect(() => {
-    if (modalState.isOpen && modalState.mode === "edit" && selectedItem) {
-      setFormData({
-        material_id: selectedItem.material_id?.toString() || "",
-        color_code: selectedItem.color_code || "",
-        color_name: selectedItem.color_name || "",
-        ruler_type: selectedItem.ruler_type || "مسطرة جديدة",
-        notes: selectedItem.notes || "",
-      });
-    } else if (modalState.isOpen && modalState.mode === "create") {
-      setFormData({
-        material_id: "",
-        color_code: "",
-        color_name: "",
-        ruler_type: "مسطرة جديدة",
-        notes: "",
-      });
+    if (modalState.isOpen && modalState.mode === "edit" || modalState.mode === "create") {
+      if (modalState.mode === "edit" && selectedItem) {
+        setFormData({
+          ruler_id: (selectedItem.ruler_id || selectedItem.ruler?.ruler_id)?.toString() || "",
+          color_code: selectedItem.color_code || "",
+          color_name: selectedItem.color_name || "",
+          notes: selectedItem.notes || "",
+          imageFile: null,
+          imagePreview: selectedItem.imageUrl ? `${API_BASE_URL}${selectedItem.imageUrl}` : null,
+        });
+      } else if (modalState.mode === "create") {
+        setFormData({
+          ruler_id: "",
+          color_code: "",
+          color_name: "",
+          notes: "",
+          imageFile: null,
+          imagePreview: null,
+        });
+      }
     }
   }, [modalState.isOpen, modalState.mode, selectedItem]);
 
-  // Load materials for dropdown
-  const loadMaterials = async () => {
+  // Load rulers for dropdown
+  const loadRulers = async () => {
     try {
-      const response = await materialApi.getMaterials();
-      setMaterials(response.data || []);
+      const response = await rulerApi.getRulers();
+      setRulers(response.data || []);
     } catch (error) {
-      console.error("Failed to load materials:", error);
+      console.error("Failed to load rulers:", error);
     }
+  };
+
+  // Helper to get material name from rulers list if missing in color object
+  const getMaterialName = (color) => {
+    // 1. Try nested structure color.ruler.material
+    if (color?.ruler?.material?.material_name) return color.ruler.material.material_name;
+
+    // 2. Try to find in rulers list
+    const rulerId = color?.ruler_id || color?.ruler?.ruler_id;
+    if (rulerId && rulers.length > 0) {
+      const ruler = rulers.find(r => r.ruler_id === rulerId);
+      if (ruler?.material?.material_name) return ruler.material.material_name;
+    }
+
+    return "غير محدد";
   };
 
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedRulerId, setSelectedRulerId] = useState("");
+  const [selectedMaterialName, setSelectedMaterialName] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -141,18 +171,15 @@ export default function Color() {
     columns: [
       { key: "color_name", header: "اسم اللون" },
       { key: "color_code", header: "كود اللون" },
-      { key: "material_name", header: "المادة" },
-      { key: "prices_count", header: "عدد الأسعار", format: (item) => colorApi.getPricesCount(item) },
-      { key: "rulers_count", header: "عدد المساطر", format: (item) => colorApi.getRulersCount(item) },
+      { key: "ruler_name", header: "المسطرة", format: (item) => colorApi.getRulerName(item) },
+      { key: "material_name", header: "المادة", format: (item) => getMaterialName(item) },
       { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [
-      { wch: 5 },   // #
       { wch: 20 },  // اسم اللون
       { wch: 15 },  // كود اللون
+      { wch: 20 },  // المسطرة
       { wch: 20 },  // المادة
-      { wch: 12 },  // عدد الأسعار
-      { wch: 12 },  // عدد المساطر
       { wch: 30 },  // الملاحظات
     ],
     sheetName: "الألوان",
@@ -163,51 +190,88 @@ export default function Color() {
     exportToExcel(filteredColors, "الألوان");
   };
 
+  // Handle image change
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setFormError("حجم الصورة كبير جداً (الأقصى 5MB)");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          imageFile: file,
+          imagePreview: reader.result
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setFormData(prev => ({
+      ...prev,
+      imageFile: null,
+      imagePreview: null
+    }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   // Handle save with validation
-  const handleSaveColor = async (data) => {
+  const handleSaveColor = async (arg1, arg2) => {
+    const isEdit = modalState.mode === 'edit';
+    const colorId = arg1 || selectedItem?.color_id;
+
     setFormError("");
 
     // Validation
-    const materialId = formData.material_id;
+    const rulerId = formData.ruler_id;
     const colorCode = formData.color_code?.trim();
     const colorName = formData.color_name?.trim();
-    const rulerType = formData.ruler_type;
 
-    if (!materialId || !colorCode || !colorName || !rulerType) {
+    if (!rulerId || !colorCode || !colorName) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
-    // Prepare data to send
-    const dataToSend = {
-      material_id: parseInt(materialId),
-      color_code: colorCode,
-      color_name: colorName,
-      notes: formData.notes || "",
-    };
+    // Prepare FormData
+    const formDataToSend = new FormData();
+    formDataToSend.append("ruler_id", rulerId);
+    formDataToSend.append("color_code", colorCode);
+    formDataToSend.append("color_name", colorName);
+    formDataToSend.append("notes", formData.notes || "");
+
+    // Note: Do NOT append color_id to the body for Prisma updates.
+    // The ID is already sent in the URL, and sending it in the body as a string
+    // causes a type mismatch in Prisma (Expected Int, provided String).
+
+    if (formData.imageFile) {
+      formDataToSend.append("imageUrl", formData.imageFile);
+    }
 
     try {
-      const response = await handleSave(dataToSend);
-
-      // If we are creating a new color, automatically create a ruler for it
-      if (modalState.mode === 'create' && response?.data?.color_id) {
-        await rulerApi.createRuler({
-          ruler_type: rulerType,
-          material_id: parseInt(materialId),
-          color_id: response.data.color_id,
-          notes: `مسطرة تلقائية للون: ${colorName}`
-        });
+      if (isEdit) {
+        await colorApi.updateColor(colorId, formDataToSend);
+        fetchItems();
+        closeModal();
+      } else {
+        await colorApi.createColor(formDataToSend);
+        fetchItems();
+        closeModal();
       }
     } catch (err) {
-      console.error("Failed to save color and ruler:", err);
+      setFormError(err.message || "فشل في حفظ اللون");
     }
   };
 
   // Calculate stats
   const stats = {
     total: colors.length,
-    withPrices: colors.filter((c) => c.prices && c.prices.length > 0).length,
-    withRulers: colors.filter((c) => c.rulers && c.rulers.length > 0).length,
   };
 
   // Filter colors
@@ -216,10 +280,15 @@ export default function Color() {
       const matchesSearch =
         color.color_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         color.color_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        color.material?.material_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        colorApi.getRulerName(color)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getMaterialName(color)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         color.notes?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      return matchesSearch;
+      const rulerId = (color.ruler_id || color.ruler?.ruler_id)?.toString();
+      const matchesRuler = selectedRulerId === "" || rulerId === selectedRulerId;
+      const matchesMaterial = selectedMaterialName === "" || getMaterialName(color) === selectedMaterialName;
+
+      return matchesSearch && matchesRuler && matchesMaterial;
     }
   );
 
@@ -229,14 +298,12 @@ export default function Color() {
       let aValue = a[sortConfig.key];
       let bValue = b[sortConfig.key];
 
-      // ?????? ?????? ???????
       if (typeof aValue === "string") {
         return sortConfig.direction === "asc"
           ? aValue.localeCompare(bValue, "ar")
           : bValue.localeCompare(aValue, "ar");
       }
 
-      // ?????? ??????? ?????? ??????
       return sortConfig.direction === "asc"
         ? aValue > bValue ? 1 : -1
         : aValue < bValue ? 1 : -1;
@@ -246,7 +313,7 @@ export default function Color() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, selectedRulerId, selectedMaterialName]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredColors.length / rowsPerPage);
@@ -269,26 +336,6 @@ export default function Color() {
       bgColor: "bg-primary-s",
       borderColor: "border-secondary-f"
     },
-    {
-      id: 2,
-      title: "ألوان لها أسعار",
-      value: stats.withPrices,
-      unit: "لون",
-      icon: DollarSign,
-      iconColor: "text-primary-f",
-      bgColor: "bg-primary-s",
-      borderColor: "border-primary-f"
-    },
-    {
-      id: 3,
-      title: "ألوان لها مساطر",
-      value: stats.withRulers,
-      unit: "لون",
-      icon: Package,
-      iconColor: "text-secondary-s",
-      bgColor: "bg-primary-s",
-      borderColor: "border-secondary-s"
-    },
   ];
 
   return (
@@ -302,7 +349,7 @@ export default function Color() {
         />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-5">
           {mainStats.map((stat) => (
             <StatsCard key={stat.id} {...stat} />
           ))}
@@ -327,14 +374,34 @@ export default function Color() {
           {/* Search */}
           <div className="-my-4">
             <SearchInput
-              placeholder="ابحث عن لون (الاسم أو الكود أو المادة أو الملاحظات)"
+              placeholder="ابحث عن لون (الاسم أو الكود أو المسطرة أو المادة أو الملاحظات)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
           {/* Filters and Results */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FilterSelect
+              label="المسطرة"
+              value={selectedRulerId}
+              onChange={(e) => setSelectedRulerId(e.target.value)}
+              options={[
+                { value: "", label: "جميع المساطر" },
+                ...rulers.map(r => ({ value: r.ruler_id.toString(), label: r.ruler_name }))
+              ]}
+            />
+
+            <FilterSelect
+              label="المادة"
+              value={selectedMaterialName}
+              onChange={(e) => setSelectedMaterialName(e.target.value)}
+              options={[
+                { value: "", label: "جميع المواد" },
+                ...[...new Set(rulers.map(r => r.material?.material_name).filter(Boolean))].map(name => ({ value: name, label: name }))
+              ]}
+            />
+
             <ResultsCounter
               current={filteredColors.length}
               total={colors.length}
@@ -382,11 +449,10 @@ export default function Color() {
                 <Table onSort={handleSort}>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>الصورة</TableHead>
                       <TableHead sortable sortKey="color_name">اسم اللون</TableHead>
                       <TableHead sortable sortKey="color_code">كود اللون</TableHead>
-                      <TableHead>المادة</TableHead>
-                      <TableHead>عدد الأسعار</TableHead>
-                      <TableHead>عدد المساطر</TableHead>
+                      <TableHead>المسطرة / المادة</TableHead>
                       <TableHead>الملاحظات</TableHead>
                       <TableHead>الإجراءات</TableHead>
                     </TableRow>
@@ -394,14 +460,21 @@ export default function Color() {
                   <TableBody>
                     {paginatedColors.map((color) => (
                       <TableRow key={color.color_id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-4 h-4 rounded-full border"
-                              style={{ backgroundColor: color.color_code || "#ccc" }}
-                            />
-                            {color.color_name}
+                        <TableCell>
+                          <div className="w-12 h-12 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden">
+                            {color.imageUrl ? (
+                              <img
+                                src={`${API_BASE_URL}${color.imageUrl}`}
+                                alt={color.color_name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <ImageIcon className="w-6 h-6 text-gray-400" />
+                            )}
                           </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {color.color_name}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">
@@ -409,19 +482,14 @@ export default function Color() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">
-                            {colorApi.getMaterialName(color)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-green-50">
-                            {colorApi.getPricesCount(color)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-blue-50">
-                            {colorApi.getRulersCount(color)}
-                          </Badge>
+                          <div className="space-y-1">
+                            <Badge variant="secondary" className="block w-fit">
+                              {colorApi.getRulerName(color)}
+                            </Badge>
+                            <span className="text-xs text-secondary-t">
+                              {getMaterialName(color)}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell className="max-w-xs truncate">
                           {color.notes || "-"}
@@ -461,12 +529,6 @@ export default function Color() {
         onClose={() => {
           closeModal();
           setFormError("");
-          setFormData({
-            material_id: "",
-            color_code: "",
-            color_name: "",
-            notes: "",
-          });
         }}
         onSubmit={handleSaveColor}
         onDelete={handleDelete}
@@ -489,19 +551,17 @@ export default function Color() {
             ? [
               { key: "color_name", label: "اسم اللون" },
               { key: "color_code", label: "كود اللون" },
-              { key: "material_name", label: "المادة", formatValue: (key, value) => colorApi.getMaterialName(selectedItem) },
               {
-                key: "prices", label: "الأسعار", formatValue: (key, value) => {
-                  if (!value || value.length === 0) return "لا توجد أسعار";
-                  return `${value.length} سعر`;
-                }
+                key: "imageUrl",
+                label: "صورة اللون",
+                formatValue: (key, value) => value ? (
+                  <div className="mt-2 w-32 h-32 rounded-xl border border-primary-f/10 overflow-hidden bg-gray-50 flex items-center justify-center">
+                    <img src={`${API_BASE_URL}${value}`} alt="Color" className="w-full h-full object-cover" />
+                  </div>
+                ) : "لا توجد صورة"
               },
-              {
-                key: "rulers", label: "المساطر", formatValue: (key, value) => {
-                  if (!value || value.length === 0) return "لا توجد مساطر";
-                  return `${value.length} مسطرة`;
-                }
-              },
+              { key: "ruler_name", label: "المسطرة", formatValue: () => colorApi.getRulerName(selectedItem) },
+              { key: "material_name", label: "المادة", formatValue: () => getMaterialName(selectedItem) },
               { key: "notes", label: "الملاحظات" },
             ]
             : []
@@ -515,89 +575,108 @@ export default function Color() {
             {formError && (
               <MessageAlert
                 type="error"
+                message={formError}
                 dismissable={false}
               />
             )}
+
             <div className="space-y-2">
-              <Label>المادة <span className="text-red-500">*</span></Label>
+              <Label>المسطرة <span className="text-red-500">*</span></Label>
               <Select
-                value={formData.material_id?.toString()}
-                onValueChange={(value) => setFormData({ ...formData, material_id: value })}
+                value={formData.ruler_id?.toString() || ""}
+                onValueChange={(value) => setFormData({ ...formData, ruler_id: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="اختر المادة" />
+                  <SelectValue placeholder="اختر المسطرة" />
                 </SelectTrigger>
                 <SelectContent>
-                  {materials.map((material) => (
-                    <SelectItem key={material.material_id} value={material.material_id.toString()}>
-                      {material.material_name}
+                  {rulers.map((ruler) => (
+                    <SelectItem key={ruler.ruler_id} value={ruler.ruler_id.toString()}>
+                      {ruler.ruler_name} ({ruler.material?.material_name || "بدون مادة"})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>نوع المسطرة <span className="text-red-500">*</span></Label>
-              <Select
-                value={formData.ruler_type}
-                onValueChange={(value) => setFormData({ ...formData, ruler_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر نوع المسطرة" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="مسطرة جديدة">مسطرة جديدة</SelectItem>
-                  <SelectItem value="مسطرة قديمة">مسطرة قديمة</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>اسم اللون <span className="text-red-500">*</span></Label>
-              <Input
-                type="text"
-                value={formData.color_name}
-                onChange={(e) => setFormData({ ...formData, color_name: e.target.value })}
-                placeholder="مثال: أحمر"
-              />
-            </div>
-
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>كود اللون <span className="text-red-500">*</span></Label>
+                <Label>اسم اللون <span className="text-red-500">*</span></Label>
                 <Input
                   type="text"
-                  value={formData.color_code}
-                  onChange={(e) => setFormData({ ...formData, color_code: e.target.value })}
-                  placeholder="مثال: RED001"
+                  value={formData.color_name || ""}
+                  onChange={(e) => setFormData({ ...formData, color_name: e.target.value })}
+                  placeholder="مثال: أحمر غامق"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>صورة اللون</Label>
-                <div className="border-2 border-dashed border-primary-f/20 rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-secondary-s/5 hover:bg-secondary-s/10 transition-colors cursor-pointer group">
+                <Label>كود اللون <span className="text-red-500">*</span></Label>
+                <Input
+                  type="text"
+                  value={formData.color_code || ""}
+                  onChange={(e) => setFormData({ ...formData, color_code: e.target.value })}
+                  placeholder="مثال: RED003"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>صورة اللون</Label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleImageChange}
+              />
+
+              {!formData.imagePreview ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-primary-f/20 rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-secondary-s/5 hover:bg-secondary-s/10 transition-colors cursor-pointer group"
+                >
                   <div className="w-16 h-16 rounded-full bg-primary-f/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <ImagePlus className="w-8 h-8 text-primary-f" />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-medium text-secondary-f">انقر لاختيار صورة أو اسحبها هنا</p>
-                    <p className="text-xs text-secondary-t mt-1">PNG, JPG حتى 5MB (واجهة فقط)</p>
+                    <p className="text-sm font-medium text-secondary-f">انقر لاختيار صورة</p>
+                    <p className="text-xs text-secondary-t mt-1">PNG, JPG حتى 5MB</p>
                   </div>
-                  {formData.color_code && (
-                    <div
-                      className="mt-2 w-12 h-6 rounded border shadow-sm"
-                      style={{ backgroundColor: formData.color_code.startsWith('#') ? formData.color_code : '#ccc' }}
-                      title="معاينة الكود إذا كان رمزاً سداسياً"
-                    />
-                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="relative w-full aspect-video rounded-xl border border-primary-f/10 overflow-hidden bg-gray-50 flex items-center justify-center group">
+                  <img
+                    src={formData.imagePreview}
+                    alt="Preview"
+                    className="w-full h-full object-contain"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      تغيير
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={removeImage}
+                    >
+                      حذف
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="space-y-2">
               <Label>الملاحظات</Label>
               <Textarea
-                value={formData.notes}
+                value={formData.notes || ""}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
                 placeholder="ملاحظات إضافية..."
