@@ -63,6 +63,21 @@ export default function SettingsManagement() {
     description: ""
   });
 
+  // Explicit handlers for settings
+  const handleOpenCreateSetting = () => {
+    setSettingFormData({ key: "", value: "", description: "" });
+    openCreateSetting();
+  };
+
+  const handleOpenEditSetting = (setting) => {
+    setSettingFormData({
+      key: setting.key || "",
+      value: setting.value || "",
+      description: setting.description || ""
+    });
+    openEditSetting(setting);
+  };
+
   // --- Discounts CRUD ---
   const discountsAdapter = useMemo(() => ({
     getItems: () => settingApi.getDiscounts(),
@@ -99,6 +114,27 @@ export default function SettingsManagement() {
     quantity: "",
     value: ""
   });
+
+  // Explicit handlers for discounts
+  const handleOpenCreateDiscount = () => {
+    setDiscountFormData({
+      type: "percentage",
+      quantityCondition: "GREATER_THAN",
+      quantity: "",
+      value: ""
+    });
+    openCreateDiscount();
+  };
+
+  const handleOpenEditDiscount = (discount) => {
+    setDiscountFormData({
+      type: discount.type || "percentage",
+      quantityCondition: discount.quantityCondition || "GREATER_THAN",
+      quantity: discount.quantity || "",
+      value: discount.value || ""
+    });
+    openEditDiscount(discount);
+  };
 
   // --- Logs ---
   const [logs, setLogs] = useState([]);
@@ -168,7 +204,7 @@ export default function SettingsManagement() {
           <Card className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold">قائمة الإعدادات</h2>
-              <Button onClick={openCreateSetting} className="bg-primary-f hover:bg-secondary-f text-white gap-2">
+              <Button onClick={handleOpenCreateSetting} className="bg-primary-f hover:bg-secondary-f text-white gap-2">
                 <Plus className="w-4 h-4" />
                 إضافة إعداد جديد
               </Button>
@@ -204,7 +240,7 @@ export default function SettingsManagement() {
                         <TableCell>
                           <div className="flex justify-center gap-2">
                             <CrudActions
-                              onEdit={() => openEditSetting(s)}
+                              onEdit={() => handleOpenEditSetting(s)}
                               onDelete={() => openDeleteSetting(s)}
                             />
                           </div>
@@ -223,7 +259,7 @@ export default function SettingsManagement() {
           <Card className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold">قائمة الخصومات</h2>
-              <Button onClick={openCreateDiscount} className="bg-primary-f hover:bg-secondary-f text-white gap-2">
+              <Button onClick={handleOpenCreateDiscount} className="bg-primary-f hover:bg-secondary-f text-white gap-2">
                 <Plus className="w-4 h-4" />
                 إضافة خصم جديد
               </Button>
@@ -263,7 +299,7 @@ export default function SettingsManagement() {
                         <TableCell>
                           <div className="flex justify-center gap-2">
                             <CrudActions
-                              onEdit={() => openEditDiscount(d)}
+                              onEdit={() => handleOpenEditDiscount(d)}
                               onDelete={() => openDeleteDiscount(d)}
                             />
                           </div>
@@ -300,7 +336,7 @@ export default function SettingsManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {[...logs].reverse().map((log) => (
+                    {[...logs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((log) => (
                       <TableRow key={log.id}>
                         <TableCell className="text-gray-500 line-through">{log.oldRate} ل.س</TableCell>
                         <TableCell className="font-bold text-primary-f">{log.newRate} ل.س</TableCell>

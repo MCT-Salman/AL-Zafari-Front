@@ -66,6 +66,8 @@ export const useCrud = (api, options = {}) => {
       toggle: 'فشل في تغيير الحالة',
       fetch: 'فشل في جلب البيانات',
     },
+    keepOpenOnCreate = false,
+    keepOpenOnUpdate = false,
   } = options;
 
   // State
@@ -73,7 +75,7 @@ export const useCrud = (api, options = {}) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
-  
+
   // Modal states
   const [modalState, setModalState] = useState({
     isOpen: false,
@@ -154,7 +156,9 @@ export const useCrud = (api, options = {}) => {
       const successMsg = successMessages.create;
       toast.success(successMsg);
       if (onSuccess) onSuccess(response, 'create');
-      setModalState({ isOpen: false, mode: null, loading: false });
+      if (!keepOpenOnCreate) {
+        setModalState({ isOpen: false, mode: null, loading: false });
+      }
       await fetchItems();
       return response;
     } catch (err) {
@@ -175,8 +179,10 @@ export const useCrud = (api, options = {}) => {
       const successMsg = successMessages.update;
       toast.success(successMsg);
       if (onSuccess) onSuccess(response, 'update');
-      setModalState({ isOpen: false, mode: null, loading: false });
-      setSelectedItem(null);
+      if (!keepOpenOnUpdate) {
+        setModalState({ isOpen: false, mode: null, loading: false });
+        setSelectedItem(null);
+      }
       await fetchItems();
       return response;
     } catch (err) {
@@ -285,7 +291,7 @@ export const useCrud = (api, options = {}) => {
     loading,
     error,
     modalState,
-    
+
     // Actions
     fetchItems,
     fetchItemById,
@@ -293,7 +299,7 @@ export const useCrud = (api, options = {}) => {
     updateItem,
     deleteItem,
     toggleStatus,
-    
+
     // Modal handlers
     openCreateModal,
     openEditModal,
@@ -302,7 +308,7 @@ export const useCrud = (api, options = {}) => {
     closeModal,
     handleSave,
     handleDelete,
-    
+
     // Setters (if needed)
     setItems,
     setError,

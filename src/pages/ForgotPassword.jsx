@@ -13,18 +13,23 @@ export default function ForgotPassword() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
+  const handlePhoneChange = (value) => {
+    const digitsOnly = value.replace(/\D/g, '').replace(/^0+/, '');
+    setPhone(digitsOnly);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
+    const fullPhone = `+963${phone}`;
     try {
-      const response = await authApi.forgotPassword(phone);
+      const response = await authApi.forgotPassword(fullPhone);
       setSuccess(true);
-      
+
       // Navigate to OTP verification page
       setTimeout(() => {
-        navigate("/verify-otp", { state: { phone } });
+        navigate("/verify-otp", { state: { phone: fullPhone } });
       }, 1500);
     } catch (err) {
       const msg = err.message || "فشل في إرسال رمز التحقق";
@@ -62,15 +67,19 @@ export default function ForgotPassword() {
 
             <div className="space-y-2">
               <label className="block text-sm font-medium">رقم الهاتف</label>
-              <Input
-                type="tel"
-                placeholder="0599000000"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-                disabled={loading || success}
-                className="h-11 pr-10 bg-white"
-              />
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium bg-gray-100 px-2 py-2 rounded-r-md border border-l-0">‫+963‬</span>
+                <Input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="912345678"
+                  value={phone}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  required
+                  disabled={loading || success}
+                  className="h-11 rounded-r-none bg-white"
+                />
+              </div>
             </div>
 
             <Button

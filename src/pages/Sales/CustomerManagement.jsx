@@ -77,16 +77,45 @@ export default function CustomerManagement() {
 
   // Form state
   const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    customer_type: "customer",
-    city: "",
-    address: "",
-    country: "SY",
-    is_active: true,
     notes: "",
   });
   const [formError, setFormError] = useState("");
+
+  // Explicit handlers for modal opening
+  const handleOpenCreate = () => {
+    setFormError("");
+    setFormData({
+      name: "",
+      phone: "",
+      customer_type: "customer",
+      city: "",
+      address: "",
+      country: "SY",
+      is_active: true,
+      notes: "",
+    });
+    openCreateModal();
+  };
+
+  const handleOpenEdit = (customer) => {
+    setFormError("");
+    // Aggressive phone stripping
+    const strippedPhone = (customer.phone || "")
+      .replace(/^(\+963|00963|963)/, "")
+      .replace(/^0+/, "");
+
+    setFormData({
+      name: customer.name || "",
+      phone: strippedPhone,
+      customer_type: customer.customer_type || "customer",
+      city: customer.city || "",
+      address: customer.address || "",
+      country: customer.country || "SY",
+      is_active: customer.is_active !== undefined ? customer.is_active : true,
+      notes: customer.notes || "",
+    });
+    openEditModal(customer);
+  };
 
   // Success state for toggle operations
   const [success, setSuccess] = useState("");
@@ -136,32 +165,36 @@ export default function CustomerManagement() {
     exportToExcel(filteredCustomers, "العملاء");
   };
 
+  // Phone input handler: digits only, strip leading zero
+  const handlePhoneChange = (value) => {
+    const digitsOnly = value.replace(/\D/g, '').replace(/^0+/, '');
+    setFormData(prev => ({ ...prev, phone: digitsOnly }));
+  };
+
   // Handle save with validation
   const handleSaveCustomer = async (data) => {
     setFormError("");
 
     // Validation
     const name = data?.name?.trim();
-    const phone = data?.phone?.trim();
+    const rawPhone = (data?.phone || formData.phone)?.replace(/\D/g, '').replace(/^0+/, '');
     const city = data?.city?.trim();
     const address = data?.address?.trim();
 
-    if (!name || !phone || !city || !address) {
+    if (!name || !rawPhone || !city || !address) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
-    // Phone validation (basic)
-    const phoneRegex = /^[\+]?[0-9\s\-\(\)]+$/;
-    if (!phoneRegex.test(phone)) {
-      setFormError("يرجى إدخال رقم هاتف صحيح");
+    if (rawPhone.length < 7) {
+      setFormError("رقم الهاتف قصير جداً");
       return;
     }
 
-    // Prepare data to send (country is set automatically by backend from phone)
+    // Prepare data to send — prepend +963
     const dataToSend = {
       name: name,
-      phone: phone,
+      phone: `+963${rawPhone}`,
       customer_type: data.customer_type || "customer",
       city: city,
       address: address,
@@ -318,7 +351,7 @@ export default function CustomerManagement() {
           title="إدارة العملاء"
           subtitle={`إجمالي العملاء: ${customers.length}`}
           actionLabel="إضافة عميل جديد"
-          onAction={openCreateModal}
+          onAction={handleOpenCreate}
         />
 
         {/* Stats Cards */}
@@ -453,7 +486,7 @@ export default function CustomerManagement() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Phone className="w-4 h-4 text-gray-500" />
-                            {customer.phone}
+                            <span dir="ltr">{customer.phone}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -488,7 +521,7 @@ export default function CustomerManagement() {
                             />
                             <CrudActions
                               onView={() => openViewModal(customer.customer_id)}
-                              onEdit={() => openEditModal(customer)}
+                              onEdit={() => handleOpenEdit(customer)}
                               onDelete={() => openDeleteModal(customer)}
                               size="md"
                             />
@@ -519,16 +552,6 @@ export default function CustomerManagement() {
         onClose={() => {
           closeModal();
           setFormError("");
-          setFormData({
-            name: "",
-            phone: "",
-            customer_type: "customer",
-            city: "",
-            address: "",
-            country: "SY",
-            is_active: true,
-            notes: "",
-          });
         }}
         onSubmit={handleSaveCustomer}
         onDelete={handleDelete}
@@ -550,7 +573,7 @@ export default function CustomerManagement() {
           modalState.mode === "view"
             ? [
               { key: "name", label: "اسم العميل" },
-              { key: "phone", label: "رقم الهاتف" },
+              { key: "phone", label: "رقم الهاتف", formatValue: (key, value) => <span dir="ltr">{value}</span> },
               { key: "customer_type", label: "نوع العميل" },
               { key: "city", label: "المدينة" },
               { key: "address", label: "العنوان" },
@@ -585,12 +608,17 @@ export default function CustomerManagement() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">رقم الهاتف <span className="text-red-500">*</span></label>
-                <Input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="مثال: +963912345678"
-                />
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="tel"
+                    inputMode="numeric"
+                    value={formData.phone}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    placeholder="912345678"
+                    className="rounded-r-none"
+                  />
+                  <span className="text-sm font-medium bg-secondary-s px-2 py-2 rounded-l-md border border-r-0 border-primary-f/20 text-primary-s" dir="ltr">+963</span>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

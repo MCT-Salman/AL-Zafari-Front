@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { colorApi } from "../../api/colorApi";
 import { rulerApi } from "../../api/rulerApi";
+import { materialApi } from "../../api/materialApi";
 import { useCrud } from "../../hooks/useCrud";
 import { useExport } from "../../hooks/useExport";
 import { CrudModal } from "../../components/common/CrudModal";
@@ -87,6 +88,7 @@ export default function Color() {
 
   // Form state
   const [formData, setFormData] = useState({
+    material_id: "",
     ruler_id: "",
     color_code: "",
     color_name: "",
@@ -96,42 +98,72 @@ export default function Color() {
   });
   const [formError, setFormError] = useState("");
 
-  // Rulers for dropdown
+  // Rulers and Materials for dropdown
   const [rulers, setRulers] = useState([]);
+  const [materials, setMaterials] = useState([]);
 
   // Load colors and rulers on mount
   useEffect(() => {
     fetchItems();
     loadRulers();
+    loadMaterials();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Synchronize formData with selectedItem when modal opens in edit mode
-  // Note: CrudModal also calls setFormData(data) which might overwrite this.
-  // We'll handle both by ensuring Select uses a string value.
-  useEffect(() => {
-    if (modalState.isOpen && modalState.mode === "edit" || modalState.mode === "create") {
-      if (modalState.mode === "edit" && selectedItem) {
-        setFormData({
-          ruler_id: (selectedItem.ruler_id || selectedItem.ruler?.ruler_id)?.toString() || "",
-          color_code: selectedItem.color_code || "",
-          color_name: selectedItem.color_name || "",
-          notes: selectedItem.notes || "",
-          imageFile: null,
-          imagePreview: selectedItem.imageUrl ? `${API_BASE_URL}${selectedItem.imageUrl}` : null,
-        });
-      } else if (modalState.mode === "create") {
-        setFormData({
-          ruler_id: "",
-          color_code: "",
-          color_name: "",
-          notes: "",
-          imageFile: null,
-          imagePreview: null,
-        });
-      }
+  // Handle open create modal
+  const handleOpenCreate = () => {
+    setFormError("");
+    setFormData({
+      material_id: "",
+      ruler_id: "",
+      color_code: "",
+      color_name: "",
+      notes: "",
+      imageFile: null,
+      imagePreview: null,
+    });
+    openCreateModal();
+  };
+
+  // Handle open edit modal
+  const handleOpenEdit = (color) => {
+    setFormError("");
+
+    // Deep-path extraction of IDs to ensure selection even if rulers list is empty
+    const rulerId = (
+      color.ruler_id ||
+      color.ruler?.ruler_id ||
+      color.ruler?.id
+    )?.toString() || "";
+
+    const materialId = (
+      color.material_id ||
+      color.ruler?.material_id ||
+      color.ruler?.material?.material_id ||
+      color.ruler?.material?.id
+    )?.toString() || "";
+
+    setFormData({
+      material_id: materialId,
+      ruler_id: rulerId,
+      color_code: color.color_code || "",
+      color_name: color.color_name || "",
+      notes: color.notes || "",
+      imageFile: null,
+      imagePreview: color.imageUrl ? `${API_BASE_URL}${color.imageUrl}` : null,
+    });
+    openEditModal(color);
+  };
+
+  // Load materials for dropdown
+  const loadMaterials = async () => {
+    try {
+      const response = await materialApi.getMaterials();
+      setMaterials(response.data || []);
+    } catch (error) {
+      console.error("Failed to load materials:", error);
     }
-  }, [modalState.isOpen, modalState.mode, selectedItem]);
+  };
 
   // Load rulers for dropdown
   const loadRulers = async () => {
@@ -223,9 +255,10 @@ export default function Color() {
   };
 
   // Handle save with validation
-  const handleSaveColor = async (arg1, arg2) => {
+  const handleSaveColor = async (idOrData, dataOrEmpty) => {
     const isEdit = modalState.mode === 'edit';
-    const colorId = arg1 || selectedItem?.color_id;
+    const colorId = isEdit ? (typeof idOrData === 'object' ? selectedItem?.color_id : idOrData) : null;
+    const actualData = isEdit ? (dataOrEmpty || idOrData) : idOrData;
 
     setFormError("");
 
@@ -262,7 +295,17 @@ export default function Color() {
       } else {
         await colorApi.createColor(formDataToSend);
         fetchItems();
-        closeModal();
+        // Clear form after successful create, but keep modal open
+        setFormData({
+          material_id: "",
+          ruler_id: "",
+          color_code: "",
+          color_name: "",
+          notes: "",
+          imageFile: null,
+          imagePreview: null,
+        });
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     } catch (err) {
       setFormError(err.message || "فشل في حفظ اللون");
@@ -345,7 +388,7 @@ export default function Color() {
           title="إدارة الألوان"
           subtitle={`إجمالي الألوان: ${colors.length}`}
           actionLabel="إضافة لون جديد"
-          onAction={openCreateModal}
+          onAction={handleOpenCreate}
         />
 
         {/* Stats Cards */}
@@ -498,7 +541,7 @@ export default function Color() {
                           <div className="flex items-center gap-2">
                             <CrudActions
                               onView={() => openViewModal(color.color_id)}
-                              onEdit={() => openEditModal(color)}
+                              onEdit={() => handleOpenEdit(color)}
                               onDelete={() => openDeleteModal(color)}
                               size="md"
                             />
@@ -580,23 +623,47 @@ export default function Color() {
               />
             )}
 
-            <div className="space-y-2">
-              <Label>المسطرة <span className="text-red-500">*</span></Label>
-              <Select
-                value={formData.ruler_id?.toString() || ""}
-                onValueChange={(value) => setFormData({ ...formData, ruler_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر المسطرة" />
-                </SelectTrigger>
-                <SelectContent>
-                  {rulers.map((ruler) => (
-                    <SelectItem key={ruler.ruler_id} value={ruler.ruler_id.toString()}>
-                      {ruler.ruler_name} ({ruler.material?.material_name || "بدون مادة"})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>المادة <span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.material_id?.toString() || ""}
+                  onValueChange={(value) => setFormData({ ...formData, material_id: value, ruler_id: "" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر المادة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materials.map((material) => (
+                      <SelectItem key={material.material_id} value={material.material_id.toString()}>
+                        {material.material_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>المسطرة <span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.ruler_id?.toString() || ""}
+                  onValueChange={(value) => setFormData({ ...formData, ruler_id: value })}
+                  disabled={!formData.material_id}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={!formData.material_id ? "اختر المادة أولاً" : "اختر المسطرة"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rulers
+                      .filter(r => r.material_id?.toString() === formData.material_id?.toString())
+                      .map((ruler) => (
+                        <SelectItem key={ruler.ruler_id} value={ruler.ruler_id.toString()}>
+                          {ruler.ruler_name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

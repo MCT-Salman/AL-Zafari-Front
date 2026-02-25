@@ -98,6 +98,39 @@ export default function Ruler() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Synchronize formData with selectedItem when modal opens
+  useEffect(() => {
+    if (modalState.isOpen) {
+      if (modalState.mode === "edit" && selectedItem) {
+        let formattedDate = "";
+        if (selectedItem.entry_date) {
+          const date = new Date(selectedItem.entry_date);
+          if (!isNaN(date.getTime())) {
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, "0");
+            const dd = String(date.getDate()).padStart(2, "0");
+            formattedDate = `${yyyy}-${mm}-${dd}`;
+          }
+        }
+
+        setFormData({
+          ruler_name: selectedItem.ruler_name || "",
+          material_id: (selectedItem.material_id || selectedItem.material?.material_id)?.toString() || "",
+          entry_date: formattedDate,
+          notes: selectedItem.notes || "",
+        });
+      } else if (modalState.mode === "create") {
+        const today = new Date().toISOString().split("T")[0];
+        setFormData({
+          ruler_name: "",
+          material_id: "",
+          entry_date: today,
+          notes: "",
+        });
+      }
+    }
+  }, [modalState.isOpen, modalState.mode, selectedItem]);
+
   // Load materials for dropdown
   const loadMaterials = async () => {
     try {
@@ -171,11 +204,13 @@ export default function Ruler() {
     // Format entry_date to ensure it's a valid ISO-8601 DateTime
     let formattedEntryDate = entryDate;
     if (formattedEntryDate) {
-      // Ensure it has seconds if it's in datetime-local format (YYYY-MM-DDTHH:MM)
-      if (formattedEntryDate.includes('T') && formattedEntryDate.split(':').length === 2) {
-        formattedEntryDate += ':00';
+      // If it's just a date (YYYY-MM-DD), append current time
+      if (!formattedEntryDate.includes('T') && formattedEntryDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const now = new Date();
+        const timeStr = now.toTimeString().split(' ')[0]; // HH:MM:SS
+        formattedEntryDate = `${formattedEntryDate}T${timeStr}`;
       }
-      // Convert to ISO string
+
       const date = new Date(formattedEntryDate);
       if (!isNaN(date.getTime())) {
         formattedEntryDate = date.toISOString();
@@ -267,9 +302,7 @@ export default function Ruler() {
           const year = date.getFullYear();
           const month = String(date.getMonth() + 1).padStart(2, '0');
           const day = String(date.getDate()).padStart(2, '0');
-          const hours = String(date.getHours()).padStart(2, '0');
-          const minutes = String(date.getMinutes()).padStart(2, '0');
-          formattedEntryDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+          formattedEntryDate = `${year}-${month}-${day}`;
         }
       } catch (error) {
         console.error('Error formatting date for edit:', error);
@@ -476,12 +509,6 @@ export default function Ruler() {
         onClose={() => {
           closeModal();
           setFormError("");
-          setFormData({
-            ruler_name: "",
-            material_id: "",
-            entry_date: "",
-            notes: "",
-          });
         }}
         onSubmit={handleSaveRuler}
         onDelete={handleDelete}
@@ -554,7 +581,7 @@ export default function Ruler() {
             <div className="space-y-2">
               <Label>تاريخ الإدخال <span className="text-red-500">*</span></Label>
               <Input
-                type="datetime-local"
+                type="date"
                 value={formData.entry_date}
                 onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
               />

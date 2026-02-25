@@ -11,7 +11,7 @@ const roleLabels = {
   cashier: "أمين الصندوق",
   sales: "مبيعات",
   production_manager: "مدير الإنتاج",
-  Warehouse_Keeper: "حارس المستودع",
+  Warehouse_Keeper: "أمين مستودع",
   Warehouse_Products: "منتجات المستودع",
   Dissection_Technician: "فني التشريح",
   Cutting_Technician: "فني القطع",
@@ -218,8 +218,8 @@ export default function UserModal({ user, onClose, onSave }) {
             <Select value={formData.role || ""} onValueChange={handleRoleChange}>
               <SelectTrigger disabled={loading} >
                 <span>
-                  {formData.role && roleLabels[formData.role] 
-                    ? roleLabels[formData.role] 
+                  {formData.role && roleLabels[formData.role]
+                    ? roleLabels[formData.role]
                     : "اختر الدور"}
                 </span>
               </SelectTrigger>
@@ -229,7 +229,7 @@ export default function UserModal({ user, onClose, onSave }) {
                 <SelectItem value="cashier">أمين الصندوق</SelectItem>
                 <SelectItem value="sales">مبيعات</SelectItem>
                 <SelectItem value="production_manager">مدير الإنتاج</SelectItem>
-                <SelectItem value="Warehouse_Keeper">حارس المستودع</SelectItem>
+                <SelectItem value="Warehouse_Keeper">أمين مستودع</SelectItem>
                 <SelectItem value="Warehouse_Products">منتجات المستودع</SelectItem>
                 <SelectItem value="Dissection_Technician">فني التشريح</SelectItem>
                 <SelectItem value="Cutting_Technician">فني القطع</SelectItem>

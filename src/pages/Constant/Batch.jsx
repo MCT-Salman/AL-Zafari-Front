@@ -98,25 +98,18 @@ export default function Batch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Synchronize formData with selectedItem when modal opens in edit mode
+  // Synchronize formData with selectedItem when modal opens in edit/create mode
   useEffect(() => {
     if (modalState.isOpen && modalState.mode === "edit" && selectedItem) {
       let formattedDate = "";
       if (selectedItem.entry_date) {
-        // Handle both ISO strings and other formats to ensure YYYY-MM-DDTHH:MM
         const date = new Date(selectedItem.entry_date);
         if (!isNaN(date.getTime())) {
-          // Format as YYYY-MM-DDTHH:MM for datetime-local
+          // Format as YYYY-MM-DD for date-only input
           const pad = (num) => String(num).padStart(2, '0');
-          const year = date.getFullYear();
-          const month = pad(date.getMonth() + 1);
-          const day = pad(date.getDate());
-          const hours = pad(date.getHours());
-          const minutes = pad(date.getMinutes());
-          formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+          formattedDate = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
         }
       }
-
       setFormData({
         batch_number: selectedItem.batch_number || "",
         entry_date: formattedDate,
@@ -124,9 +117,13 @@ export default function Batch() {
         notes: selectedItem.notes || "",
       });
     } else if (modalState.isOpen && modalState.mode === "create") {
+      // Default to today's date
+      const today = new Date();
+      const pad = (num) => String(num).padStart(2, '0');
+      const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
       setFormData({
         batch_number: "",
-        entry_date: "",
+        entry_date: todayStr,
         material_id: "",
         notes: "",
       });
@@ -186,10 +183,13 @@ export default function Batch() {
       return;
     }
 
-    // Prepare data to send
+    // Prepare data to send — combine the selected date with the current time
+    const now = new Date();
+    const [year, month, day] = entryDate.split('-').map(Number);
+    const dateWithCurrentTime = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds());
     const dataToSend = {
       batch_number: batchNumber,
-      entry_date: new Date(entryDate).toISOString(),
+      entry_date: dateWithCurrentTime.toISOString(),
       material_id: parseInt(materialId),
       notes: formData.notes || "",
     };
@@ -525,7 +525,7 @@ export default function Batch() {
             <div className="space-y-2">
               <Label>تاريخ الإدخال <span className="text-red-500">*</span></Label>
               <Input
-                type="datetime-local"
+                type="date"
                 value={formData.entry_date || ""}
                 onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
               />

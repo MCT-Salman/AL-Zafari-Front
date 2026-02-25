@@ -304,6 +304,36 @@ export default function ConstantValue() {
 
     },
 
+    keepOpenOnCreate: true,
+
+    onSuccess: (response, mode) => {
+
+      if (mode === 'create') {
+
+        setFormData({
+
+          material_id: formData.material_id, // Keep the material selected
+
+          type: formData.type, // Keep the type selected
+
+          value: "",
+
+          unit: formData.unit, // Keep the unit selected
+
+          label: "",
+
+          isDefault: false,
+
+          notes: "",
+
+        });
+
+        setFormError("");
+
+      }
+
+    }
+
   });
 
 

@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { 
-  User, 
-  Phone, 
-  AtSign, 
-  Save, 
-  Loader2, 
-  CheckCircle2, 
+import {
+  User,
+  Phone,
+  AtSign,
+  Save,
+  Loader2,
+  CheckCircle2,
   AlertCircle,
   Camera
 } from "lucide-react";
@@ -49,7 +49,7 @@ const Profile = () => {
           setFormData({
             full_name: response.data.full_name || '',
             username: response.data.username || '',
-            phone: response.data.phone || '',
+            phone: (response.data.phone || "").replace(/^(\+963|00963|963)/, "").replace(/^0+/, ""),
           });
         }
       } catch (err) {
@@ -63,10 +63,12 @@ const Profile = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    if (name === 'phone') {
+      const digitsOnly = value.replace(/\D/g, '').replace(/^0+/, '');
+      setFormData((prev) => ({ ...prev, phone: digitsOnly }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -76,13 +78,21 @@ const Profile = () => {
     setError('');
 
     try {
-      const response = await authApi.updateProfile(formData);
+      const dataToSend = {
+        ...formData,
+        // Prepend +963 to phone if not already present
+        phone: formData.phone
+          ? (formData.phone.startsWith('+') ? formData.phone : `+963${formData.phone.replace(/\D/g, '').replace(/^0+/, '')}`)
+          : '',
+      };
+      const response = await authApi.updateProfile(dataToSend);
       setMessage(response.message || 'تم تحديث الملف الشخصي بنجاح');
       if (response.data) {
         setFormData({
           full_name: response.data.full_name,
           username: response.data.username,
-          phone: response.data.phone,
+          // Strip +963 prefix for display in the input
+          phone: (response.data.phone || "").replace(/^(\+963|00963|963)/, "").replace(/^0+/, ""),
         });
       }
     } catch (err) {
@@ -101,7 +111,7 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-primary-s py-8 px-4 sm:px-6 lg:px-8" dir="rtl">
       <div className="max-w-2xl mx-auto space-y-6">
-        
+
         {/* Header Section */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-black tracking-tight" style={{ color: colors.primaryF }}>
@@ -152,7 +162,7 @@ const Profile = () => {
             </CardTitle>
           </CardHeader> */}
           <CardContent className="p-6">
-            
+
             {/* Success Message */}
             {message && (
               <div className="mb-6 p-4 rounded-xl border-2 flex items-center gap-3 bg-primary-f/5" style={{ borderColor: colors.primaryF }}>
@@ -170,11 +180,11 @@ const Profile = () => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              
+
               {/* Full Name Field */}
               <div className="space-y-2">
-                <Label 
-                  htmlFor="full_name" 
+                <Label
+                  htmlFor="full_name"
                   className="text-sm font-bold flex items-center gap-2"
                   style={{ color: colors.primaryF }}
                 >
@@ -200,8 +210,8 @@ const Profile = () => {
 
               {/* Username Field */}
               <div className="space-y-2">
-                <Label 
-                  htmlFor="username" 
+                <Label
+                  htmlFor="username"
                   className="text-sm font-bold flex items-center gap-2"
                   style={{ color: colors.primaryF }}
                 >
@@ -227,28 +237,31 @@ const Profile = () => {
 
               {/* Phone Field */}
               <div className="space-y-2">
-                <Label 
-                  htmlFor="phone" 
+                <Label
+                  htmlFor="phone"
                   className="text-sm font-bold flex items-center gap-2"
                   style={{ color: colors.primaryF }}
                 >
                   <Phone className="w-4 h-4" style={{ color: colors.secondaryF }} />
                   رقم الهاتف
                 </Label>
-                <div className="relative">
+                <div className="flex items-center gap-0">
                   <Input
                     id="phone"
                     type="tel"
+                    inputMode="numeric"
                     name="phone"
                     value={formData.phone}
                     onChange={handleInputChange}
-                    placeholder="أدخل رقم الهاتف"
-                    className="h-12 pr-12 pl-4 bg-primary-s border-2 border-[#E5E5E5] rounded-xl focus:border-primary-f focus:ring-4 focus:ring-primary-f/10 transition-all duration-300 text-primary-f placeholder:text-secondary-fo"
+                    placeholder="912345678"
+                    className="h-12 pl-4 bg-primary-s border-2 border-[#E5E5E5] rounded-l-xl rounded-r-none focus:border-primary-f focus:ring-4 focus:ring-primary-f/10 transition-all duration-300 text-primary-f placeholder:text-secondary-fo"
                     disabled={loading}
                   />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                    <Phone className="w-5 h-5" style={{ color: colors.secondaryFo }} />
-                  </div>
+                  <span
+                    className="flex items-center h-12 px-3 font-bold text-sm rounded-l-xl border-2 border-r-0 border-[#E5E5E5] bg-primary-s"
+                    dir='ltr'
+                    style={{ color: colors.primaryF }}
+                  >+963</span>
                 </div>
               </div>
 

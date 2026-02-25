@@ -35,14 +35,22 @@ export const CrudModal = ({
   const formData = externalFormData !== undefined ? externalFormData : internalFormData;
   const setFormData = setExternalFormData || setInternalFormData;
 
-  // Update form data when data changes (for edit mode)
+  // Update form data when data changes
   useEffect(() => {
+    if (!isOpen) return;
+
+    // If form data is managed externally, the parent is responsible for sync
+    if (externalFormData !== undefined) return;
+
     if (data && (mode === 'edit' || mode === 'view')) {
+      // Only set if data is different from current form data to avoid overwrite while typing
       setFormData(data);
     } else if (mode === 'create') {
       setFormData({});
     }
-  }, [data, mode, setFormData]);
+    // We only want to sync when the modal opens or the target item (data) changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, data, mode]);
 
   if (!isOpen) return null;
 

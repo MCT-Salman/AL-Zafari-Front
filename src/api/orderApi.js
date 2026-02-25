@@ -118,13 +118,14 @@ export const orderApi = {
   getFormattedDate: (order) => {
     if (!order?.created_at) return 'غير محدد';
     // Use ar-EG for standard Arabic digits if ar-SA shows Western Arabic digits or vice-versa depending on system
-    return new Date(order.created_at).toLocaleDateString('ar-EG', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }) + ' ' + new Date(order.created_at).toLocaleTimeString('ar-EG', {
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(order.created_at).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    }) + " " + new Date(order.created_at).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
     });
   },
 
@@ -170,7 +171,7 @@ export const orderApi = {
   // Format currency - always display in ل.س
   formatCurrency: (amount) => {
     const num = parseFloat(amount) || 0;
-    const formatted = new Intl.NumberFormat('ar-SA', {
+    const formatted = new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(num);

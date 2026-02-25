@@ -10,7 +10,7 @@ const roleLabels = {
   cashier: "أمين الصندوق",
   sales: "مبيعات",
   production_manager: "مدير الإنتاج",
-  Warehouse_Keeper: "حارس المستودع",
+  Warehouse_Keeper: "أمين مستودع",
   Warehouse_Products: "منتجات المستودع",
   Dissection_Technician: "فني التشريح",
   Cutting_Technician: "فني القطع",
@@ -18,34 +18,17 @@ const roleLabels = {
 };
 
 export default function UserForm({ user, formData, setFormData, loading, error }) {
-  useEffect(() => {
-    if (user && user.id) {
-      // Set form data from user prop
-      setFormData({
-        username: user.username || "",
-        full_name: user.full_name || "",
-        phone: user.phone || "",
-        role: user.role || "sales",
-        password: "",
-      });
-    } else {
-      // Reset form for new user
-      setFormData({
-        username: "",
-        full_name: "",
-        phone: "",
-        password: "",
-        role: "sales",
-      });
-    }
-  }, [user, setFormData]);
+  // State synchronization is now handled exclusively by the parent components (Users.jsx, Profile.jsx, etc.)
+  // to prevent overwriting custom pre-fills like stripped phone numbers.
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    if (name === 'phone') {
+      const digitsOnly = value.replace(/\D/g, '').replace(/^0+/, '');
+      setFormData((prev) => ({ ...prev, phone: digitsOnly }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleRoleChange = (value) => {
@@ -95,14 +78,19 @@ export default function UserForm({ user, formData, setFormData, loading, error }
         <label className="block text-sm font-medium mb-1">
           رقم الهاتف
         </label>
-        <Input
-          type="tel"
-          name="phone"
-          value={formData.phone || ""}
-          onChange={handleInputChange}
-          placeholder="+966501234567"
-          disabled={loading}
-        />
+        <div className="flex items-center gap-1">
+          <Input
+            type="tel"
+            inputMode="numeric"
+            name="phone"
+            value={formData.phone || ""}
+            onChange={handleInputChange}
+            placeholder="912345678"
+            disabled={loading}
+            className="rounded-r-none"
+          />
+          <span className="text-sm font-medium bg-gray-100 px-2 py-2 rounded-l-md border border-r-0" dir="ltr">+963</span>
+        </div>
       </div>
 
       <div>
@@ -124,15 +112,15 @@ export default function UserForm({ user, formData, setFormData, loading, error }
 
       <div>
         <label className="block text-sm font-medium mb-1">الدور</label>
-        <Select 
-          value={formData.role || ""} 
+        <Select
+          value={formData.role || ""}
           onValueChange={handleRoleChange}
           disabled={loading}
         >
           <SelectTrigger>
             <SelectValue placeholder="اختر الدور">
-              {formData.role && roleLabels[formData.role] 
-                ? roleLabels[formData.role] 
+              {formData.role && roleLabels[formData.role]
+                ? roleLabels[formData.role]
                 : "اختر الدور"}
             </SelectValue>
           </SelectTrigger>
@@ -142,7 +130,7 @@ export default function UserForm({ user, formData, setFormData, loading, error }
             <SelectItem value="cashier">أمين الصندوق</SelectItem>
             <SelectItem value="sales">مبيعات</SelectItem>
             <SelectItem value="production_manager">مدير الإنتاج</SelectItem>
-            <SelectItem value="Warehouse_Keeper">حارس المستودع</SelectItem>
+            <SelectItem value="Warehouse_Keeper">أمين مستودع</SelectItem>
             <SelectItem value="Warehouse_Products">منتجات المستودع</SelectItem>
             <SelectItem value="Dissection_Technician">فني التشريح</SelectItem>
             <SelectItem value="Cutting_Technician">فني القطع</SelectItem>

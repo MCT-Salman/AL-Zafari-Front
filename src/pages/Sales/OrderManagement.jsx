@@ -5,6 +5,8 @@ import { customerApi } from "../../api/customerApi";
 import { colorApi } from "../../api/colorApi";
 import { batchApi } from "../../api/batchApi";
 import { priceColorApi } from "../../api/priceColorApi";
+import { materialApi } from "../../api/materialApi";
+import { rulerApi } from "../../api/rulerApi";
 import { useCrud } from "../../hooks/useCrud";
 import { useExport } from "../../hooks/useExport";
 import { CrudModal } from "../../components/common/CrudModal";
@@ -81,9 +83,12 @@ export default function OrderManagement() {
     items: [],
   });
   const [formError, setFormError] = useState("");
+  const [manualLoading, setManualLoading] = useState(false);
 
   // Customers, Colors, Batches for dropdowns
   const [customers, setCustomers] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [rulers, setRulers] = useState([]);
   const [colors, setColors] = useState([]);
   const [batches, setBatches] = useState([]);
   const [priceColors, setPriceColors] = useState([]);
@@ -108,13 +113,17 @@ export default function OrderManagement() {
   // Load lookup data for dropdowns
   const loadLookupData = async () => {
     try {
-      const [custRes, colorRes, batchRes, priceRes] = await Promise.all([
+      const [custRes, matRes, rulerRes, colorRes, batchRes, priceRes] = await Promise.all([
         customerApi.getCustomers(),
+        materialApi.getMaterials(),
+        rulerApi.getRulers(),
         colorApi.getColors(),
         batchApi.getBatches(),
         priceColorApi.getPriceColors(),
       ]);
       setCustomers(custRes.data || custRes || []);
+      setMaterials(matRes.data || matRes || []);
+      setRulers(rulerRes.data || rulerRes || []);
       setColors(colorRes.data || colorRes || []);
       setBatches(batchRes.data || batchRes || []);
       setPriceColors(priceRes.data || priceRes || []);
@@ -123,54 +132,111 @@ export default function OrderManagement() {
     }
   };
 
-  // Sync modal state with form data
-  useEffect(() => {
-    if (modalState.isOpen && (modalState.mode === "edit" || modalState.mode === "view") && selectedItem) {
+  const handleOpenCreate = () => {
+    setFormError("");
+    setFormData({
+      customer_id: "",
+      status: "pending",
+      notes: "",
+    });
+    setCurrentItems([]);
+    setSelectedCustomer(null);
+    openCreateModal();
+  };
+
+  const handleOpenEdit = async (order) => {
+    if (!order?.order_id) return;
+    try {
+      setFormError("");
+      setManualLoading(true);
+
+      const response = await orderApi.getOrderById(order.order_id);
+      const fullOrder = response.data || response;
+
       setFormData({
-        customer_id: String(selectedItem.customer_id || selectedItem.customer?.customer_id || ""),
-        status: selectedItem.status || "pending",
-        notes: selectedItem.notes || "",
-        items: selectedItem.items || [],
+        customer_id: String(fullOrder.customer_id),
+        status: fullOrder.status,
+        notes: fullOrder.notes || "",
       });
 
-      // If editing, map items to internal state
-      if (selectedItem.items) {
-        setCurrentItems(selectedItem.items.map(item => ({
-          type_item: item.type_item,
-          color_id: String(item.color_id || ""),
+      const mappedItems = (fullOrder.items || []).map(item => {
+        // Derive IDs from state lookups
+        let colorId = String(item.color_id || "");
+        let rulerId = item.ruler_id ? String(item.ruler_id) : "";
+        let materialId = item.material_id ? String(item.material_id) : "";
+
+        // If ruler_id is missing, derive it from color
+        if (!rulerId && colorId) {
+          const colorObj = colors.find(c => String(c.color_id) === colorId);
+          if (colorObj) rulerId = String(colorObj.ruler_id);
+        }
+
+        // If material_id is missing, derive it from ruler
+        if (!materialId && rulerId) {
+          const rulerObj = rulers.find(r => String(r.ruler_id) === rulerId);
+          if (rulerObj) materialId = String(rulerObj.material_id);
+        }
+
+        // Handle pricing method synchronization
+        let pricingMethod = item.price_color_By || "";
+
+        // If pricing method is missing or empty, find the first valid one
+        if (!pricingMethod && colorId) {
+          const availablePricing = priceColors.filter(pc =>
+            String(pc.color_id) === colorId &&
+            pc.type_item === item.type_item
+          );
+          if (availablePricing.length > 0) {
+            pricingMethod = availablePricing[0].price_color_By;
+          }
+        }
+
+        return {
+          type_item: item.type_item || "Machine",
+          color_id: colorId,
+          material_id: materialId,
+          ruler_id: rulerId,
+          price_color_By: pricingMethod,
           width: item.width || "",
           length: item.length || "",
           thickness: item.thickness || "",
-          batch_id: String(item.batch_id || ""),
-          quantity: item.quantity || "",
+          batch_id: item.batch_id ? String(item.batch_id) : "",
+          quantity: item.quantity || 1,
           notes: item.notes || "",
-          // Helper display fields
-          material_name: item.material_name,
-          color_name: item.color_name,
-          batch_number: item.batch_number,
-          price_per_meter: item.price_per_meter,
-          subtotal: item.subtotal
-        })));
-      }
+          subtotal: item.subtotal || 0
+        };
+      });
 
-      // Find and set selected customer for display
-      const customerId = selectedItem.customer_id || selectedItem.customer?.customer_id;
+      setCurrentItems(mappedItems);
+
+      // Map customer for display
+      const customerId = fullOrder.customer_id;
       if (customerId) {
-        const customer = customers.find(c => c.customer_id == customerId);
+        const customer = customers.find(c => String(c.customer_id) === String(customerId));
         setSelectedCustomer(customer);
       }
-    } else if (modalState.isOpen && modalState.mode === "create") {
-      // Reset for create mode
-      setFormData({
-        customer_id: "",
-        status: "pending",
-        notes: "",
-        items: [],
-      });
-      setCurrentItems([]);
-      setSelectedCustomer(null);
+
+      openEditModal(fullOrder);
+    } catch (error) {
+      console.error("Failed to load order details:", error);
+    } finally {
+      setManualLoading(false);
     }
-  }, [modalState.isOpen, modalState.mode, selectedItem, customers]);
+  };
+
+  const handleOpenView = async (order) => {
+    if (!order?.order_id) return;
+    try {
+      setManualLoading(true);
+      const response = await orderApi.getOrderById(order.order_id);
+      const fullOrder = response.data || response;
+      openViewModal(fullOrder.order_id);
+    } catch (error) {
+      console.error("Failed to load order details:", error);
+    } finally {
+      setManualLoading(false);
+    }
+  };
 
   // Use export hook
   const { exportToExcel, loading: exportLoading } = useExport({
@@ -241,9 +307,9 @@ export default function OrderManagement() {
       status: status,
       notes: data.notes || "",
       items: currentItems.map(item => ({
-        type_item: item.type_item,
-        price_color_By: item.price_color_By,
+        type_item: item.type_item, // "Machine" or "Presser"
         color_id: parseInt(item.color_id),
+        price_color_By: item.price_color_By,
         width: parseFloat(item.width) || 0,
         length: parseFloat(item.length) || 0,
         thickness: parseFloat(item.thickness) || 0,
@@ -261,6 +327,8 @@ export default function OrderManagement() {
     setFormError("");
     const newItem = {
       type_item: "Machine", // Default to Machine (مكنة)
+      material_id: "",
+      ruler_id: "",
       price_color_By: "isByMeter22",
       color_id: "",
       width: "",
@@ -277,8 +345,22 @@ export default function OrderManagement() {
     const updatedItems = [...currentItems];
     const updatedItem = { ...updatedItems[index], [field]: value };
 
-    // Auto-select pricing option if color or type changes
-    if (field === "color_id" || field === "type_item") {
+    // Cascading selection logic
+    if (field === "material_id") {
+      updatedItem.ruler_id = "";
+      updatedItem.color_id = "";
+      updatedItem.price_color_By = "";
+    } else if (field === "ruler_id") {
+      updatedItem.color_id = "";
+      updatedItem.price_color_By = "";
+
+      // Auto-set dimensions from ruler if available
+      const ruler = rulers.find(r => String(r.ruler_id) === String(value));
+      if (ruler) {
+        updatedItem.width = ruler.constant_width || "";
+        updatedItem.thickness = ruler.constant_thickness || "";
+      }
+    } else if (field === "color_id" || field === "type_item") {
       const availablePricing = priceColors.filter(pc =>
         String(pc.color_id) === String(updatedItem.color_id) &&
         pc.type_item === updatedItem.type_item
@@ -291,6 +373,8 @@ export default function OrderManagement() {
           // Auto-select the first available valid pricing
           updatedItem.price_color_By = availablePricing[0].price_color_By;
         }
+      } else {
+        updatedItem.price_color_By = "";
       }
     }
 
@@ -320,7 +404,7 @@ export default function OrderManagement() {
       const price = priceRecord ? parseFloat(priceRecord.price_per_meter) : 0;
 
       let subtotal = 0;
-      if (item.price_color_By === "blanck") {
+      if (item.price_color_By === "blanck" || item.price_color_By === "isByBlanck") {
         // Price per piece/blank
         subtotal = quantity * price;
       } else {
@@ -445,7 +529,7 @@ export default function OrderManagement() {
           title="إدارة المبيعات"
           subtitle={`إجمالي الطلبات: ${orders.length}`}
           actionLabel="إنشاء طلب جديد"
-          onAction={openCreateModal}
+          onAction={handleOpenCreate}
         />
 
         {/* Stats Cards */}
@@ -519,7 +603,7 @@ export default function OrderManagement() {
           </div>
 
           {/* Orders Table */}
-          {loading ? (
+          {loading || manualLoading ? (
             <LoadingState message="جاري تحميل الطلبات..." />
           ) : filteredOrders.length === 0 ? (
             <EmptyState message="لا توجد طلبات" />
@@ -552,7 +636,7 @@ export default function OrderManagement() {
                           <TableCell>
                             <div>
                               <div className="font-medium">{orderApi.getCustomerName(order)}</div>
-                              <div className="text-xs text-gray-500">{orderApi.getCustomerPhone(order)}</div>
+                              <div className="text-xs text-gray-500" dir="ltr">{orderApi.getCustomerPhone(order)}</div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -579,8 +663,8 @@ export default function OrderManagement() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <CrudActions
-                                onView={() => openViewModal(order.order_id)}
-                                onEdit={() => openEditModal(order)}
+                                onView={() => handleOpenView(order)}
+                                onEdit={() => handleOpenEdit(order)}
                                 onDelete={() => openDeleteModal(order)}
                                 size="md"
                               />
@@ -640,7 +724,9 @@ export default function OrderManagement() {
         fields={
           modalState.mode === "view"
             ? [
+              { key: "order_id", label: "رقم الطلب", formatValue: (key, value) => `#${value}` },
               { key: "customer_name", label: "العميل", formatValue: (key, value) => orderApi.formatCustomerInfo(selectedItem) },
+              { key: "phone", label: "رقم الهاتف", formatValue: (key, value) => <span dir="ltr">{orderApi.getCustomerPhone(selectedItem)}</span> },
               {
                 key: "status", label: "الحالة", formatValue: (key, value) => {
                   const statusBadge = orderApi.getStatusBadge(value);
@@ -687,7 +773,7 @@ export default function OrderManagement() {
                   <SelectContent>
                     {customers.map((customer) => (
                       <SelectItem key={customer.customer_id} value={String(customer.customer_id)}>
-                        {customer.name} ({customer.phone})
+                        {customer.name} <span dir="ltr">({customer.phone})</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -720,7 +806,7 @@ export default function OrderManagement() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm text-blue-800">
                   <div><span className="opacity-70">الاسم:</span> <span className="font-bold">{selectedCustomer.name}</span></div>
-                  <div><span className="opacity-70">الهاتف:</span> <span className="font-bold">{selectedCustomer.phone}</span></div>
+                  <div><span className="opacity-70">الهاتف:</span> <span className="font-bold" dir="ltr">{selectedCustomer.phone}</span></div>
                   <div><span className="opacity-70">المدينة:</span> <span className="font-bold">{selectedCustomer.city}</span></div>
                   <div><span className="opacity-70">العنوان:</span> <span className="font-bold">{selectedCustomer.address}</span></div>
                 </div>
@@ -762,6 +848,8 @@ export default function OrderManagement() {
                   <thead className="bg-gray-50 border-b">
                     <tr>
                       <th className="px-3 py-2 text-right text-xs font-bold text-gray-600">النوع</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600">المادة</th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-gray-600">المسطرة</th>
                       <th className="px-3 py-2 text-right text-xs font-bold text-gray-600">اللون</th>
                       <th className="px-3 py-2 text-right text-xs font-bold text-gray-600">التسعير</th>
                       <th className="px-3 py-2 text-right text-xs font-bold text-gray-600 w-20">العرض</th>
@@ -791,18 +879,58 @@ export default function OrderManagement() {
                         </td>
                         <td className="px-2 py-2">
                           <Select
+                            value={String(item.material_id || "")}
+                            onValueChange={(val) => updateItem(index, "material_id", val)}
+                          >
+                            <SelectTrigger className="w-full h-8 text-xs border-none shadow-none focus:ring-1">
+                              <SelectValue placeholder="المادة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {materials.map(m => (
+                                <SelectItem key={m.material_id} value={String(m.material_id)}>
+                                  {m.material_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-2 py-2">
+                          <Select
+                            value={String(item.ruler_id || "")}
+                            onValueChange={(val) => updateItem(index, "ruler_id", val)}
+                            disabled={!item.material_id}
+                          >
+                            <SelectTrigger className="w-full h-8 text-xs border-none shadow-none focus:ring-1">
+                              <SelectValue placeholder="المسطرة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {rulers
+                                .filter(r => String(r.material_id) === String(item.material_id))
+                                .map(r => (
+                                  <SelectItem key={r.ruler_id} value={String(r.ruler_id)}>
+                                    {r.ruler_name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-2 py-2">
+                          <Select
                             value={String(item.color_id || "")}
                             onValueChange={(val) => updateItem(index, "color_id", val)}
+                            disabled={!item.ruler_id}
                           >
                             <SelectTrigger className="w-full h-8 text-xs border-none shadow-none focus:ring-1">
                               <SelectValue placeholder="اللون" />
                             </SelectTrigger>
                             <SelectContent>
-                              {colors.map(c => (
-                                <SelectItem key={c.color_id} value={String(c.color_id)}>
-                                  {c.color_name} ({c.color_code})
-                                </SelectItem>
-                              ))}
+                              {colors
+                                .filter(c => String(c.ruler_id) === String(item.ruler_id))
+                                .map(c => (
+                                  <SelectItem key={c.color_id} value={String(c.color_id)}>
+                                    {c.color_name} ({c.color_code})
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                         </td>
@@ -826,7 +954,7 @@ export default function OrderManagement() {
                                     {pc.price_color_By === "isByMeter22" ? "22 متر" :
                                       pc.price_color_By === "isByMeter44" ? "44 متر" :
                                         pc.price_color_By === "isByMeter66" ? "66 متر" :
-                                          pc.price_color_By === "blanck" ? "لوح" : pc.price_color_By}
+                                          pc.price_color_By === "blanck" || pc.price_color_By === "isByBlanck" ? "لوح" : pc.price_color_By}
                                   </SelectItem>
                                 ))}
                               {item.color_id && priceColors.filter(pc =>

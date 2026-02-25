@@ -84,6 +84,8 @@ export default function PriceColor() {
 
   // Form state
   const [formData, setFormData] = useState({
+    material_id: "",
+    ruler_id: "",
     color_id: "",
     type_item: "",
     price_color_By: "",
@@ -106,26 +108,59 @@ export default function PriceColor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Synchronize formData with selectedItem when modal opens in edit mode
-  useEffect(() => {
-    if (modalState.isOpen && modalState.mode === "edit" && selectedItem) {
-      setFormData({
-        color_id: selectedItem.color_id?.toString() || "",
-        type_item: selectedItem.type_item || "",
-        price_color_By: selectedItem.price_color_By || "",
-        price_per_meter: selectedItem.price_per_meter?.toString() || "",
-        notes: selectedItem.notes || "",
-      });
-    } else if (modalState.isOpen && modalState.mode === "create") {
-      setFormData({
-        color_id: "",
-        type_item: "",
-        price_color_By: "",
-        price_per_meter: "",
-        notes: "",
-      });
-    }
-  }, [modalState.isOpen, modalState.mode, selectedItem]);
+  // Handle open create modal
+  const handleOpenCreate = () => {
+    setFormError("");
+    setFormData({
+      material_id: "",
+      ruler_id: "",
+      color_id: "",
+      type_item: "Machine",
+      price_color_By: "isByMeter22",
+      price_per_meter: "",
+      notes: "",
+    });
+    openCreateModal();
+  };
+
+  // Handle open edit modal
+  const handleOpenEdit = (priceColor) => {
+    setFormError("");
+    const color = priceColor.color;
+    const ruler = color?.ruler;
+
+    // Deep extraction of IDs
+    const materialId = (
+      priceColor.material_id ||
+      ruler?.material_id ||
+      ruler?.material?.material_id ||
+      ruler?.material?.id
+    )?.toString() || "";
+
+    const rulerId = (
+      priceColor.ruler_id ||
+      color?.ruler_id ||
+      ruler?.ruler_id ||
+      ruler?.id
+    )?.toString() || "";
+
+    const colorId = (
+      priceColor.color_id ||
+      color?.color_id ||
+      color?.id
+    )?.toString() || "";
+
+    setFormData({
+      material_id: materialId,
+      ruler_id: rulerId,
+      color_id: colorId,
+      type_item: priceColor.type_item || "Machine",
+      price_color_By: priceColor.price_color_By === "blanck" ? "isByBlanck" : (priceColor.price_color_By || "isByMeter22"),
+      price_per_meter: priceColor.price_per_meter !== undefined ? priceColor.price_per_meter.toString() : "",
+      notes: priceColor.notes || "",
+    });
+    openEditModal(priceColor);
+  };
 
   // Load colors for dropdown
   const loadColors = async () => {
@@ -168,11 +203,13 @@ export default function PriceColor() {
     { value: "isByMeter22", label: "22 متر" },
     { value: "isByMeter44", label: "44 متر" },
     { value: "isByMeter66", label: "66 متر" },
-    { value: "blanck", label: "لوح" },
+    { value: "isByBlanck", label: "لوح" },
   ];
 
   const getLabel = (options, value) => {
-    return options.find(opt => opt.value === value)?.label || value || "غير محدد";
+    // Check both standard value and legacy 'blanck'
+    const actualValue = value === "blanck" ? "isByBlanck" : value;
+    return options.find(opt => opt.value === actualValue)?.label || actualValue || "غير محدد";
   };
 
   // Filter and pagination state
@@ -212,15 +249,20 @@ export default function PriceColor() {
     exportToExcel(filteredPriceColors, "أسعار_الألوان");
   };
 
+
+
   // Handle save with validation
-  const handleSavePriceColor = async (data) => {
+  const handleSavePriceColor = async (idOrData, data) => {
     setFormError("");
 
+    const isEditMode = typeof idOrData === 'number' || typeof idOrData === 'string';
+    const actualData = isEditMode ? data : idOrData;
+
     // Validation
-    const colorId = formData.color_id;
-    const typeItem = formData.type_item?.trim();
-    const priceColorBy = formData.price_color_By?.trim();
-    const pricePerMeter = formData.price_per_meter;
+    const colorId = actualData.color_id;
+    const typeItem = actualData.type_item?.trim();
+    const priceColorBy = actualData.price_color_By?.trim();
+    const pricePerMeter = actualData.price_per_meter;
 
     if (!colorId || !typeItem || !priceColorBy || !pricePerMeter) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
@@ -237,10 +279,13 @@ export default function PriceColor() {
     const dataToSend = {
       color_id: parseInt(colorId),
       type_item: typeItem,
-      price_color_By: priceColorBy,
+      price_color_By: priceColorBy === "blanck" ? "isByBlanck" : priceColorBy,
       price_per_meter: parseFloat(pricePerMeter),
-      notes: formData.notes || "",
+      notes: actualData.notes || "",
     };
+
+    // Special handling for "blanck" (Board) if the backend expects different structure
+    // (Assuming standard payload based on previous context, but ensuring clean values)
 
     await handleSave(dataToSend);
   };
@@ -367,7 +412,7 @@ export default function PriceColor() {
           title="إدارة أسعار الألوان"
           subtitle={`إجمالي أسعار الألوان: ${priceColors.length}`}
           actionLabel="إضافة سعر جديد"
-          onAction={openCreateModal}
+          onAction={handleOpenCreate}
         />
 
         {/* Stats Cards */}
@@ -530,7 +575,7 @@ export default function PriceColor() {
                           <div className="flex items-center gap-2">
                             <CrudActions
                               onView={() => openViewModal(priceColor.price_color_id)}
-                              onEdit={() => openEditModal(priceColor)}
+                              onEdit={() => handleOpenEdit(priceColor)}
                               onDelete={() => openDeleteModal(priceColor)}
                               size="md"
                             />
@@ -604,21 +649,67 @@ export default function PriceColor() {
                 dismissable={false}
               />
             )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>المادة <span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.material_id?.toString() || ""}
+                  onValueChange={(value) => setFormData({ ...formData, material_id: value, ruler_id: "", color_id: "" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر المادة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {materials.map((m) => (
+                      <SelectItem key={m.material_id} value={m.material_id.toString()}>
+                        {m.material_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>المسطرة <span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.ruler_id?.toString() || ""}
+                  onValueChange={(value) => setFormData({ ...formData, ruler_id: value, color_id: "" })}
+                  disabled={!formData.material_id}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={!formData.material_id ? "اختر المادة أولاً" : "اختر المسطرة"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rulers
+                      .filter(r => r.material_id?.toString() === formData.material_id?.toString())
+                      .map((r) => (
+                        <SelectItem key={r.ruler_id} value={r.ruler_id.toString()}>
+                          {r.ruler_name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>اللون <span className="text-red-500">*</span></Label>
               <Select
                 value={formData.color_id?.toString() || ""}
                 onValueChange={(value) => setFormData({ ...formData, color_id: value })}
+                disabled={!formData.ruler_id}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="اختر اللون" />
+                  <SelectValue placeholder={!formData.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {colors.map((color) => (
-                    <SelectItem key={color.color_id} value={color.color_id.toString()}>
-                      {color.color_name} ({color.color_code}) - {color.ruler?.ruler_name}
-                    </SelectItem>
-                  ))}
+                  {colors
+                    .filter(c => c.ruler_id?.toString() === formData.ruler_id?.toString())
+                    .map((color) => (
+                      <SelectItem key={color.color_id} value={color.color_id.toString()}>
+                        {color.color_name} ({color.color_code})
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

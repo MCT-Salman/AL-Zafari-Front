@@ -22,7 +22,7 @@ export const UserRoleLabels = {
   [UserRole.cashier]: 'أمين الصندوق',
   [UserRole.sales]: 'مبيعات',
   [UserRole.production_manager]: 'مدير الإنتاج',
-  [UserRole.Warehouse_Keeper]: 'حارس المستودع',
+  [UserRole.Warehouse_Keeper]: 'أمين مستودع',
   [UserRole.Warehouse_Products]: 'منتجات المستودع',
   [UserRole.Dissection_Technician]: 'فني التشريح',
   [UserRole.Cutting_Technician]: 'فني القطع',

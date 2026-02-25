@@ -32,7 +32,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from ".
                 <SelectItem value="cashier">أمين الصندوق</SelectItem>
                 <SelectItem value="sales">مبيعات</SelectItem>
                 <SelectItem value="production_manager">مدير الإنتاج</SelectItem>
-                <SelectItem value="Warehouse_Keeper">حارس المستودع</SelectItem>
+                <SelectItem value="Warehouse_Keeper">أمين مستودع</SelectItem>
                 <SelectItem value="Warehouse_Products">منتجات المستودع</SelectItem>
                 <SelectItem value="Dissection_Technician">فني التشريح</SelectItem>
                 <SelectItem value="Cutting_Technician">فني القطع</SelectItem>
@@ -71,7 +71,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from ".
 //               console.warn(`Option at index ${index} has empty value. Skipping.`);
 //               return null;
 //             }
-            
+
 //             return (
 //               <SelectItem 
 //                 key={index} 
@@ -141,7 +141,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from ".
 //           {label}
 //         </label>
 //       )}
-      
+
 //       <div className="relative">
 //         <select
 //           value={value}
@@ -167,7 +167,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from ".
 //             </option>
 //           ))}
 //         </select>
-        
+
 //         {/* أيقونة السهم */}
 //         <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none
 //                         text-primary-f transition-all duration-300 ease-out
@@ -187,7 +187,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from ".
 //           </svg>
 //         </div>
 //       </div>
-      
+
 //       {/* الخط التزييني السفلي */}
 //       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0.5 
 //                       bg-primary-f rounded-full
@@ -204,7 +204,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from ".
 const FilterSelect = ({
   label = "",
   value = "",
-  onChange = () => {},
+  onChange = () => { },
   options = [],
   className = "",
   disabled = false,

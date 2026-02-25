@@ -105,23 +105,23 @@ export default function Users() {
       { key: 'full_name', header: 'الاسم الكامل' },
       { key: 'username', header: 'اسم المستخدم' },
       { key: 'phone', header: 'رقم الهاتف' },
-      { 
-        key: 'role', 
+      {
+        key: 'role',
         header: 'الدور',
         format: (value) => UserRoleLabels[value] || value
       },
-      { 
-        key: 'is_active', 
+      {
+        key: 'is_active',
         header: 'الحالة',
         format: (value) => value ? 'نشط' : 'معطل'
       },
-      { 
-        key: 'created_at', 
+      {
+        key: 'created_at',
         header: 'تاريخ الإنشاء',
         format: (value) => new Date(value).toLocaleDateString('ar-SA')
       },
-      { 
-        key: 'updated_at', 
+      {
+        key: 'updated_at',
         header: 'آخر تحديث',
         format: (value) => value ? new Date(value).toLocaleDateString('ar-SA') : ''
       },
@@ -148,26 +148,21 @@ export default function Users() {
   // Can be called as: handleSaveUser(userData) for create, or handleSaveUser(id, userData) for edit
   const handleSaveUser = async (idOrUserData, userData) => {
     setFormError("");
-    
+
     // Determine if first argument is ID (edit mode) or userData (create mode)
     const isEditMode = typeof idOrUserData === 'number' || typeof idOrUserData === 'string';
     const actualUserData = isEditMode ? userData : idOrUserData;
-    
+
     // Validation - check for required fields (trim to handle whitespace)
     const username = actualUserData?.username?.trim();
     const fullName = actualUserData?.full_name?.trim();
     const phone = actualUserData?.phone?.trim();
-    
+
     if (!username || !fullName || !phone) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
-    // Password is only required for new users (when not in edit mode)
-    if (!isEditMode && (!actualUserData.password || !actualUserData.password.trim())) {
-      setFormError("كلمة المرور مطلوبة للمستخدمين الجدد");
-      return;
-    }
 
     // If password is provided (even in edit mode), validate its length
     if (actualUserData.password && actualUserData.password.trim() && actualUserData.password.trim().length < 8) {
@@ -175,11 +170,12 @@ export default function Users() {
       return;
     }
 
-    // Prepare data to send
+    // Prepare data to send — prepend +963 to phone
+    const rawPhone = phone.replace(/\D/g, '').replace(/^0+/, '');
     const dataToSend = {
       username: username,
       full_name: fullName,
-      phone: phone,
+      phone: `+963${rawPhone}`,
       role: actualUserData.role || "sales",
     };
 
@@ -201,6 +197,37 @@ export default function Users() {
     total: users.length,
     active: users.filter((u) => u.is_active).length,
     inactive: users.filter((u) => !u.is_active).length,
+  };
+
+  // Handle open create modal
+  const handleOpenCreate = () => {
+    setFormError("");
+    setFormData({
+      username: "",
+      full_name: "",
+      phone: "",
+      password: "",
+      role: "sales",
+    });
+    openCreateModal();
+  };
+
+  // Handle open edit modal
+  const handleOpenEdit = (user) => {
+    setFormError("");
+    // Aggressive phone stripping: remove +963, 00963, 963, or leading 0
+    const strippedPhone = (user.phone || "")
+      .replace(/^(\+963|00963|963)/, "")
+      .replace(/^0+/, "");
+
+    setFormData({
+      username: user.username || "",
+      full_name: user.full_name || "",
+      phone: strippedPhone,
+      password: "", // Don't pre-fill password for security
+      role: user.role || "sales",
+    });
+    openEditModal(user);
   };
 
   // Get unique roles
@@ -252,10 +279,7 @@ export default function Users() {
     });
   }
 
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, roleFilter, statusFilter]);
+
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
@@ -317,7 +341,7 @@ export default function Users() {
           title="إدارة المستخدمين"
           subtitle={`إجمالي المستخدمين: ${users.length}`}
           actionLabel="إضافة مستخدم جديد"
-          onAction={openCreateModal}
+          onAction={handleOpenCreate}
         />
 
         {/* Stats Cards */}
@@ -339,7 +363,7 @@ export default function Users() {
             <MessageAlert
               type="error"
               message={error}
-              onDismiss={() => {}}
+              onDismiss={() => { }}
               dismissable={true}
             />
           )}
@@ -386,33 +410,33 @@ export default function Users() {
           </div>
 
           <div className="flex justify-between">
-          {/* Rows Per Page Selector */}
-          <div className=" flex justify-start">
-            <RowsPerPageSelector
-              value={rowsPerPage}
-              onChange={setRowsPerPage}
-              options={[5, 10, 20, 50]}
-            />
-          </div>
+            {/* Rows Per Page Selector */}
+            <div className=" flex justify-start">
+              <RowsPerPageSelector
+                value={rowsPerPage}
+                onChange={setRowsPerPage}
+                options={[5, 10, 20, 50]}
+              />
+            </div>
 
-          {/* Export Button */}
-          <Button
-            onClick={handleExport}
-            disabled={exportLoading || filteredUsers.length === 0}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white p-6 rounded-xl"
-          >
-            {exportLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                <span>جاري التصدير...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                <span>تصدير Excel ({filteredUsers.length})</span>
-              </>
-            )}
-          </Button>
+            {/* Export Button */}
+            <Button
+              onClick={handleExport}
+              disabled={exportLoading || filteredUsers.length === 0}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white p-6 rounded-xl"
+            >
+              {exportLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  <span>جاري التصدير...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>تصدير Excel ({filteredUsers.length})</span>
+                </>
+              )}
+            </Button>
           </div>
 
 
@@ -472,7 +496,7 @@ export default function Users() {
                             />
                             <CrudActions
                               onView={() => openViewModal(user.id)}
-                              onEdit={() => openEditModal(user)}
+                              onEdit={() => handleOpenEdit(user)}
                               onDelete={() => openDeleteModal(user)}
                               size="md"
                             />
@@ -515,13 +539,13 @@ export default function Users() {
         onDelete={handleDelete}
         data={selectedItem}
         title={
-          modalState.mode === 'create' 
-            ? 'إضافة مستخدم جديد' 
-            : modalState.mode === 'edit' 
-            ? 'تعديل المستخدم' 
-            : modalState.mode === 'view'
-            ? 'تفاصيل المستخدم'
-            : ''
+          modalState.mode === 'create'
+            ? 'إضافة مستخدم جديد'
+            : modalState.mode === 'edit'
+              ? 'تعديل المستخدم'
+              : modalState.mode === 'view'
+                ? 'تفاصيل المستخدم'
+                : ''
         }
         loading={modalState.loading}
         size="lg"
@@ -530,14 +554,14 @@ export default function Users() {
         fields={
           modalState.mode === 'view'
             ? [
-                { key: 'full_name', label: 'الاسم الكامل' },
-                { key: 'username', label: 'اسم المستخدم' },
-                { key: 'phone', label: 'رقم الهاتف' },
-                { key: 'role', label: 'الدور', formatValue: (key, value) => UserRoleLabels[value] || value },
-                { key: 'is_active', label: 'الحالة' },
-                { key: 'created_at', label: 'تاريخ الإنشاء' },
-                { key: 'updated_at', label: 'آخر تحديث' },
-              ]
+              { key: 'full_name', label: 'الاسم الكامل' },
+              { key: 'username', label: 'اسم المستخدم' },
+              { key: 'phone', label: 'رقم الهاتف' },
+              { key: 'role', label: 'الدور', formatValue: (key, value) => UserRoleLabels[value] || value },
+              { key: 'is_active', label: 'الحالة' },
+              { key: 'created_at', label: 'تاريخ الإنشاء' },
+              { key: 'updated_at', label: 'آخر تحديث' },
+            ]
             : []
         }
         deleteTitle="حذف المستخدم"

@@ -2,14 +2,22 @@
 import { useState, useEffect } from "react";
 import { customerApi } from "../../api/customerApi";
 import { orderApi } from "../../api/orderApi";
+import { materialApi } from "../../api/materialApi";
+import { rulerApi } from "../../api/rulerApi";
+import { colorApi } from "../../api/colorApi";
+import { priceColorApi } from "../../api/priceColorApi";
+import { batchApi } from "../../api/batchApi";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { 
-  ShoppingCart, 
-  Plus, 
-  Search, 
-  User, 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Label } from "../../components/ui/label";
+import { Input } from "../../components/ui/input";
+import {
+  ShoppingCart,
+  Plus,
+  Search,
+  User,
   Package,
   Check,
   X,
@@ -23,9 +31,16 @@ export default function SimpleOrderCreation() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  
-  // Customer data
+
+  // Order reference data
   const [customers, setCustomers] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [rulers, setRulers] = useState([]);
+  const [colors, setColors] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [priceColors, setPriceColors] = useState([]);
+
+  // Selection and form state
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
@@ -36,31 +51,50 @@ export default function SimpleOrderCreation() {
     address: ""
   });
 
-  // Order items
   const [orderItems, setOrderItems] = useState([]);
   const [currentItem, setCurrentItem] = useState({
-    type: "كوي", // Default type
+    type_item: "Machine",
+    material_id: "",
+    ruler_id: "",
+    color_id: "",
+    price_color_By: "",
+    batch_id: "",
     width: "",
     length: "",
-    quantity: "",
+    thickness: "",
+    quantity: 1,
     notes: ""
   });
 
-  // Order details
   const [orderNotes, setOrderNotes] = useState("");
   const [createdOrder, setCreatedOrder] = useState(null);
 
-  // Load customers on mount
+  // Load lookup data on mount
   useEffect(() => {
-    loadCustomers();
+    loadInitialData();
   }, []);
 
-  const loadCustomers = async () => {
+  const loadInitialData = async () => {
     try {
-      const response = await customerApi.getCustomers();
-      setCustomers(response.data || []);
+      setLoading(true);
+      const [custRes, matRes, rulerRes, colorRes, batchRes, priceRes] = await Promise.all([
+        customerApi.getCustomers(),
+        materialApi.getMaterials(),
+        rulerApi.getRulers(),
+        colorApi.getColors(),
+        batchApi.getBatches(),
+        priceColorApi.getPriceColors(),
+      ]);
+      setCustomers(custRes.data || custRes || []);
+      setMaterials(matRes.data || matRes || []);
+      setRulers(rulerRes.data || rulerRes || []);
+      setColors(colorRes.data || colorRes || []);
+      setBatches(batchRes.data || batchRes || []);
+      setPriceColors(priceRes.data || priceRes || []);
     } catch (err) {
-      setError("فشل في تحميل العملاء");
+      setError("فشل في تحميل البيانات الأولية");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,7 +125,7 @@ export default function SimpleOrderCreation() {
         customer_type: "customer",
         is_active: true
       });
-      
+
       const createdCustomer = response.data;
       setSelectedCustomer(createdCustomer);
       setCustomers([...customers, createdCustomer]);
@@ -106,25 +140,85 @@ export default function SimpleOrderCreation() {
     }
   };
 
+  // Handle item field change with cascading reset
+  const handleItemFieldChange = (field, value) => {
+    const updatedItem = { ...currentItem, [field]: value };
+
+    if (field === "material_id") {
+      updatedItem.ruler_id = "";
+      updatedItem.color_id = "";
+      updatedItem.price_color_By = "";
+    } else if (field === "ruler_id") {
+      updatedItem.color_id = "";
+      updatedItem.price_color_By = "";
+
+      const ruler = rulers.find(r => String(r.ruler_id) === String(value));
+      if (ruler) {
+        updatedItem.width = ruler.constant_width || "";
+        updatedItem.thickness = ruler.constant_thickness || "";
+      }
+    } else if (field === "color_id" || field === "type_item") {
+      const availablePricing = priceColors.filter(pc =>
+        String(pc.color_id) === String(updatedItem.color_id) &&
+        pc.type_item === updatedItem.type_item
+      );
+
+      if (availablePricing.length > 0) {
+        updatedItem.price_color_By = availablePricing[0].price_color_By;
+      } else {
+        updatedItem.price_color_By = "";
+      }
+    }
+
+    setCurrentItem(updatedItem);
+  };
+
   // Add item to order
   const handleAddItem = () => {
-    if (!currentItem.width || !currentItem.length || !currentItem.quantity) {
-      setError("يرجى ملء جميع حقول العنصر");
+    if (!currentItem.color_id || !currentItem.batch_id || !currentItem.quantity || !currentItem.length) {
+      setError("يرجى إكمال بيانات العنصر (اللون، الطبخة، الطول والكمية مطلوبة)");
       return;
     }
 
-    const item = {
+    // Find names for display
+    const material = materials.find(m => String(m.material_id) === String(currentItem.material_id));
+    const ruler = rulers.find(r => String(r.ruler_id) === String(currentItem.ruler_id));
+    const color = colors.find(c => String(c.color_id) === String(currentItem.color_id));
+    const batch = batches.find(b => String(b.batch_id) === String(currentItem.batch_id));
+    const pc = priceColors.find(pc =>
+      String(pc.color_id) === String(currentItem.color_id) &&
+      pc.type_item === currentItem.type_item &&
+      pc.price_color_By === currentItem.price_color_By
+    );
+
+    const price = pc ? parseFloat(pc.price_per_meter) : 0;
+    const quantity = parseFloat(currentItem.quantity) || 0;
+    const length = parseFloat(currentItem.length) || 0;
+
+    let subtotal = 0;
+    if (currentItem.price_color_By === "blanck" || currentItem.price_color_By === "isByBlanck") {
+      subtotal = quantity * price;
+    } else {
+      subtotal = quantity * price * (length / 100);
+    }
+
+    const itemToAdd = {
       ...currentItem,
-      id: Date.now(), // Temporary ID
-      subtotal: parseFloat(currentItem.width) * parseFloat(currentItem.length) * parseFloat(currentItem.quantity)
+      id: Date.now(),
+      material_name: material?.material_name,
+      ruler_name: ruler?.ruler_name,
+      color_name: color?.color_name,
+      batch_number: batch?.batch_number,
+      subtotal: subtotal
     };
 
-    setOrderItems([...orderItems, item]);
+    setOrderItems([...orderItems, itemToAdd]);
     setCurrentItem({
-      type: "كوي",
-      width: "",
-      length: "",
-      quantity: "",
+      ...currentItem,
+      color_id: "",
+      price_color_By: "",
+      batch_id: "",
+      quantity: 1,
       notes: ""
     });
     setError("");
@@ -150,16 +244,16 @@ export default function SimpleOrderCreation() {
     try {
       setLoading(true);
       const orderData = {
-        customer_id: selectedCustomer.customer_id,
+        customer_id: parseInt(selectedCustomer.customer_id),
         status: "pending",
         notes: orderNotes,
         items: orderItems.map(item => ({
-          type_item: item.type === "كوي" ? 7 : 8, // Map to API values
-          ruler_id: 1, // Default ruler
-          constant_width: parseFloat(item.width),
+          type_item: item.type_item, // Use "Machine" or "Presser" strings
+          color_id: parseInt(item.color_id),
+          width: parseFloat(item.width),
           length: parseFloat(item.length),
-          constant_thickness: 0.6, // Default thickness
-          batch_id: 1, // Default batch
+          thickness: parseFloat(item.thickness),
+          batch_id: parseInt(item.batch_id),
           quantity: parseInt(item.quantity),
           notes: item.notes
         }))
@@ -182,10 +276,16 @@ export default function SimpleOrderCreation() {
     setSelectedCustomer(null);
     setOrderItems([]);
     setCurrentItem({
-      type: "كوي",
+      type_item: "Machine",
+      material_id: "",
+      ruler_id: "",
+      color_id: "",
+      price_color_By: "",
+      batch_id: "",
       width: "",
       length: "",
-      quantity: "",
+      thickness: "",
+      quantity: 1,
       notes: ""
     });
     setOrderNotes("");
@@ -197,10 +297,11 @@ export default function SimpleOrderCreation() {
   // Format currency
   const formatCurrency = (amount) => {
     const num = parseFloat(amount) || 0;
-    return new Intl.NumberFormat("ar-SA", {
-      style: "currency",
-      currency: "SYP"
+    const formatted = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(num);
+    return `${formatted} ل.س`;
   };
 
   return (
@@ -217,18 +318,16 @@ export default function SimpleOrderCreation() {
           <div className="flex items-center justify-between">
             {[1, 2, 3, 4].map((stepNumber) => (
               <div key={stepNumber} className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  step >= stepNumber ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"
-                }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step >= stepNumber ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"
+                  }`}>
                   {stepNumber === 1 && <User className="w-5 h-5" />}
                   {stepNumber === 2 && <Package className="w-5 h-5" />}
                   {stepNumber === 3 && <Check className="w-5 h-5" />}
                   {stepNumber === 4 && <ShoppingCart className="w-5 h-5" />}
                 </div>
                 {stepNumber < 4 && (
-                  <div className={`w-full h-1 mx-2 ${
-                    step > stepNumber ? "bg-blue-600" : "bg-gray-300"
-                  }`} />
+                  <div className={`w-full h-1 mx-2 ${step > stepNumber ? "bg-blue-600" : "bg-gray-300"
+                    }`} />
                 )}
               </div>
             ))}
@@ -263,7 +362,7 @@ export default function SimpleOrderCreation() {
         {step === 1 && (
           <Card className="p-6">
             <h2 className="text-xl font-bold mb-4">اختيار العميل</h2>
-            
+
             {/* Search */}
             <div className="mb-4">
               <div className="relative">
@@ -288,8 +387,8 @@ export default function SimpleOrderCreation() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium">{customer.name}</div>
-                      <div className="text-sm text-gray-600">{customer.phone}</div>
+                      <div className="font-medium text-lg">{customer.name}</div>
+                      <div className="text-sm text-gray-600 font-bold" dir="ltr">{customer.phone}</div>
                       <div className="text-sm text-gray-600">{customer.city} - {customer.address}</div>
                     </div>
                     <Badge className={customer.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
@@ -321,28 +420,29 @@ export default function SimpleOrderCreation() {
                     className="p-2 border rounded"
                     placeholder="اسم العميل"
                     value={newCustomer.name}
-                    onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                   />
                   <input
                     type="tel"
                     className="p-2 border rounded"
                     placeholder="رقم الهاتف"
                     value={newCustomer.phone}
-                    onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                    dir="ltr"
+                    onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
                   />
                   <input
                     type="text"
                     className="p-2 border rounded"
                     placeholder="المدينة"
                     value={newCustomer.city}
-                    onChange={(e) => setNewCustomer({...newCustomer, city: e.target.value})}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, city: e.target.value })}
                   />
                   <input
                     type="text"
                     className="p-2 border rounded"
                     placeholder="العنوان"
                     value={newCustomer.address}
-                    onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
                   />
                 </div>
                 <div className="flex gap-2 mt-4">
@@ -374,67 +474,184 @@ export default function SimpleOrderCreation() {
             </div>
 
             {/* Add Item Form */}
-            <div className="border rounded-lg p-4 mb-4">
-              <h3 className="font-medium mb-4">إضافة عنصر جديد</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">النوع</label>
-                  <select
-                    className="w-full p-2 border rounded"
-                    value={currentItem.type}
-                    onChange={(e) => setCurrentItem({...currentItem, type: e.target.value})}
+            <div className="border rounded-2xl p-6 bg-white shadow-sm mb-6">
+              <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-blue-600" /> إضافة عنصر جديد
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label>النوع</Label>
+                  <Select
+                    value={currentItem.type_item}
+                    onValueChange={(val) => handleItemFieldChange("type_item", val)}
                   >
-                    <option value="كوي">كوي</option>
-                    <option value="مكنة">مكنة</option>
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Machine">مكنة</SelectItem>
+                      <SelectItem value="Presser">كوي</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">العرض (سم)</label>
-                  <input
+
+                <div className="space-y-2">
+                  <Label>المادة</Label>
+                  <Select
+                    value={String(currentItem.material_id || "")}
+                    onValueChange={(val) => handleItemFieldChange("material_id", val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر المادة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {materials.map(m => (
+                        <SelectItem key={m.material_id} value={String(m.material_id)}>
+                          {m.material_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>المسطرة</Label>
+                  <Select
+                    value={String(currentItem.ruler_id || "")}
+                    onValueChange={(val) => handleItemFieldChange("ruler_id", val)}
+                    disabled={!currentItem.material_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر المسطرة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rulers
+                        .filter(r => String(r.material_id) === String(currentItem.material_id))
+                        .map(r => (
+                          <SelectItem key={r.ruler_id} value={String(r.ruler_id)}>
+                            {r.ruler_name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>اللون</Label>
+                  <Select
+                    value={String(currentItem.color_id || "")}
+                    onValueChange={(val) => handleItemFieldChange("color_id", val)}
+                    disabled={!currentItem.ruler_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر اللون" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {colors
+                        .filter(c => String(c.ruler_id) === String(currentItem.ruler_id))
+                        .map(c => (
+                          <SelectItem key={c.color_id} value={String(c.color_id)}>
+                            {c.color_name} ({c.color_code})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>التسعير</Label>
+                  <Select
+                    value={currentItem.price_color_By}
+                    onValueChange={(val) => handleItemFieldChange("price_color_By", val)}
+                    disabled={!currentItem.color_id}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر طريقة التسعير" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {priceColors
+                        .filter(pc =>
+                          String(pc.color_id) === String(currentItem.color_id) &&
+                          pc.type_item === currentItem.type_item
+                        )
+                        .map(pc => (
+                          <SelectItem key={pc.id} value={pc.price_color_By}>
+                            {pc.price_color_By === "isByMeter22" ? "22 متر" :
+                              pc.price_color_By === "isByMeter44" ? "44 متر" :
+                                pc.price_color_By === "isByMeter66" ? "66 متر" :
+                                  pc.price_color_By === "blanck" || pc.price_color_By === "isByBlanck" ? "لوح" : pc.price_color_By}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>الطبخة</Label>
+                  <Select
+                    value={String(currentItem.batch_id || "")}
+                    onValueChange={(val) => handleItemFieldChange("batch_id", val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر الطبخة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {batches.map(b => (
+                        <SelectItem key={b.batch_id} value={String(b.batch_id)}>
+                          {b.batch_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>العرض (سم)</Label>
+                  <Input
                     type="number"
-                    className="w-full p-2 border rounded"
-                    placeholder="22"
+                    readOnly
                     value={currentItem.width}
-                    onChange={(e) => setCurrentItem({...currentItem, width: e.target.value})}
+                    className="bg-gray-50 font-bold"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">الطول (سم)</label>
-                  <input
+
+                <div className="space-y-2">
+                  <Label>الطول (سم) <span className="text-red-500">*</span></Label>
+                  <Input
                     type="number"
-                    className="w-full p-2 border rounded"
-                    placeholder="100"
                     value={currentItem.length}
-                    onChange={(e) => setCurrentItem({...currentItem, length: e.target.value})}
+                    onChange={(e) => handleItemFieldChange("length", e.target.value)}
+                    placeholder="مثال: 100"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">الكمية</label>
-                  <input
+
+                <div className="space-y-2">
+                  <Label>الكمية <span className="text-red-500">*</span></Label>
+                  <Input
                     type="number"
-                    className="w-full p-2 border rounded"
-                    placeholder="50"
                     value={currentItem.quantity}
-                    onChange={(e) => setCurrentItem({...currentItem, quantity: e.target.value})}
+                    onChange={(e) => handleItemFieldChange("quantity", e.target.value)}
+                    className="font-bold"
                   />
                 </div>
               </div>
-              <div className="mt-4">
-                <label className="block text-sm font-medium mb-1">ملاحظات (اختياري)</label>
-                <input
-                  type="text"
-                  className="w-full p-2 border rounded"
-                  placeholder="ملاحظات العنصر"
+
+              <div className="mt-6">
+                <Label>ملاحظات (اختياري)</Label>
+                <Input
+                  className="mt-1"
+                  placeholder="أضف أي ملاحظات خاصة بهذا العنصر..."
                   value={currentItem.notes}
-                  onChange={(e) => setCurrentItem({...currentItem, notes: e.target.value})}
+                  onChange={(e) => handleItemFieldChange("notes", e.target.value)}
                 />
               </div>
+
               <Button
                 onClick={handleAddItem}
-                className="mt-4 bg-blue-600 hover:bg-blue-700"
+                className="mt-6 w-full lg:w-auto px-10 h-11 bg-blue-600 hover:bg-blue-700 rounded-xl"
               >
-                <Plus className="w-5 h-5 ml-2" />
-                إضافة العنصر
+                <Plus className="w-5 h-5 ml-2" /> إضافة العنصر للطلب
               </Button>
             </div>
 
@@ -444,12 +661,15 @@ export default function SimpleOrderCreation() {
                 <div key={item.id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium">{item.type}</div>
-                      <div className="text-sm text-gray-600">
-                        العرض: {item.width} سم | الطول: {item.length} سم | الكمية: {item.quantity}
+                      <div className="font-bold text-primary-f">{item.type_item === "Machine" ? "مكنة" : "كوي"} | {item.material_name}</div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        المسطرة: {item.ruler_name} | اللون: {item.color_name} | الطبخة: {item.batch_number}
+                      </div>
+                      <div className="text-sm text-gray-500 mt-0.5">
+                        الأبعاد: {item.width} × {item.length} سم | الكمية: <span className="font-bold text-primary-f">{item.quantity}</span>
                       </div>
                       {item.notes && (
-                        <div className="text-sm text-gray-600">ملاحظات: {item.notes}</div>
+                        <div className="text-xs text-gray-400 mt-1 italic">ملاحظات: {item.notes}</div>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
@@ -467,6 +687,14 @@ export default function SimpleOrderCreation() {
                 </div>
               ))}
             </div>
+
+            {/* Total Summary */}
+            {orderItems.length > 0 && (
+              <div className="bg-blue-50 p-4 rounded-xl flex justify-between items-center mb-6">
+                <span className="font-bold text-blue-900">إجمالي العناصر المضافة:</span>
+                <span className="text-xl font-bold text-blue-600">{formatCurrency(calculateTotal())}</span>
+              </div>
+            )}
 
             {/* Navigation */}
             <div className="flex justify-between mt-6">
@@ -492,13 +720,13 @@ export default function SimpleOrderCreation() {
         {step === 3 && (
           <Card className="p-6">
             <h2 className="text-xl font-bold mb-4">مراجعة الطلب</h2>
-            
+
             {/* Customer Info */}
             <div className="border rounded-lg p-4 mb-4">
               <h3 className="font-medium mb-2">معلومات العميل</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 <div><strong>الاسم:</strong> {selectedCustomer?.name}</div>
-                <div><strong>الهاتف:</strong> {selectedCustomer?.phone}</div>
+                <div><strong>الهاتف:</strong> <span dir="ltr">{selectedCustomer?.phone}</span></div>
                 <div><strong>المدينة:</strong> {selectedCustomer?.city}</div>
                 <div><strong>العنوان:</strong> {selectedCustomer?.address}</div>
               </div>
@@ -511,9 +739,9 @@ export default function SimpleOrderCreation() {
                 {orderItems.map((item, index) => (
                   <div key={item.id} className="flex justify-between items-center py-2 border-b">
                     <div>
-                      <div className="font-medium">{item.type}</div>
-                      <div className="text-sm text-gray-600">
-                        {item.width} × {item.length} × {item.quantity}
+                      <div className="font-bold">{item.type_item === "Machine" ? "مكنة" : "كوي"} | {item.material_name}</div>
+                      <div className="text-xs text-gray-500">
+                        {item.color_name} | {item.width} × {item.length} × {item.quantity}
                       </div>
                     </div>
                     <div className="font-medium">{formatCurrency(item.subtotal)}</div>
@@ -575,13 +803,15 @@ export default function SimpleOrderCreation() {
               <p className="text-gray-600">رقم الطلب: #{createdOrder?.order_id}</p>
             </div>
 
-            <div className="border rounded-lg p-4 mb-6 text-left">
-              <h3 className="font-medium mb-2">تفاصيل الطلب</h3>
+            <div className="border rounded-lg p-4 mb-6 text-right">
+              <h3 className="font-medium mb-2 border-b pb-2">تفاصيل الطلب</h3>
               <div className="space-y-2 text-sm">
                 <div><strong>العميل:</strong> {selectedCustomer?.name}</div>
-                <div><strong>الحالة:</strong> قيد الانتظار</div>
+                <div><strong>الحالة:</strong> <Badge className="bg-yellow-100 text-yellow-800">قيد الانتظار</Badge></div>
                 <div><strong>عدد العناصر:</strong> {orderItems.length}</div>
-                <div><strong>المبلغ الإجمالي:</strong> {formatCurrency(calculateTotal())}</div>
+                <div className="text-lg font-bold text-green-600 border-t pt-2 mt-2">
+                  <strong>المبلغ الإجمالي:</strong> {formatCurrency(calculateTotal())}
+                </div>
               </div>
             </div>
 
