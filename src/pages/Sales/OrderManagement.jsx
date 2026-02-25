@@ -191,6 +191,28 @@ export default function OrderManagement() {
           }
         }
 
+        // Calculate subtotal for this item
+        const quantity = parseFloat(item.quantity) || 0;
+        const length = parseFloat(item.length) || 0;
+
+        // Find price per meter for this item
+        const priceRecord = priceColors.find(pc =>
+          String(pc.color_id) === String(colorId) &&
+          pc.type_item === item.type_item &&
+          pc.price_color_By === pricingMethod
+        );
+
+        const price = priceRecord ? parseFloat(priceRecord.price_per_meter) : 0;
+
+        let subtotal = 0;
+        if (pricingMethod === "blanck" || pricingMethod === "isByBlanck") {
+          // Price per piece/blank
+          subtotal = quantity * price;
+        } else {
+          // Price per linear meter (Length is in cm, price is per meter)
+          subtotal = quantity * price * (length / 100);
+        }
+
         return {
           type_item: item.type_item || "Machine",
           color_id: colorId,
@@ -203,7 +225,7 @@ export default function OrderManagement() {
           batch_id: item.batch_id ? String(item.batch_id) : "",
           quantity: item.quantity || 1,
           notes: item.notes || "",
-          subtotal: item.subtotal || 0
+          subtotal: subtotal
         };
       });
 
@@ -391,7 +413,6 @@ export default function OrderManagement() {
   const calculateOrderTotal = () => {
     return currentItems.reduce((total, item) => {
       const quantity = parseFloat(item.quantity) || 0;
-      const width = parseFloat(item.width) || 0;
       const length = parseFloat(item.length) || 0;
 
       // Find price per meter for this item
@@ -724,9 +745,9 @@ export default function OrderManagement() {
         fields={
           modalState.mode === "view"
             ? [
-              { key: "order_id", label: "رقم الطلب", formatValue: (key, value) => `#${value}` },
-              { key: "customer_name", label: "العميل", formatValue: (key, value) => orderApi.formatCustomerInfo(selectedItem) },
-              { key: "phone", label: "رقم الهاتف", formatValue: (key, value) => <span dir="ltr">{orderApi.getCustomerPhone(selectedItem)}</span> },
+              { key: "order_id", label: "رقم الطلب", formatValue: (_key, value) => `#${value}` },
+              { key: "customer_name", label: "العميل", formatValue: () => orderApi.formatCustomerInfo(selectedItem) },
+              { key: "phone", label: "رقم الهاتف", formatValue: () => <span dir="ltr">{orderApi.getCustomerPhone(selectedItem)}</span> },
               {
                 key: "status", label: "الحالة", formatValue: (key, value) => {
                   const statusBadge = orderApi.getStatusBadge(value);
@@ -734,8 +755,8 @@ export default function OrderManagement() {
                 }
               },
               { key: "count_items", label: "عدد العناصر" },
-              { key: "total_amount", label: "المبلغ الإجمالي", formatValue: (key, value) => orderApi.formatCurrency(value) },
-              { key: "created_at", label: "تاريخ الإنشاء", formatValue: (key, value) => orderApi.getFormattedDate(selectedItem) },
+              { key: "total_amount", label: "المبلغ الإجمالي", formatValue: (_key, value) => orderApi.formatCurrency(value) },
+              { key: "created_at", label: "تاريخ الإنشاء", formatValue: () => orderApi.getFormattedDate(selectedItem) },
               { key: "notes", label: "الملاحظات" },
             ]
             : []
@@ -1041,9 +1062,14 @@ export default function OrderManagement() {
 
               {/* Order Total */}
               <div className="flex justify-between items-center p-4 bg-primary-s/30 rounded-xl border border-secondary-f/10">
-                <div className="text-sm font-bold text-gray-700 italic">إجمالي تقديري:</div>
+                <div className="text-sm font-bold text-gray-700 italic">
+                  {modalState.mode === "edit" ? "المبلغ الإجمالي:" : "إجمالي تقديري:"}
+                </div>
                 <div className="text-xl font-black text-secondary-f">
-                  {orderApi.formatCurrency(calculateOrderTotal())}
+                  {modalState.mode === "edit" 
+                    ? orderApi.formatCurrency(selectedItem?.total_amount || calculateOrderTotal())
+                    : orderApi.formatCurrency(calculateOrderTotal())
+                  }
                 </div>
               </div>
             </div>

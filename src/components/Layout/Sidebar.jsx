@@ -85,15 +85,15 @@
 // src/components/Layout/Sidebar.jsx
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils"; // تأكد من وجود مسار utils لديك
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLayout } from "./LayoutContext";
 
-const Sidebar = ({ logo, title, items = [], footerItem }) => {
+const Sidebar = ({ items = [], footerItem }) => {
   const { collapsed, setCollapsed, mobileMenuOpen, setMobileMenuOpen } = useLayout();
   const location = useLocation();
 
-  const SidebarContent = () => (
+  const sidebarContent = (
     <div className="flex flex-col h-full bg-primary-s border-l-2 border-secondary-f transition-all duration-300">
       {/* Header */}
       <div className={cn("h-20 flex items-center border-b-2 border-secondary-f px-4", collapsed ? "justify-center" : "justify-between")}>
@@ -105,7 +105,10 @@ const Sidebar = ({ logo, title, items = [], footerItem }) => {
           <div className="text-xl font-bold  text-primary-f">
             <img
               src="/logo_alzafari/1-8.png"
+              alt="Alzafari logo"
               width={collapsed ? 40 : 60}
+              height={collapsed ? 40 : 60}
+              decoding="async"
               className="transition-all duration-300"
             />
           </div>
@@ -118,7 +121,7 @@ const Sidebar = ({ logo, title, items = [], footerItem }) => {
      {collapsed ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
   </Button> */}
 
-        <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)} className="md:hidden text-text-strong hover:bg-secondary-f">
+        <Button variant="ghost" size="icon" aria-label="إغلاق القائمة الجانبية" onClick={() => setMobileMenuOpen(false)} className="md:hidden text-text-strong hover:bg-secondary-f">
           <X className="w-5 h-5 text-primary-s" />
         </Button>
       </div>
@@ -168,7 +171,7 @@ const Sidebar = ({ logo, title, items = [], footerItem }) => {
           collapsed ? "w-20" : "w-64"
         )}
       >
-        <SidebarContent />
+        {sidebarContent}
       </aside>
 
       {/* Mobile Sidebar (Drawer) */}
@@ -176,7 +179,7 @@ const Sidebar = ({ logo, title, items = [], footerItem }) => {
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
           <div className="fixed inset-y-0 right-0 w-64 bg-surface animate-in slide-in-from-right shadow-2xl">
-            <SidebarContent />
+            {sidebarContent}
           </div>
         </div>
       )}

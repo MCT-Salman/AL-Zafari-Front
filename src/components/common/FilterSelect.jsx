@@ -15,6 +15,7 @@
  * />
  */
 
+import { useId } from "react";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/select";
 
 {/* <label className="block text-sm font-medium mb-1">الدور</label>
@@ -209,16 +210,19 @@ const FilterSelect = ({
   className = "",
   disabled = false,
 }) => {
+  const selectId = useId();
+
   return (
     <div className={`group w-full ${className}`}>
       {label && (
-        <label className="mb-2 block text-xs font-semibold tracking-wide text-secondary-t transition-colors group-focus-within:text-primary-f">
+        <label htmlFor={selectId} className="mb-2 block text-xs font-semibold tracking-wide text-secondary-t transition-colors group-focus-within:text-primary-f">
           {label}
         </label>
       )}
 
       <div className="relative">
         <select
+          id={selectId}
           value={value}
           onChange={onChange}
           disabled={disabled}

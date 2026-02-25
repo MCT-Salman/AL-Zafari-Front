@@ -8,7 +8,6 @@ export const TablePagination = ({
   totalPages,
   rowsPerPage,
   onPageChange,
-  onRowsPerPageChange,
   totalCount,
 }) => {
   const startItem = (currentPage - 1) * rowsPerPage + 1;
@@ -50,6 +49,7 @@ export const TablePagination = ({
         <Button
           variant="outline"
           size="icon"
+          aria-label="الصفحة السابقة"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
         >
@@ -80,6 +80,7 @@ export const TablePagination = ({
         <Button
           variant="outline"
           size="icon"
+          aria-label="الصفحة التالية"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
         >

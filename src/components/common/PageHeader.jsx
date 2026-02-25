@@ -19,8 +19,7 @@ const PageHeader = ({
   title = "العنوان",
   subtitle = "",
   actionLabel = null,
-  onAction = null,
-  className = ''
+  onAction = null
 }) => {
   return (
 

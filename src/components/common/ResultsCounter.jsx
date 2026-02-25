@@ -13,8 +13,7 @@
 
 const ResultsCounter = ({
   current = 0,
-  total = 0,
-  label = "تم العثور على"
+  total = 0
   // Example: "تم العثور على 10 من 25"
 }) => {
   return (

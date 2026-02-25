@@ -1,11 +1,11 @@
-
-const StatCircle = ({ value, label, icon: Icon, icon_color, subtitle_color, num_color }) => {
+const StatCircle = ({ value, label, icon, icon_color, subtitle_color, num_color }) => {
+    const Icon = icon;
     return (
         <div className="flex flex-col items-center gap-3 p-4 rounded-2xl bg-primary-s border-2 border-[#E5E5E5] hover:border-primary-f hover:shadow-md transition-all duration-300 group">
             <div
                 className={`w-16 h-16 flex items-center justify-center rounded-full bg-white border-2 shadow-sm group-hover:scale-110 transition-transform duration-300 ${icon_color}`}
             >
-                <Icon className={`w-7 h-7 ${icon_color}`} />
+                {Icon ? <Icon className={`w-7 h-7 ${icon_color}`} /> : null}
             </div>
             <div className="text-center">
                 <span className={`block text-2xl font-black ${num_color}`}>{value}</span>

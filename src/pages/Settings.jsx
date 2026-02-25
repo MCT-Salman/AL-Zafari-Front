@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Bell, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function Settings() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -105,7 +105,7 @@ export default function Settings() {
     setLoading(true);
     try {
       await logout();
-    } catch (err) {
+    } catch {
       setError("فشل في تسجيل الخروج");
     } finally {
       setLoading(false);

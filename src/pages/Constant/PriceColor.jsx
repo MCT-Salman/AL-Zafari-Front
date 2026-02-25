@@ -4,7 +4,6 @@ import { priceColorApi } from "../../api/priceColorApi";
 import { colorApi } from "../../api/colorApi";
 import { rulerApi } from "../../api/rulerApi";
 import { materialApi } from "../../api/materialApi";
-import { constantApi } from "../../api/constantApi";
 import { useCrud } from "../../hooks/useCrud";
 import { useExport } from "../../hooks/useExport";
 import { CrudModal } from "../../components/common/CrudModal";

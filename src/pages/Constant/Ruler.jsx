@@ -177,8 +177,6 @@ export default function Ruler() {
     // and onSubmit(data.id, formData) for edit
     const isEdit = arg2 !== undefined;
     const data = isEdit ? arg2 : arg1;
-    const rulerId = isEdit ? arg1 : null;
-
     setFormError("");
 
     // Validation
@@ -531,7 +529,7 @@ export default function Ruler() {
             ? [
               { key: "ruler_name", label: "اسم المسطرة" },
               { key: "entry_date", label: "تاريخ الإدخال" },
-              { key: "material_name", label: "المادة", formatValue: (key, value) => rulerApi.getMaterialName(selectedItem) },
+              { key: "material_name", label: "المادة", formatValue: () => rulerApi.getMaterialName(selectedItem) },
               { key: "notes", label: "الملاحظات" },
             ]
             : []

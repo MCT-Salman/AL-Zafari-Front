@@ -68,7 +68,6 @@ export default function Color() {
     openViewModal,
     openDeleteModal,
     closeModal,
-    handleSave,
     handleDelete,
   } = useCrud(colorApiAdapter, {
     idField: 'color_id',
@@ -255,11 +254,9 @@ export default function Color() {
   };
 
   // Handle save with validation
-  const handleSaveColor = async (idOrData, dataOrEmpty) => {
+  const handleSaveColor = async (idOrData) => {
     const isEdit = modalState.mode === 'edit';
     const colorId = isEdit ? (typeof idOrData === 'object' ? selectedItem?.color_id : idOrData) : null;
-    const actualData = isEdit ? (dataOrEmpty || idOrData) : idOrData;
-
     setFormError("");
 
     // Validation
@@ -509,6 +506,10 @@ export default function Color() {
                               <img
                                 src={`${API_BASE_URL}${color.imageUrl}`}
                                 alt={color.color_name}
+                                width="48"
+                                height="48"
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-full object-cover"
                               />
                             ) : (
@@ -599,7 +600,15 @@ export default function Color() {
                 label: "صورة اللون",
                 formatValue: (key, value) => value ? (
                   <div className="mt-2 w-32 h-32 rounded-xl border border-primary-f/10 overflow-hidden bg-gray-50 flex items-center justify-center">
-                    <img src={`${API_BASE_URL}${value}`} alt="Color" className="w-full h-full object-cover" />
+                    <img
+                      src={`${API_BASE_URL}${value}`}
+                      alt="Color"
+                      width="128"
+                      height="128"
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 ) : "لا توجد صورة"
               },
@@ -716,6 +725,9 @@ export default function Color() {
                   <img
                     src={formData.imagePreview}
                     alt="Preview"
+                    width="640"
+                    height="360"
+                    decoding="async"
                     className="w-full h-full object-contain"
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">

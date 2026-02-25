@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { authApi } from '../api/authApi';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   User,
@@ -14,10 +14,8 @@ import {
   Save,
   Loader2,
   CheckCircle2,
-  AlertCircle,
-  Camera
+  AlertCircle
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 // الألوان المستخدمة
 const colors = {
@@ -30,7 +28,7 @@ const colors = {
 };
 
 const Profile = () => {
-  const { user } = useAuth();
+  useAuth();
   const [formData, setFormData] = useState({
     full_name: '',
     username: '',
@@ -101,11 +99,6 @@ const Profile = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // حرف الأول من الاسم للأفاتار
-  const getInitials = () => {
-    return formData.full_name ? formData.full_name.charAt(0).toUpperCase() : 'U';
   };
 
   return (

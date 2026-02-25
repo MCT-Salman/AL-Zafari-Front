@@ -1,5 +1,4 @@
 // src/components/common/CrudModals/EditModal.jsx
-import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -14,18 +13,11 @@ export const EditModal = ({
   loading = false,
   size = 'md',
 }) => {
-  const [formData, setFormData] = useState(data || {});
-
-  // Update form when data changes
-  useEffect(() => {
-    if (data) setFormData(data);
-  }, [data]);
-
   if (!isOpen || !data) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await onSubmit(data.id, formData);
+    await onSubmit(data.id, data);
   };
 
   const sizeClasses = {

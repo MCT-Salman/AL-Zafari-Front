@@ -1,16 +1,11 @@
 // src/hooks/useFilter.js
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 
 export const useFilter = (data, config) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTermState] = useState('');
   const [filters, setFilters] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(20);
-
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filters]);
 
   // Apply search
   const searchedData = useMemo(() => {
@@ -41,8 +36,14 @@ export const useFilter = (data, config) => {
     return filteredData.slice(start, start + rowsPerPage);
   }, [filteredData, currentPage, rowsPerPage]);
 
+  const setSearchTerm = (value) => {
+    setSearchTermState(value);
+    setCurrentPage(1);
+  };
+
   const setFilter = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+    setCurrentPage(1);
   };
 
   return {

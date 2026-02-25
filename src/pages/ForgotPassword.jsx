@@ -24,7 +24,7 @@ export default function ForgotPassword() {
     setError("");
     const fullPhone = `+963${phone}`;
     try {
-      const response = await authApi.forgotPassword(fullPhone);
+      await authApi.forgotPassword(fullPhone);
       setSuccess(true);
 
       // Navigate to OTP verification page

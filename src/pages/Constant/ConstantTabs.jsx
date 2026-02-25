@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import ConstantType from "./ConstantType";
-import ConstantValue from "./ConstantValue";
-import Material from "./Material";
-import Color from "./Color";
-import PriceColor from "./PriceColor";
-import Batch from "./Batch";
-import Ruler from "./Ruler";
+
+const ConstantValue = lazy(() => import("./ConstantValue"));
+const Material = lazy(() => import("./Material"));
+const Color = lazy(() => import("./Color"));
+const PriceColor = lazy(() => import("./PriceColor"));
+const Batch = lazy(() => import("./Batch"));
+const Ruler = lazy(() => import("./Ruler"));
 
 
 const ConstantTabs = () => {
@@ -61,31 +61,48 @@ const ConstantTabs = () => {
 
         {/* محتوى التبويبات */}
         <div className="mt-3 md:mt-4 bg-background rounded-lg p-3 md:p-4 shadow-sm">
-          <TabsContent value="constant_type" className="space-y-3 md:space-y-4">
-            <ConstantType />
-          </TabsContent>
           <TabsContent value="constant_value" className="space-y-3 md:space-y-4">
-            <ConstantValue />
+            <Suspense fallback={<TabLoading />}>
+              <ConstantValue />
+            </Suspense>
           </TabsContent>
           <TabsContent value="material" className="space-y-3 md:space-y-4">
-            <Material />
+            <Suspense fallback={<TabLoading />}>
+              <Material />
+            </Suspense>
           </TabsContent>
           <TabsContent value="color" className="space-y-3 md:space-y-4">
-            <Color />
+            <Suspense fallback={<TabLoading />}>
+              <Color />
+            </Suspense>
           </TabsContent>
           <TabsContent value="price_color" className="space-y-3 md:space-y-4">
-            <PriceColor />
+            <Suspense fallback={<TabLoading />}>
+              <PriceColor />
+            </Suspense>
           </TabsContent>
           <TabsContent value="ruler" className="space-y-3 md:space-y-4">
-            <Ruler />
+            <Suspense fallback={<TabLoading />}>
+              <Ruler />
+            </Suspense>
           </TabsContent>
           <TabsContent value="batch" className="space-y-3 md:space-y-4">
-            <Batch />
+            <Suspense fallback={<TabLoading />}>
+              <Batch />
+            </Suspense>
           </TabsContent>
         </div>
       </Tabs>
     </div>
   );
 };
+
+function TabLoading() {
+  return (
+    <div className="flex items-center justify-center py-10 text-secondary-t">
+      جاري التحميل...
+    </div>
+  );
+}
 
 export default ConstantTabs;

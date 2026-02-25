@@ -25,9 +25,7 @@ const Select = forwardRef(({
   className = '',
   name,
   id,
-  allowClear = true,
   showCount = false,
-  virtualScroll = false,
   maxHeight = '250px',
   dropdownPosition = 'bottom',
   isLoadingOptions = false,
@@ -35,8 +33,7 @@ const Select = forwardRef(({
   onCreateOption,
   noOptionsMessage = 'No options available',
   loadingMessage = 'Loading...',
-  onCreateMessage = 'Create',
-  ...props
+  onCreateMessage = 'Create'
 }, ref) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -151,21 +148,6 @@ const Select = forwardRef(({
     
     if (onSearch) {
       onSearch(term);
-    }
-  };
-
-  const getSelectedLabels = () => {
-    if (multiple) {
-      const values = Array.isArray(selectedValue) ? selectedValue : [];
-      return values
-        .map(val => {
-          const option = internalOptions.find(opt => opt.value === val);
-          return option ? option.label : val;
-        })
-        .join(', ');
-    } else {
-      const option = internalOptions.find(opt => opt.value === selectedValue);
-      return option ? option.label : selectedValue || '';
     }
   };
 

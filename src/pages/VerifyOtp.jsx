@@ -15,7 +15,6 @@ export default function VerifyOtp() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [resetToken, setResetToken] = useState("");
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -26,7 +25,6 @@ export default function VerifyOtp() {
     try {
       const response = await authApi.verifyOtp(phone, otp);
       setSuccess(true);
-      setResetToken(response.data.resetToken);
       
       // Navigate to reset password page
       setTimeout(() => {

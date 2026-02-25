@@ -102,13 +102,10 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [error, setError] = useState("");
-
-  // 1. التعامل مع رسائل انتهاء الجلسة من الـ URL
-  useEffect(() => {
+  const [error, setError] = useState(() => {
     const message = searchParams.get('message');
-    if (message) setError(decodeURIComponent(message));
-  }, [searchParams]);
+    return message ? decodeURIComponent(message) : "";
+  });
 
   // 2. التوجيه التلقائي إذا كان مسجلاً للدخول
   useEffect(() => {

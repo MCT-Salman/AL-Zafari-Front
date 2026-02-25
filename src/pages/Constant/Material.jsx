@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { materialApi } from "../../api/materialApi";
-import { constantApi } from "../../api/constantApi";
 import { useCrud } from "../../hooks/useCrud";
 import { useExport } from "../../hooks/useExport";
 import { CrudModal } from "../../components/common/CrudModal";
@@ -135,7 +134,7 @@ export default function Material() {
   };
 
   // Handle save with validation
-  const handleSaveMaterial = async (data) => {
+  const handleSaveMaterial = async () => {
     setFormError("");
 
     // Validation

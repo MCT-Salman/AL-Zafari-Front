@@ -1,12 +1,10 @@
 // src\components\auth\AuthTemplate.jsx
 import { useState } from "react";
-import { Eye, EyeOff, Lock, User, Loader2, ArrowLeft, AlertCircle, Shield, Mail, ArrowDown } from "lucide-react";
+import { Eye, EyeOff, Lock, User, Loader2, ArrowLeft, AlertCircle, Shield, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
 
 export function AuthTemplate({
   title = "تسجيل الدخول",
@@ -25,7 +23,6 @@ export function AuthTemplate({
   const [showPassword, setShowPassword] = useState(false);
   const [internalLoading, setInternalLoading] = useState(false);
   const [formData, setFormData] = useState({ username: "", password: "" });
-  const navigate = useNavigate()
   // دمج حالة التحميل الداخلية والخارجية
   const isLoading = loading || internalLoading;
 
@@ -68,6 +65,9 @@ export function AuthTemplate({
                   <img
                     src={logo}
                     alt="Logo"
+                    width="64"
+                    height="64"
+                    decoding="async"
                     className="h-12 lg:h-16 object-contain relative z-10 drop-shadow-lg"
                   />
                 </div>
@@ -137,6 +137,7 @@ export function AuthTemplate({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
                       className="h-7 w-7 lg:h-8 lg:w-8 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md lg:rounded-lg transition-colors"
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
@@ -173,6 +174,17 @@ export function AuthTemplate({
                   </div>
                 )}
               </Button>
+              {onForgotPassword && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onForgotPassword}
+                  className="w-full text-primary-f hover:text-secondary-f"
+                  disabled={isLoading}
+                >
+                  نسيت كلمة المرور؟
+                </Button>
+              )}
             </form>
           </CardContent>
         </Card>

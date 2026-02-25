@@ -99,6 +99,7 @@ const Header = ({ children, className }) => {
         <Button 
           variant="ghost" 
           size="icon" 
+          aria-label="فتح القائمة الجانبية"
           className="md:hidden text-text-strong hover:bg-secondary-f" 
           onClick={() => setMobileMenuOpen(true)}
         >

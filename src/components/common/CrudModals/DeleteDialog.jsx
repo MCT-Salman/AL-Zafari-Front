@@ -1,7 +1,6 @@
 // src\components\common\CrudModals\DeleteDialog.jsx
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 export const DeleteModal = ({
   isOpen,

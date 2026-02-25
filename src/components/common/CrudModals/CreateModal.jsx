@@ -13,7 +13,7 @@ export const CreateModal = ({
   loading = false,
   size = 'md',
 }) => {
-  const [formData, setFormData] = useState({});
+  const [formData] = useState({});
 
   if (!isOpen) return null;
 

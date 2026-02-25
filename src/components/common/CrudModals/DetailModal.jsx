@@ -12,9 +12,8 @@ export const DetailsModal = ({
   fields = [],
   onEdit,
   onDelete,
-  loading = false,
   size = 'md',
-  formatValue,
+  formatValue: customFormatValue,
 }) => {
   if (!isOpen || !data) return null;
 
@@ -35,7 +34,7 @@ export const DetailsModal = ({
     return icons[key] || User;
   };
 
-   formatValue = (key, value) => {
+  const formatValue = customFormatValue || ((key, value) => {
     if (key.includes('date') || key.includes('_at')) {
       return new Date(value).toLocaleDateString('ar-SA', {
         year: 'numeric',
@@ -53,7 +52,7 @@ export const DetailsModal = ({
       );
     }
     return value;
-  };
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

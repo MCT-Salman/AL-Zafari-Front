@@ -35,10 +35,14 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     try {
       const response = await authApi.login({ username, password });
-      
-      if (response.data) {
-        const userData = response.data;
-        const { accessToken, refreshToken, expiresIn, ...userInfo } = userData;
+
+      // Support both payload shapes:
+      // - direct data object (current authApi)
+      // - axios response object with .data
+      const userData = response?.data ?? response;
+
+      if (userData) {
+        const { accessToken, refreshToken, expiresIn: _expiresIn, ...userInfo } = userData;
         
         setUser(userInfo);
         setIsAuthenticated(true);

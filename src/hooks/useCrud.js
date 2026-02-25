@@ -169,7 +169,7 @@ export const useCrud = (api, options = {}) => {
     } finally {
       setModalState(prev => ({ ...prev, loading: false }));
     }
-  }, [api, successMessages.create, errorMessages.create, onSuccess, onError, fetchItems]);
+  }, [api, successMessages.create, errorMessages.create, onSuccess, onError, fetchItems, keepOpenOnCreate]);
 
   // Update item
   const updateItem = useCallback(async (id, data) => {
@@ -193,7 +193,7 @@ export const useCrud = (api, options = {}) => {
     } finally {
       setModalState(prev => ({ ...prev, loading: false }));
     }
-  }, [api, successMessages.update, errorMessages.update, onSuccess, onError, fetchItems]);
+  }, [api, successMessages.update, errorMessages.update, onSuccess, onError, fetchItems, keepOpenOnUpdate]);
 
   // Delete item
   const deleteItem = useCallback(async (id) => {

@@ -1,23 +1,30 @@
 ﻿// src\App.jsx
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import MainLayout from "@/components/Layout/MainLayout";
-import Login from "@/pages/Login";
-import Dashboard from "@/pages/Dashboard";
-import Profile from "@/pages/Profile";
-import Settings from "@/pages/Settings";
-import Users from "@/pages/Users";
-import Constants from "@/pages/Constants";
-import SettingsManagement from "@/pages/SettingsManagement";
-import ForgotPassword from "@/pages/ForgotPassword";
-import VerifyOtp from "@/pages/VerifyOtp";
-import ResetPassword from "@/pages/ResetPassword";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Toaster } from 'react-hot-toast';
-import ConstantTabs from "./pages/Constant/ConstantTabs";
-import CustomerManagement from "./pages/Sales/CustomerManagement";
-import OrderManagement from "./pages/Sales/OrderManagement";
-import SalesHome from "./pages/Sales/SalesHome";
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
+
+const MainLayout = lazy(() => import("@/components/Layout/MainLayout"));
+const Login = lazy(() => import("@/pages/Login"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Users = lazy(() => import("@/pages/Users"));
+const SettingsManagement = lazy(() => import("@/pages/SettingsManagement"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const VerifyOtp = lazy(() => import("@/pages/VerifyOtp"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const ConstantTabs = lazy(() => import("./pages/Constant/ConstantTabs"));
+const CustomerManagement = lazy(() => import("./pages/Sales/CustomerManagement"));
+const OrderManagement = lazy(() => import("./pages/Sales/OrderManagement"));
+const SalesHome = lazy(() => import("./pages/Sales/SalesHome"));
+
+const RouteFallback = () => (
+  <div className="min-h-screen flex items-center justify-center text-sm text-gray-600">
+    جاري التحميل...
+  </div>
+);
 
 // Dashboard switcher based on role
 const DashboardSwitcher = () => {
@@ -30,55 +37,57 @@ const App = () => {
   return (
     <>
       <AuthProvider>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/verify-otp" element={<VerifyOtp />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/verify-otp" element={<VerifyOtp />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* Protected/App routes wrapped with MainLayout */}
-          <Route element={<MainLayout />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardSwitcher />} />
-            <Route path="/profile" element={
-              <RoleProtectedRoute allowedRoles="admin">
-                <Profile />
-              </RoleProtectedRoute>
-            } />
-            <Route path="/settings" element={
-              <RoleProtectedRoute allowedRoles="admin">
-                <Settings />
-              </RoleProtectedRoute>
-            } />
-            <Route path="/constants" element={
-              <RoleProtectedRoute allowedRoles="admin">
-                <ConstantTabs />
-              </RoleProtectedRoute>
-            } />
-            <Route path="/settings-management" element={
-              <RoleProtectedRoute allowedRoles="admin">
-                <SettingsManagement />
-              </RoleProtectedRoute>
-            } />
-            <Route path="/customers" element={
-              <RoleProtectedRoute allowedRoles="sales">
-                <CustomerManagement />
-              </RoleProtectedRoute>
-            } />
-            <Route path="/orders" element={
-              <RoleProtectedRoute allowedRoles="sales">
-                <OrderManagement />
-              </RoleProtectedRoute>
-            } />
-            <Route path="/users" element={
-              <RoleProtectedRoute allowedRoles="admin">
-                <Users />
-              </RoleProtectedRoute>
-            } />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Route>
-        </Routes>
+            {/* Protected/App routes wrapped with MainLayout */}
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardSwitcher />} />
+              <Route path="/profile" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <Profile />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <Settings />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/constants" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <ConstantTabs />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/settings-management" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <SettingsManagement />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/customers" element={
+                <RoleProtectedRoute allowedRoles="sales">
+                  <CustomerManagement />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/orders" element={
+                <RoleProtectedRoute allowedRoles="sales">
+                  <OrderManagement />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/users" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <Users />
+                </RoleProtectedRoute>
+              } />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
+          </Routes>
+        </Suspense>
       </AuthProvider>
       <Toaster
         position="top-center"

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { userApi } from "../../api/userApi";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -12,11 +12,7 @@ export default function UserDetailModal({ userId, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadUserDetails();
-  }, [userId]);
-
-  const loadUserDetails = async () => {
+  const loadUserDetails = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -27,7 +23,11 @@ export default function UserDetailModal({ userId, onClose }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    loadUserDetails();
+  }, [loadUserDetails]);
 
   if (!user && !loading) {
     return null;

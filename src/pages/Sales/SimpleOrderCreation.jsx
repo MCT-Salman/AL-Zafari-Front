@@ -91,7 +91,7 @@ export default function SimpleOrderCreation() {
       setColors(colorRes.data || colorRes || []);
       setBatches(batchRes.data || batchRes || []);
       setPriceColors(priceRes.data || priceRes || []);
-    } catch (err) {
+    } catch {
       setError("فشل في تحميل البيانات الأولية");
     } finally {
       setLoading(false);
@@ -133,7 +133,7 @@ export default function SimpleOrderCreation() {
       setNewCustomer({ name: "", phone: "", city: "", address: "" });
       setStep(2);
       setSuccess("تم إنشاء العميل بنجاح");
-    } catch (err) {
+    } catch {
       setError("فشل في إنشاء العميل");
     } finally {
       setLoading(false);
@@ -263,7 +263,7 @@ export default function SimpleOrderCreation() {
       setCreatedOrder(response.data);
       setStep(4);
       setSuccess("تم إنشاء الطلب بنجاح");
-    } catch (err) {
+    } catch {
       setError("فشل في إنشاء الطلب");
     } finally {
       setLoading(false);
@@ -657,7 +657,7 @@ export default function SimpleOrderCreation() {
 
             {/* Items List */}
             <div className="space-y-2">
-              {orderItems.map((item, index) => (
+              {orderItems.map((item) => (
                 <div key={item.id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -736,7 +736,7 @@ export default function SimpleOrderCreation() {
             <div className="border rounded-lg p-4 mb-4">
               <h3 className="font-medium mb-2">عناصر الطلب</h3>
               <div className="space-y-2">
-                {orderItems.map((item, index) => (
+                {orderItems.map((item) => (
                   <div key={item.id} className="flex justify-between items-center py-2 border-b">
                     <div>
                       <div className="font-bold">{item.type_item === "Machine" ? "مكنة" : "كوي"} | {item.material_name}</div>

@@ -1,7 +1,14 @@
 // src/hooks/useExport.js
 import { useState } from 'react';
-import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
+
+let xlsxModulePromise;
+const getXLSX = () => {
+  if (!xlsxModulePromise) {
+    xlsxModulePromise = import('xlsx');
+  }
+  return xlsxModulePromise;
+};
 
 export const useExport = (config) => {
   const [loading, setLoading] = useState(false);
@@ -9,6 +16,8 @@ export const useExport = (config) => {
   const exportToExcel = async (data, filename) => {
     setLoading(true);
     try {
+      const XLSX = await getXLSX();
+
       const exportData = data.map((item, index) => {
         const row = { '#': index + 1 };
         config.columns.forEach(col => {

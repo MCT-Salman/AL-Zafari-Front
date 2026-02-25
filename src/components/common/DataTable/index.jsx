@@ -17,7 +17,6 @@ export const DataTable = ({
   filters,
   searchConfig,
   pagination,
-  sortConfig,
   onSort,
   onExport,
   exportLoading,

@@ -119,6 +119,7 @@ export default function CustomerManagement() {
 
   // Success state for toggle operations
   const [success, setSuccess] = useState("");
+  const [toggleError, setToggleError] = useState("");
 
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
@@ -208,6 +209,7 @@ export default function CustomerManagement() {
   // Handle toggle customer status
   const handleToggleStatus = async (customerId) => {
     try {
+      setToggleError("");
       console.log('=== STARTING TOGGLE ===');
       console.log('Toggling customer status for ID:', customerId);
 
@@ -244,7 +246,7 @@ export default function CustomerManagement() {
       console.error('=== TOGGLE ERROR ===');
       console.error('Toggle error:', err);
       console.error('Error response:', err.response?.data);
-      setError(err.message || "فشل في تغيير حالة العميل");
+      setToggleError(err.message || "فشل في تغيير حالة العميل");
     }
   };
 
@@ -373,6 +375,14 @@ export default function CustomerManagement() {
               type="error"
               message={error}
               onDismiss={() => { }}
+              dismissable={true}
+            />
+          )}
+          {toggleError && (
+            <MessageAlert
+              type="error"
+              message={toggleError}
+              onDismiss={() => setToggleError("")}
               dismissable={true}
             />
           )}

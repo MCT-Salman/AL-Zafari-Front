@@ -153,7 +153,6 @@ export default function Constants() {
     setFormLoading(true);
     try {
       const typeId = parseInt(selectedTab);
-      const typeIdStr = selectedTab;
       if (editingValue) {
         await constantApi.updateConstantValue(editingValue.constant_value_id, {
           value: formValueData.value,

@@ -170,7 +170,7 @@ export default function Batch() {
   };
 
   // Handle save with validation
-  const handleSaveBatch = async (data) => {
+  const handleSaveBatch = async () => {
     setFormError("");
 
     // Validation

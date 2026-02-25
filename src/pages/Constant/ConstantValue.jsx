@@ -76,15 +76,9 @@ import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 
 import PaginationControls from "../../components/common/PaginationControls";
 
-import SwitchActive from "../../components/common/SwitchActive";
-
 import { materialApi } from "../../api/materialApi";
 
 
-
-// القيم المتاحة للاختيار
-
-const AVAILABLE_VALUES = ["22", "44", "66"];
 
 // الوحدات المتاحة
 
@@ -102,19 +96,13 @@ const AVAILABLE_UNITS = [
 
 export default function ConstantValue() {
 
-  // State for constant types (for filter)
-
-  const [constantTypes, setConstantTypes] = useState([]);
-
-  const [typesLoading, setTypesLoading] = useState(false);
-
-
-
   // State for materials and type selection
 
   const [selectedMaterialId, setSelectedMaterialId] = useState("");
 
   const [selectedType, setSelectedType] = useState("");
+
+  const [materials, setMaterials] = useState([]);
 
 
 
@@ -244,7 +232,7 @@ export default function ConstantValue() {
 
     deleteItem: (...args) => constantApi.deleteConstantValue(...args),
 
-  }), [selectedMaterialId, selectedType]);
+  }), [selectedMaterialId, selectedType, materials]);
 
 
 
@@ -360,21 +348,11 @@ export default function ConstantValue() {
 
   const [formError, setFormError] = useState("");
 
-  const [materials, setMaterials] = useState([]);
-
-
-
-  useEffect(() => {
-
-    loadMaterials();
-
-  }, [])
-
 
 
   // Load materials for dropdown
 
-  const loadMaterials = async () => {
+  async function loadMaterials() {
 
     try {
 
@@ -388,7 +366,14 @@ export default function ConstantValue() {
 
     }
 
-  };
+  }
+
+  useEffect(() => {
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadMaterials();
+
+  }, [])
 
 
 
@@ -424,7 +409,7 @@ export default function ConstantValue() {
 
     }
 
-  }, [selectedMaterialId, selectedType]);
+  }, [selectedMaterialId, selectedType, fetchItems]);
 
 
 
@@ -666,26 +651,6 @@ export default function ConstantValue() {
 
 
 
-  // Handle toggle default status
-
-  const handleToggleDefault = async (value) => {
-
-    const updatedData = {
-
-      ...value,
-
-      isDefault: !value.isDefault,
-
-    };
-
-    const { constant_value_id, id, constant_type_id, type, ...dataToSend } = updatedData;
-
-    await handleSave(constant_value_id || id, dataToSend);
-
-  };
-
-
-
   // Calculate stats
 
   const stats = {
@@ -786,6 +751,7 @@ export default function ConstantValue() {
 
   useEffect(() => {
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentPage(1);
 
   }, [searchTerm, defaultFilter, selectedMaterialId, selectedType]);

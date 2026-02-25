@@ -1,4 +1,4 @@
-import React, { useState, useEffect, forwardRef } from 'react';
+import React, { useId, useState, forwardRef } from 'react';
 import PropTypes from 'prop-types';
 import './Switch.css'; // Optional CSS file
 
@@ -76,7 +76,8 @@ const Switch = forwardRef(({
   };
 
   // Generate unique IDs if not provided
-  const switchId = id || name || `switch-${Math.random().toString(36).substr(2, 9)}`;
+  const generatedId = useId();
+  const switchId = id || name || `switch-${generatedId}`;
   const labelId = `label-${switchId}`;
 
   const baseClasses = 'switch';
