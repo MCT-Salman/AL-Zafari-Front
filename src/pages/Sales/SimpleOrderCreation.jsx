@@ -21,12 +21,18 @@ import {
   Package,
   Check,
   X,
-  ArrowRight
+  ArrowRight,
+  History,
+  Trash2,
+  Eye,
+  RotateCcw
 } from "lucide-react";
 import MessageAlert from "../../components/common/MessageAlert";
 import LoadingState from "../../components/common/LoadingState";
+import { getApiData } from "../../utils/api";
 
 export default function SimpleOrderCreation() {
+  const [viewMode, setViewMode] = useState("create"); // create | history
   const [step, setStep] = useState(1); // 1: Customer, 2: Items, 3: Review, 4: Success
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -68,11 +74,64 @@ export default function SimpleOrderCreation() {
 
   const [orderNotes, setOrderNotes] = useState("");
   const [createdOrder, setCreatedOrder] = useState(null);
+  const [activeField, setActiveField] = useState("length");
+  const [itemsPage, setItemsPage] = useState(1);
+  const [customerPage, setCustomerPage] = useState(1);
+
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrderLoading, setSelectedOrderLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+
+  const itemsPerPage = 4;
+  const customersPerPage = 6;
+  const historyPageSize = 6;
+
+  const getActiveValue = () => {
+    const value = currentItem[activeField];
+    return value === undefined || value === null ? "" : String(value);
+  };
+
+  const setActiveValue = (value) => {
+    setCurrentItem((prev) => ({ ...prev, [activeField]: value }));
+  };
+
+  const handleNumpadPress = (val) => {
+    if (!activeField) return;
+    let next = getActiveValue();
+
+    if (val === "clear") {
+      next = "";
+    } else if (val === "back") {
+      next = next.slice(0, -1);
+    } else if (val === ".") {
+      if (next.includes(".")) return;
+      next = next ? `${next}.` : "0.";
+    } else {
+      next = `${next}${val}`;
+    }
+
+    setActiveValue(next);
+  };
 
   // Load lookup data on mount
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (viewMode === "history") {
+      loadOrders();
+      setHistoryPage(1);
+      setSelectedOrder(null);
+    }
+  }, [viewMode]);
+
+  useEffect(() => {
+    setCustomerPage(1);
+  }, [searchTerm]);
 
   const loadInitialData = async () => {
     try {
@@ -85,16 +144,57 @@ export default function SimpleOrderCreation() {
         batchApi.getBatches(),
         priceColorApi.getPriceColors(),
       ]);
-      setCustomers(custRes.data || custRes || []);
-      setMaterials(matRes.data || matRes || []);
-      setRulers(rulerRes.data || rulerRes || []);
-      setColors(colorRes.data || colorRes || []);
-      setBatches(batchRes.data || batchRes || []);
-      setPriceColors(priceRes.data || priceRes || []);
+      setCustomers(getApiData(custRes, []) || []);
+      setMaterials(getApiData(matRes, []) || []);
+      setRulers(getApiData(rulerRes, []) || []);
+      setColors(getApiData(colorRes, []) || []);
+      setBatches(getApiData(batchRes, []) || []);
+      setPriceColors(getApiData(priceRes, []) || []);
     } catch {
       setError("فشل في تحميل البيانات الأولية");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      setOrdersError("");
+      const response = await orderApi.getOrders();
+      setOrders(getApiData(response, []) || []);
+      setHistoryPage(1);
+    } catch (err) {
+      setOrdersError(err.message || "فشل في تحميل الطلبات");
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const openOrderDetails = async (orderId) => {
+    try {
+      setSelectedOrderLoading(true);
+      const response = await orderApi.getOrderById(orderId);
+      setSelectedOrder(getApiData(response, null));
+    } catch (err) {
+      setOrdersError(err.message || "فشل في تحميل تفاصيل الطلب");
+    } finally {
+      setSelectedOrderLoading(false);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    const confirmed = window.confirm("هل تريد حذف هذا الطلب؟");
+    if (!confirmed) return;
+    try {
+      setOrdersError("");
+      await orderApi.deleteOrder(orderId);
+      await loadOrders();
+      if (selectedOrder?.order_id === orderId) {
+        setSelectedOrder(null);
+      }
+    } catch (err) {
+      setOrdersError(err.message || "فشل في حذف الطلب");
     }
   };
 
@@ -104,6 +204,39 @@ export default function SimpleOrderCreation() {
     customer.phone?.includes(searchTerm) ||
     customer.city?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const totalCustomerPages = Math.max(1, Math.ceil(filteredCustomers.length / customersPerPage));
+  const visibleCustomers = filteredCustomers.slice(
+    (customerPage - 1) * customersPerPage,
+    customerPage * customersPerPage
+  );
+
+  const totalItemsPages = Math.max(1, Math.ceil(orderItems.length / itemsPerPage));
+  const visibleItems = orderItems.slice(
+    (itemsPage - 1) * itemsPerPage,
+    itemsPage * itemsPerPage
+  );
+
+  const totalHistoryPages = Math.max(1, Math.ceil(orders.length / historyPageSize));
+  const visibleOrders = orders.slice(
+    (historyPage - 1) * historyPageSize,
+    historyPage * historyPageSize
+  );
+
+  const getOrderCustomerName = (order) =>
+    order?.customer?.name || order?.customer_name || order?.customer?.customer_name || `#${order?.customer_id || "-"}`;
+
+  const getOrderId = (order) => order?.order_id || order?.id;
+
+  const getOrderTotal = (order) => {
+    if (!order) return 0;
+    if (order.total_amount !== undefined) return order.total_amount;
+    if (order.total !== undefined) return order.total;
+    if (Array.isArray(order.items)) {
+      return order.items.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
+    }
+    return 0;
+  };
 
   // Handle customer selection
   const handleCustomerSelect = (customer) => {
@@ -126,7 +259,7 @@ export default function SimpleOrderCreation() {
         is_active: true
       });
 
-      const createdCustomer = response.data;
+      const createdCustomer = getApiData(response, null);
       setSelectedCustomer(createdCustomer);
       setCustomers([...customers, createdCustomer]);
       setShowNewCustomerForm(false);
@@ -212,7 +345,9 @@ export default function SimpleOrderCreation() {
       subtotal: subtotal
     };
 
-    setOrderItems([...orderItems, itemToAdd]);
+    const nextItems = [...orderItems, itemToAdd];
+    setOrderItems(nextItems);
+    setItemsPage(Math.ceil(nextItems.length / itemsPerPage));
     setCurrentItem({
       ...currentItem,
       color_id: "",
@@ -226,7 +361,9 @@ export default function SimpleOrderCreation() {
 
   // Remove item from order
   const handleRemoveItem = (itemId) => {
-    setOrderItems(orderItems.filter(item => item.id !== itemId));
+    const nextItems = orderItems.filter(item => item.id !== itemId);
+    setOrderItems(nextItems);
+    setItemsPage(Math.max(1, Math.min(itemsPage, Math.ceil(nextItems.length / itemsPerPage))));
   };
 
   // Calculate order total
@@ -260,7 +397,7 @@ export default function SimpleOrderCreation() {
       };
 
       const response = await orderApi.createOrder(orderData);
-      setCreatedOrder(response.data);
+      setCreatedOrder(getApiData(response, null));
       setStep(4);
       setSuccess("تم إنشاء الطلب بنجاح");
     } catch {
@@ -275,6 +412,8 @@ export default function SimpleOrderCreation() {
     setStep(1);
     setSelectedCustomer(null);
     setOrderItems([]);
+    setItemsPage(1);
+    setCustomerPage(1);
     setCurrentItem({
       type_item: "Machine",
       material_id: "",
@@ -305,40 +444,65 @@ export default function SimpleOrderCreation() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50 p-4 overflow-hidden">
+      <div className="max-w-6xl mx-auto h-[calc(100vh-2rem)] flex flex-col gap-4">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">إنشاء طلب جديد</h1>
-          <p className="text-gray-600 mt-2">عملية سهلة ومبسطة لإنشاء طلبات المبيعات</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">?? ??? ???</h1>
+            <p className="text-gray-600 mt-1">??? ? ??? ?? ??? ????</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={viewMode === "create" ? "default" : "outline"}
+              className="h-11 px-4"
+              onClick={() => setViewMode("create")}
+            >
+              <ShoppingCart className="w-4 h-4 ml-2" />
+              ??? ?
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === "history" ? "default" : "outline"}
+              className="h-11 px-4"
+              onClick={() => setViewMode("history")}
+            >
+              <History className="w-4 h-4 ml-2" />
+              ??? ???
+            </Button>
+          </div>
         </div>
 
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            {[1, 2, 3, 4].map((stepNumber) => (
-              <div key={stepNumber} className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step >= stepNumber ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"
-                  }`}>
-                  {stepNumber === 1 && <User className="w-5 h-5" />}
-                  {stepNumber === 2 && <Package className="w-5 h-5" />}
-                  {stepNumber === 3 && <Check className="w-5 h-5" />}
-                  {stepNumber === 4 && <ShoppingCart className="w-5 h-5" />}
+
+                {/* Progress Steps */}
+        {viewMode === "create" && (
+          <div className="mb-2">
+            <div className="flex items-center justify-between">
+              {[1, 2, 3, 4].map((stepNumber) => (
+                <div key={stepNumber} className="flex items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step >= stepNumber ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"
+                    }`}>
+                    {stepNumber === 1 && <User className="w-5 h-5" />}
+                    {stepNumber === 2 && <Package className="w-5 h-5" />}
+                    {stepNumber === 3 && <Check className="w-5 h-5" />}
+                    {stepNumber === 4 && <ShoppingCart className="w-5 h-5" />}
+                  </div>
+                  {stepNumber < 4 && (
+                    <div className={`w-full h-1 mx-2 ${step > stepNumber ? "bg-blue-600" : "bg-gray-300"
+                      }`} />
+                  )}
                 </div>
-                {stepNumber < 4 && (
-                  <div className={`w-full h-1 mx-2 ${step > stepNumber ? "bg-blue-600" : "bg-gray-300"
-                    }`} />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
+            <div className="flex justify-between mt-2 text-sm">
+              <span className={step >= 1 ? "text-blue-600 font-medium" : "text-gray-600"}>???? ????</span>
+              <span className={step >= 2 ? "text-blue-600 font-medium" : "text-gray-600"}>???? ??????</span>
+              <span className={step >= 3 ? "text-blue-600 font-medium" : "text-gray-600"}>???? ????</span>
+              <span className={step >= 4 ? "text-blue-600 font-medium" : "text-gray-600"}>?? ??????</span>
+            </div>
           </div>
-          <div className="flex justify-between mt-2 text-sm">
-            <span className={step >= 1 ? "text-blue-600 font-medium" : "text-gray-600"}>اختيار العميل</span>
-            <span className={step >= 2 ? "text-blue-600 font-medium" : "text-gray-600"}>إضافة العناصر</span>
-            <span className={step >= 3 ? "text-blue-600 font-medium" : "text-gray-600"}>مراجعة الطلب</span>
-            <span className={step >= 4 ? "text-blue-600 font-medium" : "text-gray-600"}>تم الإنشاء</span>
-          </div>
-        </div>
+        )}
 
         {/* Messages */}
         {error && (
@@ -359,8 +523,8 @@ export default function SimpleOrderCreation() {
         )}
 
         {/* Step 1: Customer Selection */}
-        {step === 1 && (
-          <Card className="p-6">
+        {viewMode === "create" && step === 1 && (
+          <Card className="p-6 flex-1 overflow-hidden">
             <h2 className="text-xl font-bold mb-4">اختيار العميل</h2>
 
             {/* Search */}
@@ -378,8 +542,8 @@ export default function SimpleOrderCreation() {
             </div>
 
             {/* Customer List */}
-            <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-              {filteredCustomers.map((customer) => (
+            <div className="space-y-2 mb-4">
+              {visibleCustomers.map((customer) => (
                 <div
                   key={customer.customer_id}
                   className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -397,6 +561,30 @@ export default function SimpleOrderCreation() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                onClick={() => setCustomerPage((prev) => Math.max(1, prev - 1))}
+                disabled={customerPage === 1}
+              >
+                السابق
+              </Button>
+              <div className="text-sm text-gray-500">
+                صفحة {customerPage} من {totalCustomerPages}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                onClick={() => setCustomerPage((prev) => Math.min(totalCustomerPages, prev + 1))}
+                disabled={customerPage >= totalCustomerPages}
+              >
+                التالي
+              </Button>
             </div>
 
             {/* Add New Customer Button */}
@@ -466,8 +654,8 @@ export default function SimpleOrderCreation() {
         )}
 
         {/* Step 2: Add Items */}
-        {step === 2 && (
-          <Card className="p-6">
+        {viewMode === "create" && step === 2 && (
+          <Card className="p-6 flex-1 overflow-hidden">
             <div className="mb-4">
               <h2 className="text-xl font-bold">إضافة العناصر</h2>
               <p className="text-gray-600">العميل: {selectedCustomer?.name}</p>
@@ -621,6 +809,7 @@ export default function SimpleOrderCreation() {
                   <Input
                     type="number"
                     value={currentItem.length}
+                    onFocus={() => setActiveField("length")}
                     onChange={(e) => handleItemFieldChange("length", e.target.value)}
                     placeholder="مثال: 100"
                   />
@@ -631,6 +820,7 @@ export default function SimpleOrderCreation() {
                   <Input
                     type="number"
                     value={currentItem.quantity}
+                    onFocus={() => setActiveField("quantity")}
                     onChange={(e) => handleItemFieldChange("quantity", e.target.value)}
                     className="font-bold"
                   />
@@ -653,11 +843,53 @@ export default function SimpleOrderCreation() {
               >
                 <Plus className="w-5 h-5 ml-2" /> إضافة العنصر للطلب
               </Button>
+
+              <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-sm font-bold">لوحة الأرقام</div>
+                    <div className="text-xs text-gray-500">
+                      الحقل الحالي: {activeField === "length" ? "الطول" : "الكمية"}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mb-4">
+                    <Button
+                      type="button"
+                      variant={activeField === "length" ? "default" : "outline"}
+                      className="flex-1 h-11"
+                      onClick={() => setActiveField("length")}
+                    >
+                      الطول
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={activeField === "quantity" ? "default" : "outline"}
+                      className="flex-1 h-11"
+                      onClick={() => setActiveField("quantity")}
+                    >
+                      الكمية
+                    </Button>
+                  </div>
+
+                  <Numpad onPress={handleNumpadPress} />
+                </Card>
+
+                <Card className="p-4">
+                  <div className="text-sm font-bold mb-3">القيمة الحالية</div>
+                  <div className="text-3xl font-black text-secondary-f border rounded-xl p-4 text-center bg-gray-50">
+                    {getActiveValue() || "0"}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-3">
+                    استخدم لوحة الأرقام لإدخال {activeField === "length" ? "الطول" : "الكمية"}
+                  </div>
+                </Card>
+              </div>
             </div>
 
             {/* Items List */}
             <div className="space-y-2">
-              {orderItems.map((item) => (
+              {visibleItems.map((item) => (
                 <div key={item.id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -686,6 +918,30 @@ export default function SimpleOrderCreation() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="flex items-center justify-between mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                onClick={() => setItemsPage((prev) => Math.max(1, prev - 1))}
+                disabled={itemsPage === 1}
+              >
+                السابق
+              </Button>
+              <div className="text-sm text-gray-500">
+                صفحة {itemsPage} من {totalItemsPages}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                onClick={() => setItemsPage((prev) => Math.min(totalItemsPages, prev + 1))}
+                disabled={itemsPage >= totalItemsPages}
+              >
+                التالي
+              </Button>
             </div>
 
             {/* Total Summary */}
@@ -717,8 +973,8 @@ export default function SimpleOrderCreation() {
         )}
 
         {/* Step 3: Review */}
-        {step === 3 && (
-          <Card className="p-6">
+        {viewMode === "create" && step === 3 && (
+          <Card className="p-6 flex-1 overflow-hidden">
             <h2 className="text-xl font-bold mb-4">مراجعة الطلب</h2>
 
             {/* Customer Info */}
@@ -793,8 +1049,8 @@ export default function SimpleOrderCreation() {
         )}
 
         {/* Step 4: Success */}
-        {step === 4 && (
-          <Card className="p-6 text-center">
+        {viewMode === "create" && step === 4 && (
+          <Card className="p-6 text-center flex-1 overflow-hidden">
             <div className="mb-6">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check className="w-10 h-10 text-green-600" />
@@ -831,7 +1087,191 @@ export default function SimpleOrderCreation() {
             </div>
           </Card>
         )}
+        {viewMode === "history" && (
+          <div className="flex-1 overflow-hidden">
+            <Card className="p-4 h-full">
+              <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1.4fr] gap-4 h-full">
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h2 className="text-lg font-bold">الطلبات السابقة</h2>
+                      <p className="text-xs text-gray-500">اختر طلباً لعرض التفاصيل</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10"
+                      onClick={loadOrders}
+                      disabled={ordersLoading}
+                    >
+                      <RotateCcw className="w-4 h-4 ml-2" />
+                      تحديث
+                    </Button>
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    {ordersLoading && <LoadingState message="جاري تحميل الطلبات..." />}
+                    {!ordersLoading && visibleOrders.length === 0 && (
+                      <div className="border rounded-lg p-4 text-center text-sm text-gray-500">
+                        لا توجد طلبات سابقة
+                      </div>
+                    )}
+                    {!ordersLoading && visibleOrders.map((order) => {
+                      const orderId = getOrderId(order);
+                      return (
+                        <div
+                          key={orderId}
+                          className={`border rounded-lg p-3 flex items-center justify-between ${getOrderId(selectedOrder) === orderId ? "border-blue-400 bg-blue-50" : "hover:bg-gray-50"}`}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold">طلب #{orderId}</span>
+                            <span className="text-xs text-gray-600">{getOrderCustomerName(order)}</span>
+                            <span className="text-xs text-gray-500">{order.created_at || order.date || ""}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 px-3"
+                              onClick={() => openOrderDetails(orderId)}
+                            >
+                              <Eye className="w-4 h-4 ml-2" />
+                              عرض
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 px-3 text-red-600 border-red-200 hover:text-red-700"
+                              onClick={() => handleDeleteOrder(orderId)}
+                            >
+                              <Trash2 className="w-4 h-4 ml-2" />
+                              حذف
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center justify-between mt-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10"
+                      onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
+                      disabled={historyPage === 1}
+                    >
+                      السابق
+                    </Button>
+                    <div className="text-sm text-gray-500">
+                      صفحة {historyPage} من {totalHistoryPages}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10"
+                      onClick={() => setHistoryPage((prev) => Math.min(totalHistoryPages, prev + 1))}
+                      disabled={historyPage >= totalHistoryPages}
+                    >
+                      التالي
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col h-full">
+                  <div className="mb-3">
+                    <h2 className="text-lg font-bold">تفاصيل الطلب</h2>
+                    <p className="text-xs text-gray-500">عرض سريع بدون تمرير</p>
+                  </div>
+                  <div className="flex-1 border rounded-lg p-4 bg-gray-50">
+                    {selectedOrderLoading && <LoadingState message="جاري تحميل التفاصيل..." />}
+                    {!selectedOrderLoading && !selectedOrder && (
+                      <div className="text-center text-sm text-gray-500">اختر طلباً من القائمة</div>
+                    )}
+                    {!selectedOrderLoading && selectedOrder && (
+                      <div className="space-y-3 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold">طلب #{getOrderId(selectedOrder)}</span>
+                          <Badge className="bg-yellow-100 text-yellow-800">
+                            {selectedOrder.status || "قيد الانتظار"}
+                          </Badge>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">العميل</div>
+                          <div className="font-medium">{getOrderCustomerName(selectedOrder)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">المبلغ الإجمالي</div>
+                          <div className="text-lg font-bold text-green-600">{formatCurrency(getOrderTotal(selectedOrder))}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">العناصر</div>
+                          <div className="space-y-2">
+                            {(selectedOrder.items || []).slice(0, 4).map((item, idx) => (
+                              <div key={`${item.id || idx}`} className="border rounded-md p-2 bg-white">
+                                <div className="text-xs text-gray-600">
+                                  {item.type_item === "Machine" ? "مكـنة" : "كوي"} | {item.color_name || item.color?.color_name || "-"}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {item.width || "-"} × {item.length || "-"} | الكمية: {item.quantity || "-"}
+                                </div>
+                              </div>
+                            ))}
+                            {(selectedOrder.items || []).length > 4 && (
+                              <div className="text-xs text-gray-500">... عناصر إضافية</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {ordersError && (
+                    <div className="mt-3">
+                      <MessageAlert
+                        type="error"
+                        message={ordersError}
+                        onDismiss={() => setOrdersError("")}
+                        dismissable={true}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function Numpad({ onPress }) {
+  const keys = [
+    "7", "8", "9",
+    "4", "5", "6",
+    "1", "2", "3",
+    ".", "0", "back",
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {keys.map((key) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onPress(key)}
+          className="h-14 rounded-xl border bg-white text-lg font-bold active:scale-95 transition"
+        >
+          {key === "back" ? "⌫" : key}
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={() => onPress("clear")}
+        className="col-span-3 h-12 rounded-xl bg-red-100 text-red-700 font-bold"
+      >
+        مسح
+      </button>
     </div>
   );
 }

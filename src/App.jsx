@@ -19,6 +19,8 @@ const ConstantTabs = lazy(() => import("./pages/Constant/ConstantTabs"));
 const CustomerManagement = lazy(() => import("./pages/Sales/CustomerManagement"));
 const OrderManagement = lazy(() => import("./pages/Sales/OrderManagement"));
 const SalesHome = lazy(() => import("./pages/Sales/SalesHome"));
+const SalesProfile = lazy(() => import("./pages/Sales/SalesProfile"));
+const PasswordResetOtp = lazy(() => import("./pages/Admin/PasswordResetOtp"));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center text-sm text-gray-600">
@@ -79,9 +81,19 @@ const App = () => {
                   <OrderManagement />
                 </RoleProtectedRoute>
               } />
+              <Route path="/sales/profile" element={
+                <RoleProtectedRoute allowedRoles="sales">
+                  <SalesProfile />
+                </RoleProtectedRoute>
+              } />
               <Route path="/users" element={
                 <RoleProtectedRoute allowedRoles="admin">
                   <Users />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/admin/password-reset" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <PasswordResetOtp />
                 </RoleProtectedRoute>
               } />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

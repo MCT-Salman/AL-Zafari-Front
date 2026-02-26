@@ -39,19 +39,21 @@ export const AuthProvider = ({ children }) => {
       // Support both payload shapes:
       // - direct data object (current authApi)
       // - axios response object with .data
-      const userData = response?.data ?? response;
+      const payload = response?.data ?? response;
+      const userData = payload?.data ?? payload;
 
       if (userData) {
-        const { accessToken, refreshToken, expiresIn: _expiresIn, ...userInfo } = userData;
-        
+        const { accessToken, refreshToken, expiresIn: _expiresIn, userWithoutPassword } = userData;
+        const userInfo = userWithoutPassword || userData;
+
         setUser(userInfo);
         setIsAuthenticated(true);
-        
+
         // Store tokens
-        localStorage.setItem("accessToken", accessToken);
-        localStorage.setItem("refreshToken", refreshToken);
+        if (accessToken) localStorage.setItem("accessToken", accessToken);
+        if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
         localStorage.setItem("auth", JSON.stringify(userInfo));
-        
+
         return response;
       }
     } catch (error) {

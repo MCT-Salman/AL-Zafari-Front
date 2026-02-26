@@ -30,6 +30,7 @@ import EmptyState from "../components/common/EmptyState";
 import RowsPerPageSelector from "../components/common/RowsPerPageSelector";
 import PaginationControls from "../components/common/PaginationControls";
 import StyledDialog from "../components/common/StyledDialog";
+import { getApiData } from "../utils/api";
 
 export default function Constants() {
   const [constantTypes, setConstantTypes] = useState([]);
@@ -88,9 +89,10 @@ export default function Constants() {
     try {
       const response = await constantApi.getConstantTypes();
       // GET /constant-type returns values embedded inside each type
-      setConstantTypes(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedTab(response.data[0].constant_type_id.toString());
+      const data = getApiData(response, []);
+      setConstantTypes(data || []);
+      if (data && data.length > 0) {
+        setSelectedTab(data[0].constant_type_id.toString());
       }
     } catch (err) {
       setError(err.message || "فشل في تحميل أنواع الثوابت");
@@ -102,10 +104,11 @@ export default function Constants() {
   const reloadConstantValues = async (typeId) => {
     try {
       const response = await constantApi.getConstantValuesByType(typeId);
+      const data = getApiData(response, []);
       setConstantTypes(prev => 
         prev.map(type => 
           type.constant_type_id.toString() === typeId.toString() 
-            ? { ...type, values: response.data || [] }
+            ? { ...type, values: data || [] }
             : type
         )
       );

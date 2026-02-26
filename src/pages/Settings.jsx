@@ -6,6 +6,7 @@ import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Bell, Lock, Eye, EyeOff } from "lucide-react";
+import { getApiData, getApiMessage } from "../utils/api";
 
 export default function Settings() {
   const { logout } = useAuth();
@@ -33,14 +34,15 @@ export default function Settings() {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const response = await authApi.getProfile();
-        if (response.data) {
-          setProfileData({
-            full_name: response.data.full_name || "",
-            username: response.data.username || "",
-            phone: response.data.phone || "",
-          });
-        }
+      const response = await authApi.getProfile();
+      const data = getApiData(response, null);
+      if (data) {
+        setProfileData({
+          full_name: data.full_name || "",
+          username: data.username || "",
+          phone: data.phone || "",
+        });
+      }
       } catch (err) {
         console.error("Error loading profile:", err);
       }
@@ -57,7 +59,7 @@ export default function Settings() {
 
     try {
       const response = await authApi.updateProfile(profileData);
-      setMessage(response.message || "تم تحديث البيانات الشخصية بنجاح");
+      setMessage(getApiMessage(response, "تم تحديث البيانات الشخصية بنجاح"));
     } catch (err) {
       setError(err.message || "فشل في تحديث البيانات");
     } finally {

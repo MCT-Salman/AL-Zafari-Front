@@ -82,6 +82,16 @@ export const orderApi = {
     }
   },
 
+  // Delete order
+  deleteOrder: async (orderId) => {
+    try {
+      const response = await axiosInstance.delete(`/order/${orderId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'ط­ط¯ط« ط®ط·ط£ ظپظٹ ط­ط°ظپ ط§ظ„ط·ظ„ط¨' };
+    }
+  },
+
   // Helper functions
   getOrderStatus: (order) => {
     return order?.status || 'غير محدد';

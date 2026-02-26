@@ -53,6 +53,15 @@ axiosInstance.interceptors.response.use(
       data: error.response?.data,
     });
 
+    // Normalize error message to server message if present
+    const serverMessage =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      (typeof error.response?.data === "string" ? error.response.data : "");
+    if (serverMessage) {
+      error.message = serverMessage;
+    }
+
     const originalRequest = error.config;
 
     // تجديد التوكن إذا كان منتهي الصلاحية
@@ -62,10 +71,12 @@ axiosInstance.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refreshToken');
         const response = await axiosInstance.post('/auth/refresh', { refreshToken });
-        const { accessToken } = response.data;
-        
-        localStorage.setItem('accessToken', accessToken);
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        const accessToken = response?.data?.data?.accessToken || response?.data?.accessToken;
+
+        if (accessToken) {
+          localStorage.setItem('accessToken', accessToken);
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        }
         
         return axiosInstance(originalRequest);
       } catch (refreshError) {

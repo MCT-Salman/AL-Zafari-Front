@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from "lucide-react";
+import { getApiData, getApiMessage } from "../utils/api";
 
 // الألوان المستخدمة
 const colors = {
@@ -43,11 +44,12 @@ const Profile = () => {
     const loadProfile = async () => {
       try {
         const response = await authApi.getProfile();
-        if (response.data) {
+        const data = getApiData(response, null);
+        if (data) {
           setFormData({
-            full_name: response.data.full_name || '',
-            username: response.data.username || '',
-            phone: (response.data.phone || "").replace(/^(\+963|00963|963)/, "").replace(/^0+/, ""),
+            full_name: data.full_name || '',
+            username: data.username || '',
+            phone: (data.phone || "").replace(/^(\+963|00963|963)/, "").replace(/^0+/, ""),
           });
         }
       } catch (err) {
@@ -84,13 +86,14 @@ const Profile = () => {
           : '',
       };
       const response = await authApi.updateProfile(dataToSend);
-      setMessage(response.message || 'تم تحديث الملف الشخصي بنجاح');
-      if (response.data) {
+      setMessage(getApiMessage(response, 'تم تحديث الملف الشخصي بنجاح'));
+      const data = getApiData(response, null);
+      if (data) {
         setFormData({
-          full_name: response.data.full_name,
-          username: response.data.username,
+          full_name: data.full_name,
+          username: data.username,
           // Strip +963 prefix for display in the input
-          phone: (response.data.phone || "").replace(/^(\+963|00963|963)/, "").replace(/^0+/, ""),
+          phone: (data.phone || "").replace(/^(\+963|00963|963)/, "").replace(/^0+/, ""),
         });
       }
     } catch (err) {

@@ -4,6 +4,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { X } from "lucide-react";
+import { getApiData } from "../../utils/api";
 
 const roleLabels = {
   admin: "مسؤول",
@@ -35,7 +36,7 @@ export default function UserModal({ user, onClose, onSave }) {
       const loadUserDetails = async () => {
         try {
           const response = await userApi.getUserById(user.id);
-          const userData = response.data;
+          const userData = getApiData(response, null);
           console.log("Loaded user details:", userData); // Debug log
           setFormData({
             username: userData.username || "",

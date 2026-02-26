@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight } from "lucide-react";
+import { getApiData } from "@/utils/api";
 
 export default function VerifyOtp() {
   const navigate = useNavigate();
@@ -24,11 +25,12 @@ export default function VerifyOtp() {
 
     try {
       const response = await authApi.verifyOtp(phone, otp);
+      const data = getApiData(response, null);
       setSuccess(true);
       
       // Navigate to reset password page
       setTimeout(() => {
-        navigate("/reset-password", { state: { resetToken: response.data.resetToken } });
+        navigate("/reset-password", { state: { resetToken: data?.resetToken } });
       }, 1500);
     } catch (err) {
       const msg = err.message || "فشل التحقق من الرمز";

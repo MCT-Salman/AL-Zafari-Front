@@ -40,6 +40,7 @@ import EmptyState from "../../components/common/EmptyState";
 import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
+import { getApiData } from "../../utils/api";
 
 export default function PriceColor() {
   // Create adapter to map generic CRUD method names to priceColorApi method names
@@ -166,7 +167,7 @@ export default function PriceColor() {
     try {
       const response = await colorApi.getColors();
       // Handle both { data: [...] } and [...] structures
-      setColors(response.data || response || []);
+      setColors(getApiData(response, []) || []);
     } catch (error) {
       console.error("Failed to load colors:", error);
     }
@@ -176,7 +177,7 @@ export default function PriceColor() {
   const loadRulers = async () => {
     try {
       const response = await rulerApi.getRulers();
-      setRulers(response.data || response || []);
+      setRulers(getApiData(response, []) || []);
     } catch (error) {
       console.error("Failed to load rulers:", error);
     }
@@ -186,7 +187,7 @@ export default function PriceColor() {
   const loadMaterials = async () => {
     try {
       const response = await materialApi.getMaterials();
-      setMaterials(response.data || response || []);
+      setMaterials(getApiData(response, []) || []);
     } catch (error) {
       console.error("Failed to load materials:", error);
     }

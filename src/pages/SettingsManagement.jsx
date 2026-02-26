@@ -23,6 +23,7 @@ import MessageAlert from "../components/common/MessageAlert";
 import PageHeader from "../components/common/PageHeader";
 import LoadingState from "../components/common/LoadingState";
 import EmptyState from "../components/common/EmptyState";
+import { getApiData } from "../utils/api";
 
 export default function SettingsManagement() {
   const [activeTab, setActiveTab] = useState("general");
@@ -145,7 +146,7 @@ export default function SettingsManagement() {
     setLogsLoading(true);
     try {
       const response = await settingApi.getExchangeRateLogs();
-      setLogs(response.data || response || []);
+      setLogs(getApiData(response, []) || []);
     } catch (err) {
       setLogsError(err.message || "فشل في جلب السجلات");
     } finally {

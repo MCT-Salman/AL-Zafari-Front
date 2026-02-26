@@ -39,6 +39,7 @@ import EmptyState from "../../components/common/EmptyState";
 import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
+import { getApiData } from "../../utils/api";
 
 // Base URL for images - Strip /api if it exists to get the server root
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
@@ -158,7 +159,7 @@ export default function Color() {
   const loadMaterials = async () => {
     try {
       const response = await materialApi.getMaterials();
-      setMaterials(response.data || []);
+      setMaterials(getApiData(response, []) || []);
     } catch (error) {
       console.error("Failed to load materials:", error);
     }
@@ -168,7 +169,7 @@ export default function Color() {
   const loadRulers = async () => {
     try {
       const response = await rulerApi.getRulers();
-      setRulers(response.data || []);
+      setRulers(getApiData(response, []) || []);
     } catch (error) {
       console.error("Failed to load rulers:", error);
     }

@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { X } from "lucide-react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
+import { getApiData } from "../../utils/api";
 
 export default function UserDetailModal({ userId, onClose }) {
   const [user, setUser] = useState(null);
@@ -17,7 +18,7 @@ export default function UserDetailModal({ userId, onClose }) {
     setError("");
     try {
       const response = await userApi.getUserById(userId);
-      setUser(response.data);
+      setUser(getApiData(response, null));
     } catch (err) {
       setError(err.message || "فشل في تحميل بيانات المستخدم");
     } finally {

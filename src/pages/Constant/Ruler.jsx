@@ -38,6 +38,7 @@ import EmptyState from "../../components/common/EmptyState";
 import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
+import { getApiData } from "../../utils/api";
 
 export default function Ruler() {
   // Create adapter to map generic CRUD method names to rulerApi method names
@@ -135,7 +136,7 @@ export default function Ruler() {
   const loadMaterials = async () => {
     try {
       const response = await materialApi.getMaterials();
-      setMaterials(response.data || []);
+      setMaterials(getApiData(response, []) || []);
     } catch (error) {
       console.error("Failed to load materials:", error);
     }

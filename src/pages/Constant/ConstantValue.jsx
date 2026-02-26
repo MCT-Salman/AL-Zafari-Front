@@ -77,6 +77,7 @@ import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
 
 import { materialApi } from "../../api/materialApi";
+import { getApiData, getApiSuccess } from "../../utils/api";
 
 
 
@@ -136,11 +137,13 @@ export default function ConstantValue() {
 
           );
 
-          if (response.success && response.data) {
+          const data = getApiData(response, []);
+
+          if (getApiSuccess(response) || Array.isArray(data)) {
 
             // Add material name to each value
 
-            const valuesWithMaterialName = response.data.map(value => ({
+            const valuesWithMaterialName = data.map(value => ({
 
               ...value,
 
@@ -170,9 +173,11 @@ export default function ConstantValue() {
 
 
 
-      if (response.success && response.data) {
+      const data = getApiData(response, []);
 
-        return { success: true, data: response.data };
+      if (getApiSuccess(response) || Array.isArray(data)) {
+
+        return { success: true, data: data };
 
       }
 
@@ -358,7 +363,7 @@ export default function ConstantValue() {
 
       const response = await materialApi.getMaterials();
 
-      setMaterials(response.data || []);
+      setMaterials(getApiData(response, []) || []);
 
     } catch (error) {
 
@@ -645,7 +650,7 @@ export default function ConstantValue() {
 
     };
 
-    await handleSave(idOrValueData, dataToSend);
+    await handleSave(dataToSend);
 
   };
 
