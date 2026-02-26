@@ -16,13 +16,6 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Label } from "../../components/ui/label";
@@ -492,24 +485,15 @@ export default function Batch() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>المادة <span className="text-red-500">*</span></Label>
-                <Select
+                <FilterSelect
                   value={formData.material_id?.toString() || ""}
-                  onValueChange={(value) => setFormData({ ...formData, material_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر المادة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materials.map((material) => (
-                      <SelectItem
-                        key={material.material_id}
-                        value={material.material_id.toString()}
-                      >
-                        {material.material_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setFormData({ ...formData, material_id: e.target.value })}
+                  options={materials.map((material) => ({
+                    value: material.material_id.toString(),
+                    label: material.material_name,
+                  }))}
+                  placeholder="اختر المادة"
+                />
               </div>
 
               <div className="space-y-2">

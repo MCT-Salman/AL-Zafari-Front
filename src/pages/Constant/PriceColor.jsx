@@ -18,13 +18,6 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Label } from "../../components/ui/label";
@@ -652,105 +645,73 @@ export default function PriceColor() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>المادة <span className="text-red-500">*</span></Label>
-                <Select
+                <FilterSelect
                   value={formData.material_id?.toString() || ""}
-                  onValueChange={(value) => setFormData({ ...formData, material_id: value, ruler_id: "", color_id: "" })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر المادة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materials.map((m) => (
-                      <SelectItem key={m.material_id} value={m.material_id.toString()}>
-                        {m.material_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      material_id: e.target.value,
+                      ruler_id: "",
+                      color_id: "",
+                    })
+                  }
+                  options={materials.map((m) => ({
+                    value: m.material_id.toString(),
+                    label: m.material_name,
+                  }))}
+                  placeholder="اختر المادة"
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>المسطرة <span className="text-red-500">*</span></Label>
-                <Select
+                <FilterSelect
                   value={formData.ruler_id?.toString() || ""}
-                  onValueChange={(value) => setFormData({ ...formData, ruler_id: value, color_id: "" })}
+                  onChange={(e) => setFormData({ ...formData, ruler_id: e.target.value, color_id: "" })}
                   disabled={!formData.material_id}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={!formData.material_id ? "اختر المادة أولاً" : "اختر المسطرة"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rulers
-                      .filter(r => r.material_id?.toString() === formData.material_id?.toString())
-                      .map((r) => (
-                        <SelectItem key={r.ruler_id} value={r.ruler_id.toString()}>
-                          {r.ruler_name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  options={rulers
+                    .filter((r) => r.material_id?.toString() === formData.material_id?.toString())
+                    .map((r) => ({ value: r.ruler_id.toString(), label: r.ruler_name }))}
+                  placeholder={!formData.material_id ? "اختر المادة أولاً" : "اختر المسطرة"}
+                />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label>اللون <span className="text-red-500">*</span></Label>
-              <Select
+              <FilterSelect
                 value={formData.color_id?.toString() || ""}
-                onValueChange={(value) => setFormData({ ...formData, color_id: value })}
+                onChange={(e) => setFormData({ ...formData, color_id: e.target.value })}
                 disabled={!formData.ruler_id}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={!formData.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {colors
-                    .filter(c => c.ruler_id?.toString() === formData.ruler_id?.toString())
-                    .map((color) => (
-                      <SelectItem key={color.color_id} value={color.color_id.toString()}>
-                        {color.color_name} ({color.color_code})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                options={colors
+                  .filter((c) => c.ruler_id?.toString() === formData.ruler_id?.toString())
+                  .map((color) => ({
+                    value: color.color_id.toString(),
+                    label: `${color.color_name} (${color.color_code})`,
+                  }))}
+                placeholder={!formData.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>النوع <span className="text-red-500">*</span></Label>
-                <Select
+                <FilterSelect
                   value={formData.type_item || ""}
-                  onValueChange={(value) => setFormData({ ...formData, type_item: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر النوع" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {typeItemOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setFormData({ ...formData, type_item: e.target.value })}
+                  options={typeItemOptions}
+                  placeholder="اختر النوع"
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>طريقة التسعير <span className="text-red-500">*</span></Label>
-                <Select
+                <FilterSelect
                   value={formData.price_color_By || ""}
-                  onValueChange={(value) => setFormData({ ...formData, price_color_By: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر الطريقة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pricingOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setFormData({ ...formData, price_color_By: e.target.value })}
+                  options={pricingOptions}
+                  placeholder="اختر الطريقة"
+                />
               </div>
             </div>
 

@@ -17,13 +17,6 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Label } from "../../components/ui/label";
@@ -636,43 +629,31 @@ export default function Color() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>المادة <span className="text-red-500">*</span></Label>
-                <Select
+                <FilterSelect
                   value={formData.material_id?.toString() || ""}
-                  onValueChange={(value) => setFormData({ ...formData, material_id: value, ruler_id: "" })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر المادة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materials.map((material) => (
-                      <SelectItem key={material.material_id} value={material.material_id.toString()}>
-                        {material.material_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setFormData({ ...formData, material_id: e.target.value, ruler_id: "" })}
+                  options={materials.map((material) => ({
+                    value: material.material_id.toString(),
+                    label: material.material_name,
+                  }))}
+                  placeholder="اختر المادة"
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>المسطرة <span className="text-red-500">*</span></Label>
-                <Select
+                <FilterSelect
                   value={formData.ruler_id?.toString() || ""}
-                  onValueChange={(value) => setFormData({ ...formData, ruler_id: value })}
+                  onChange={(e) => setFormData({ ...formData, ruler_id: e.target.value })}
                   disabled={!formData.material_id}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={!formData.material_id ? "اختر المادة أولاً" : "اختر المسطرة"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rulers
-                      .filter(r => r.material_id?.toString() === formData.material_id?.toString())
-                      .map((ruler) => (
-                        <SelectItem key={ruler.ruler_id} value={ruler.ruler_id.toString()}>
-                          {ruler.ruler_name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  options={rulers
+                    .filter((r) => r.material_id?.toString() === formData.material_id?.toString())
+                    .map((ruler) => ({
+                      value: ruler.ruler_id.toString(),
+                      label: ruler.ruler_name,
+                    }))}
+                  placeholder={!formData.material_id ? "اختر المادة أولاً" : "اختر المسطرة"}
+                />
               </div>
             </div>
 

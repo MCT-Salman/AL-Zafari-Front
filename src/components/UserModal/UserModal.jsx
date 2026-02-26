@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { userApi } from "../../api/userApi";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import FilterSelect from "../common/FilterSelect";
 import { X } from "lucide-react";
 import { getApiData } from "../../utils/api";
 
@@ -216,27 +216,27 @@ export default function UserModal({ user, onClose, onSave }) {
 
           <div>
             <label className="block text-sm font-medium mb-1">الدور</label>
-            <Select value={formData.role || ""} onValueChange={handleRoleChange}>
-              <SelectTrigger disabled={loading} >
-                <span>
-                  {formData.role && roleLabels[formData.role]
-                    ? roleLabels[formData.role]
-                    : "اختر الدور"}
-                </span>
-              </SelectTrigger>
-              <SelectContent className={`bg-white ${loading ? "pointer-events-none opacity-50" : ""}`}>
-                <SelectItem value="admin">مسؤول</SelectItem>
-                <SelectItem value="accountant">محاسب</SelectItem>
-                <SelectItem value="cashier">أمين الصندوق</SelectItem>
-                <SelectItem value="sales">مبيعات</SelectItem>
-                <SelectItem value="production_manager">مدير الإنتاج</SelectItem>
-                <SelectItem value="Warehouse_Keeper">أمين مستودع</SelectItem>
-                <SelectItem value="Warehouse_Products">منتجات المستودع</SelectItem>
-                <SelectItem value="Dissection_Technician">فني التشريح</SelectItem>
-                <SelectItem value="Cutting_Technician">فني القطع</SelectItem>
-                <SelectItem value="Gluing_Technician">فني اللصق</SelectItem>
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={formData.role || ""}
+              onChange={(e) => handleRoleChange(e.target.value)}
+              disabled={loading}
+              options={[
+                "admin",
+                "accountant",
+                "cashier",
+                "sales",
+                "production_manager",
+                "Warehouse_Keeper",
+                "Warehouse_Products",
+                "Dissection_Technician",
+                "Cutting_Technician",
+                "Gluing_Technician",
+              ].map((role) => ({
+                value: role,
+                label: roleLabels[role] || role,
+              }))}
+              placeholder="Select role"
+            />
           </div>
 
           {/* Buttons */}

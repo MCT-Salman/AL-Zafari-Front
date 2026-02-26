@@ -7,13 +7,6 @@ import { CrudModal } from "../../components/common/CrudModal";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -26,6 +19,7 @@ import { Download, Settings } from "lucide-react";
 import CrudActions from "../../components/common/CrudActions";
 import StatsCard from "../../components/common/StatsCard";
 import SearchInput from "../../components/common/SearchInput";
+import FilterSelect from "../../components/common/FilterSelect";
 import MessageAlert from "../../components/common/MessageAlert";
 import PageHeader from "../../components/common/PageHeader";
 import LoadingState from "../../components/common/LoadingState";
@@ -440,19 +434,16 @@ export default function ConstantType() {
             )}
             <div className="space-y-2">
               <label className="text-sm font-medium">المعرف الفني <span className="text-red-500">*</span></label>
-               <Select
+              <FilterSelect
                 value={formData.type}
-                onValueChange={(value) => setFormData({ ...formData, type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر نوع الثابت" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem key="height" value="height"> الطول</SelectItem>
-                    <SelectItem key="width" value="width"> العرض</SelectItem>
-                    <SelectItem key="thickness" value="thickness"> السماكة</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                options={[
+                  { value: "height", label: "الطول" },
+                  { value: "width", label: "العرض" },
+                  { value: "thickness", label: "السماكة" },
+                ]}
+                placeholder="اختر نوع الثابت"
+              />
               {/* <input
                 type="text"
                 className="w-full p-2 border rounded-md"

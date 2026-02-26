@@ -63,7 +63,7 @@
 
 
 // src/components/Layout/MainLayout.jsx
-import { Outlet, Navigate } from "react-router-dom";
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { LayoutProvider, useLayout } from "./LayoutContext";
 import Header from "./Header";
@@ -80,6 +80,8 @@ import { UserRoleLabels } from "@/enums";
 const LayoutContent = () => {
   const { collapsed } = useLayout();
   const { logout, user } = useAuth();
+  const location = useLocation();
+  const isOrdersPage = location.pathname === "/orders";
 
   // تحويل بيانات الـ Sidebar الخاصة بك لتناسب المكون الجديد
   // إذا كان للعنصر role معيّن، لن يظهر إلا للمستخدم الذي يملك نفس الدور
@@ -106,7 +108,7 @@ const LayoutContent = () => {
   );
 
   return (
-    <div className="min-h-screen bg-surface text-text-strong" dir="rtl">
+    <div className="h-screen overflow-hidden bg-surface text-text-strong" dir="rtl">
       {/* تمرير البيانات للمكونات النظيفة */}
       <Sidebar
         title="AL-Zafari"
@@ -116,7 +118,7 @@ const LayoutContent = () => {
 
       <div
         className={cn(
-          "flex-1 flex flex-col min-h-screen transition-all duration-300",
+          "flex-1 flex flex-col h-screen transition-all duration-300",
           "md:mr-64", // الهامش الافتراضي
           collapsed && "md:mr-20" // الهامش عند التصغير
         )}
@@ -144,7 +146,7 @@ const LayoutContent = () => {
         </Header>
 
         {/* منطقة المحتوى المتغير */}
-        <main className="flex-1 p-4 md:p-6 mt-20 overflow-x-hidden">
+        <main className={cn("flex-1 min-h-0 p-4 md:p-6 mt-20", isOrdersPage ? "overflow-hidden" : "overflow-y-auto overflow-x-hidden")}>
           <Outlet />
         </main>
       </div>

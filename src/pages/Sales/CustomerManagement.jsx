@@ -16,7 +16,6 @@ import {
 } from "../../components/ui/table";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
 import { Badge } from "../../components/ui/badge";
 import { Download, User, Phone, MapPin, Mail } from "lucide-react";
@@ -634,35 +633,29 @@ export default function CustomerManagement() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">نوع العميل</label>
-                <Select
+                <FilterSelect
                   value={formData.customer_type}
-                  onValueChange={(value) => setFormData({ ...formData, customer_type: value })}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر نوع العميل" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="customer">عميل</SelectItem>
-                    <SelectItem value="supplier">مورد</SelectItem>
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setFormData({ ...formData, customer_type: e.target.value })}
+                  options={[
+                    { value: "customer", label: "عميل" },
+                    { value: "supplier", label: "مورد" },
+                  ]}
+                  placeholder="اختر نوع العميل"
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">البلد</label>
-                <Select
+                <FilterSelect
                   value={formData.country}
-                  onValueChange={(value) => setFormData({ ...formData, country: value })}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر البلد" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SY">سوريا</SelectItem>
-                    <SelectItem value="LB">لبنان</SelectItem>
-                    <SelectItem value="JO">الأردن</SelectItem>
-                    <SelectItem value="IQ">العراق</SelectItem>
-                  </SelectContent>
-                </Select>
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  options={[
+                    { value: "SY", label: "سوريا" },
+                    { value: "LB", label: "لبنان" },
+                    { value: "JO", label: "الأردن" },
+                    { value: "IQ", label: "العراق" },
+                  ]}
+                  placeholder="اختر البلد"
+                />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

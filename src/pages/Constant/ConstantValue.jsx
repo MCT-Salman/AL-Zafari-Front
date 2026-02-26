@@ -1487,35 +1487,15 @@ export default function ConstantValue() {
 
               <Label>المادة <span className="text-red-500">*</span></Label>
 
-              <Select
-
-                value={formData.material_id?.toString()}
-
-                onValueChange={(value) => setFormData({ ...formData, material_id: value })}
-
-              >
-
-                <SelectTrigger>
-
-                  <SelectValue placeholder="اختر المادة" />
-
-                </SelectTrigger>
-
-                <SelectContent>
-
-                  {materials.map((material) => (
-
-                    <SelectItem key={material.material_id} value={material.material_id.toString()}>
-
-                      {material.material_name}
-
-                    </SelectItem>
-
-                  ))}
-
-                </SelectContent>
-
-              </Select>
+              <FilterSelect
+                value={formData.material_id?.toString() || ""}
+                onChange={(e) => setFormData({ ...formData, material_id: e.target.value })}
+                options={materials.map((material) => ({
+                  value: material.material_id.toString(),
+                  label: material.material_name,
+                }))}
+                placeholder="Search material"
+              />
 
             </div>
 
@@ -1527,32 +1507,17 @@ export default function ConstantValue() {
 
               <Label>نوع القيمة <span className="text-red-500">*</span></Label>
 
-              <Select
 
-                value={formData.type}
-
-                onValueChange={(value) => setFormData({ ...formData, type: value })}
-
-              >
-
-                <SelectTrigger>
-
-                  <SelectValue placeholder="اختر نوع القيمة" />
-
-                </SelectTrigger>
-
-                <SelectContent>
-
-                  <SelectItem value="width">العرض</SelectItem>
-
-                  <SelectItem value="height">الطول</SelectItem>
-
-                  <SelectItem value="thickness">السماكة</SelectItem>
-
-                </SelectContent>
-
-              </Select>
-
+              <FilterSelect
+                value={formData.type || ""}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                options={[
+                  { value: "width", label: "Width" },
+                  { value: "height", label: "Height" },
+                  { value: "thickness", label: "Thickness" },
+                ]}
+                placeholder="Search value type"
+              />
             </div>
 
 
@@ -1563,36 +1528,16 @@ export default function ConstantValue() {
 
               <Label>الوحدة <span className="text-red-500">*</span></Label>
 
-              <Select
 
-                value={formData.unit}
-
-                onValueChange={(value) => setFormData({ ...formData, unit: value })}
-
-              >
-
-                <SelectTrigger>
-
-                  <SelectValue placeholder="اختر الوحدة" />
-
-                </SelectTrigger>
-
-                <SelectContent>
-
-                  {AVAILABLE_UNITS.map((unit) => (
-
-                    <SelectItem key={unit.value} value={unit.value}>
-
-                      {unit.label}
-
-                    </SelectItem>
-
-                  ))}
-
-                </SelectContent>
-
-              </Select>
-
+              <FilterSelect
+                value={formData.unit || ""}
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                options={AVAILABLE_UNITS.map((unit) => ({
+                  value: unit.value,
+                  label: unit.label,
+                }))}
+                placeholder="Search unit"
+              />
             </div>
 
 

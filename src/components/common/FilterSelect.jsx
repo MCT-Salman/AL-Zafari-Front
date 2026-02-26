@@ -1,286 +1,171 @@
-// src\components\common\FilterSelect.jsx
-/**
- * FilterSelect Component
- * Reusable select dropdown for filtering
- * 
- * Usage:
- * <FilterSelect
- *   label="الدور"
- *   value={roleFilter}
- *   onChange={(e) => setRoleFilter(e.target.value)}
- *   options={[
- *     { value: "", label: "جميع الأدوار" },
- *     { value: "admin", label: "مسؤول" }
- *   ]}
- * />
- */
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { ChevronDown, Search } from "lucide-react";
 
-import { useId } from "react";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/select";
+const toStringValue = (value) => {
+  if (value === null || value === undefined) return "";
+  return String(value);
+};
 
-{/* <label className="block text-sm font-medium mb-1">الدور</label>
-            <Select value={formData.role || ""} onValueChange={handleRoleChange}>
-              <SelectTrigger disabled={loading} >
-                <span>
-                  {formData.role && roleLabels[formData.role] 
-                    ? roleLabels[formData.role] 
-                    : "اختر الدور"}
-                </span>
-              </SelectTrigger>
-              <SelectContent className={`bg-white ${loading ? "pointer-events-none opacity-50" : ""}`}>
-                <SelectItem value="admin">مسؤول</SelectItem>
-                <SelectItem value="accountant">محاسب</SelectItem>
-                <SelectItem value="cashier">أمين الصندوق</SelectItem>
-                <SelectItem value="sales">مبيعات</SelectItem>
-                <SelectItem value="production_manager">مدير الإنتاج</SelectItem>
-                <SelectItem value="Warehouse_Keeper">أمين مستودع</SelectItem>
-                <SelectItem value="Warehouse_Products">منتجات المستودع</SelectItem>
-                <SelectItem value="Dissection_Technician">فني التشريح</SelectItem>
-                <SelectItem value="Cutting_Technician">فني القطع</SelectItem>
-                <SelectItem value="Gluing_Technician">فني اللصق</SelectItem>
-              </SelectContent>
-            </Select> */}
-// const FilterSelect = ({
-//   label = "",
-//   value = "",
-//   onChange = () => {},
-//   options = [],
-//   className = '',
-//   disabled = false,
-//   placeholder = "اختر..."
-// }) => {
-//   return (
-//     <div className={className}>
-//       {label && (
-//         <label className="block text-sm font-semibold mb-2 text-gray-700">
-//           {label}
-//         </label>
-//       )}
-//       <Select 
-//         value={value} 
-//         onValueChange={onChange}
-//         disabled={disabled}
-//       >
-//         <SelectTrigger className="w-full h-10 border border-gray-300 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-f focus:ring-offset-0 focus:border-primary-f disabled:opacity-50 disabled:cursor-not-allowed text-gray-900">
-//           <SelectValue placeholder={placeholder} />
-//         </SelectTrigger>
-//         <SelectContent className="bg-white border border-gray-200 rounded-lg shadow-lg">
-//           {options.map((option, index) => {
-//             // التحقق من أن القيمة ليست فارغة
-//             const optionValue = option.value?.toString() || "";
-//             if (optionValue === "") {
-//               console.warn(`Option at index ${index} has empty value. Skipping.`);
-//               return null;
-//             }
-
-//             return (
-//               <SelectItem 
-//                 key={index} 
-//                 value={optionValue}
-//                 className="focus:bg-gray-100 focus:text-gray-900 cursor-pointer"
-//               >
-//                 {option.label || option.value}
-//               </SelectItem>
-//             );
-//           })}
-//         </SelectContent>
-//       </Select>
-//     </div>
-//   );
-// };
-
-
-
-// const FilterSelect = ({
-//   label = "",
-//   value = "",
-//   onChange = () => {},
-//   options = [],
-//   className = '',
-//   disabled = false
-// }) => {
-//   return (
-//     <div className={className}>
-//       {label && (
-//         <label className="block text-sm font-semibold mb-2 text-gray-700">
-//           {label}
-//         </label>
-//       )}
-//       <select
-//         value={value}
-//         onChange={onChange}
-//         disabled={disabled}
-//         className="w-full px-4  cursor-pointer h-10 border border-gray-300 bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary  disabled:opacity-50 disabled:cursor-not-allowed "
-//       >
-//         {options.map((option, index) => (
-//           <option key={index} value={option.value} className="">
-//             {option.label}
-//           </option>
-//         ))}
-//       </select>
-//     </div>
-//   );
-// };
-
-// export default FilterSelect;
-
-
-
-
-// const FilterSelect = ({
-//   label = "",
-//   value = "",
-//   onChange = () => {},
-//   options = [],
-//   className = '',
-//   disabled = false
-// }) => {
-//   return (
-//     <div className={`group relative ${className}`}>
-//       {label && (
-//         <label className="block text-xs font-semibold uppercase tracking-widest mb-3 text-secondary-t transition-colors duration-300 group-focus-within:text-primary-f">
-//           {label}
-//         </label>
-//       )}
-
-//       <div className="relative">
-//         <select
-//           value={value}
-//           onChange={onChange}
-//           disabled={disabled}
-//           className="w-full px-5 py-3 pr-12 h-12 cursor-pointer text-lg
-//                      bg-primary-s border-2 border-primary-f text-secondary-f
-//                      rounded-lg text-sm font-medium
-//                      shadow-md
-//                      hover:bg-primary-f hover:border-secondary-f hover:shadow-lg hover:-translate-y-0.5
-//                      focus:outline-none focus:border-secondary-f focus:shadow-lg focus:ring-4 focus:ring-primary-f/10
-//                      disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:bg-primary-s disabled:hover:border-primary-f disabled:hover:shadow-md
-//                      transition-all duration-250 ease-out
-//                      appearance-none"
-//         >
-//           {options.map((option, index) => (
-//             <option 
-//               key={index} 
-//               value={option.value}
-//               className="bg-primary-s text-secondary-s py-2 px-3 text-lg"
-//             >
-//               {option.label}
-//             </option>
-//           ))}
-//         </select>
-
-//         {/* أيقونة السهم */}
-//         <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none
-//                         text-primary-f transition-all duration-300 ease-out
-//                         group-hover:text-secondary-f group-hover:-translate-y-[45%]
-//                         group-focus-within:rotate-180">
-//           <svg 
-//             width="18" 
-//             height="18" 
-//             viewBox="0 0 24 24" 
-//             fill="none" 
-//             stroke="currentColor" 
-//             strokeWidth="2.5" 
-//             strokeLinecap="round" 
-//             strokeLinejoin="round"
-//           >
-//             <polyline points="6 9 12 15 18 9" />
-//           </svg>
-//         </div>
-//       </div>
-
-//       {/* الخط التزييني السفلي */}
-//       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0.5 
-//                       bg-primary-f rounded-full
-//                       group-hover:w-[95%] group-focus-within:w-[95%]
-//                       transition-all duration-400 ease-out" />
-//     </div>
-//   );
-// };
-
-// export default FilterSelect;
-
-
+const buildEventLike = (value) => ({
+  target: { value },
+  currentTarget: { value },
+});
 
 const FilterSelect = ({
   label = "",
   value = "",
-  onChange = () => { },
+  onChange = () => {},
+  onValueChange,
   options = [],
   className = "",
   disabled = false,
+  placeholder = "ابحث أو اختر...",
 }) => {
   const selectId = useId();
+  const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const normalizedValue = toStringValue(value);
+
+  const selectedOption = useMemo(
+    () => options.find((option) => toStringValue(option?.value) === normalizedValue),
+    [options, normalizedValue]
+  );
+
+  const filteredOptions = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return options;
+    return options.filter((option) => {
+      const labelText = String(option?.label ?? "").toLowerCase();
+      const valueText = String(option?.value ?? "").toLowerCase();
+      return labelText.includes(query) || valueText.includes(query);
+    });
+  }, [options, searchTerm]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!wrapperRef.current?.contains(event.target)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const handleSelect = (optionValue) => {
+    const nextValue = toStringValue(optionValue);
+    if (typeof onValueChange === "function") {
+      onValueChange(nextValue);
+    }
+    onChange(buildEventLike(nextValue));
+    setIsOpen(false);
+    setSearchTerm("");
+  };
+
+  const handleInputFocus = () => {
+    if (disabled) return;
+    setIsOpen(true);
+  };
+
+  const handleInputChange = (event) => {
+    setSearchTerm(event.target.value);
+    if (!isOpen) setIsOpen(true);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Escape") {
+      setIsOpen(false);
+      setSearchTerm("");
+      inputRef.current?.blur();
+      return;
+    }
+
+    if (event.key === "Enter" && filteredOptions.length > 0) {
+      event.preventDefault();
+      handleSelect(filteredOptions[0]?.value);
+    }
+  };
+
+  const inputText = isOpen
+    ? searchTerm
+    : String(selectedOption?.label ?? (normalizedValue ? normalizedValue : ""));
 
   return (
-    <div className={`group w-full ${className}`}>
+    <div ref={wrapperRef} className={`group relative w-full ${className}`}>
       {label && (
-        <label htmlFor={selectId} className="mb-2 block text-xs font-semibold tracking-wide text-secondary-t transition-colors group-focus-within:text-primary-f">
+        <label
+          htmlFor={selectId}
+          className="mb-2 block text-xs font-semibold tracking-wide text-secondary-t transition-colors group-focus-within:text-primary-f"
+        >
           {label}
         </label>
       )}
 
       <div className="relative">
-        <select
+        <Search className="pointer-events-none absolute right-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-secondary-fo" />
+        <input
           id={selectId}
-          value={value}
-          onChange={onChange}
+          ref={inputRef}
+          type="text"
+          value={inputText}
+          onFocus={handleInputFocus}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
           disabled={disabled}
-          className="
-            peer w-full h-12 px-4 pr-11
-            text-sm font-medium
-            bg-primary-s text-secondary-s
-            border border-primary-f/30
-            rounded-xl
-            shadow-sm
-            text-lg
-            appearance-none cursor-pointer
-
-            transition-all duration-300 ease-out
-
-            hover:border-primary-f hover:shadow-md
-            focus:outline-none focus:border-primary-f
-            focus:ring-4 focus:ring-primary-f/15
-
-            disabled:opacity-50 disabled:cursor-not-allowed
-            
-          "
+          className="h-[52px] w-full rounded-md border border-primary-f bg-primary-s py-2 pl-10 pr-10 text-right text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            if (disabled) return;
+            setIsOpen((prev) => !prev);
+            inputRef.current?.focus();
+          }}
+          disabled={disabled}
+          className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-fo transition-transform duration-200 disabled:cursor-not-allowed"
+          aria-label="تبديل القائمة"
         >
-          {options.map((option, index) => (
-            <option
-              key={index}
-              value={option.value}
-              className="bg-primary-s text-secondary-s text-lg font-medium"
-            >
-              {option.label}
-            </option>
-          ))}
-        </select>
-
-        {/* أيقونة السهم */}
-        <div
-          className="
-            pointer-events-none absolute right-3 top-1/2 -translate-y-1/2
-            text-secondary-t
-            transition-all duration-300
-            peer-focus:text-primary-f
-            peer-focus:rotate-180
-          "
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </div>
+          <ChevronDown className={`h-4 w-4 ${isOpen ? "rotate-180" : ""}`} />
+        </button>
       </div>
+
+      {isOpen && !disabled && (
+        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-secondary-f/30 bg-primary-s p-1 shadow-md">
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((option, index) => {
+              const optionValue = toStringValue(option?.value);
+              const optionLabel = String(option?.label ?? optionValue);
+              const optionDisabled = Boolean(option?.disabled);
+              const isSelected = optionValue === normalizedValue;
+
+              return (
+                <button
+                  key={`${optionValue}-${index}`}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  disabled={optionDisabled}
+                  onClick={() => handleSelect(optionValue)}
+                  className={`flex w-full items-center justify-end rounded-sm px-3 py-2 text-right text-sm transition-colors hover:bg-secondary-f hover:text-primary-s disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isSelected ? "bg-secondary-f/20 font-semibold" : ""
+                  }`}
+                >
+                  {optionLabel}
+                </button>
+              );
+            })
+          ) : (
+            <div className="px-3 py-2 text-right text-sm text-secondary-fo">
+              لا توجد نتائج
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

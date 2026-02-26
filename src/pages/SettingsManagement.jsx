@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { Input } from "../components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import FilterSelect from "../components/common/FilterSelect";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Settings, Percent, History, Edit, Trash2, Plus, Info } from "lucide-react";
@@ -421,35 +421,27 @@ export default function SettingsManagement() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">النوع</label>
-              <Select
+              <FilterSelect
                 value={discountFormData.type}
-                onValueChange={(val) => setDiscountFormData({ ...discountFormData, type: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="percentage">نسبة مئوية</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(e) => setDiscountFormData({ ...discountFormData, type: e.target.value })}
+                options={[{ value: "percentage", label: "Percentage" }]}
+                placeholder="Select type"
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">الشرط</label>
-              <Select
+              <FilterSelect
                 value={discountFormData.quantityCondition}
-                onValueChange={(val) => setDiscountFormData({ ...discountFormData, quantityCondition: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GREATER_THAN">أكبر من</SelectItem>
-                  <SelectItem value="LESS_THAN">أصغر من</SelectItem>
-                  <SelectItem value="EQUAL_TO">يساوي</SelectItem>
-                  <SelectItem value="GREATER_THAN_OR_EQUAL_TO">أكبر من أو يساوي</SelectItem>
-                  <SelectItem value="LESS_THAN_OR_EQUAL_TO">أصغر من أو يساوي</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(e) => setDiscountFormData({ ...discountFormData, quantityCondition: e.target.value })}
+                options={[
+                  { value: "GREATER_THAN", label: "Greater than" },
+                  { value: "LESS_THAN", label: "Less than" },
+                  { value: "EQUAL_TO", label: "Equal to" },
+                  { value: "GREATER_THAN_OR_EQUAL_TO", label: "Greater than or equal" },
+                  { value: "LESS_THAN_OR_EQUAL_TO", label: "Less than or equal" },
+                ]}
+                placeholder="Select condition"
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

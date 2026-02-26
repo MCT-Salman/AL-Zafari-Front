@@ -1,6 +1,6 @@
 // src\components\UserForm.jsx
 import { Input } from "../components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import FilterSelect from "../components/common/FilterSelect";
 
 const roleLabels = {
   admin: "مسؤول",
@@ -110,31 +110,27 @@ export default function UserForm({ user, formData, setFormData, loading, error }
 
       <div>
         <label className="block text-sm font-medium mb-1">الدور</label>
-        <Select
+        <FilterSelect
           value={formData.role || ""}
-          onValueChange={handleRoleChange}
+          onChange={(e) => handleRoleChange(e.target.value)}
           disabled={loading}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="اختر الدور">
-              {formData.role && roleLabels[formData.role]
-                ? roleLabels[formData.role]
-                : "اختر الدور"}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent className="bg-white">
-            <SelectItem value="admin">مسؤول</SelectItem>
-            <SelectItem value="accountant">محاسب</SelectItem>
-            <SelectItem value="cashier">أمين الصندوق</SelectItem>
-            <SelectItem value="sales">مبيعات</SelectItem>
-            <SelectItem value="production_manager">مدير الإنتاج</SelectItem>
-            <SelectItem value="Warehouse_Keeper">أمين مستودع</SelectItem>
-            <SelectItem value="Warehouse_Products">منتجات المستودع</SelectItem>
-            <SelectItem value="Dissection_Technician">فني التشريح</SelectItem>
-            <SelectItem value="Cutting_Technician">فني القطع</SelectItem>
-            <SelectItem value="Gluing_Technician">فني اللصق</SelectItem>
-          </SelectContent>
-        </Select>
+          options={[
+            "admin",
+            "accountant",
+            "cashier",
+            "sales",
+            "production_manager",
+            "Warehouse_Keeper",
+            "Warehouse_Products",
+            "Dissection_Technician",
+            "Cutting_Technician",
+            "Gluing_Technician",
+          ].map((role) => ({
+            value: role,
+            label: roleLabels[role] || role,
+          }))}
+          placeholder="Select role"
+        />
       </div>
     </>
   );
