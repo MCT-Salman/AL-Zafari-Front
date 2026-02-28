@@ -69,7 +69,15 @@ const App = () => {
                   <SettingsManagement />
                 </RoleProtectedRoute>
               } />
-              <Route path="/customers" element={
+             
+              <Route path="/users" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <Users />
+                </RoleProtectedRoute>
+              } />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
+             <Route path="/customers" element={
                 <RoleProtectedRoute allowedRoles="sales">
                   <CustomerManagement />
                 </RoleProtectedRoute>
@@ -79,13 +87,6 @@ const App = () => {
                   <OrderManagement />
                 </RoleProtectedRoute>
               } />
-              <Route path="/users" element={
-                <RoleProtectedRoute allowedRoles="admin">
-                  <Users />
-                </RoleProtectedRoute>
-              } />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Route>
           </Routes>
         </Suspense>
       </AuthProvider>
