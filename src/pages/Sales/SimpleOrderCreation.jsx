@@ -11,6 +11,7 @@ import { constantApi } from "../../api/constantApi";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import FilterSelect from "../../components/common/FilterSelect";
+import StyledDialog from "../../components/common/StyledDialog";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import {
@@ -35,6 +36,7 @@ export default function SimpleOrderCreation() {
   const [viewMode, setViewMode] = useState("create");
   const [loading, setLoading] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Data
   const [materials, setMaterials] = useState([]);
@@ -78,6 +80,18 @@ export default function SimpleOrderCreation() {
     isByMeter66: 66,
   };
   const getWidthFromPriceBy = (priceBy) => PRICE_BY_TO_WIDTH[priceBy] ?? null;
+  const totalPreviewQuantity = useMemo(() => {
+    return orderItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+  }, [orderItems]);
+  const getStatusLabel = (status) => {
+    const key = String(status || "").toLowerCase();
+    if (key === "pending") return "معلق";
+    if (key === "completed") return "مكتمل";
+    if (key === "cancelled" || key === "canceled") return "ملغي";
+    if (key === "processing") return "قيد المعالجة";
+    if (key === "draft") return "مسودة";
+    return status || "-";
+  };
 
 
   // Load initial data
@@ -253,7 +267,7 @@ export default function SimpleOrderCreation() {
       return { priced: isPriced, label: "" };
     }
 
-    if (!formData.width) return { priced: false, label: " (???? ?????)" };
+    if (!formData.width) return { priced: false, label: " (اختر العرض)" };
 
     const targetWidth = Number(formData.width);
     const isPriced = priceColors.some(pc =>
@@ -359,7 +373,7 @@ export default function SimpleOrderCreation() {
       notes: ""
     }));
     setColorSearchCode("");
-      };
+  };
 
   const removeItem = (id) => {
     setOrderItems(prev => prev.filter(item => item.id !== id));
@@ -392,6 +406,11 @@ export default function SimpleOrderCreation() {
       setLoading(false);
     }
   };
+  const handleConfirmSave = async () => {
+    await saveOrder();
+    setShowPreview(false);
+  };
+
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
@@ -846,13 +865,55 @@ export default function SimpleOrderCreation() {
 
             {/* العمود الأيسر - الجدول */}
             <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
+              {showPreview && orderItems.length > 0 && (
+                <StyledDialog
+                  isOpen={showPreview}
+                  onOpenChange={setShowPreview}
+                  title="تفاصيل الطلب قبل الحفظ"
+                  onCancel={() => setShowPreview(false)}
+                  onConfirm={handleConfirmSave}
+                  confirmLabel="تأكيد الحفظ"
+                  cancelLabel="إلغاء"
+                  confirmVariant="default"
+                  isLoading={loading}
+                >
+                  <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                    <div className="bg-gray-50 rounded-lg p-2">عدد العناصر: <span className="font-bold">{orderItems.length}</span></div>
+                    <div className="bg-gray-50 rounded-lg p-2">إجمالي الكمية: <span className="font-bold">{totalPreviewQuantity}</span></div>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto border rounded-lg">
+                    <table className="w-full table-fixed border-collapse text-sm">
+                      <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                          <th className="p-2 text-right border-b break-words">المادة</th>
+                          <th className="p-2 text-right border-b break-words">المسطرة</th>
+                          <th className="p-2 text-right border-b break-words">اللون</th>
+                          <th className="p-2 text-center border-b break-words">الأبعاد</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orderItems.map(item => (
+                          <tr key={item.id} className="border-b">
+                            <td className="p-2 break-words">{item.material_name}</td>
+                            <td className="p-2 break-words">{item.ruler_name}</td>
+                            <td className="p-2 break-words">{item.color_name}</td>
+                            <td className="p-2 text-center break-words">
+                              {(item.width || "-")}x{(item.thickness || "0.6")}x{(item.quantity || "-")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </StyledDialog>
+              )}
               <Card className="flex flex-col h-full min-h-0 overflow-hidden">
                 {/* رأس الجدول - ثابت */}
                 <div className="flex justify-between items-center p-3 border-b bg-gray-50 flex-shrink-0">
                   <span className="font-bold text-base">العناصر المضافة: {orderItems.length}</span>
                   <Button
                     size="lg"
-                    onClick={saveOrder}
+                    onClick={() => setShowPreview(true)}
                     disabled={loading || orderItems.length === 0}
                     className="h-12 bg-secondary-s hover:brightness-110 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
                   >
@@ -935,22 +996,30 @@ export default function SimpleOrderCreation() {
                   <tr>
                     <th className="p-3 text-right border-b break-words">#</th>
                     <th className="p-3 text-right border-b break-words">التاريخ</th>
-                    <th className="p-3 text-center border-b break-words">العناصر</th>
-                    <th className="p-3 text-center border-b break-words">حالة</th>
+                    <th className="p-3 text-center border-b break-words">عدد العناصر</th>
+                    <th className="p-3 text-center border-b break-words">الإجمالي</th>
+                    <th className="p-3 text-center border-b break-words">المبيعات</th>
+                    <th className="p-3 text-center border-b break-words">الزبون</th>
+                    <th className="p-3 text-center border-b break-words">ملاحظات</th>
+                    <th className="p-3 text-center border-b break-words">الحالة</th>
                     <th className="p-3 text-center border-b break-words">عرض</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ordersLoading ? (
-                    <tr><td colSpan="5" className="p-6"><LoadingState /></td></tr>
+                    <tr><td colSpan="9" className="p-6"><LoadingState /></td></tr>
                   ) : orders.map(order => (
                     <tr key={order.order_id} className="border-b hover:bg-gray-50">
                       <td className="p-3 break-words">{order.order_id}</td>
                       <td className="p-3 break-words">{order.created_at?.split("T")[0]}</td>
-                      <td className="p-3 text-center break-words">{order.items?.length || 0}</td>
+                      <td className="p-3 text-center break-words">{order.count_items ?? order.items?.length ?? 0}</td>
+                      <td className="p-3 text-center break-words">{order.total_amount ?? "-"}</td>
+                      <td className="p-3 text-center break-words">{order.sales?.full_name || order.sales?.username || "-"}</td>
+                      <td className="p-3 text-center break-words">{order.customer?.name || "-"}</td>
+                      <td className="p-3 text-center break-words">{order.notes || "-"}</td>
                       <td className="p-3 text-center break-words">
                         <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-sm">
-                          {order.status || "معلق"}
+                          {getStatusLabel(order.status)}
                         </span>
                       </td>
                       <td className="p-3 text-center">
@@ -970,26 +1039,32 @@ export default function SimpleOrderCreation() {
             </div>
 
             {selectedOrder && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-lg border flex-shrink-0">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-bold text-base">طلب #{selectedOrder.order_id}</span>
-                  <button
-                    onClick={() => setSelectedOrder(null)}
-                    className="text-gray-500 hover:text-gray-700 p-2 text-xl touch-manipulation"
-                  >
-                    ✕
-                  </button>
+              <StyledDialog
+                isOpen={Boolean(selectedOrder)}
+                onOpenChange={(open) => { if (!open) setSelectedOrder(null); }}
+                title={`تفاصيل الطلب #${selectedOrder.order_id}`}
+                onCancel={() => setSelectedOrder(null)}
+                cancelLabel="إغلاق"
+                showFooter={false}
+              >
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+                  <div className="bg-white p-2 rounded-lg border">الحالة: {getStatusLabel(selectedOrder.status)}</div>
+                  <div className="bg-white p-2 rounded-lg border">الإجمالي: {selectedOrder.total_amount || "-"}</div>
+                  <div className="bg-white p-2 rounded-lg border">عدد العناصر: {selectedOrder.count_items ?? selectedOrder.items?.length ?? 0}</div>
+                  <div className="bg-white p-2 rounded-lg border">المبيعات: {selectedOrder.sales?.full_name || selectedOrder.sales?.username || "-"}</div>
+                  <div className="bg-white p-2 rounded-lg border">الزبون: {selectedOrder.customer?.name || "-"}</div>
+                  <div className="bg-white p-2 rounded-lg border">ملاحظات: {selectedOrder.notes || "-"}</div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-base">
-                  {selectedOrder.items?.map((item, i) => (
-                    <div key={i} className="bg-white p-2 rounded-lg border whitespace-nowrap overflow-hidden text-ellipsis">
-                      {item.type_item === "Machine" ? "مكنة" : "كوي"} |
-                      {item.width || "-"} |
-                      {item.quantity} م
-                    </div>
-                  ))}
-                </div>
-              </div>
+                {selectedOrder.items?.length > 0 && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-base">
+                    {selectedOrder.items.map((item, i) => (
+                      <div key={i} className="bg-white p-2 rounded-lg border whitespace-nowrap overflow-hidden text-ellipsis">
+                        {item.type_item === "Machine" ? "مكنة" : "كوي"} | {item.width || "-"} | {item.quantity} م
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </StyledDialog>
             )}
           </Card>
         )}
