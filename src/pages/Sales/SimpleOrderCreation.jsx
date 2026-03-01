@@ -6,6 +6,7 @@ import { materialApi } from "../../api/materialApi";
 import { rulerApi } from "../../api/rulerApi";
 import { colorApi } from "../../api/colorApi";
 import { batchApi } from "../../api/batchApi";
+import { priceColorApi } from "../../api/priceColorApi";
 import { constantApi } from "../../api/constantApi";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -13,752 +14,1449 @@ import FilterSelect from "../../components/common/FilterSelect";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import {
-    ShoppingCart,
-    Plus,
-    History,
-    Trash2,
-    Eye,
-    RotateCcw,
-    Check,
-    User,
-    Users,
-    LogIn,
-    EyeOff
+  ShoppingCart,
+  Plus,
+  History,
+  Trash2,
+  Eye,
+  RotateCcw,
+  Check,
+  User,
+  Users,
+  LogIn,
+  EyeOff
 } from "lucide-react";
 import MessageAlert from "../../components/common/MessageAlert";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
 
 export default function SimpleOrderCreation() {
-    const navigate = useNavigate();
-    const [viewMode, setViewMode] = useState("create");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState("");
-    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const navigate = useNavigate();
+  const [viewMode, setViewMode] = useState("create");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
-    // Data
-    const [materials, setMaterials] = useState([]);
-    const [rulers, setRulers] = useState([]);
-    const [colors, setColors] = useState([]);
-    const [batches, setBatches] = useState([]);
-    const [widthValues, setWidthValues] = useState([]); // قيم العرض حسب المادة
-    const [loadingWidths, setLoadingWidths] = useState(false); // حالة تحميل قيم العرض
+  // Data
+  const [materials, setMaterials] = useState([]);
+  const [rulers, setRulers] = useState([]);
+  const [colors, setColors] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [priceColors, setPriceColors] = useState([]);
+  const [widthValues, setWidthValues] = useState([]); // قيم العرض حسب المادة
+  const [loadingWidths, setLoadingWidths] = useState(false); // حالة تحميل قيم العرض
 
-    // Form State
-    const [formData, setFormData] = useState({
-        material_id: "",
-        type_item: "Machine",
-        ruler_id: "",
-        color_id: "",
-        batch_id: "",
-        width: "",
-        quantity: "",
-        notes: ""
-    });
+  // Form State
+  const [formData, setFormData] = useState({
+    material_id: "",
+    type_item: "Machine",
+    ruler_id: "",
+    color_id: "",
+    batch_id: "",
+    width: "",
+    thickness: "0.6",
+    quantity: "",
+    notes: ""
+  });
 
-    const [orderItems, setOrderItems] = useState([]);
-    const [orders, setOrders] = useState([]);
-    const [ordersLoading, setOrdersLoading] = useState(false);
-    const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderItems, setOrderItems] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
-    // Numpad
-    const [numpadMode, setNumpadMode] = useState("quantity");
-    const [colorSearchCode, setColorSearchCode] = useState("");
-    const [activeField, setActiveField] = useState("quantity");
+  // Numpad
+  const [numpadMode, setNumpadMode] = useState("quantity");
+  const [colorSearchCode, setColorSearchCode] = useState("");
+  const [activeField, setActiveField] = useState("quantity");
 
-    const TYPE_OPTIONS = [
-        { value: "Machine", label: "مكنة" },
-        { value: "Presser", label: "كوي" }
-    ];
+  const TYPE_OPTIONS = [
+    { value: "Machine", label: "مكنة" },
+    { value: "Presser", label: "كوي" }
+  ];
 
-    // Load initial data
-    useEffect(() => {
-        loadInitialData();
-    }, []);
+  // Load initial data
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
-    useEffect(() => {
-        if (viewMode === "history") loadOrders();
-    }, [viewMode]);
+  useEffect(() => {
+    if (viewMode === "history") loadOrders();
+  }, [viewMode]);
 
-    // Load width values when material changes
-    useEffect(() => {
-        if (formData.material_id) {
-            loadWidthValues(formData.material_id);
-        } else {
-            setWidthValues([]);
-        }
-    }, [formData.material_id]);
+  // Load width values when material changes
+  useEffect(() => {
+    if (formData.material_id) {
+      loadWidthValues(formData.material_id);
+    } else {
+      setWidthValues([]);
+    }
+  }, [formData.material_id]);
 
-    const loadInitialData = async () => {
-        try {
-            const [matRes, rulerRes, colorRes, batchRes] = await Promise.all([
-                materialApi.getMaterials(),
-                rulerApi.getRulers(),
-                colorApi.getColors(),
-                batchApi.getBatches(),
-            ]);
+  const loadInitialData = async () => {
+    try {
+      const [matRes, rulerRes, colorRes, batchRes, priceRes] = await Promise.all([
+        materialApi.getMaterials(),
+        rulerApi.getRulers(),
+        colorApi.getColors(),
+        batchApi.getBatches(),
+        priceColorApi.getPriceColors(),
+      ]);
 
-            setMaterials(getApiData(matRes, []) || []);
-            setRulers(getApiData(rulerRes, []) || []);
-            setColors(getApiData(colorRes, []) || []);
-            setBatches(getApiData(batchRes, []) || []);
+      setMaterials(getApiData(matRes, []) || []);
+      setRulers(getApiData(rulerRes, []) || []);
+      setColors(getApiData(colorRes, []) || []);
+      setBatches(getApiData(batchRes, []) || []);
+      setPriceColors(getApiData(priceRes, []) || []);
 
-        } catch (error) {
-            setError("فشل في تحميل البيانات");
-        }
-    };
+    } catch (error) {
+      setError("فشل في تحميل البيانات");
+    }
+  };
 
-    // جلب قيم العرض حسب المادة
-    const loadWidthValues = async (materialId) => {
-        try {
-            setLoadingWidths(true);
-            const response = await constantApi.getConstantValuesByMaterial(materialId, 'width');
-            const widthData = getApiData(response, []);
-            setWidthValues(widthData);
+  // جلب قيم العرض حسب المادة
+  const loadWidthValues = async (materialId) => {
+    try {
+      setLoadingWidths(true);
+      const response = await constantApi.getConstantValuesByMaterial(materialId, 'width');
+      const widthData = getApiData(response, []);
+      setWidthValues(widthData);
 
-            // إعادة تعيين العرض المحدد عند تغيير المادة
-            setFormData(prev => ({ ...prev, width: "" }));
-        } catch (error) {
-            setError("فشل في تحميل قيم العرض");
-            setWidthValues([]);
-        } finally {
-            setLoadingWidths(false);
-        }
-    };
+      // إعادة تعيين العرض المحدد عند تغيير المادة
+      setFormData(prev => ({ ...prev, width: "" }));
+    } catch (error) {
+      setError("فشل في تحميل قيم العرض");
+      setWidthValues([]);
+    } finally {
+      setLoadingWidths(false);
+    }
+  };
 
-    const loadOrders = async () => {
-        try {
-            setOrdersLoading(true);
-            const response = await orderApi.getOrders();
-            setOrders(getApiData(response, []) || []);
-        } catch {
-            setError("فشل في تحميل الطلبات");
-        } finally {
-            setOrdersLoading(false);
-        }
-    };
+  const loadOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      const response = await orderApi.getOrders();
+      setOrders(getApiData(response, []) || []);
+    } catch {
+      setError("فشل في تحميل الطلبات");
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
-    // التحقق مما إذا كانت المادة المحددة تحتوي على كلمة "لوح"
-    const isSelectedMaterialBoard = useMemo(() => {
-        if (!formData.material_id) return false;
-        const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
-        return selectedMaterial?.material_name?.includes("لوح", "ألواح") || false;
-    }, [formData.material_id, materials]);
+  // التحقق مما إذا كانت المادة المحددة تحتوي على كلمة "لوح" أو مشتقاتها
+  const isSelectedMaterialBoard = useMemo(() => {
+    if (!formData.material_id) return false;
+    const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
+    const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
 
-    // Filters
-    const availableRulers = useMemo(() => {
-        if (!formData.material_id) return [];
-        return rulers.filter(r => String(r.material_id) === String(formData.material_id));
-    }, [formData.material_id, rulers]);
+    // التحقق من الكلمات المختلفة للواح
+    const boardKeywords = ["لوح", "ألواح", "board", "boards", "لوحة", "الواح"];
+    return boardKeywords.some(keyword => materialName.includes(keyword));
+  }, [formData.material_id, materials]);
 
-    const availableColors = useMemo(() => {
-        if (!formData.ruler_id) return [];
-        return colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
-    }, [formData.ruler_id, colors]);
+  // Filters
+  const availableRulers = useMemo(() => {
+    if (!formData.material_id) return [];
+    return rulers.filter(r => String(r.material_id) === String(formData.material_id));
+  }, [formData.material_id, rulers]);
 
-    const filteredColorsBySearch = useMemo(() => {
-        if (!colorSearchCode || numpadMode !== "colorSearch") return availableColors;
-        return availableColors.filter(c =>
-            c.color_code?.toLowerCase().includes(colorSearchCode.toLowerCase())
-        );
-    }, [colorSearchCode, availableColors, numpadMode]);
+  const availableColors = useMemo(() => {
+    if (!formData.ruler_id) return [];
+    return colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
+  }, [formData.ruler_id, colors]);
 
-    const selectedColorImage = useMemo(() => {
-        const color = colors.find(c => String(c.color_id) === String(formData.color_id));
-        return color?.image_url || color?.color_image || null;
-    }, [formData.color_id, colors]);
+  // فلترة الألوان المتاحة مع استبعاد غير المسعرة
+  const availablePricedColors = useMemo(() => {
+    if (!formData.ruler_id) return [];
 
-    const handleFieldChange = (field, value) => {
-        setFormData(prev => {
-            const newData = { ...prev, [field]: value };
+    let filteredColors = colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
 
-            if (field === "material_id") {
-                newData.ruler_id = "";
-                newData.color_id = "";
-                newData.width = "";
-            } else if (field === "ruler_id") {
-                newData.color_id = "";
-                newData.width = "";
-            } else if (field === "color_id") {
-                newData.width = "";
-            }
+    // Debug logs
+    console.log("Debug - formData:", formData);
+    console.log("Debug - colors for ruler:", filteredColors);
+    console.log("Debug - priceColors:", priceColors);
+    console.log("Debug - isSelectedMaterialBoard:", isSelectedMaterialBoard);
 
-            return newData;
-        });
-    };
+    // دائماً إرجاع جميع الألوان المتاحة للمسطرة
+    // التحقق من التسعير سيتم في isColorPriced وليس هنا
+    console.log("Debug - Returning all available colors for ruler");
+    return filteredColors;
+  }, [formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, colors, priceColors]);
 
-    const handleNumpadPress = (val) => {
-        if (numpadMode === "colorSearch") {
-            let search = colorSearchCode;
-            if (val === "clear") search = "";
-            else if (val === "back") search = search.slice(0, -1);
-            else search = search + val;
-
-            setColorSearchCode(search);
-
-            const matched = availableColors.find(c => c.color_code === search);
-            if (matched) {
-                handleFieldChange("color_id", matched.color_id);
-                setNumpadMode("quantity");
-                setColorSearchCode("");
-            }
-        } else {
-            let current = String(formData[activeField] || "");
-            if (val === "clear") current = "";
-            else if (val === "back") current = current.slice(0, -1);
-            else if (val === ".") {
-                if (!current.includes(".")) current = current ? current + "." : "0.";
-            } else {
-                current = current + val;
-            }
-            handleFieldChange(activeField, current);
-        }
-    };
-
-    const addItem = () => {
-        if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity) {
-            setError("يرجى اكمال جميع البيانات");
-            return;
-        }
-
-        // إذا كانت المادة ليست "لوح" يجب تحديد العرض
-        if (!isSelectedMaterialBoard && !formData.width) {
-            setError("يرجى اختيار العرض");
-            return;
-        }
-
-        const material = materials.find(m => String(m.material_id) === String(formData.material_id));
-        const ruler = rulers.find(r => String(r.ruler_id) === String(formData.ruler_id));
-        const color = colors.find(c => String(c.color_id) === String(formData.color_id));
-        const batch = batches.find(b => String(b.batch_id) === String(formData.batch_id));
-
-        const newItem = {
-            id: Date.now(),
-            ...formData,
-            material_name: material?.material_name,
-            ruler_name: ruler?.ruler_name,
-            color_name: color?.color_name,
-            batch_number: batch?.batch_number,
-        };
-
-        setOrderItems(prev => [...prev, newItem]);
-
-        // Reset form keeping material
-        setFormData(prev => ({
-            material_id: prev.material_id,
-            type_item: "Machine",
-            ruler_id: "",
-            color_id: "",
-            batch_id: "",
-            width: "",
-            quantity: "",
-            notes: ""
-        }));
-        setColorSearchCode("");
-        setError("");
-    };
-
-    const removeItem = (id) => {
-        setOrderItems(prev => prev.filter(item => item.id !== id));
-    };
-
-    const saveOrder = async () => {
-        if (orderItems.length === 0) {
-            setError("أضف عنصراً واحداً على الأقل");
-            return;
-        }
-
-        try {
-            setLoading(true);
-            const items = orderItems.map(item => ({
-                type_item: item.type_item,
-                color_id: Number(item.color_id),
-                width: Number(item.width) || 0,
-                batch_id: Number(item.batch_id) || null,
-                quantity: Number(item.quantity),
-                notes: item.notes
-            }));
-
-            await orderApi.createOrder({ status: "pending", items, notes: "" });
-            setSuccess("تم حفظ الطلب بنجاح");
-            setOrderItems([]);
-        } catch {
-            setError("فشل في حفظ الطلب");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="h-screen flex flex-col">
-            <div className="relative">
-                {isHeaderVisible && (
-                    <div className="flex flex-wrap items-center justify-between border-b-2 border-secondary-f gap-3 px-3 py-2">
-                        <div className="flex flex-wrap gap-3">
-                            <Button
-                                size="lg"
-                                variant={viewMode === "create" ? "default" : "outline"}
-                                onClick={() => setViewMode("create")}
-                                className="px-6 py-3 text-base"
-                            >
-                                <ShoppingCart className="w-5 h-5 ml-2" />
-                                طلب جديد
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant={viewMode === "history" ? "default" : "outline"}
-                                onClick={() => setViewMode("history")}
-                                className="px-6 py-3 text-base"
-                            >
-                                <History className="w-5 h-5 ml-2" />
-                                سجل الطلبات
-                            </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/profile")}
-                                className="px-5 py-3 text-base"
-                            >
-                                <User className="w-5 h-5 ml-2" />
-                                البروفايل
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/customers")}
-                                className="px-5 py-3 text-base"
-                            >
-                                <Users className="w-5 h-5 ml-2" />
-                                الزبائن
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/login")}
-                                className="px-5 py-3 text-base"
-                            >
-                                <LogIn className="w-5 h-5 ml-2" />
-                                تسجيل الدخول
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setIsHeaderVisible(false)}
-                                className="px-4 py-3 text-base"
-                            >
-                                <EyeOff className="w-5 h-5 ml-2" />
-                                إخفاء
-                            </Button>
-                        </div>
-                    </div>
-                )}
-                {!isHeaderVisible && (
-                    <div className="absolute top-2 right-2 z-20">
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => setIsHeaderVisible(true)}
-                            className="px-4 py-2 text-base bg-white"
-                        >
-                            <Eye className="w-5 h-5 ml-2" />
-                            إظهار الهيدر
-                        </Button>
-                    </div>
-                )}
-            </div>
-
-            <div className="flex-1 min-h-0 p-3">
-                {error && <MessageAlert type="error" message={error} onDismiss={() => setError("")} dismissable />}
-                {success && <MessageAlert type="success" message={success} onDismiss={() => setSuccess("")} dismissable />}
-
-                {viewMode === "create" ? (
-                    <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1.8fr_1fr] gap-3 h-full min-h-0">
-                        <div className="left flex flex-col gap-3 min-h-0">
-                            <Card className="l-top flex flex-col min-h-0 overflow-hidden">
-                                <div className="flex justify-between items-center p-3 border-b bg-gray-50 shrink-0">
-                                    <span className="font-bold text-base">العناصر المضافة: {orderItems.length}</span>
-                                    <Button
-                                        size="lg"
-                                        onClick={saveOrder}
-                                        disabled={loading || orderItems.length === 0}
-                                        className="h-12 bg-green-600 hover:bg-green-700 text-base px-6"
-                                    >
-                                        <Check className="w-5 h-5 ml-2" />
-                                        حفظ الطلب
-                                    </Button>
-                                </div>
-
-                                <div className="flex-1 overflow-auto">
-                                    <table className="w-full text-base">
-                                        <thead className="bg-gray-100 sticky top-0 z-10">
-                                            <tr>
-                                                <th className="p-3 text-right border-b">المادة</th>
-                                                <th className="p-3 text-right border-b">المسطرة</th>
-                                                <th className="p-3 text-right border-b">اللون</th>
-                                                <th className="p-3 text-center border-b">النوع</th>
-                                                <th className="p-3 text-center border-b">العرض</th>
-                                                <th className="p-3 text-center border-b">الكمية</th>
-                                                <th className="p-3 text-center border-b">حذف</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {orderItems.map(item => (
-                                                <tr key={item.id} className="border-b hover:bg-gray-50">
-                                                    <td className="p-3">{item.material_name}</td>
-                                                    <td className="p-3">{item.ruler_name}</td>
-                                                    <td className="p-3">{item.color_name}</td>
-                                                    <td className="p-3 text-center">{item.type_item === "Machine" ? "مكنة" : "كوي"}</td>
-                                                    <td className="p-3 text-center">{item.width || "-"}</td>
-                                                    <td className="p-3 text-center font-bold">{item.quantity} م</td>
-                                                    <td className="p-3 text-center">
-                                                        <button
-                                                            onClick={() => removeItem(item.id)}
-                                                            className="text-red-600 hover:bg-red-50 p-3 rounded-lg touch-manipulation"
-                                                        >
-                                                            <Trash2 className="w-5 h-5" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {orderItems.length === 0 && (
-                                                <tr>
-                                                    <td colSpan="7" className="p-6 text-center text-gray-400 text-base">لا توجد عناصر مضافة</td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </Card>
-
-                            <Card className="l-bottom p-4">
-                                <div className="text-gray-500 text-sm">مساحة إضافية</div>
-                            </Card>
-                        </div>
-                        <div className="center flex flex-col gap-3 min-h-0 overflow-y-auto">
-                            {!isSelectedMaterialBoard && (
-                                <Card className="p-4 shrink-0">
-                                    <Label className="font-bold text-base mb-3 block">نوع الطلب</Label>
-                                    <div className="grid grid-cols-2 gap-3 justify-items-center">
-                                        {TYPE_OPTIONS.map(t => (
-                                            <button
-                                                key={t.value}
-                                                onClick={() => handleFieldChange("type_item", t.value)}
-                                                className={`w-24 h-24 sm:w-28 sm:h-28 xl:w-30 xl:h-30 rounded-2xl border-2 text-2xl sm:text-3xl font-medium transition-all touch-manipulation ${formData.type_item === t.value
-                                                    ? "border-primary-f bg-primary-f text-white shadow-lg"
-                                                    : "border-gray-300 bg-white hover:border-green-400 active:bg-gray-100"
-                                                    }`}
-                                            >
-                                                {t.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </Card>
-                            )}
-
-                            {formData.material_id && !isSelectedMaterialBoard && (
-                                <Card className="p-4 shrink-0">
-                                    <Label className="font-bold text-base mb-3 block">
-                                        العرض (سم)
-                                        {loadingWidths && <span className="mr-2 text-gray-500 text-sm">جاري التحميل...</span>}
-                                    </Label>
-                                    {widthValues.length > 0 ? (
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 justify-items-center">
-                                            {widthValues.map(w => (
-                                                <button
-                                                    key={w.id}
-                                                    onClick={() => handleFieldChange("width", w.value)}
-                                                    className={`w-24 h-24 sm:w-28 sm:h-28 xl:w-30 xl:h-30 rounded-2xl border-2 text-xl sm:text-2xl font-medium transition-all touch-manipulation ${formData.width === w.value
-                                                        ? "border-teal-600 bg-teal-600 text-white shadow-lg"
-                                                        : "border-gray-300 bg-white hover:border-teal-400 active:bg-gray-100"
-                                                        }`}
-                                                >
-                                                    {w.value}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        !loadingWidths && (
-                                            <div className="text-center p-4 text-gray-400 text-base border-2 border-dashed border-gray-300 rounded-xl">
-                                                لا توجد قيم عرض لهذه المادة
-                                            </div>
-                                        )
-                                    )}
-                                </Card>
-                            )}
-
-                            <Card className="p-4 shrink-0">
-                                <Label className="font-bold text-base mb-3 block">المسطرة</Label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 justify-items-center">
-                                    {availableRulers.length === 0 ? (
-                                        <span className="text-gray-400 text-base col-span-3 text-center p-4">اختر المادة أولاً</span>
-                                    ) : (
-                                        availableRulers.map(r => (
-                                            <button
-                                                key={r.ruler_id}
-                                                onClick={() => handleFieldChange("ruler_id", r.ruler_id)}
-                                                className={`w-24 h-24 sm:w-28 sm:h-28 xl:w-30 xl:h-30 rounded-2xl border-2 text-xl sm:text-2xl font-medium transition-all touch-manipulation ${String(formData.ruler_id) === String(r.ruler_id)
-                                                    ? "border-purple-600 bg-purple-600 text-white shadow-lg"
-                                                    : "border-gray-300 bg-white hover:border-purple-400 active:bg-gray-100"
-                                                    }`}
-                                            >
-                                                {r.ruler_name}
-                                            </button>
-                                        ))
-                                    )}
-                                </div>
-                            </Card>
-
-                            <Card className="p-4 shrink-0">
-                                <div className="grid grid-cols-[1fr_140px] gap-4 items-end">
-                                    <div>
-                                        <Label className="font-bold text-base mb-3 block">
-                                            اللون
-                                            {numpadMode === "colorSearch" && colorSearchCode && (
-                                                <span className="mr-3 text-blue-600 text-sm">(بحث: {colorSearchCode})</span>
-                                            )}
-                                        </Label>
-                                        <FilterSelect
-                                            value={formData.color_id}
-                                            onChange={(e) => handleFieldChange("color_id", e.target.value)}
-                                            disabled={!formData.ruler_id}
-                                            options={filteredColorsBySearch.map(c => ({
-                                                value: c.color_id,
-                                                label: `${c.color_name} (${c.color_code})`
-                                            }))}
-                                            placeholder={formData.ruler_id ? "اختر اللون" : "اختر المسطرة أولاً"}
-                                            className="w-full text-base p-3"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label className="font-bold text-base mb-3 block">الصورة</Label>
-                                        <div className="h-24 border-2 border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden">
-                                            {selectedColorImage ? (
-                                                <img src={selectedColorImage} alt="" className="h-full w-full object-cover" />
-                                            ) : (
-                                                <span className="text-gray-400 text-sm">لا توجد</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </Card>
-
-                            <Card className="p-4 shrink-0">
-                                <Label className="font-bold text-base mb-3 block">رقم الطبخة</Label>
-                                <FilterSelect
-                                    value={formData.batch_id}
-                                    onChange={(e) => handleFieldChange("batch_id", e.target.value)}
-                                    options={batches.map(b => ({
-                                        value: b.batch_id,
-                                        label: b.batch_number
-                                    }))}
-                                    placeholder="اختر الطبخة"
-                                    className="w-full text-base p-3"
-                                />
-                            </Card>
-
-                            <Card className="p-4 shrink-0">
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="font-bold text-base mb-3 block">الكمية</Label>
-                                        <div className="flex items-center gap-3">
-                                            <Input
-                                                type="number"
-                                                value={formData.quantity}
-                                                onChange={(e) => handleFieldChange("quantity", e.target.value)}
-                                                onClick={() => {
-                                                    setActiveField("quantity");
-                                                    setNumpadMode("quantity");
-                                                }}
-                                                className={`h-16 text-xl text-center font-bold flex-1 ${activeField === "quantity" ? "ring-2 ring-blue-400" : ""}`}
-                                                placeholder="0"
-                                            />
-                                            <span className="text-lg font-bold text-gray-600 w-16">متر</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label className="font-bold text-base mb-3 block">الملاحظات</Label>
-                                        <Input
-                                            value={formData.notes}
-                                            onChange={(e) => handleFieldChange("notes", e.target.value)}
-                                            placeholder="أي ملاحظات إضافية..."
-                                            className="h-16 text-base"
-                                        />
-                                    </div>
-                                </div>
-                            </Card>
-
-                            <Button
-                                onClick={addItem}
-                                size="lg"
-                                className="h-16 bg-blue-600 hover:bg-blue-700 shrink-0 text-lg font-bold"
-                                disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
-                            >
-                                <Plus className="w-6 h-6 ml-2" />
-                                إضافة للطلب
-                            </Button>
-                        </div>
-
-                        <div className="right flex flex-col gap-3 min-h-0">
-                            <Card className="r-top p-4 shrink-0">
-                                <Label className="font-bold text-base mb-3 block">المادة</Label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 justify-items-center">
-                                    {materials.map(m => (
-                                        <button
-                                            key={m.material_id}
-                                            onClick={() => handleFieldChange("material_id", m.material_id)}
-                                            className={`w-24 h-24 sm:w-28 sm:h-28 xl:w-30 xl:h-30 rounded-2xl border-4 text-xl sm:text-2xl font-bold transition-all touch-manipulation ${String(formData.material_id) === String(m.material_id)
-                                                ? "border-primary-f bg-secondary-f text-white shadow-lg"
-                                                : "border-gray-300 bg-white hover:border-blue-400 active:bg-gray-100"
-                                                }`}
-                                        >
-                                            {m.material_name}
-                                        </button>
-                                    ))}
-                                </div>
-                            </Card>
-
-                            <Card className="r-bottom p-4 flex flex-col min-h-0 overflow-hidden">
-                                <div className="text-center mb-4 shrink-0">
-                                    <div className="flex gap-3 mb-4">
-                                        <button
-                                            onClick={() => {
-                                                setNumpadMode("colorSearch");
-                                                setColorSearchCode("");
-                                            }}
-                                            className={`flex-1 py-4 px-4 rounded-xl text-lg font-bold border-2 touch-manipulation ${numpadMode === "colorSearch" ? "bg-purple-600 text-white border-purple-600" : "bg-white border-gray-300"
-                                                }`}
-                                        >
-                                            بحث بالكود
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setNumpadMode("quantity");
-                                                setActiveField("quantity");
-                                            }}
-                                            className={`flex-1 py-4 px-4 rounded-xl text-lg font-bold border-2 touch-manipulation ${numpadMode === "quantity" ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-300"
-                                                }`}
-                                        >
-                                            كتابة الكمية
-                                        </button>
-                                    </div>
-
-                                    <div className="bg-gray-100 rounded-xl p-5 mb-4">
-                                        <div className="text-base text-gray-500 mb-2">
-                                            {numpadMode === "colorSearch" ? "كود اللون" :
-                                                activeField === "quantity" ? "الكمية" :
-                                                    activeField === "width" ? "العرض" : "القيمة"}
-                                        </div>
-                                        <div className="text-4xl font-mono font-bold text-gray-800">
-                                            {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-3 flex-1">
-                                    {["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "back"].map(key => (
-                                        <button
-                                            key={key}
-                                            onClick={() => handleNumpadPress(key)}
-                                            className="bg-white border-2 border-gray-300 rounded-xl text-3xl font-bold hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center justify-center aspect-square touch-manipulation"
-                                        >
-                                            {key === "back" ? "?" : key}
-                                        </button>
-                                    ))}
-                                    <button
-                                        onClick={() => handleNumpadPress("clear")}
-                                        className="col-span-3 h-16 bg-red-100 text-red-700 rounded-xl text-xl font-bold hover:bg-red-200 transition-colors touch-manipulation"
-                                    >
-                                        مسح الكل
-                                    </button>
-                                </div>
-
-                                {numpadMode === "quantity" && (
-                                    <div className="mt-4 grid grid-cols-2 gap-3 shrink-0">
-                                        <button
-                                            onClick={() => setActiveField("width")}
-                                            className={`py-4 rounded-xl border-2 text-lg font-bold touch-manipulation ${activeField === "width" ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-300"
-                                                }`}
-                                        >
-                                            العرض
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveField("quantity")}
-                                            className={`py-4 rounded-xl border-2 text-lg font-bold touch-manipulation ${activeField === "quantity" ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-300"
-                                                }`}
-                                        >
-                                            الكمية
-                                        </button>
-                                    </div>
-                                )}
-                            </Card>
-                        </div>
-                    </div>
-                ) : (
-                    <Card className="flex-1 p-4 overflow-hidden flex flex-col">
-                        <div className="flex justify-between items-center mb-3 shrink-0">
-                            <h2 className="font-bold text-xl">سجل الطلبات</h2>
-                            <Button size="lg" variant="outline" onClick={loadOrders} disabled={ordersLoading} className="px-6 py-3 text-base">
-                                <RotateCcw className="w-5 h-5 ml-2" />
-                                تحديث
-                            </Button>
-                        </div>
-
-                        <div className="flex-1 border rounded-lg overflow-auto bg-white">
-                            <table className="w-full text-base">
-                                <thead className="bg-gray-100 sticky top-0">
-                                    <tr>
-                                        <th className="p-3 text-right border-b">#</th>
-                                        <th className="p-3 text-right border-b">التاريخ</th>
-                                        <th className="p-3 text-center border-b">العناصر</th>
-                                        <th className="p-3 text-center border-b">حالة</th>
-                                        <th className="p-3 text-center border-b">عرض</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {ordersLoading ? (
-                                        <tr><td colSpan="5" className="p-6"><LoadingState /></td></tr>
-                                    ) : orders.map(order => (
-                                        <tr key={order.order_id} className="border-b hover:bg-gray-50">
-                                            <td className="p-3">{order.order_id}</td>
-                                            <td className="p-3">{order.created_at?.split("T")[0]}</td>
-                                            <td className="p-3 text-center">{order.items?.length || 0}</td>
-                                            <td className="p-3 text-center">
-                                                <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-sm">{order.status || "معلق"}</span>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <Button size="lg" variant="outline" className="h-12 px-4" onClick={() => setSelectedOrder(order)}>
-                                                    <Eye className="w-5 h-5" />
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {selectedOrder && (
-                            <div className="mt-3 p-3 bg-gray-50 rounded-lg border shrink-0">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="font-bold text-base">طلب #{selectedOrder.order_id}</span>
-                                    <button onClick={() => setSelectedOrder(null)} className="text-gray-500 hover:text-gray-700 p-2 text-xl">x</button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 text-base">
-                                    {selectedOrder.items?.map((item, i) => (
-                                        <div key={i} className="bg-white p-2 rounded-lg border">
-                                            {item.type_item === "Machine" ? "مكنة" : "كوي"} |
-                                            {item.width || "-"} |
-                                            {item.quantity} م
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </Card>
-                )}
-            </div>
-        </div>
+  const filteredColorsBySearch = useMemo(() => {
+    if (!colorSearchCode || numpadMode !== "colorSearch") return availablePricedColors;
+    return availablePricedColors.filter(c =>
+      c.color_code?.toLowerCase().includes(colorSearchCode.toLowerCase())
     );
+  }, [colorSearchCode, availablePricedColors, numpadMode]);
+
+  const selectedColorImage = useMemo(() => {
+    const color = colors.find(c => String(c.color_id) === String(formData.color_id));
+    return color?.image_url || color?.color_image || null;
+  }, [formData.color_id, colors]);
+
+  // التحقق مما إذا كان اللون مسعرًا للمسطرة والعرض المحددين
+  const isColorPriced = useMemo(() => {
+    if (!formData.color_id || !formData.ruler_id) return false;
+
+    // إذا لم توجد بيانات تسعير، افترض أن اللون مسعر
+    if (!priceColors || priceColors.length === 0) {
+      return true;
+    }
+
+    // للمواد اللوحية - التحقق من التسعير حسب المسطرة فقط
+    if (isSelectedMaterialBoard) {
+      return priceColors.some(pc =>
+        String(pc.color_id) === String(formData.color_id) &&
+        String(pc.ruler_id) === String(formData.ruler_id) &&
+        pc.type_item === formData.type_item
+      );
+    }
+
+    // للمواد الأخرى - التحقق من التسعير حسب المسطرة والعرض
+    if (!formData.width) return false;
+
+    return priceColors.some(pc =>
+      String(pc.color_id) === String(formData.color_id) &&
+      String(pc.ruler_id) === String(formData.ruler_id) &&
+      pc.width === Number(formData.width) &&
+      pc.type_item === formData.type_item
+    );
+  }, [formData.color_id, formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, priceColors]);
+
+  // دالة للتحقق مما إذا كان اللون مسعرًا
+  const getColorPricingStatus = (colorId) => {
+    if (!priceColors || priceColors.length === 0) return { priced: true, label: "" };
+
+    if (isSelectedMaterialBoard) {
+      const isPriced = priceColors.some(pc =>
+        String(pc.color_id) === String(colorId) &&
+        String(pc.ruler_id) === String(formData.ruler_id) &&
+        pc.type_item === formData.type_item
+      );
+      return {
+        priced: isPriced,
+        label: isPriced ? "" : ""
+      };
+    } else {
+      if (!formData.width) return { priced: false, label: " (اختر العرض)" };
+
+      const isPriced = priceColors.some(pc =>
+        String(pc.color_id) === String(colorId) &&
+        String(pc.ruler_id) === String(formData.ruler_id) &&
+        pc.width === Number(formData.width) &&
+        pc.type_item === formData.type_item
+      );
+      return {
+        priced: isPriced,
+        label: isPriced ? "" : ""
+      };
+    }
+  };
+
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+
+      if (field === "material_id") {
+        newData.ruler_id = "";
+        newData.color_id = "";
+        newData.width = "";
+      } else if (field === "ruler_id") {
+        newData.color_id = "";
+        // Keep width when ruler changes
+      } else if (field === "color_id") {
+        // Keep width when color changes
+      }
+
+      return newData;
+    });
+  };
+
+  const handleNumpadPress = (val) => {
+    if (numpadMode === "colorSearch") {
+      let search = colorSearchCode;
+      if (val === "clear") search = "";
+      else if (val === "back") search = search.slice(0, -1);
+      else search = search + val;
+
+      setColorSearchCode(search);
+
+      const matched = availablePricedColors.find(c => c.color_code === search);
+      if (matched) {
+        handleFieldChange("color_id", matched.color_id);
+        setNumpadMode("quantity");
+        setColorSearchCode("");
+      }
+    } else {
+      let current = String(formData[activeField] || "");
+      if (val === "clear") current = "";
+      else if (val === "back") current = current.slice(0, -1);
+      else if (val === ".") {
+        if (!current.includes(".")) current = current ? current + "." : "0.";
+      } else {
+        current = current + val;
+      }
+      handleFieldChange(activeField, current);
+    }
+  };
+
+  const addItem = () => {
+    if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity) {
+      setError("يرجى اكمال جميع البيانات");
+      return;
+    }
+
+    // إذا كانت المادة ليست "لوح" يجب تحديد العرض
+    if (!isSelectedMaterialBoard && !formData.width) {
+      setError("يرجى اختيار العرض");
+      return;
+    }
+
+    // التحقق من أن اللون مسعر
+    // if (!isColorPriced) {
+    //   setError("اللون المحدد غير مسعر لهذه المواصفات");
+    //   return;
+    // }
+
+    const material = materials.find(m => String(m.material_id) === String(formData.material_id));
+    const ruler = rulers.find(r => String(r.ruler_id) === String(formData.ruler_id));
+    const color = colors.find(c => String(c.color_id) === String(formData.color_id));
+    const batch = batches.find(b => String(b.batch_id) === String(formData.batch_id));
+
+    const newItem = {
+      id: Date.now(),
+      ...formData,
+      material_name: material?.material_name,
+      ruler_name: ruler?.ruler_name,
+      color_name: color?.color_name,
+      batch_number: batch?.batch_number,
+    };
+
+    setOrderItems(prev => [...prev, newItem]);
+
+    // Reset form keeping material and thickness
+    setFormData(prev => ({
+      material_id: prev.material_id,
+      thickness: "0.6",
+      type_item: "Machine",
+      ruler_id: "",
+      color_id: "",
+      batch_id: "",
+      width: "",
+      quantity: "",
+      notes: ""
+    }));
+    setColorSearchCode("");
+    setError("");
+  };
+
+  const removeItem = (id) => {
+    setOrderItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const saveOrder = async () => {
+    if (orderItems.length === 0) {
+      setError("أضف عنصراً واحداً على الأقل");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const items = orderItems.map(item => ({
+        type_item: item.type_item,
+        color_id: Number(item.color_id),
+        width: Number(item.width) || 0,
+        thickness: 0.6,
+        batch_id: Number(item.batch_id) || null,
+        quantity: Number(item.quantity),
+        notes: item.notes
+      }));
+
+      await orderApi.createOrder({ status: "pending", items, notes: "" });
+      setSuccess("تم حفظ الطلب بنجاح");
+      setOrderItems([]);
+    } catch {
+      setError("فشل في حفظ الطلب");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+      {/* Header - ثابت في الأعلى */}
+      <div className="relative flex-shrink-0">
+        {isHeaderVisible && (
+          <div className="flex flex-wrap items-center justify-between border-b-2 border-secondary-f bg-white gap-4 px-4 py-2">
+            <div className="flex flex-wrap gap-3">
+              <Button
+                size="lg"
+                variant={viewMode === "create" ? "default" : "outline"}
+                onClick={() => setViewMode("create")}
+                className="px-6 py-3 text-base min-w-[120px] touch-manipulation"
+              >
+                <ShoppingCart className="w-5 h-5 ml-2" />
+                طلب جديد
+              </Button>
+              <Button
+                size="lg"
+                variant={viewMode === "history" ? "default" : "outline"}
+                onClick={() => setViewMode("history")}
+                className="px-6 py-3 text-base min-w-[120px] touch-manipulation"
+              >
+                <History className="w-5 h-5 ml-2" />
+                سجل الطلبات
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("/profile")}
+                className="px-5 py-3 text-base min-w-[100px] touch-manipulation"
+              >
+                <User className="w-5 h-5 ml-2" />
+                البروفايل
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("/customers")}
+                className="px-5 py-3 text-base min-w-[100px] touch-manipulation"
+              >
+                <Users className="w-5 h-5 ml-2" />
+                الزبائن
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("/login")}
+                className="px-5 py-3 text-base min-w-[100px] touch-manipulation"
+              >
+                <LogIn className="w-5 h-5 ml-2" />
+                تسجيل الدخول
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => setIsHeaderVisible(false)}
+                className="px-4 py-3 text-base min-w-[60px] touch-manipulation"
+              >
+                <EyeOff className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+        )}
+        {!isHeaderVisible && (
+          <div className="absolute top-2 right-2 z-20">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setIsHeaderVisible(true)}
+              className="px-4 py-2 text-base bg-white shadow-lg touch-manipulation"
+            >
+              <Eye className="w-5 h-5 ml-2" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Content - يأخذ المساحة المتبقية */}
+      <div className="flex-1 min-h-0 p-3 overflow-hidden">
+        {error && <MessageAlert type="error" message={error} onDismiss={() => setError("")} dismissable />}
+        {success && <MessageAlert type="success" message={success} onDismiss={() => setSuccess("")} dismissable />}
+
+        {viewMode === "create" ? (
+          /* 
+            توزيع الأعمدة بشكل ديناميكي:
+            - العمود الأول: 1.2fr (المواد والأرقام)
+            - العمود الثاني: 2fr (العناصر الوسطى)
+            - العمود الثالث: 1.8fr (الجدول)
+          */
+          <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_2fr_1.8fr] gap-3 h-full min-h-0">
+
+            {/* العمود الأيمن - أزرار المواد والأرقام */}
+            <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
+              {/* أزرار المواد - تستخدم Grid ديناميكي */}
+              <Card className="flex-shrink-0 p-4">
+                <Label className="font-bold text-base mb-3 block">المادة</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 auto-rows-fr">
+                  {materials.map(m => (
+                    <button
+                      key={m.material_id}
+                      onClick={() => handleFieldChange("material_id", m.material_id)}
+                      className={`
+                                            aspect-square rounded-2xl border-4 text-xl sm:text-2xl font-bold 
+                                            transition-all touch-manipulation hover:scale-105 active:scale-95
+                                            flex items-center justify-center p-2
+                                            ${String(formData.material_id) === String(m.material_id)
+                          ? "border-primary-f bg-secondary-f text-white shadow-lg"
+                          : "border-gray-300 bg-white hover:border-blue-400"
+                        }
+                                        `}
+                    >
+                      {m.material_name}
+                    </button>
+                  ))}
+                </div>
+              </Card>
+
+              {/* الأرقام - تأخذ المساحة المتبقية */}
+              <Card className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
+                {/* شاشة العرض الرقمية - مدمجة أكثر */}
+                <div className="flex-shrink-0 mb-2">
+                  <div className="flex gap-2 mb-2">
+                    <button
+                      onClick={() => {
+                        setNumpadMode("colorSearch");
+                        setColorSearchCode("");
+                      }}
+                      className={`
+                    flex-1 py-3 px-2 rounded-lg text-sm font-bold border-2 
+                    touch-manipulation transition-all active:scale-95
+                    ${numpadMode === "colorSearch"
+                          ? "bg-purple-600 text-white border-purple-600"
+                          : "bg-white border-gray-300 hover:bg-gray-100"
+                        }
+                `}
+                    >
+                      بحث بالكود
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNumpadMode("quantity");
+                        setActiveField("quantity");
+                      }}
+                      className={`
+                    flex-1 py-3 px-2 rounded-lg text-sm font-bold border-2 
+                    touch-manipulation transition-all active:scale-95
+                    ${numpadMode === "quantity"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white border-gray-300 hover:bg-gray-100"
+                        }
+                `}
+                    >
+                      كتابة الكمية
+                    </button>
+                  </div>
+
+                  <div className="bg-gray-100 rounded-lg py-2 px-3">
+                    <div className="text-xs text-gray-500 mb-0.5">
+                      {numpadMode === "colorSearch" ? "كود اللون" :
+                        activeField === "quantity" ? "الكمية" :
+                          activeField === "width" ? "العرض" : "القيمة"}
+                    </div>
+                    <div className="text-3xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
+                      {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
+                    </div>
+                  </div>
+                </div>
+
+                {/* أزرار الأرقام - 4 صفوف فقط (بدون مساحة إضافية) */}
+                <div className="flex-1 grid grid-rows-4 gap-1.5 min-h-0">
+                  {/* الصف 1: 7 8 9 */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {["7", "8", "9"].map(key => (
+                      <button
+                        key={key}
+                        onClick={() => handleNumpadPress(key)}
+                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 w-full h-full"
+                      >
+                        {key}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* الصف 2: 4 5 6 */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {["4", "5", "6"].map(key => (
+                      <button
+                        key={key}
+                        onClick={() => handleNumpadPress(key)}
+                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 w-full h-full"
+                      >
+                        {key}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* الصف 3: 1 2 3 */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {["1", "2", "3"].map(key => (
+                      <button
+                        key={key}
+                        onClick={() => handleNumpadPress(key)}
+                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 w-full h-full"
+                      >
+                        {key}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* الصف 4: . 0 ⌫ مع مسح الكل */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      onClick={() => handleNumpadPress(".")}
+                      className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 w-full h-full"
+                    >
+                      .
+                    </button>
+                    <button
+                      onClick={() => handleNumpadPress("0")}
+                      className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 w-full h-full"
+                    >
+                      0
+                    </button>
+                    <button
+                      onClick={() => handleNumpadPress("clear")}
+                      className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-xl font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 w-full h-full"
+                    >
+                      مسح
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* العمود الأوسط - العناصر الإضافية */}
+            <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
+              {!isSelectedMaterialBoard && (
+                <Card className="flex-shrink-0 p-4">
+                  {/* <Label className="font-bold text-base mb-3 block">نوع الطلب</Label> */}
+                  <div className="grid grid-cols-4 ">
+                    {TYPE_OPTIONS.map(t => (
+                      <button
+                        key={t.value}
+                        onClick={() => handleFieldChange("type_item", t.value)}
+                        className={`
+                                                w-30 h-30 rounded-2xl border-2 text-2xl sm:text-3xl font-medium
+                                                transition-all touch-manipulation
+                                                flex items-center justify-center p-2
+                                                ${formData.type_item === t.value
+                            ? "border-primary-f bg-primary-f text-white shadow-lg"
+                            : "border-gray-300 bg-white hover:border-green-400"
+                          }
+                                            `}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {formData.material_id && !isSelectedMaterialBoard && (
+                <Card className="flex-shrink-0 p-4">
+                  <Label className="font-bold text-base mb-3 block">
+                    العرض
+                    {loadingWidths && <span className="mr-2 text-gray-500 text-sm">جاري التحميل...</span>}
+                  </Label>
+                  {widthValues.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-fr">
+                      {widthValues.map(w => (
+                        <button
+                          key={w.id}
+                          onClick={() => handleFieldChange("width", w.value)}
+                          className={`
+                                                    aspect-square rounded-2xl border-4 text-xl sm:text-2xl font-medium
+                                                    transition-all touch-manipulation hover:scale-105 active:scale-95
+                                                    flex items-center justify-center p-2
+                                                    ${formData.width === w.value
+                              ? "border-teal-600 bg-teal-600 text-white shadow-lg"
+                              : "border-gray-300 bg-white hover:border-teal-400"
+                            }
+                                                `}
+                        >
+                          {w.value}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    !loadingWidths && (
+                      <div className="text-center p-4 text-gray-400 text-base border-2 border-dashed border-gray-300 rounded-xl">
+                        لا توجد قيم عرض لهذه المادة
+                      </div>
+                    )
+                  )}
+                </Card>
+              )}
+
+              <Card className="flex-shrink-0 p-4">
+                <Label className="font-bold text-base mb-3 block">المسطرة</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-fr">
+                  {availableRulers.length === 0 ? (
+                    <span className="text-gray-400 text-base col-span-4 text-center p-4">اختر المادة أولاً</span>
+                  ) : (
+                    availableRulers.map(r => (
+                      <button
+                        key={r.ruler_id}
+                        onClick={() => handleFieldChange("ruler_id", r.ruler_id)}
+                        className={`
+                                                aspect-square rounded-2xl border-4 text-xl sm:text-2xl font-medium
+                                                transition-all touch-manipulation hover:scale-105 active:scale-95
+                                                flex items-center justify-center p-2
+                                                ${String(formData.ruler_id) === String(r.ruler_id)
+                            ? "border-purple-600 bg-purple-600 text-white shadow-lg"
+                            : "border-gray-300 bg-white hover:border-purple-400"
+                          }
+                                            `}
+                      >
+                        {r.ruler_name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </Card>
+
+              <Card className="flex-shrink-0 p-4">
+                <div className="grid grid-cols-[1fr_140px] gap-4 items-end">
+                  <div>
+                    <Label className="font-bold text-base mb-3 block">
+                      اللون
+                      {numpadMode === "colorSearch" && colorSearchCode && (
+                        <span className="mr-3 text-blue-600 text-sm">(بحث: {colorSearchCode})</span>
+                      )}
+                    </Label>
+                    <FilterSelect
+                      value={formData.color_id}
+                      onChange={(e) => handleFieldChange("color_id", e.target.value)}
+                      disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
+                      options={filteredColorsBySearch.map(c => {
+                        const pricingStatus = getColorPricingStatus(c.color_id);
+                        return {
+                          value: c.color_id,
+                          label: `${c.color_name} (${c.color_code})${pricingStatus.label}`
+                        };
+                      })}
+                      placeholder={
+                        !formData.ruler_id
+                          ? "اختر المسطرة أولاً"
+                          : (!isSelectedMaterialBoard && !formData.width)
+                            ? "اختر العرض أولاً"
+                            : filteredColorsBySearch.length === 0
+                              ? "لا توجد ألوان مسعرة"
+                              : "اختر اللون"
+                      }
+                      className="w-full text-base p-3 min-h-[50px]"
+                    />
+                  </div>
+                  <div>
+                    <Label className="font-bold text-base mb-3 block">الصورة</Label>
+                    <div className="h-24 border-2 border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden">
+                      {selectedColorImage ? (
+                        <img src={selectedColorImage} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-gray-400 text-sm">لا توجد</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="flex-shrink-0 p-4">
+                <Label className="font-bold text-base mb-3 block">رقم الطبخة</Label>
+                <FilterSelect
+                  value={formData.batch_id}
+                  onChange={(e) => handleFieldChange("batch_id", e.target.value)}
+                  disabled={!isSelectedMaterialBoard && !formData.width}
+                  options={batches.map(b => ({
+                    value: b.batch_id,
+                    label: b.batch_number
+                  }))}
+                  placeholder={
+                    (!isSelectedMaterialBoard && !formData.width)
+                      ? "اختر العرض أولاً"
+                      : "اختر الطبخة"
+                  }
+                  className="w-full text-base p-3 min-h-[50px]"
+                />
+              </Card>
+
+              <Card className="flex-shrink-0 p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="font-bold text-base mb-3 block">الكمية</Label>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        value={formData.quantity}
+                        onChange={(e) => handleFieldChange("quantity", e.target.value)}
+                        onClick={() => {
+                          setActiveField("quantity");
+                          setNumpadMode("quantity");
+                        }}
+                        className={`h-14 text-xl text-center font-bold flex-1 ${activeField === "quantity" ? "ring-2 ring-blue-400" : ""}`}
+                        placeholder="0"
+                      />
+                      <span className="text-lg font-bold text-gray-600 whitespace-nowrap">متر</span>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="font-bold text-base mb-3 block">السماكة</Label>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        value={formData.thickness}
+                        className="h-14 text-lg text-center font-bold flex-1 bg-gray-100"
+                        placeholder="0.6"
+                        step="0.1"
+                        readOnly
+                      />
+                      <span className="text-lg font-bold text-gray-600 whitespace-nowrap">مم</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="flex-shrink-0 p-4">
+                <Label className="font-bold text-base mb-3 block">الملاحظات</Label>
+                <Input
+                  value={formData.notes}
+                  onChange={(e) => handleFieldChange("notes", e.target.value)}
+                  placeholder="ملاحظات إضافية..."
+                  className="h-14 text-base"
+                />
+              </Card>
+
+              <Button
+                onClick={addItem}
+                size="lg"
+                className="h-14 bg-blue-600 hover:bg-blue-700 flex-shrink-0 text-lg font-bold touch-manipulation active:scale-95 transition-transform"
+                disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
+              >
+                <Plus className="w-6 h-6 ml-2" />
+                إضافة للطلب
+              </Button>
+            </div>
+
+            {/* العمود الأيسر - الجدول */}
+            <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
+              <Card className="flex flex-col h-full min-h-0 overflow-hidden">
+                {/* رأس الجدول - ثابت */}
+                <div className="flex justify-between items-center p-3 border-b bg-gray-50 flex-shrink-0">
+                  <span className="font-bold text-base">العناصر المضافة: {orderItems.length}</span>
+                  <Button
+                    size="lg"
+                    onClick={saveOrder}
+                    disabled={loading || orderItems.length === 0}
+                    className="h-12 bg-green-600 hover:bg-green-700 text-base px-6 touch-manipulation active:scale-95 transition-transform"
+                  >
+                    <Check className="w-5 h-5 ml-2" />
+                    حفظ الطلب
+                  </Button>
+                </div>
+
+                {/* الجدول مع التمرير العمودي فقط */}
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  <table className="w-full border-collapse">
+                    <thead className="bg-gray-100 sticky top-0 z-10">
+                      <tr>
+                        <th className="p-3 text-right border-b whitespace-nowrap">المادة</th>
+                        <th className="p-3 text-right border-b whitespace-nowrap">المسطرة</th>
+                        <th className="p-3 text-right border-b whitespace-nowrap">اللون</th>
+                        <th className="p-3 text-center border-b whitespace-nowrap">النوع</th>
+                        <th className="p-3 text-center border-b whitespace-nowrap">العرض</th>
+                        <th className="p-3 text-center border-b whitespace-nowrap">السماكة</th>
+                        <th className="p-3 text-center border-b whitespace-nowrap">الكمية</th>
+                        <th className="p-3 text-center border-b whitespace-nowrap">حذف</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orderItems.map(item => (
+                        <tr key={item.id} className="border-b hover:bg-gray-50">
+                          <td className="p-3 whitespace-nowrap">{item.material_name}</td>
+                          <td className="p-3 whitespace-nowrap">{item.ruler_name}</td>
+                          <td className="p-3 whitespace-nowrap">{item.color_name}</td>
+                          <td className="p-3 text-center whitespace-nowrap">
+                            {item.type_item === "Machine" ? "مكنة" : "كوي"}
+                          </td>
+                          <td className="p-3 text-center whitespace-nowrap">{item.width || "-"}</td>
+                          <td className="p-3 text-center whitespace-nowrap">{item.thickness || "0.6"}</td>
+                          <td className="p-3 text-center font-bold whitespace-nowrap">{item.quantity} م</td>
+                          <td className="p-3 text-center">
+                            <button
+                              onClick={() => removeItem(item.id)}
+                              className="text-red-600 hover:bg-red-50 p-2 rounded-lg touch-manipulation active:scale-95 transition-transform"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {orderItems.length === 0 && (
+                        <tr>
+                          <td colSpan="8" className="p-8 text-center text-gray-400 text-base">
+                            لا توجد عناصر مضافة
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </div>
+          </div>
+        ) : (
+          /* وضع السجل */
+          <Card className="flex flex-col h-full min-h-0 overflow-hidden p-4">
+            <div className="flex justify-between items-center mb-3 flex-shrink-0">
+              <h2 className="font-bold text-xl">سجل الطلبات</h2>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={loadOrders}
+                disabled={ordersLoading}
+                className="px-6 py-3 text-base touch-manipulation active:scale-95 transition-transform"
+              >
+                <RotateCcw className="w-5 h-5 ml-2" />
+                تحديث
+              </Button>
+            </div>
+
+            {/* جدول السجل مع التمرير العمودي فقط */}
+            <div className="flex-1 overflow-y-auto min-h-0 border rounded-lg bg-white">
+              <table className="w-full border-collapse">
+                <thead className="bg-gray-100 sticky top-0">
+                  <tr>
+                    <th className="p-3 text-right border-b whitespace-nowrap">#</th>
+                    <th className="p-3 text-right border-b whitespace-nowrap">التاريخ</th>
+                    <th className="p-3 text-center border-b whitespace-nowrap">العناصر</th>
+                    <th className="p-3 text-center border-b whitespace-nowrap">حالة</th>
+                    <th className="p-3 text-center border-b whitespace-nowrap">عرض</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ordersLoading ? (
+                    <tr><td colSpan="5" className="p-6"><LoadingState /></td></tr>
+                  ) : orders.map(order => (
+                    <tr key={order.order_id} className="border-b hover:bg-gray-50">
+                      <td className="p-3 whitespace-nowrap">{order.order_id}</td>
+                      <td className="p-3 whitespace-nowrap">{order.created_at?.split("T")[0]}</td>
+                      <td className="p-3 text-center whitespace-nowrap">{order.items?.length || 0}</td>
+                      <td className="p-3 text-center whitespace-nowrap">
+                        <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-sm">
+                          {order.status || "معلق"}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className="h-10 px-3 touch-manipulation active:scale-95 transition-transform"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {selectedOrder && (
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg border flex-shrink-0">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-bold text-base">طلب #{selectedOrder.order_id}</span>
+                  <button
+                    onClick={() => setSelectedOrder(null)}
+                    className="text-gray-500 hover:text-gray-700 p-2 text-xl touch-manipulation"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-base">
+                  {selectedOrder.items?.map((item, i) => (
+                    <div key={i} className="bg-white p-2 rounded-lg border whitespace-nowrap overflow-hidden text-ellipsis">
+                      {item.type_item === "Machine" ? "مكنة" : "كوي"} |
+                      {item.width || "-"} |
+                      {item.quantity} م
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+
+  // return (
+  //     <div className="h-screen flex flex-col">
+  //         <div className="relative">
+  //             {isHeaderVisible && (
+  //                 <div className="flex flex-wrap items-center justify-between border-b-2 border-secondary-f gap-3 px-3 py-2">
+  //                     <div className="flex flex-wrap gap-3">
+  //                         <Button
+  //                             size="lg"
+  //                             variant={viewMode === "create" ? "default" : "outline"}
+  //                             onClick={() => setViewMode("create")}
+  //                             className="px-6 py-3 text-base"
+  //                         >
+  //                             <ShoppingCart className="w-5 h-5 ml-2" />
+  //                             طلب جديد
+  //                         </Button>
+  //                         <Button
+  //                             size="lg"
+  //                             variant={viewMode === "history" ? "default" : "outline"}
+  //                             onClick={() => setViewMode("history")}
+  //                             className="px-6 py-3 text-base"
+  //                         >
+  //                             <History className="w-5 h-5 ml-2" />
+  //                             سجل الطلبات
+  //                         </Button>
+  //                     </div>
+  //                     <div className="flex flex-wrap gap-2">
+  //                         <Button
+  //                             size="lg"
+  //                             variant="outline"
+  //                             onClick={() => navigate("/profile")}
+  //                             className="px-5 py-3 text-base"
+  //                         >
+  //                             <User className="w-5 h-5 ml-2" />
+  //                             البروفايل
+  //                         </Button>
+  //                         <Button
+  //                             size="lg"
+  //                             variant="outline"
+  //                             onClick={() => navigate("/customers")}
+  //                             className="px-5 py-3 text-base"
+  //                         >
+  //                             <Users className="w-5 h-5 ml-2" />
+  //                             الزبائن
+  //                         </Button>
+  //                         <Button
+  //                             size="lg"
+  //                             variant="outline"
+  //                             onClick={() => navigate("/login")}
+  //                             className="px-5 py-3 text-base"
+  //                         >
+  //                             <LogIn className="w-5 h-5 ml-2" />
+  //                             تسجيل الدخول
+  //                         </Button>
+  //                         <Button
+  //                             size="lg"
+  //                             variant="outline"
+  //                             onClick={() => setIsHeaderVisible(false)}
+  //                             className="px-4 py-3 text-base"
+  //                         >
+  //                             <EyeOff className="w-5 h-5 ml-2" />
+
+  //                         </Button>
+  //                     </div>
+  //                 </div>
+  //             )}
+  //             {!isHeaderVisible && (
+  //                 <div className="absolute top-2 right-2 z-20">
+  //                     <Button
+  //                         size="lg"
+  //                         variant="outline"
+  //                         onClick={() => setIsHeaderVisible(true)}
+  //                         className="px-4 py-2 text-base bg-white"
+  //                     >
+  //                         <Eye className="w-5 h-5 ml-2" />
+
+  //                     </Button>
+  //                 </div>
+  //             )}
+  //         </div>
+
+  //         <div className="flex-1 min-h-0 p-3">
+  //             {error && <MessageAlert type="error" message={error} onDismiss={() => setError("")} dismissable />}
+  //             {success && <MessageAlert type="success" message={success} onDismiss={() => setSuccess("")} dismissable />}
+
+  //             {viewMode === "create" ? (
+  //                 <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_2fr_1.5fr] gap-3 h-full min-h-0">
+
+  //                     <div className="right flex flex-col gap-3 min-h-0">
+  //                         <Card className="r-top p-4 shrink-0">
+  //                             <Label className="font-bold text-base mb-3 block">المادة</Label>
+  //                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 justify-items-center">
+  //                                 {materials.map(m => (
+  //                                     <button
+  //                                         key={m.material_id}
+  //                                         onClick={() => handleFieldChange("material_id", m.material_id)}
+  //                                         className={`w-24 h-24 sm:w-28 sm:h-28 xl:w-30 xl:h-30 rounded-2xl border-4 text-xl sm:text-2xl font-bold transition-all touch-manipulation ${String(formData.material_id) === String(m.material_id)
+  //                                             ? "border-primary-f bg-secondary-f text-white shadow-lg"
+  //                                             : "border-gray-300 bg-white hover:border-blue-400 active:bg-gray-100"
+  //                                             }`}
+  //                                     >
+  //                                         {m.material_name}
+  //                                     </button>
+  //                                 ))}
+  //                             </div>
+  //                         </Card>
+
+  //                         <Card className="r-bottom h-full flex flex-col p-4 overflow-hidden">
+  //                             <div className="text-center mb-4 shrink-0">
+  //                                 <div className="flex gap-3 mb-4">
+  //                                     <button
+  //                                         onClick={() => {
+  //                                             setNumpadMode("colorSearch");
+  //                                             setColorSearchCode("");
+  //                                         }}
+  //                                         className={`flex-1 py-4 px-4 rounded-xl text-lg font-bold border-2 touch-manipulation ${numpadMode === "colorSearch" ? "bg-purple-600 text-white border-purple-600" : "bg-white border-gray-300"
+  //                                             }`}
+  //                                     >
+  //                                         بحث بالكود
+  //                                     </button>
+  //                                     <button
+  //                                         onClick={() => {
+  //                                             setNumpadMode("quantity");
+  //                                             setActiveField("quantity");
+  //                                         }}
+  //                                         className={`flex-1 py-4 px-4 rounded-xl text-lg font-bold border-2 touch-manipulation ${numpadMode === "quantity" ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-300"
+  //                                             }`}
+  //                                     >
+  //                                         كتابة الكمية
+  //                                     </button>
+  //                                 </div>
+
+  //                                 <div className="bg-gray-100 rounded-xl flex justify-center items-center ">
+  //                                     <div className="text-base text-gray-500 mb-2">
+  //                                         {numpadMode === "colorSearch" ? "كود اللون" :
+  //                                             activeField === "quantity" ? "الكمية" :
+  //                                                 activeField === "width" ? "العرض" : "القيمة"}
+  //                                     </div>
+  //                                     <div className="text-4xl font-mono font-bold text-gray-800">
+  //                                         {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
+  //                                     </div>
+  //                                 </div>
+  //                             </div>
+
+  //                             <div className="grid grid-cols-3 gap-3  flex-1 overflow-hidden mx-auto  w-full -mt-8">
+  //                                 {["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "back"].map(key => (
+  //                                     <button
+  //                                         key={key}
+  //                                         onClick={() => handleNumpadPress(key)}
+  //                                         className="bg-white border-2 border-gray-300 min-w-[80%]  min-h-[80%] m-5 rounded-xl text-3xl font-bold hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center justify-center aspect-square touch-manipulation"
+  //                                     >
+  //                                         {key === "back" ? "مسح" : key}
+  //                                     </button>
+  //                                 ))}
+  //                                 <button
+  //                                     onClick={() => handleNumpadPress("clear")}
+  //                                     className="col-span-3 h-16 bg-red-100 text-red-700 rounded-xl mt-5 text-xl font-bold hover:bg-red-200 transition-colors touch-manipulation"
+  //                                 >
+  //                                     مسح الكل
+  //                                 </button>
+  //                             </div>
+
+  //                             {/* {numpadMode === "quantity" && (
+  //                                 <div className="mt-4 grid grid-cols-2 gap-3 shrink-0">
+  //                                     <button
+  //                                         onClick={() => setActiveField("width")}
+  //                                         className={`py-4 rounded-xl border-2 text-lg font-bold touch-manipulation ${activeField === "width" ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-300"
+  //                                             }`}
+  //                                     >
+  //                                         العرض
+  //                                     </button>
+  //                                     <button
+  //                                         onClick={() => setActiveField("quantity")}
+  //                                         className={`py-4 rounded-xl border-2 text-lg font-bold touch-manipulation ${activeField === "quantity" ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-300"
+  //                                             }`}
+  //                                     >
+  //                                         الكمية
+  //                                     </button>
+  //                                 </div>
+  //                             )} */}
+  //                         </Card>
+  //                     </div>
+
+  //                     <div className="center flex flex-col gap-3 min-h-0 overflow-y-auto">
+  //                         {!isSelectedMaterialBoard && (
+  //                             <Card className="p-4 shrink-0">
+  //                                 <Label className="font-bold text-base mb-3 block">نوع الطلب</Label>
+  //                                 <div className="grid grid-cols-2 gap-3 justify-items-center">
+  //                                     {TYPE_OPTIONS.map(t => (
+  //                                         <button
+  //                                             key={t.value}
+  //                                             onClick={() => handleFieldChange("type_item", t.value)}
+  //                                             className={`w-24 h-24 sm:w-28 sm:h-28 xl:w-30 xl:h-30 rounded-2xl border-2 text-2xl sm:text-3xl font-medium transition-all touch-manipulation ${formData.type_item === t.value
+  //                                                 ? "border-primary-f bg-primary-f text-white shadow-lg"
+  //                                                 : "border-gray-300 bg-white hover:border-green-400 active:bg-gray-100"
+  //                                                 }`}
+  //                                         >
+  //                                             {t.label}
+  //                                         </button>
+  //                                     ))}
+  //                                 </div>
+  //                             </Card>
+  //                         )}
+
+  //                         {formData.material_id && !isSelectedMaterialBoard && (
+  //                             <Card className="p-4 shrink-0">
+  //                                 <Label className="font-bold text-base mb-3 block">
+  //                                     العرض (سم)
+  //                                     {loadingWidths && <span className="mr-2 text-gray-500 text-sm">جاري التحميل...</span>}
+  //                                 </Label>
+  //                                 {widthValues.length > 0 ? (
+  //                                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 justify-items-center">
+  //                                         {widthValues.map(w => (
+  //                                             <button
+  //                                                 key={w.id}
+  //                                                 onClick={() => handleFieldChange("width", w.value)}
+  //                                                 className={`w-24 h-24 sm:w-28 sm:h-28 xl:w-30 xl:h-30 rounded-2xl border-2 text-xl sm:text-2xl font-medium transition-all touch-manipulation ${formData.width === w.value
+  //                                                     ? "border-teal-600 bg-teal-600 text-white shadow-lg"
+  //                                                     : "border-gray-300 bg-white hover:border-teal-400 active:bg-gray-100"
+  //                                                     }`}
+  //                                             >
+  //                                                 {w.value}
+  //                                             </button>
+  //                                         ))}
+  //                                     </div>
+  //                                 ) : (
+  //                                     !loadingWidths && (
+  //                                         <div className="text-center p-4 text-gray-400 text-base border-2 border-dashed border-gray-300 rounded-xl">
+  //                                             لا توجد قيم عرض لهذه المادة
+  //                                         </div>
+  //                                     )
+  //                                 )}
+  //                             </Card>
+  //                         )}
+
+  //                         <Card className="p-4 shrink-0">
+  //                             <Label className="font-bold text-base mb-3 block">المسطرة</Label>
+  //                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 justify-items-center">
+  //                                 {availableRulers.length === 0 ? (
+  //                                     <span className="text-gray-400 text-base col-span-3 text-center p-4">اختر المادة أولاً</span>
+  //                                 ) : (
+  //                                     availableRulers.map(r => (
+  //                                         <button
+  //                                             key={r.ruler_id}
+  //                                             onClick={() => handleFieldChange("ruler_id", r.ruler_id)}
+  //                                             className={`w-24 h-24 sm:w-28 sm:h-28 xl:w-30 xl:h-30 rounded-2xl border-2 text-xl sm:text-2xl font-medium transition-all touch-manipulation ${String(formData.ruler_id) === String(r.ruler_id)
+  //                                                 ? "border-purple-600 bg-purple-600 text-white shadow-lg"
+  //                                                 : "border-gray-300 bg-white hover:border-purple-400 active:bg-gray-100"
+  //                                                 }`}
+  //                                         >
+  //                                             {r.ruler_name}
+  //                                         </button>
+  //                                     ))
+  //                                 )}
+  //                             </div>
+  //                         </Card>
+
+  //                         <Card className="p-4 shrink-0">
+  //                             <div className="grid grid-cols-[1fr_140px] gap-4 items-end">
+  //                                 <div>
+  //                                     <Label className="font-bold text-base mb-3 block">
+  //                                         اللون
+  //                                         {numpadMode === "colorSearch" && colorSearchCode && (
+  //                                             <span className="mr-3 text-blue-600 text-sm">(بحث: {colorSearchCode})</span>
+  //                                         )}
+  //                                     </Label>
+  //                                     <FilterSelect
+  //                                         value={formData.color_id}
+  //                                         onChange={(e) => handleFieldChange("color_id", e.target.value)}
+  //                                         disabled={!formData.ruler_id}
+  //                                         options={filteredColorsBySearch.map(c => ({
+  //                                             value: c.color_id,
+  //                                             label: `${c.color_name} (${c.color_code})`
+  //                                         }))}
+  //                                         placeholder={formData.ruler_id ? "اختر اللون" : "اختر المسطرة أولاً"}
+  //                                         className="w-full text-base p-3"
+  //                                     />
+  //                                 </div>
+  //                                 <div>
+  //                                     <Label className="font-bold text-base mb-3 block">الصورة</Label>
+  //                                     <div className="h-24 border-2 border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden">
+  //                                         {selectedColorImage ? (
+  //                                             <img src={selectedColorImage} alt="" className="h-full w-full object-cover" />
+  //                                         ) : (
+  //                                             <span className="text-gray-400 text-sm">لا توجد</span>
+  //                                         )}
+  //                                     </div>
+  //                                 </div>
+  //                             </div>
+  //                         </Card>
+
+  //                         <Card className="p-4 shrink-0">
+  //                             <Label className="font-bold text-base mb-3 block">رقم الطبخة</Label>
+  //                             <FilterSelect
+  //                                 value={formData.batch_id}
+  //                                 onChange={(e) => handleFieldChange("batch_id", e.target.value)}
+  //                                 options={batches.map(b => ({
+  //                                     value: b.batch_id,
+  //                                     label: b.batch_number
+  //                                 }))}
+  //                                 placeholder="اختر الطبخة"
+  //                                 className="w-full text-base p-3"
+  //                             />
+  //                         </Card>
+
+  //                         <Card className="p-4 shrink-0">
+  //                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  //                                 <div>
+  //                                     <Label className="font-bold text-base mb-3 block">الكمية</Label>
+  //                                     <div className="flex items-center gap-3">
+  //                                         <Input
+  //                                             type="number"
+  //                                             value={formData.quantity}
+  //                                             onChange={(e) => handleFieldChange("quantity", e.target.value)}
+  //                                             onClick={() => {
+  //                                                 setActiveField("quantity");
+  //                                                 setNumpadMode("quantity");
+  //                                             }}
+  //                                             className={`h-16 text-xl text-center font-bold flex-1 ${activeField === "quantity" ? "ring-2 ring-blue-400" : ""}`}
+  //                                             placeholder="0"
+  //                                         />
+  //                                         <span className="text-lg font-bold text-gray-600 w-16">قطعة/متر</span>
+  //                                     </div>
+  //                                 </div>
+  //                                 <div>
+  //                                     <Label className="font-bold text-base mb-3 block">الملاحظات</Label>
+  //                                     <Input
+  //                                         value={formData.notes}
+  //                                         onChange={(e) => handleFieldChange("notes", e.target.value)}
+  //                                         placeholder="أي ملاحظات إضافية..."
+  //                                         className="h-16 text-base"
+  //                                     />
+  //                                 </div>
+  //                             </div>
+  //                         </Card>
+
+  //                         <Button
+  //                             onClick={addItem}
+  //                             size="lg"
+  //                             className="h-16 bg-blue-600 hover:bg-blue-700 shrink-0 text-lg font-bold"
+  //                             disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
+  //                         >
+  //                             <Plus className="w-6 h-6 ml-2" />
+  //                             إضافة للطلب
+  //                         </Button>
+  //                     </div>
+
+
+
+  //                     <div className="left flex flex-col gap-3 min-h-0">
+  //                         <Card className="l-top flex flex-col min-h-0 overflow-hidden">
+  //                             <div className="flex justify-between items-center p-3 border-b bg-gray-50 shrink-0">
+  //                                 <span className="font-bold text-base">العناصر المضافة: {orderItems.length}</span>
+  //                                 <Button
+  //                                     size="lg"
+  //                                     onClick={saveOrder}
+  //                                     disabled={loading || orderItems.length === 0}
+  //                                     className="h-12 bg-green-600 hover:bg-green-700 text-base px-6"
+  //                                 >
+  //                                     <Check className="w-5 h-5 ml-2" />
+  //                                     حفظ الطلب
+  //                                 </Button>
+  //                             </div>
+
+  //                             <div className="flex-1 overflow-auto">
+  //                                 <table className="w-full text-base">
+  //                                     <thead className="bg-gray-100 sticky top-0 z-10">
+  //                                         <tr>
+  //                                             <th className="p-3 text-right border-b">المادة</th>
+  //                                             <th className="p-3 text-right border-b">المسطرة</th>
+  //                                             <th className="p-3 text-right border-b">اللون</th>
+  //                                             <th className="p-3 text-center border-b">النوع</th>
+  //                                             <th className="p-3 text-center border-b">العرض</th>
+  //                                             <th className="p-3 text-center border-b">الكمية</th>
+  //                                             <th className="p-3 text-center border-b">حذف</th>
+  //                                         </tr>
+  //                                     </thead>
+  //                                     <tbody>
+  //                                         {orderItems.map(item => (
+  //                                             <tr key={item.id} className="border-b hover:bg-gray-50">
+  //                                                 <td className="p-3">{item.material_name}</td>
+  //                                                 <td className="p-3">{item.ruler_name}</td>
+  //                                                 <td className="p-3">{item.color_name}</td>
+  //                                                 <td className="p-3 text-center">{item.type_item === "Machine" ? "مكنة" : "كوي"}</td>
+  //                                                 <td className="p-3 text-center">{item.width || "-"}</td>
+  //                                                 <td className="p-3 text-center font-bold">{item.quantity} م</td>
+  //                                                 <td className="p-3 text-center">
+  //                                                     <button
+  //                                                         onClick={() => removeItem(item.id)}
+  //                                                         className="text-red-600 hover:bg-red-50 p-3 rounded-lg touch-manipulation"
+  //                                                     >
+  //                                                         <Trash2 className="w-5 h-5" />
+  //                                                     </button>
+  //                                                 </td>
+  //                                             </tr>
+  //                                         ))}
+  //                                         {orderItems.length === 0 && (
+  //                                             <tr>
+  //                                                 <td colSpan="7" className="p-6 text-center text-gray-400 text-base">لا توجد عناصر مضافة</td>
+  //                                             </tr>
+  //                                         )}
+  //                                     </tbody>
+  //                                 </table>
+  //                             </div>
+  //                         </Card>
+
+  //                         <Card className="l-bottom p-4">
+  //                             <div className="text-gray-500 text-sm">مساحة إضافية</div>
+  //                         </Card>
+  //                     </div>
+  //                 </div>
+  //             ) : (
+  //                 <Card className="flex-1 p-4 overflow-hidden flex flex-col">
+  //                     <div className="flex justify-between items-center mb-3 shrink-0">
+  //                         <h2 className="font-bold text-xl">سجل الطلبات</h2>
+  //                         <Button size="lg" variant="outline" onClick={loadOrders} disabled={ordersLoading} className="px-6 py-3 text-base">
+  //                             <RotateCcw className="w-5 h-5 ml-2" />
+  //                             تحديث
+  //                         </Button>
+  //                     </div>
+
+  //                     <div className="flex-1 border rounded-lg overflow-auto bg-white">
+  //                         <table className="w-full text-base">
+  //                             <thead className="bg-gray-100 sticky top-0">
+  //                                 <tr>
+  //                                     <th className="p-3 text-right border-b">#</th>
+  //                                     <th className="p-3 text-right border-b">التاريخ</th>
+  //                                     <th className="p-3 text-center border-b">العناصر</th>
+  //                                     <th className="p-3 text-center border-b">حالة</th>
+  //                                     <th className="p-3 text-center border-b">عرض</th>
+  //                                 </tr>
+  //                             </thead>
+  //                             <tbody>
+  //                                 {ordersLoading ? (
+  //                                     <tr><td colSpan="5" className="p-6"><LoadingState /></td></tr>
+  //                                 ) : orders.map(order => (
+  //                                     <tr key={order.order_id} className="border-b hover:bg-gray-50">
+  //                                         <td className="p-3">{order.order_id}</td>
+  //                                         <td className="p-3">{order.created_at?.split("T")[0]}</td>
+  //                                         <td className="p-3 text-center">{order.items?.length || 0}</td>
+  //                                         <td className="p-3 text-center">
+  //                                             <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-sm">{order.status || "معلق"}</span>
+  //                                         </td>
+  //                                         <td className="p-3 text-center">
+  //                                             <Button size="lg" variant="outline" className="h-12 px-4" onClick={() => setSelectedOrder(order)}>
+  //                                                 <Eye className="w-5 h-5" />
+  //                                             </Button>
+  //                                         </td>
+  //                                     </tr>
+  //                                 ))}
+  //                             </tbody>
+  //                         </table>
+  //                     </div>
+
+  //                     {selectedOrder && (
+  //                         <div className="mt-3 p-3 bg-gray-50 rounded-lg border shrink-0">
+  //                             <div className="flex justify-between items-center mb-2">
+  //                                 <span className="font-bold text-base">طلب #{selectedOrder.order_id}</span>
+  //                                 <button onClick={() => setSelectedOrder(null)} className="text-gray-500 hover:text-gray-700 p-2 text-xl">x</button>
+  //                             </div>
+  //                             <div className="grid grid-cols-2 gap-2 text-base">
+  //                                 {selectedOrder.items?.map((item, i) => (
+  //                                     <div key={i} className="bg-white p-2 rounded-lg border">
+  //                                         {item.type_item === "Machine" ? "مكنة" : "كوي"} |
+  //                                         {item.width || "-"} |
+  //                                         {item.quantity} م
+  //                                     </div>
+  //                                 ))}
+  //                             </div>
+  //                         </div>
+  //                     )}
+  //                 </Card>
+  //             )}
+  //         </div>
+  //     </div>
+  // );
 }
