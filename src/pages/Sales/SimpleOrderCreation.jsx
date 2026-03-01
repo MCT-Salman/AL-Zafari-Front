@@ -26,16 +26,14 @@ import {
   LogIn,
   EyeOff
 } from "lucide-react";
-import MessageAlert from "../../components/common/MessageAlert";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
+import toast from "react-hot-toast";
 
 export default function SimpleOrderCreation() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState("create");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
   // Data
@@ -74,6 +72,13 @@ export default function SimpleOrderCreation() {
     { value: "Machine", label: "مكنة" },
     { value: "Presser", label: "كوي" }
   ];
+  const PRICE_BY_TO_WIDTH = {
+    isByMeter22: 22,
+    isByMeter44: 44,
+    isByMeter66: 66,
+  };
+  const getWidthFromPriceBy = (priceBy) => PRICE_BY_TO_WIDTH[priceBy] ?? null;
+
 
   // Load initial data
   useEffect(() => {
@@ -110,7 +115,7 @@ export default function SimpleOrderCreation() {
       setPriceColors(getApiData(priceRes, []) || []);
 
     } catch (error) {
-      setError("فشل في تحميل البيانات");
+      toast.error("فشل في تحميل البيانات");
     }
   };
 
@@ -125,7 +130,7 @@ export default function SimpleOrderCreation() {
       // إعادة تعيين العرض المحدد عند تغيير المادة
       setFormData(prev => ({ ...prev, width: "" }));
     } catch (error) {
-      setError("فشل في تحميل قيم العرض");
+      toast.error("فشل في تحميل قيم العرض");
       setWidthValues([]);
     } finally {
       setLoadingWidths(false);
@@ -138,7 +143,7 @@ export default function SimpleOrderCreation() {
       const response = await orderApi.getOrders();
       setOrders(getApiData(response, []) || []);
     } catch {
-      setError("فشل في تحميل الطلبات");
+      toast.error("فشل في تحميل الطلبات");
     } finally {
       setOrdersLoading(false);
     }
@@ -170,18 +175,32 @@ export default function SimpleOrderCreation() {
   const availablePricedColors = useMemo(() => {
     if (!formData.ruler_id) return [];
 
-    let filteredColors = colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
+    const filteredColors = colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
 
-    // Debug logs
-    console.log("Debug - formData:", formData);
-    console.log("Debug - colors for ruler:", filteredColors);
-    console.log("Debug - priceColors:", priceColors);
-    console.log("Debug - isSelectedMaterialBoard:", isSelectedMaterialBoard);
+    if (!priceColors || priceColors.length === 0) {
+      return filteredColors;
+    }
 
-    // دائماً إرجاع جميع الألوان المتاحة للمسطرة
-    // التحقق من التسعير سيتم في isColorPriced وليس هنا
-    console.log("Debug - Returning all available colors for ruler");
-    return filteredColors;
+    if (isSelectedMaterialBoard) {
+      return filteredColors.filter(color =>
+        priceColors.some(pc =>
+          String(pc.color_id) === String(color.color_id) &&
+          pc.type_item === formData.type_item &&
+          getWidthFromPriceBy(pc.price_color_By) === null
+        )
+      );
+    }
+
+    if (!formData.width) return [];
+    const targetWidth = Number(formData.width);
+
+    return filteredColors.filter(color =>
+      priceColors.some(pc =>
+        String(pc.color_id) === String(color.color_id) &&
+        pc.type_item === formData.type_item &&
+        getWidthFromPriceBy(pc.price_color_By) === targetWidth
+      )
+    );
   }, [formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, colors, priceColors]);
 
   const filteredColorsBySearch = useMemo(() => {
@@ -200,75 +219,66 @@ export default function SimpleOrderCreation() {
   const isColorPriced = useMemo(() => {
     if (!formData.color_id || !formData.ruler_id) return false;
 
-    // إذا لم توجد بيانات تسعير، افترض أن اللون مسعر
     if (!priceColors || priceColors.length === 0) {
       return true;
     }
 
-    // للمواد اللوحية - التحقق من التسعير حسب المسطرة فقط
     if (isSelectedMaterialBoard) {
       return priceColors.some(pc =>
         String(pc.color_id) === String(formData.color_id) &&
-        String(pc.ruler_id) === String(formData.ruler_id) &&
-        pc.type_item === formData.type_item
+        pc.type_item === formData.type_item &&
+        getWidthFromPriceBy(pc.price_color_By) === null
       );
     }
 
-    // للمواد الأخرى - التحقق من التسعير حسب المسطرة والعرض
     if (!formData.width) return false;
+    const targetWidth = Number(formData.width);
 
     return priceColors.some(pc =>
       String(pc.color_id) === String(formData.color_id) &&
-      String(pc.ruler_id) === String(formData.ruler_id) &&
-      pc.width === Number(formData.width) &&
-      pc.type_item === formData.type_item
+      pc.type_item === formData.type_item &&
+      getWidthFromPriceBy(pc.price_color_By) === targetWidth
     );
   }, [formData.color_id, formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, priceColors]);
 
-  // دالة للتحقق مما إذا كان اللون مسعرًا
   const getColorPricingStatus = (colorId) => {
     if (!priceColors || priceColors.length === 0) return { priced: true, label: "" };
 
     if (isSelectedMaterialBoard) {
       const isPriced = priceColors.some(pc =>
         String(pc.color_id) === String(colorId) &&
-        String(pc.ruler_id) === String(formData.ruler_id) &&
-        pc.type_item === formData.type_item
+        pc.type_item === formData.type_item &&
+        getWidthFromPriceBy(pc.price_color_By) === null
       );
-      return {
-        priced: isPriced,
-        label: isPriced ? "" : ""
-      };
-    } else {
-      if (!formData.width) return { priced: false, label: " (اختر العرض)" };
-
-      const isPriced = priceColors.some(pc =>
-        String(pc.color_id) === String(colorId) &&
-        String(pc.ruler_id) === String(formData.ruler_id) &&
-        pc.width === Number(formData.width) &&
-        pc.type_item === formData.type_item
-      );
-      return {
-        priced: isPriced,
-        label: isPriced ? "" : ""
-      };
+      return { priced: isPriced, label: "" };
     }
+
+    if (!formData.width) return { priced: false, label: " (???? ?????)" };
+
+    const targetWidth = Number(formData.width);
+    const isPriced = priceColors.some(pc =>
+      String(pc.color_id) === String(colorId) &&
+      pc.type_item === formData.type_item &&
+      getWidthFromPriceBy(pc.price_color_By) === targetWidth
+    );
+    return { priced: isPriced, label: "" };
   };
 
   const handleFieldChange = (field, value) => {
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
 
-      if (field === "material_id") {
-        newData.ruler_id = "";
-        newData.color_id = "";
-        newData.width = "";
-      } else if (field === "ruler_id") {
-        newData.color_id = "";
-        // Keep width when ruler changes
-      } else if (field === "color_id") {
-        // Keep width when color changes
-      }
+    if (field === "material_id") {
+      newData.ruler_id = "";
+      newData.color_id = "";
+      newData.width = "";
+    } else if (field === "ruler_id") {
+      newData.color_id = "";
+    } else if (field === "width") {
+      newData.color_id = "";
+    } else if (field === "type_item") {
+      newData.color_id = "";
+    }
 
       return newData;
     });
@@ -304,21 +314,21 @@ export default function SimpleOrderCreation() {
 
   const addItem = () => {
     if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity) {
-      setError("يرجى اكمال جميع البيانات");
+      toast.error("يرجى اكمال جميع البيانات");
       return;
     }
 
     // إذا كانت المادة ليست "لوح" يجب تحديد العرض
     if (!isSelectedMaterialBoard && !formData.width) {
-      setError("يرجى اختيار العرض");
+      toast.error("يرجى اختيار العرض");
       return;
     }
 
     // التحقق من أن اللون مسعر
-    // if (!isColorPriced) {
-    //   setError("اللون المحدد غير مسعر لهذه المواصفات");
-    //   return;
-    // }
+    if (!isColorPriced) {
+      toast.error("اللون المحدد غير مسعر لهذه المواصفات");
+      return;
+    }
 
     const material = materials.find(m => String(m.material_id) === String(formData.material_id));
     const ruler = rulers.find(r => String(r.ruler_id) === String(formData.ruler_id));
@@ -349,8 +359,7 @@ export default function SimpleOrderCreation() {
       notes: ""
     }));
     setColorSearchCode("");
-    setError("");
-  };
+      };
 
   const removeItem = (id) => {
     setOrderItems(prev => prev.filter(item => item.id !== id));
@@ -358,7 +367,7 @@ export default function SimpleOrderCreation() {
 
   const saveOrder = async () => {
     if (orderItems.length === 0) {
-      setError("أضف عنصراً واحداً على الأقل");
+      toast.error("أضف عنصراً واحداً على الأقل");
       return;
     }
 
@@ -375,10 +384,10 @@ export default function SimpleOrderCreation() {
       }));
 
       await orderApi.createOrder({ status: "pending", items, notes: "" });
-      setSuccess("تم حفظ الطلب بنجاح");
+      toast.success("تم حفظ الطلب بنجاح");
       setOrderItems([]);
     } catch {
-      setError("فشل في حفظ الطلب");
+      toast.error("فشل في حفظ الطلب");
     } finally {
       setLoading(false);
     }
@@ -389,22 +398,28 @@ export default function SimpleOrderCreation() {
       {/* Header - ثابت في الأعلى */}
       <div className="relative flex-shrink-0">
         {isHeaderVisible && (
-          <div className="flex flex-wrap items-center justify-between border-b-2 border-secondary-f bg-white gap-4 px-4 py-2">
+          <div className="flex flex-wrap items-center justify-between border-b-2 border-secondary-f bg-secondary-f text-white gap-4 px-4 py-3 shadow-md">
             <div className="flex flex-wrap gap-3">
               <Button
                 size="lg"
-                variant={viewMode === "create" ? "default" : "outline"}
+                variant="outline"
                 onClick={() => setViewMode("create")}
-                className="px-6 py-3 text-base min-w-[120px] touch-manipulation"
+                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
+                  ? "bg-primary-f text-white border-primary-f"
+                  : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                  }`}
               >
                 <ShoppingCart className="w-5 h-5 ml-2" />
                 طلب جديد
               </Button>
               <Button
                 size="lg"
-                variant={viewMode === "history" ? "default" : "outline"}
+                variant="outline"
                 onClick={() => setViewMode("history")}
-                className="px-6 py-3 text-base min-w-[120px] touch-manipulation"
+                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
+                  ? "bg-primary-f text-white border-primary-f"
+                  : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                  }`}
               >
                 <History className="w-5 h-5 ml-2" />
                 سجل الطلبات
@@ -415,7 +430,7 @@ export default function SimpleOrderCreation() {
                 size="lg"
                 variant="outline"
                 onClick={() => navigate("/profile")}
-                className="px-5 py-3 text-base min-w-[100px] touch-manipulation"
+                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
               >
                 <User className="w-5 h-5 ml-2" />
                 البروفايل
@@ -424,7 +439,7 @@ export default function SimpleOrderCreation() {
                 size="lg"
                 variant="outline"
                 onClick={() => navigate("/customers")}
-                className="px-5 py-3 text-base min-w-[100px] touch-manipulation"
+                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
               >
                 <Users className="w-5 h-5 ml-2" />
                 الزبائن
@@ -433,7 +448,7 @@ export default function SimpleOrderCreation() {
                 size="lg"
                 variant="outline"
                 onClick={() => navigate("/login")}
-                className="px-5 py-3 text-base min-w-[100px] touch-manipulation"
+                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
               >
                 <LogIn className="w-5 h-5 ml-2" />
                 تسجيل الدخول
@@ -442,7 +457,7 @@ export default function SimpleOrderCreation() {
                 size="lg"
                 variant="outline"
                 onClick={() => setIsHeaderVisible(false)}
-                className="px-4 py-3 text-base min-w-[60px] touch-manipulation"
+                className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s text-white border-secondary-s hover:brightness-110"
               >
                 <EyeOff className="w-5 h-5" />
               </Button>
@@ -455,9 +470,10 @@ export default function SimpleOrderCreation() {
               size="lg"
               variant="outline"
               onClick={() => setIsHeaderVisible(true)}
-              className="px-4 py-2 text-base bg-white shadow-lg touch-manipulation"
+              className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f shadow-lg touch-manipulation"
             >
               <Eye className="w-5 h-5 ml-2" />
+              إظهار الهيدر
             </Button>
           </div>
         )}
@@ -465,9 +481,6 @@ export default function SimpleOrderCreation() {
 
       {/* Main Content - يأخذ المساحة المتبقية */}
       <div className="flex-1 min-h-0 p-3 overflow-hidden">
-        {error && <MessageAlert type="error" message={error} onDismiss={() => setError("")} dismissable />}
-        {success && <MessageAlert type="success" message={success} onDismiss={() => setSuccess("")} dismissable />}
-
         {viewMode === "create" ? (
           /* 
             توزيع الأعمدة بشكل ديناميكي:
@@ -493,7 +506,7 @@ export default function SimpleOrderCreation() {
                                             flex items-center justify-center p-2
                                             ${String(formData.material_id) === String(m.material_id)
                           ? "border-primary-f bg-secondary-f text-white shadow-lg"
-                          : "border-gray-300 bg-white hover:border-blue-400"
+                          : "border-gray-300 bg-white hover:border-secondary-s"
                         }
                                         `}
                     >
@@ -517,7 +530,7 @@ export default function SimpleOrderCreation() {
                     flex-1 py-3 px-2 rounded-lg text-sm font-bold border-2 
                     touch-manipulation transition-all active:scale-95
                     ${numpadMode === "colorSearch"
-                          ? "bg-purple-600 text-white border-purple-600"
+                          ? "bg-secondary-s text-white border-secondary-s"
                           : "bg-white border-gray-300 hover:bg-gray-100"
                         }
                 `}
@@ -533,7 +546,7 @@ export default function SimpleOrderCreation() {
                     flex-1 py-3 px-2 rounded-lg text-sm font-bold border-2 
                     touch-manipulation transition-all active:scale-95
                     ${numpadMode === "quantity"
-                          ? "bg-blue-600 text-white border-blue-600"
+                          ? "bg-primary-f text-white border-primary-f"
                           : "bg-white border-gray-300 hover:bg-gray-100"
                         }
                 `}
@@ -636,7 +649,7 @@ export default function SimpleOrderCreation() {
                                                 flex items-center justify-center p-2
                                                 ${formData.type_item === t.value
                             ? "border-primary-f bg-primary-f text-white shadow-lg"
-                            : "border-gray-300 bg-white hover:border-green-400"
+                            : "border-gray-300 bg-white hover:border-secondary-s"
                           }
                                             `}
                       >
@@ -664,8 +677,8 @@ export default function SimpleOrderCreation() {
                                                     transition-all touch-manipulation hover:scale-105 active:scale-95
                                                     flex items-center justify-center p-2
                                                     ${formData.width === w.value
-                              ? "border-teal-600 bg-teal-600 text-white shadow-lg"
-                              : "border-gray-300 bg-white hover:border-teal-400"
+                              ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+                              : "border-gray-300 bg-white hover:border-secondary-s"
                             }
                                                 `}
                         >
@@ -698,8 +711,8 @@ export default function SimpleOrderCreation() {
                                                 transition-all touch-manipulation hover:scale-105 active:scale-95
                                                 flex items-center justify-center p-2
                                                 ${String(formData.ruler_id) === String(r.ruler_id)
-                            ? "border-purple-600 bg-purple-600 text-white shadow-lg"
-                            : "border-gray-300 bg-white hover:border-purple-400"
+                          ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+                          : "border-gray-300 bg-white hover:border-secondary-s"
                           }
                                             `}
                       >
@@ -716,7 +729,7 @@ export default function SimpleOrderCreation() {
                     <Label className="font-bold text-base mb-3 block">
                       اللون
                       {numpadMode === "colorSearch" && colorSearchCode && (
-                        <span className="mr-3 text-blue-600 text-sm">(بحث: {colorSearchCode})</span>
+                        <span className="mr-3 text-secondary-s text-sm">(بحث: {colorSearchCode})</span>
                       )}
                     </Label>
                     <FilterSelect
@@ -823,7 +836,7 @@ export default function SimpleOrderCreation() {
               <Button
                 onClick={addItem}
                 size="lg"
-                className="h-14 bg-blue-600 hover:bg-blue-700 flex-shrink-0 text-lg font-bold touch-manipulation active:scale-95 transition-transform"
+                className="h-14 bg-primary-f hover:bg-secondary-f flex-shrink-0 text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform"
                 disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
               >
                 <Plus className="w-6 h-6 ml-2" />
@@ -841,7 +854,7 @@ export default function SimpleOrderCreation() {
                     size="lg"
                     onClick={saveOrder}
                     disabled={loading || orderItems.length === 0}
-                    className="h-12 bg-green-600 hover:bg-green-700 text-base px-6 touch-manipulation active:scale-95 transition-transform"
+                    className="h-12 bg-secondary-s hover:brightness-110 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
                   >
                     <Check className="w-5 h-5 ml-2" />
                     حفظ الطلب
@@ -849,32 +862,32 @@ export default function SimpleOrderCreation() {
                 </div>
 
                 {/* الجدول مع التمرير العمودي فقط */}
-                <div className="flex-1 overflow-y-auto min-h-0">
-                  <table className="w-full border-collapse">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+                  <table className="w-full table-fixed border-collapse">
                     <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
-                        <th className="p-3 text-right border-b whitespace-nowrap">المادة</th>
-                        <th className="p-3 text-right border-b whitespace-nowrap">المسطرة</th>
-                        <th className="p-3 text-right border-b whitespace-nowrap">اللون</th>
-                        <th className="p-3 text-center border-b whitespace-nowrap">النوع</th>
-                        <th className="p-3 text-center border-b whitespace-nowrap">العرض</th>
-                        <th className="p-3 text-center border-b whitespace-nowrap">السماكة</th>
-                        <th className="p-3 text-center border-b whitespace-nowrap">الكمية</th>
-                        <th className="p-3 text-center border-b whitespace-nowrap">حذف</th>
+                        <th className="p-3 text-right border-b break-words">المادة</th>
+                        <th className="p-3 text-right border-b break-words">المسطرة</th>
+                        <th className="p-3 text-right border-b break-words">اللون</th>
+                        <th className="p-3 text-center border-b break-words">النوع</th>
+                        <th className="p-3 text-center border-b break-words">العرض</th>
+                        <th className="p-3 text-center border-b break-words">السماكة</th>
+                        <th className="p-3 text-center border-b break-words">الكمية</th>
+                        <th className="p-3 text-center border-b break-words">حذف</th>
                       </tr>
                     </thead>
                     <tbody>
                       {orderItems.map(item => (
                         <tr key={item.id} className="border-b hover:bg-gray-50">
-                          <td className="p-3 whitespace-nowrap">{item.material_name}</td>
-                          <td className="p-3 whitespace-nowrap">{item.ruler_name}</td>
-                          <td className="p-3 whitespace-nowrap">{item.color_name}</td>
-                          <td className="p-3 text-center whitespace-nowrap">
+                          <td className="p-3 break-words">{item.material_name}</td>
+                          <td className="p-3 break-words">{item.ruler_name}</td>
+                          <td className="p-3 break-words">{item.color_name}</td>
+                          <td className="p-3 text-center break-words">
                             {item.type_item === "Machine" ? "مكنة" : "كوي"}
                           </td>
-                          <td className="p-3 text-center whitespace-nowrap">{item.width || "-"}</td>
-                          <td className="p-3 text-center whitespace-nowrap">{item.thickness || "0.6"}</td>
-                          <td className="p-3 text-center font-bold whitespace-nowrap">{item.quantity} م</td>
+                          <td className="p-3 text-center break-words">{item.width || "-"}</td>
+                          <td className="p-3 text-center break-words">{item.thickness || "0.6"}</td>
+                          <td className="p-3 text-center font-bold break-words">{item.quantity} م</td>
                           <td className="p-3 text-center">
                             <button
                               onClick={() => removeItem(item.id)}
@@ -908,7 +921,7 @@ export default function SimpleOrderCreation() {
                 variant="outline"
                 onClick={loadOrders}
                 disabled={ordersLoading}
-                className="px-6 py-3 text-base touch-manipulation active:scale-95 transition-transform"
+                className="px-6 py-3 text-base bg-secondary-s text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
               >
                 <RotateCcw className="w-5 h-5 ml-2" />
                 تحديث
@@ -916,15 +929,15 @@ export default function SimpleOrderCreation() {
             </div>
 
             {/* جدول السجل مع التمرير العمودي فقط */}
-            <div className="flex-1 overflow-y-auto min-h-0 border rounded-lg bg-white">
-              <table className="w-full border-collapse">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 border rounded-lg bg-white">
+              <table className="w-full table-fixed border-collapse">
                 <thead className="bg-gray-100 sticky top-0">
                   <tr>
-                    <th className="p-3 text-right border-b whitespace-nowrap">#</th>
-                    <th className="p-3 text-right border-b whitespace-nowrap">التاريخ</th>
-                    <th className="p-3 text-center border-b whitespace-nowrap">العناصر</th>
-                    <th className="p-3 text-center border-b whitespace-nowrap">حالة</th>
-                    <th className="p-3 text-center border-b whitespace-nowrap">عرض</th>
+                    <th className="p-3 text-right border-b break-words">#</th>
+                    <th className="p-3 text-right border-b break-words">التاريخ</th>
+                    <th className="p-3 text-center border-b break-words">العناصر</th>
+                    <th className="p-3 text-center border-b break-words">حالة</th>
+                    <th className="p-3 text-center border-b break-words">عرض</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -932,10 +945,10 @@ export default function SimpleOrderCreation() {
                     <tr><td colSpan="5" className="p-6"><LoadingState /></td></tr>
                   ) : orders.map(order => (
                     <tr key={order.order_id} className="border-b hover:bg-gray-50">
-                      <td className="p-3 whitespace-nowrap">{order.order_id}</td>
-                      <td className="p-3 whitespace-nowrap">{order.created_at?.split("T")[0]}</td>
-                      <td className="p-3 text-center whitespace-nowrap">{order.items?.length || 0}</td>
-                      <td className="p-3 text-center whitespace-nowrap">
+                      <td className="p-3 break-words">{order.order_id}</td>
+                      <td className="p-3 break-words">{order.created_at?.split("T")[0]}</td>
+                      <td className="p-3 text-center break-words">{order.items?.length || 0}</td>
+                      <td className="p-3 text-center break-words">
                         <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-sm">
                           {order.status || "معلق"}
                         </span>
@@ -1065,8 +1078,8 @@ export default function SimpleOrderCreation() {
   //         </div>
 
   //         <div className="flex-1 min-h-0 p-3">
-  //             {error && <MessageAlert type="error" message={error} onDismiss={() => setError("")} dismissable />}
-  //             {success && <MessageAlert type="success" message={success} onDismiss={() => setSuccess("")} dismissable />}
+  //             {error && <MessageAlert type="error" message={error} onDismiss={() => toast.error("")} dismissable />}
+  //             {success && <MessageAlert type="success" message={success} onDismiss={() => toast.success("")} dismissable />}
 
   //             {viewMode === "create" ? (
   //                 <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_2fr_1.5fr] gap-3 h-full min-h-0">
