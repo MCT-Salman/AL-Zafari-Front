@@ -75,13 +75,13 @@ const App = () => {
                   <Users />
                 </RoleProtectedRoute>
               } />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Route>
              <Route path="/customers" element={
                 <RoleProtectedRoute allowedRoles="sales">
                   <CustomerManagement />
                 </RoleProtectedRoute>
               } />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
               <Route path="/orders" element={
                 <RoleProtectedRoute allowedRoles="sales">
                   <OrderManagement />
