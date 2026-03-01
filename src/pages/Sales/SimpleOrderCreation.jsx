@@ -927,14 +927,14 @@ export default function SimpleOrderCreation() {
                   <table className="w-full table-fixed border-collapse">
                     <thead className="bg-gray-100 sticky top-0 z-10">
                       <tr>
-                        <th className="p-3 text-right border-b break-words">المادة</th>
-                        <th className="p-3 text-right border-b break-words">المسطرة</th>
-                        <th className="p-3 text-right border-b break-words">اللون</th>
-                        <th className="p-3 text-center border-b break-words">النوع</th>
-                        <th className="p-3 text-center border-b break-words">العرض</th>
-                        <th className="p-3 text-center border-b break-words">السماكة</th>
-                        <th className="p-3 text-center border-b break-words">الكمية</th>
-                        <th className="p-3 text-center border-b break-words">حذف</th>
+                        <th className="p-1 text-sm text-right border-b break-words">المادة</th>
+                        <th className="p-1 text-sm text-right border-b break-words">المسطرة</th>
+                        <th className="p-1 text-sm text-right border-b break-words">اللون</th>
+                        <th className="p-1 text-sm text-right border-b break-words">النوع</th>
+                        <th className="p-1 text-sm text-right border-b break-words">العرض</th>
+                        <th className="p-1 text-sm text-right border-b break-words">السماكة</th>
+                        <th className="p-1 text-sm text-right border-b break-words">الكمية</th>
+                        <th className="p-1 text-sm text-right border-b break-words">حذف</th>
                       </tr>
                     </thead>
                     <tbody>
