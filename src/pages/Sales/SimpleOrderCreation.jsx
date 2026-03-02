@@ -25,7 +25,8 @@ import {
   User,
   Users,
   LogIn,
-  EyeOff
+  EyeOff,
+  Home
 } from "lucide-react";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
@@ -195,12 +196,17 @@ export default function SimpleOrderCreation() {
       return filteredColors;
     }
 
+    console.log("=== DEBUG PRICING ===");
+    console.log("formData:", formData);
+    console.log("filteredColors:", filteredColors);
+    console.log("priceColors:", priceColors);
+
     if (isSelectedMaterialBoard) {
+      // للمواد اللوحية: تحقق من المسطرة والنوع فقط
       return filteredColors.filter(color =>
         priceColors.some(pc =>
           String(pc.color_id) === String(color.color_id) &&
-          pc.type_item === formData.type_item &&
-          getWidthFromPriceBy(pc.price_color_By) === null
+          pc.type_item === formData.type_item
         )
       );
     }
@@ -208,13 +214,30 @@ export default function SimpleOrderCreation() {
     if (!formData.width) return [];
     const targetWidth = Number(formData.width);
 
-    return filteredColors.filter(color =>
-      priceColors.some(pc =>
+    const result = filteredColors.filter(color => {
+      const hasPricing = priceColors.some(pc =>
         String(pc.color_id) === String(color.color_id) &&
         pc.type_item === formData.type_item &&
-        getWidthFromPriceBy(pc.price_color_By) === targetWidth
-      )
-    );
+        (pc.price_color_By === `isByMeter${targetWidth}` || pc.price_color_By === 'isByBlanck')
+      );
+
+      console.log(`Color ${color.color_name} (${color.color_id}):`, {
+        hasPricing,
+        colorId: color.color_id,
+        typeItem: formData.type_item,
+        width: targetWidth,
+        matchingPrices: priceColors.filter(pc =>
+          String(pc.color_id) === String(color.color_id) &&
+          pc.type_item === formData.type_item
+        )
+      });
+
+      return hasPricing;
+    });
+
+    console.log("Final result:", result);
+    console.log("=== END DEBUG ===");
+    return result;
   }, [formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, colors, priceColors]);
 
   const filteredColorsBySearch = useMemo(() => {
@@ -226,7 +249,7 @@ export default function SimpleOrderCreation() {
 
   const selectedColorImage = useMemo(() => {
     const color = colors.find(c => String(c.color_id) === String(formData.color_id));
-    return color?.image_url || color?.color_image || null;
+    return color?.imageUrl || color?.image_url || color?.color_image || null;
   }, [formData.color_id, colors]);
 
   // التحقق مما إذا كان اللون مسعرًا للمسطرة والعرض المحددين
@@ -238,10 +261,10 @@ export default function SimpleOrderCreation() {
     }
 
     if (isSelectedMaterialBoard) {
+      // للمواد اللوحية: تحقق من المسطرة والنوع فقط
       return priceColors.some(pc =>
         String(pc.color_id) === String(formData.color_id) &&
-        pc.type_item === formData.type_item &&
-        getWidthFromPriceBy(pc.price_color_By) === null
+        pc.type_item === formData.type_item
       );
     }
 
@@ -251,7 +274,7 @@ export default function SimpleOrderCreation() {
     return priceColors.some(pc =>
       String(pc.color_id) === String(formData.color_id) &&
       pc.type_item === formData.type_item &&
-      getWidthFromPriceBy(pc.price_color_By) === targetWidth
+      (pc.price_color_By === `isByMeter${targetWidth}` || pc.price_color_By === 'isByBlanck')
     );
   }, [formData.color_id, formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, priceColors]);
 
@@ -261,8 +284,7 @@ export default function SimpleOrderCreation() {
     if (isSelectedMaterialBoard) {
       const isPriced = priceColors.some(pc =>
         String(pc.color_id) === String(colorId) &&
-        pc.type_item === formData.type_item &&
-        getWidthFromPriceBy(pc.price_color_By) === null
+        pc.type_item === formData.type_item
       );
       return { priced: isPriced, label: "" };
     }
@@ -273,7 +295,7 @@ export default function SimpleOrderCreation() {
     const isPriced = priceColors.some(pc =>
       String(pc.color_id) === String(colorId) &&
       pc.type_item === formData.type_item &&
-      getWidthFromPriceBy(pc.price_color_By) === targetWidth
+      (pc.price_color_By === `isByMeter${targetWidth}` || pc.price_color_By === 'isByBlanck')
     );
     return { priced: isPriced, label: "" };
   };
@@ -417,15 +439,15 @@ export default function SimpleOrderCreation() {
       {/* Header - ثابت في الأعلى */}
       <div className="relative flex-shrink-0">
         {isHeaderVisible && (
-          <div className="flex flex-wrap items-center justify-between border-b-2 border-secondary-f bg-secondary-f text-white gap-4 px-4 py-3 shadow-md">
+          <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
             <div className="flex flex-wrap gap-3">
               <Button
                 size="lg"
                 variant="outline"
                 onClick={() => setViewMode("create")}
                 className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
-                  ? "bg-primary-f text-white border-primary-f"
-                  : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                  : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
                   }`}
               >
                 <ShoppingCart className="w-5 h-5 ml-2" />
@@ -436,8 +458,8 @@ export default function SimpleOrderCreation() {
                 variant="outline"
                 onClick={() => setViewMode("history")}
                 className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
-                  ? "bg-primary-f text-white border-primary-f"
-                  : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                  ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                  : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
                   }`}
               >
                 <History className="w-5 h-5 ml-2" />
@@ -445,7 +467,7 @@ export default function SimpleOrderCreation() {
               </Button>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button
+              {/* <Button
                 size="lg"
                 variant="outline"
                 onClick={() => navigate("/profile")}
@@ -453,7 +475,7 @@ export default function SimpleOrderCreation() {
               >
                 <User className="w-5 h-5 ml-2" />
                 البروفايل
-              </Button>
+              </Button> */}
               <Button
                 size="lg"
                 variant="outline"
@@ -466,17 +488,17 @@ export default function SimpleOrderCreation() {
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => navigate("/login")}
+                onClick={() => navigate("/dashboard")}
                 className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
               >
-                <LogIn className="w-5 h-5 ml-2" />
-                تسجيل الدخول
+                <Home className="w-5 h-5 ml-2" />
+                الرئيسية
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 onClick={() => setIsHeaderVisible(false)}
-                className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s text-white border-secondary-s hover:brightness-110"
+                className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110"
               >
                 <EyeOff className="w-5 h-5" />
               </Button>
@@ -489,7 +511,7 @@ export default function SimpleOrderCreation() {
               size="lg"
               variant="outline"
               onClick={() => setIsHeaderVisible(true)}
-              className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f shadow-lg touch-manipulation"
+              className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f hover:bg-secondary-f shadow-lg touch-manipulation"
             >
               <Eye className="w-5 h-5 ml-2" />
               إظهار الهيدر
@@ -655,15 +677,15 @@ export default function SimpleOrderCreation() {
             {/* العمود الأوسط - العناصر الإضافية */}
             <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
               {!isSelectedMaterialBoard && (
-                <Card className="flex-shrink-0 p-4">
+                <Card className="flex-shrink-0 p-4 ">
                   {/* <Label className="font-bold text-base mb-3 block">نوع الطلب</Label> */}
-                  <div className="grid grid-cols-4 ">
+                  <div className="grid grid-cols-2  mx-auto gap-4">
                     {TYPE_OPTIONS.map(t => (
                       <button
                         key={t.value}
                         onClick={() => handleFieldChange("type_item", t.value)}
                         className={`
-                                                w-30 h-30 rounded-2xl border-2 text-2xl sm:text-3xl font-medium
+                                                w-35 h-35 rounded-2xl border-2 text-2xl sm:text-3xl font-medium
                                                 transition-all touch-manipulation
                                                 flex items-center justify-center p-2
                                                 ${formData.type_item === t.value
@@ -982,7 +1004,7 @@ export default function SimpleOrderCreation() {
                 variant="outline"
                 onClick={loadOrders}
                 disabled={ordersLoading}
-                className="px-6 py-3 text-base bg-secondary-s text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
+                className="px-6 py-3 text-base bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
               >
                 <RotateCcw className="w-5 h-5 ml-2" />
                 تحديث
