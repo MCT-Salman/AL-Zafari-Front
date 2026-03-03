@@ -3727,3 +3727,660 @@ Headers (21)
     ]
   }
 }
+///////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+
+الان اريد بناء هذه الصفحة كالسابق
+وايضا ملف ال api
+
+GET
+get invoice
+{{autolocal}}/invoice
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/invoice'
+200 OK
+Example Response
+Body
+Headers (20)
+{
+  "success": true,
+  "message": "تم جلب الفواتير بنجاح",
+  "data": [
+    {
+      "invoice_id": 8,
+      "order_id": 1,
+      "customer_id": 1,
+      "total_amount": "1194000",
+      "paid_amount": "1190000",
+      "remaining_amount": "4000",
+      "issued_by": 1,
+      "issued_at": "2026-02-08T12:20:42.834Z",
+      "notes": "دفعة أولى",
+      "order": {
+        "order_id": 1,
+        "customer_id": 1,
+        "sales_user_id": 1,
+        "status": "completed",
+        "total_amount": "1194000",
+        "created_at": "2026-02-03T13:17:30.945Z",
+        "notes": "تحديث ملاحظات الطلب"
+      },
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين",
+        "country": "SY",
+        "countryCode": "+963",
+        "balance": "4000",
+        "is_active": true,
+        "fcmToken": null,
+        "notes": "ملاحظات",
+        "created_at": "2026-02-03T10:12:30.517Z"
+      },
+      "user": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator"
+      }
+    }
+  ],
+  "total": 1
+}
+---------------------
+GET
+get invoicebyid
+{{autolocal}}/invoice/8
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/invoice/8'
+200 OK
+Example Response
+Body
+Headers (21)
+{
+  "success": true,
+  "message": "تم جلب الفاتورة بنجاح",
+  "data": {
+    "invoice_id": 8,
+    "order_id": 1,
+    "customer_id": 1,
+    "total_amount": "1194000",
+    "paid_amount": "1190000",
+    "remaining_amount": "4000",
+    "issued_by": 1,
+    "issued_at": "2026-02-08T12:20:42.834Z",
+    "notes": "دفعة أولى",
+    "order": {
+      "order_id": 1,
+      "customer_id": 1,
+      "sales_user_id": 1,
+      "status": "completed",
+      "total_amount": "1194000",
+      "created_at": "2026-02-03T13:17:30.945Z",
+      "notes": "تحديث ملاحظات الطلب",
+      "items": [
+        {
+          "order_item_id": 47,
+          "order_id": 1,
+          "type_item": 7,
+          "ruler_id": 1,
+          "constant_width": "22",
+          "length": "100",
+          "constant_thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "150",
+          "subtotal": "746250",
+          "notes": "تحديث ملاحظات العنصر",
+          "ruler": {
+            "ruler_id": 1,
+            "ruler_type": "new",
+            "material_id": 2,
+            "color_id": 2,
+            "notes": "ملاحظات",
+            "material": {
+              "material_id": 2,
+              "material_name": "pvc",
+              "type": "Role",
+              "constant_height_id": 5,
+              "constant_width_id": 3,
+              "constant_thickness_id": 6,
+              "constant_value_unit": "متر",
+              "notes": "ملاحظات"
+            },
+            "color": {
+              "color_id": 2,
+              "material_id": 2,
+              "color_code": "RED002",
+              "color_name": "أحمر لولي",
+              "notes": "ملاحظات"
+            }
+          },
+          "batch": {
+            "batch_id": 1,
+            "batch_number": "BATCH-2024-001",
+            "entry_date": "2024-01-15T10:30:00.000Z",
+            "material_id": 2,
+            "notes": "ملاحظات"
+          }
+        },
+        {
+          "order_item_id": 48,
+          "order_id": 1,
+          "type_item": 8,
+          "ruler_id": 2,
+          "constant_width": "44",
+          "length": "100",
+          "constant_thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 30,
+          "unit_price": "50",
+          "subtotal": "149250",
+          "notes": "عنصر جديد",
+          "ruler": {
+            "ruler_id": 2,
+            "ruler_type": "old",
+            "material_id": 2,
+            "color_id": 2,
+            "notes": "ملاحظات",
+            "material": {
+              "material_id": 2,
+              "material_name": "pvc",
+              "type": "Role",
+              "constant_height_id": 5,
+              "constant_width_id": 3,
+              "constant_thickness_id": 6,
+              "constant_value_unit": "متر",
+              "notes": "ملاحظات"
+            },
+            "color": {
+              "color_id": 2,
+              "material_id": 2,
+              "color_code": "RED002",
+              "color_name": "أحمر لولي",
+              "notes": "ملاحظات"
+            }
+          },
+          "batch": {
+            "batch_id": 1,
+            "batch_number": "BATCH-2024-001",
+            "entry_date": "2024-01-15T10:30:00.000Z",
+            "material_id": 2,
+            "notes": "ملاحظات"
+          }
+        },
+        {
+          "order_item_id": 49,
+          "order_id": 1,
+          "type_item": 8,
+          "ruler_id": 2,
+          "constant_width": "44",
+          "length": "100",
+          "constant_thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 30,
+          "unit_price": "50",
+          "subtotal": "149250",
+          "notes": "عنصر جديد",
+          "ruler": {
+            "ruler_id": 2,
+            "ruler_type": "old",
+            "material_id": 2,
+            "color_id": 2,
+            "notes": "ملاحظات",
+            "material": {
+              "material_id": 2,
+              "material_name": "pvc",
+              "type": "Role",
+              "constant_height_id": 5,
+              "constant_width_id": 3,
+              "constant_thickness_id": 6,
+              "constant_value_unit": "متر",
+              "notes": "ملاحظات"
+            },
+            "color": {
+              "color_id": 2,
+              "material_id": 2,
+              "color_code": "RED002",
+              "color_name": "أحمر لولي",
+              "notes": "ملاحظات"
+            }
+          },
+          "batch": {
+            "batch_id": 1,
+            "batch_number": "BATCH-2024-001",
+            "entry_date": "2024-01-15T10:30:00.000Z",
+            "material_id": 2,
+            "notes": "ملاحظات"
+          }
+        },
+        {
+          "order_item_id": 50,
+          "order_id": 1,
+          "type_item": 8,
+          "ruler_id": 2,
+          "constant_width": "44",
+          "length": "100",
+          "constant_thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 30,
+          "unit_price": "50",
+          "subtotal": "149250",
+          "notes": "عنصر جديد",
+          "ruler": {
+            "ruler_id": 2,
+            "ruler_type": "old",
+            "material_id": 2,
+            "color_id": 2,
+            "notes": "ملاحظات",
+            "material": {
+              "material_id": 2,
+              "material_name": "pvc",
+              "type": "Role",
+              "constant_height_id": 5,
+              "constant_width_id": 3,
+              "constant_thickness_id": 6,
+              "constant_value_unit": "متر",
+              "notes": "ملاحظات"
+            },
+            "color": {
+              "color_id": 2,
+              "material_id": 2,
+              "color_code": "RED002",
+              "color_name": "أحمر لولي",
+              "notes": "ملاحظات"
+            }
+          },
+          "batch": {
+            "batch_id": 1,
+            "batch_number": "BATCH-2024-001",
+            "entry_date": "2024-01-15T10:30:00.000Z",
+            "material_id": 2,
+            "notes": "ملاحظات"
+          }
+        }
+      ]
+    },
+    "customer": {
+      "customer_id": 1,
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين",
+      "country": "SY",
+      "countryCode": "+963",
+      "balance": "4000",
+      "is_active": true,
+      "fcmToken": null,
+      "notes": "ملاحظات",
+      "created_at": "2026-02-03T10:12:30.517Z"
+    },
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator"
+    }
+  }
+}
+------------------------
+GET
+getInvoicesbyCustomerId
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/invoice/customer/1'
+200 OK
+Example Response
+Body
+Headers (20)
+{
+  "success": true,
+  "message": "تم جلب الفواتير بنجاح",
+  "data": [
+    {
+      "invoice_id": 1,
+      "order_id": 1,
+      "customer_id": 1,
+      "total_amount": "18000000000",
+      "paid_amount": "801800000",
+      "remaining_amount": "17198200000",
+      "issued_by": 1,
+      "issued_at": "2026-02-24T08:44:05.091Z",
+      "notes": "دفعة أولى",
+      "order": {
+        "order_id": 1,
+        "customer_id": 1,
+        "sales_user_id": 1,
+        "status": "completed",
+        "total_amount": "18000000000",
+        "created_at": "2026-02-24T08:10:11.103Z",
+        "notes": "ملاحظات الطلب"
+      },
+      "user": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "System Administrator"
+      }
+    }
+  ]
+}
+----------------------
+GET
+getInvoicesbyOrderId
+{{autolocal}}/invoice/order/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/invoice/order/1'
+200 OK
+Example Response
+Body
+Headers (20)
+-----------------------------
+{
+  "success": true,
+  "message": "تم جلب الفواتير بنجاح",
+  "data": [
+    {
+      "invoice_id": 1,
+      "order_id": 1,
+      "customer_id": 1,
+      "total_amount": "18000000000",
+      "paid_amount": "801800000",
+      "remaining_amount": "17198200000",
+      "issued_by": 1,
+      "issued_at": "2026-02-24T08:44:05.091Z",
+      "notes": "دفعة أولى",
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين",
+        "country": "SY",
+        "countryCode": "+963",
+        "balance": "17198200000",
+        "is_active": true,
+        "fcmToken": null,
+        "notes": "ملاحظات",
+        "created_at": "2026-02-24T08:04:30.900Z"
+      },
+      "user": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "System Administrator"
+      }
+    }
+  ]
+}
+---------------------------
+POST
+create invoice
+{{autolocal}}/invoice
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "order_id": 1,          
+  "paid_amount":  20000,
+  "notes": "دفعة أولى"     
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/invoice' \
+--data '{
+  "order_id": 2,          
+  "paid_amount":  0,
+  "notes": "دفعة أولى"     
+}'
+201 Created
+Example Response
+Body
+Headers (21)
+{
+  "success": true,
+  "message": "تم إنشاء الفاتورة بنجاح",
+  "data": {
+    "invoice_id": 4,
+    "order_id": 2,
+    "customer_id": 1,
+    "total_amount": "124800000",
+    "paid_amount": "0",
+    "remaining_amount": "124800000",
+    "issued_by": 1,
+    "issued_at": "2026-02-24T09:30:38.490Z",
+    "notes": "دفعة أولى",
+    "customer": {
+      "customer_id": 1,
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين",
+      "country": "SY",
+      "countryCode": "+963",
+      "balance": "249600000",
+      "is_active": true,
+      "fcmToken": null,
+      "notes": "ملاحظات",
+      "created_at": "2026-02-24T08:04:30.900Z"
+    },
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "System Administrator"
+    },
+    "order": {
+      "order_id": 2,
+      "customer_id": 1,
+      "sales_user_id": 1,
+      "status": "completed",
+      "total_amount": "124800000",
+      "created_at": "2026-02-24T08:32:56.937Z",
+      "notes": "ملاحظات الطلب",
+      "items": [
+        {
+          "order_item_id": 3,
+          "order_id": 2,
+          "type_item": null,
+          "color_id": 3,
+          "width": null,
+          "length": null,
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "1560000",
+          "subtotal": "78000000",
+          "notes": "ملاحظات العنصر"
+        },
+        {
+          "order_item_id": 4,
+          "order_id": 2,
+          "type_item": null,
+          "color_id": 3,
+          "width": null,
+          "length": "1",
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 30,
+          "unit_price": "1560000",
+          "subtotal": "46800000",
+          "notes": "عنصر جديد"
+        }
+      ]
+    }
+  }
+}
+----------------------------------
+PUT
+put invoice
+{{autolocal}}/invoice/6
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "paid_amount": 300000,   
+  "notes": "تم التعديل"     
+}
+Example Request
+true
+curl
+curl --location -g --request PUT '{{autolocal}}/invoice/6' \
+--data '{
+  "paid_amount": 300000,   
+  "notes": "تم التعديل"     
+}'
+200 OK
+Example Response
+Body
+Headers (20)
+{
+  "success": true,
+  "message": "تم تحديث الفاتورة بنجاح",
+  "data": {
+    "invoice_id": 6,
+    "order_id": 1,
+    "customer_id": 1,
+    "total_amount": "1194000",
+    "paid_amount": "300000",
+    "remaining_amount": "894000",
+    "issued_by": 1,
+    "issued_at": "2026-02-08T12:13:01.456Z",
+    "notes": "تم التعديل"
+  }
+}
+---------------------------
+DELETE
+del invoice
+{{autolocal}}/invoice/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw
+{
+  "total_amount": 5500.00,  
+  "paid_amount": 3000.00,   
+  "notes": "تم التعديل"     
+}
+Example Request
+true
+curl
+curl --location -g --request DELETE '{{autolocal}}/invoice/7' \
+--data '{
+  "total_amount": 5500.00,  
+  "paid_amount": 3000.00,   
+  "notes": "تم التعديل"     
+}'
+200 OK
+Example Response
+Body
+Headers (20)
+{
+  "success": true,
+  "message": "تم حذف الفاتورة بنجاح"
+}
+-----------------------------------
+POST
+add payment
+{{autolocal}}/invoice/1/payment
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+  "payment_amount": 799800000  
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/invoice/8/payment' \
+--data '{
+  "payment_amount": 1170000  
+}'
+200 OK
+Example Response
+Body
+Headers (20)
+
+{
+  "success": true,
+  "message": "تم إضافة الدفعة بنجاح",
+  "data": {
+    "invoice_id": 8,
+    "order_id": 1,
+    "customer_id": 1,
+    "total_amount": "1194000",
+    "paid_amount": "1190000",
+    "remaining_amount": "4000",
+    "issued_by": 1,
+    "issued_at": "2026-02-08T12:20:42.834Z",
+    "notes": "دفعة أولى",
+    "customer": {
+      "customer_id": 1,
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين",
+      "country": "SY",
+      "countryCode": "+963",
+      "balance": "1174000",
+      "is_active": true,
+      "fcmToken": null,
+      "notes": "ملاحظات",
+      "created_at": "2026-02-03T10:12:30.517Z"
+    },
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Administrator"
+    }
+  }
+}
+حيث اريد ان تكون الصفحة مشابهة لصفحة الطلبات المبيعات 
+ولكن في البداية يكون الجدول ثابت على اليسار كما هو اما على اليمين والنصف يكون هناك تابات بالاعلى اختار اما مسح عبر QR Code او كتابه الكود بمربع نصي 
+او اختيار ادخال يدوي وتصبح الصفحة مثل الطلبات 

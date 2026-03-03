@@ -10,4 +10,6 @@ export const sideData = [
     { id: 5, title: 'الزبائن', link: '/customers', logo: User, role: 'sales' },
     { id: 6, title: 'الطلبات', link: '/orders', logo: ShoppingCart, role: 'sales' },
     { id: 9, title: 'ملف المبيعات', link: '/sales/profile', logo: User, role: 'sales' },
+    { id: 10, title: 'مدير الإنتاج', link: '/production', logo: User, role: 'sales' },
+    { id: 11, title: 'إدارة الفواتير', link: '/invoice', logo: User, role: 'sales' },
 ]

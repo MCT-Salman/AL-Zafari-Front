@@ -4,6 +4,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Toaster } from 'react-hot-toast';
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
+import ProductionManager from "./pages/Production/ProductionManager";
+import InvoiceManager from "./pages/Sales/InvoiceManager";
 
 const MainLayout = lazy(() => import("@/components/Layout/MainLayout"));
 const Login = lazy(() => import("@/pages/Login"));
@@ -85,6 +87,16 @@ const App = () => {
               <Route path="/orders" element={
                 <RoleProtectedRoute allowedRoles="sales">
                   <OrderManagement />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/invoice" element={
+                <RoleProtectedRoute allowedRoles="sales">
+                  <InvoiceManager />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/production" element={
+                <RoleProtectedRoute allowedRoles="sales">
+                  <ProductionManager />
                 </RoleProtectedRoute>
               } />
           </Routes>

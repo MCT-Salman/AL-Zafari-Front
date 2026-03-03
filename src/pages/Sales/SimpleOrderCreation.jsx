@@ -1,7 +1,8 @@
 // src/pages/Sales/SimpleOrderCreation.jsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderApi } from "../../api/orderApi";
+import { customerApi } from "../../api/customerApi";
 import { materialApi } from "../../api/materialApi";
 import { rulerApi } from "../../api/rulerApi";
 import { colorApi } from "../../api/colorApi";
@@ -22,15 +23,23 @@ import {
     Eye,
     RotateCcw,
     Check,
-    User,
     Users,
-    LogIn,
     EyeOff,
-    Home
+    Home,
+    X,
+    AlertCircle,
+    Edit,
+    Save,
+    ChevronLeft,
+    ChevronRight,
+    UserPlus,
+    User,
+    UserX
 } from "lucide-react";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
 import toast from "react-hot-toast";
+import { TypeItem, OrderStatus, CustomerType, PriceColorBy } from "../../types/enums";
 
 export default function SimpleOrderCreation() {
     const navigate = useNavigate();
@@ -38,6 +47,8 @@ export default function SimpleOrderCreation() {
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [showPreview, setShowPreview] = useState(false);
+    const [editingItemId, setEditingItemId] = useState(null);
+    const tableContainerRef = useRef(null);
 
     // Data
     const [materials, setMaterials] = useState([]);
@@ -45,13 +56,31 @@ export default function SimpleOrderCreation() {
     const [colors, setColors] = useState([]);
     const [batches, setBatches] = useState([]);
     const [priceColors, setPriceColors] = useState([]);
-    const [widthValues, setWidthValues] = useState([]); // قيم العرض حسب المادة
-    const [loadingWidths, setLoadingWidths] = useState(false); // حالة تحميل قيم العرض
+    const [widthValues, setWidthValues] = useState([]);
+    const [customers, setCustomers] = useState([]);
+    const [loadingWidths, setLoadingWidths] = useState(false);
+    const [loadingCustomers, setLoadingCustomers] = useState(false);
+
+    // Customer State
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [customerSearchTerm, setCustomerSearchTerm] = useState("");
+    const [customerOption, setCustomerOption] = useState("none"); // none, existing, new
+
+    // New Customer Form
+    const [newCustomer, setNewCustomer] = useState({
+        name: "",
+        phone: "",
+        customer_type: CustomerType.customer,
+        city: "",
+        address: "",
+        is_active: true,
+        notes: ""
+    });
 
     // Form State
     const [formData, setFormData] = useState({
         material_id: "",
-        type_item: "Machine",
+        type_item: TypeItem.Machine,
         ruler_id: "",
         color_id: "",
         batch_id: "",
@@ -71,33 +100,72 @@ export default function SimpleOrderCreation() {
     const [colorSearchCode, setColorSearchCode] = useState("");
     const [activeField, setActiveField] = useState("quantity");
 
+    // Helper functions from orderApi
+    const getOrderStatus = (order) => orderApi.getOrderStatus(order);
+    const getFormattedDate = (order) => orderApi.getFormattedDate(order);
+    const formatCurrency = (amount) => orderApi.formatCurrency(amount);
+    const getStatusBadge = (status) => orderApi.getStatusBadge(status);
+    const getSalesUserName = (order) => orderApi.getSalesUserName(order);
+    const getCustomerName = (order) => orderApi.getCustomerName(order);
+    const getCustomerPhone = (order) => orderApi.getCustomerPhone(order);
+    const getCustomerCity = (order) => orderApi.getCustomerCity(order);
+    const getCustomerAddress = (order) => orderApi.getCustomerAddress(order);
+    const formatCustomerInfo = (order) => orderApi.formatCustomerInfo(order);
+    const calculateOrderTotal = (items) => orderApi.calculateOrderTotal(items);
+
     const TYPE_OPTIONS = [
-        { value: "Machine", label: "مكنة" },
-        { value: "Presser", label: "كوي" }
+        { value: TypeItem.Machine, label: "مكنة" },
+        { value: TypeItem.Presser, label: "كوي" }
     ];
+
+    const CUSTOMER_OPTIONS = [
+        { value: "none", label: "بدون زبون", icon: UserX },
+        { value: "existing", label: "زبون موجود", icon: User },
+        { value: "new", label: "زبون جديد", icon: UserPlus }
+    ];
+
     const PRICE_BY_TO_WIDTH = {
-        isByMeter22: 22,
-        isByMeter44: 44,
-        isByMeter66: 66,
+        [PriceColorBy.isByMeter22]: 22,
+        [PriceColorBy.isByMeter44]: 44,
+        [PriceColorBy.isByMeter66]: 66,
+        [PriceColorBy.isByBlanck]: null
     };
-    const getWidthFromPriceBy = (priceBy) => PRICE_BY_TO_WIDTH[priceBy] ?? null;
+
     const totalPreviewQuantity = useMemo(() => {
         return orderItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
     }, [orderItems]);
+
     const getStatusLabel = (status) => {
-        const key = String(status || "").toLowerCase();
-        if (key === "pending") return "معلق";
-        if (key === "completed") return "مكتمل";
-        if (key === "cancelled" || key === "canceled") return "ملغي";
-        if (key === "processing") return "قيد المعالجة";
-        if (key === "draft") return "مسودة";
-        return status || "-";
+        switch(status) {
+            case OrderStatus.pending:
+                return "معلق";
+            case OrderStatus.preparing:
+                return "قيد التحضير";
+            case OrderStatus.completed:
+                return "مكتمل";
+            case OrderStatus.canceled:
+                return "ملغي";
+            default:
+                return status || "-";
+        }
     };
 
+    const formatPhoneNumber = (phone) => {
+        if (!phone) return "";
+        let cleaned = phone.replace(/\D/g, "");
+        if (cleaned.startsWith("0")) {
+            cleaned = cleaned.substring(1);
+        }
+        if (cleaned.startsWith("963")) {
+            return `+${cleaned}`;
+        }
+        return `+963${cleaned}`;
+    };
 
     // Load initial data
     useEffect(() => {
         loadInitialData();
+        loadCustomers();
     }, []);
 
     useEffect(() => {
@@ -115,6 +183,7 @@ export default function SimpleOrderCreation() {
 
     const loadInitialData = async () => {
         try {
+            setLoading(true);
             const [matRes, rulerRes, colorRes, batchRes, priceRes] = await Promise.all([
                 materialApi.getMaterials(),
                 rulerApi.getRulers(),
@@ -130,21 +199,35 @@ export default function SimpleOrderCreation() {
             setPriceColors(getApiData(priceRes, []) || []);
 
         } catch (error) {
+            console.error("Error loading data:", error);
             toast.error("فشل في تحميل البيانات");
+        } finally {
+            setLoading(false);
         }
     };
 
-    // جلب قيم العرض حسب المادة
+    const loadCustomers = async () => {
+        try {
+            setLoadingCustomers(true);
+            const response = await customerApi.getCustomers();
+            setCustomers(getApiData(response, []) || []);
+        } catch (error) {
+            console.error("Error loading customers:", error);
+            toast.error("فشل في تحميل العملاء");
+        } finally {
+            setLoadingCustomers(false);
+        }
+    };
+
     const loadWidthValues = async (materialId) => {
         try {
             setLoadingWidths(true);
             const response = await constantApi.getConstantValuesByMaterial(materialId, 'width');
             const widthData = getApiData(response, []);
             setWidthValues(widthData);
-
-            // إعادة تعيين العرض المحدد عند تغيير المادة
             setFormData(prev => ({ ...prev, width: "" }));
         } catch (error) {
+            console.error("Error loading widths:", error);
             toast.error("فشل في تحميل قيم العرض");
             setWidthValues([]);
         } finally {
@@ -157,20 +240,67 @@ export default function SimpleOrderCreation() {
             setOrdersLoading(true);
             const response = await orderApi.getOrders();
             setOrders(getApiData(response, []) || []);
-        } catch {
+        } catch (error) {
+            console.error("Error loading orders:", error);
             toast.error("فشل في تحميل الطلبات");
         } finally {
             setOrdersLoading(false);
         }
     };
 
-    // التحقق مما إذا كانت المادة المحددة تحتوي على كلمة "لوح" أو مشتقاتها
+    const handleCreateCustomer = async () => {
+        if (!newCustomer.name || !newCustomer.phone) {
+            toast.error("الاسم ورقم الهاتف مطلوبان");
+            return;
+        }
+
+        try {
+            setLoading(true);
+            
+            const formattedPhone = formatPhoneNumber(newCustomer.phone);
+            
+            const customerData = {
+                name: newCustomer.name,
+                phone: formattedPhone,
+                customer_type: CustomerType.customer,
+                city: newCustomer.city || "",
+                address: newCustomer.address || "",
+                is_active: true,
+                notes: newCustomer.notes || ""
+            };
+
+            console.log("Creating customer with data:", customerData);
+            
+            const response = await customerApi.createCustomer(customerData);
+            const createdCustomer = getApiData(response, {});
+            
+            if (createdCustomer) {
+                toast.success("تم إنشاء الزبون بنجاح");
+                setCustomers(prev => [...prev, createdCustomer]);
+                setSelectedCustomer(createdCustomer);
+                setCustomerOption("existing");
+                setNewCustomer({ 
+                    name: "", 
+                    phone: "", 
+                    customer_type: CustomerType.customer,
+                    city: "", 
+                    address: "",
+                    is_active: true,
+                    notes: ""
+                });
+            }
+        } catch (error) {
+            console.error("Error creating customer:", error);
+            toast.error(error.response?.data?.message || "فشل في إنشاء الزبون");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const isSelectedMaterialBoard = useMemo(() => {
         if (!formData.material_id) return false;
         const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
-
-        // التحقق من الكلمات المختلفة للواح
         const boardKeywords = ["لوح", "ألواح", "board", "boards", "لوحة", "الواح"];
         return boardKeywords.some(keyword => materialName.includes(keyword));
     }, [formData.material_id, materials]);
@@ -186,7 +316,6 @@ export default function SimpleOrderCreation() {
         return colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
     }, [formData.ruler_id, colors]);
 
-    // فلترة الألوان المتاحة مع استبعاد غير المسعرة
     const availablePricedColors = useMemo(() => {
         if (!formData.ruler_id) return [];
 
@@ -196,13 +325,7 @@ export default function SimpleOrderCreation() {
             return filteredColors;
         }
 
-        console.log("=== DEBUG PRICING ===");
-        console.log("formData:", formData);
-        console.log("filteredColors:", filteredColors);
-        console.log("priceColors:", priceColors);
-
         if (isSelectedMaterialBoard) {
-            // للمواد اللوحية: تحقق من المسطرة والنوع فقط
             return filteredColors.filter(color =>
                 priceColors.some(pc =>
                     String(pc.color_id) === String(color.color_id) &&
@@ -214,30 +337,16 @@ export default function SimpleOrderCreation() {
         if (!formData.width) return [];
         const targetWidth = Number(formData.width);
 
-        const result = filteredColors.filter(color => {
-            const hasPricing = priceColors.some(pc =>
+        return filteredColors.filter(color => {
+            return priceColors.some(pc =>
                 String(pc.color_id) === String(color.color_id) &&
                 pc.type_item === formData.type_item &&
-                (pc.price_color_By === `isByMeter${targetWidth}` || pc.price_color_By === 'isByBlanck')
+                (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
+                 pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
+                 pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
+                 pc.price_color_By === PriceColorBy.isByBlanck)
             );
-
-            console.log(`Color ${color.color_name} (${color.color_id}):`, {
-                hasPricing,
-                colorId: color.color_id,
-                typeItem: formData.type_item,
-                width: targetWidth,
-                matchingPrices: priceColors.filter(pc =>
-                    String(pc.color_id) === String(color.color_id) &&
-                    pc.type_item === formData.type_item
-                )
-            });
-
-            return hasPricing;
         });
-
-        console.log("Final result:", result);
-        console.log("=== END DEBUG ===");
-        return result;
     }, [formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, colors, priceColors]);
 
     const filteredColorsBySearch = useMemo(() => {
@@ -252,7 +361,6 @@ export default function SimpleOrderCreation() {
         return color?.imageUrl || color?.image_url || color?.color_image || null;
     }, [formData.color_id, colors]);
 
-    // التحقق مما إذا كان اللون مسعرًا للمسطرة والعرض المحددين
     const isColorPriced = useMemo(() => {
         if (!formData.color_id || !formData.ruler_id) return false;
 
@@ -261,7 +369,6 @@ export default function SimpleOrderCreation() {
         }
 
         if (isSelectedMaterialBoard) {
-            // للمواد اللوحية: تحقق من المسطرة والنوع فقط
             return priceColors.some(pc =>
                 String(pc.color_id) === String(formData.color_id) &&
                 pc.type_item === formData.type_item
@@ -274,7 +381,10 @@ export default function SimpleOrderCreation() {
         return priceColors.some(pc =>
             String(pc.color_id) === String(formData.color_id) &&
             pc.type_item === formData.type_item &&
-            (pc.price_color_By === `isByMeter${targetWidth}` || pc.price_color_By === 'isByBlanck')
+            (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
+             pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
+             pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
+             pc.price_color_By === PriceColorBy.isByBlanck)
         );
     }, [formData.color_id, formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, priceColors]);
 
@@ -286,7 +396,7 @@ export default function SimpleOrderCreation() {
                 String(pc.color_id) === String(colorId) &&
                 pc.type_item === formData.type_item
             );
-            return { priced: isPriced, label: "" };
+            return { priced: isPriced, label: isPriced ? "" : " (غير مسعر)" };
         }
 
         if (!formData.width) return { priced: false, label: " (اختر العرض)" };
@@ -295,9 +405,12 @@ export default function SimpleOrderCreation() {
         const isPriced = priceColors.some(pc =>
             String(pc.color_id) === String(colorId) &&
             pc.type_item === formData.type_item &&
-            (pc.price_color_By === `isByMeter${targetWidth}` || pc.price_color_By === 'isByBlanck')
+            (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
+             pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
+             pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
+             pc.price_color_By === PriceColorBy.isByBlanck)
         );
-        return { priced: isPriced, label: "" };
+        return { priced: isPriced, label: isPriced ? "" : " (غير مسعر)" };
     };
 
     const handleFieldChange = (field, value) => {
@@ -331,9 +444,10 @@ export default function SimpleOrderCreation() {
 
             const matched = availablePricedColors.find(c => c.color_code === search);
             if (matched) {
-                handleFieldChange("color_id", matched.color_id);
+                handleFieldChange("color_id", String(matched.color_id));
                 setNumpadMode("quantity");
                 setColorSearchCode("");
+                toast.success(`تم العثور على اللون: ${matched.color_name}`);
             }
         } else {
             let current = String(formData[activeField] || "");
@@ -348,19 +462,17 @@ export default function SimpleOrderCreation() {
         }
     };
 
-    const addItem = () => {
+    const addOrUpdateItem = () => {
         if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity) {
             toast.error("يرجى اكمال جميع البيانات");
             return;
         }
 
-        // إذا كانت المادة ليست "لوح" يجب تحديد العرض
         if (!isSelectedMaterialBoard && !formData.width) {
             toast.error("يرجى اختيار العرض");
             return;
         }
 
-        // التحقق من أن اللون مسعر
         if (!isColorPriced) {
             toast.error("اللون المحدد غير مسعر لهذه المواصفات");
             return;
@@ -372,21 +484,37 @@ export default function SimpleOrderCreation() {
         const batch = batches.find(b => String(b.batch_id) === String(formData.batch_id));
 
         const newItem = {
-            id: Date.now(),
-            ...formData,
+            id: editingItemId || Date.now(),
+            material_id: formData.material_id,
+            type_item: formData.type_item,
+            ruler_id: formData.ruler_id,
+            color_id: formData.color_id,
+            batch_id: formData.batch_id,
+            width: formData.width,
+            thickness: formData.thickness,
+            quantity: formData.quantity,
+            notes: formData.notes,
             material_name: material?.material_name,
             ruler_name: ruler?.ruler_name,
             color_name: color?.color_name,
             batch_number: batch?.batch_number,
         };
 
-        setOrderItems(prev => [...prev, newItem]);
+        if (editingItemId) {
+            setOrderItems(prev => prev.map(item => 
+                item.id === editingItemId ? newItem : item
+            ));
+            toast.success("تم تحديث العنصر بنجاح");
+            setEditingItemId(null);
+        } else {
+            setOrderItems(prev => [...prev, newItem]);
+            toast.success("تم إضافة العنصر بنجاح");
+        }
 
-        // Reset form keeping material and thickness
         setFormData(prev => ({
             material_id: prev.material_id,
             thickness: "0.6",
-            type_item: "Machine",
+            type_item: TypeItem.Machine,
             ruler_id: "",
             color_id: "",
             batch_id: "",
@@ -397,8 +525,39 @@ export default function SimpleOrderCreation() {
         setColorSearchCode("");
     };
 
+    const handleEditItem = (item) => {
+        setFormData({
+            material_id: String(item.material_id),
+            type_item: item.type_item,
+            ruler_id: String(item.ruler_id),
+            color_id: String(item.color_id),
+            batch_id: item.batch_id ? String(item.batch_id) : "",
+            width: item.width || "",
+            thickness: item.thickness || "0.6",
+            quantity: item.quantity,
+            notes: item.notes || ""
+        });
+        setEditingItemId(item.id);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     const removeItem = (id) => {
+        if (editingItemId === id) {
+            setEditingItemId(null);
+            setFormData(prev => ({
+                material_id: prev.material_id,
+                thickness: "0.6",
+                type_item: TypeItem.Machine,
+                ruler_id: "",
+                color_id: "",
+                batch_id: "",
+                width: "",
+                quantity: "",
+                notes: ""
+            }));
+        }
         setOrderItems(prev => prev.filter(item => item.id !== id));
+        toast.success("تم حذف العنصر");
     };
 
     const saveOrder = async () => {
@@ -409,34 +568,143 @@ export default function SimpleOrderCreation() {
 
         try {
             setLoading(true);
+            
             const items = orderItems.map(item => ({
                 type_item: item.type_item,
                 color_id: Number(item.color_id),
                 width: Number(item.width) || 0,
                 thickness: 0.6,
-                batch_id: Number(item.batch_id) || null,
+                batch_id: item.batch_id ? Number(item.batch_id) : null,
                 quantity: Number(item.quantity),
-                notes: item.notes
+                notes: item.notes || ""
             }));
 
-            await orderApi.createOrder({ status: "pending", items, notes: "" });
+            const orderData = {
+                status: OrderStatus.pending,
+                notes: "",
+                items: items
+            };
+
+            if (customerOption === "existing" && selectedCustomer) {
+                orderData.customer_id = Number(selectedCustomer.customer_id);
+            }
+
+            console.log("Saving order:", orderData);
+            await orderApi.createOrder(orderData);
+            
             toast.success("تم حفظ الطلب بنجاح");
+            
             setOrderItems([]);
-        } catch {
+            setSelectedCustomer(null);
+            setCustomerOption("none");
+            setShowPreview(false);
+            setEditingItemId(null);
+            
+        } catch (error) {
+            console.error("Error saving order:", error);
             toast.error("فشل في حفظ الطلب");
         } finally {
             setLoading(false);
         }
     };
+
     const handleConfirmSave = async () => {
         await saveOrder();
-        setShowPreview(false);
     };
 
+    const clearAllItems = () => {
+        if (orderItems.length > 0) {
+            setOrderItems([]);
+            setEditingItemId(null);
+            setFormData(prev => ({
+                material_id: prev.material_id,
+                thickness: "0.6",
+                type_item: TypeItem.Machine,
+                ruler_id: "",
+                color_id: "",
+                batch_id: "",
+                width: "",
+                quantity: "",
+                notes: ""
+            }));
+            toast.success("تم مسح جميع العناصر");
+        }
+    };
+
+    const cancelEdit = () => {
+        setEditingItemId(null);
+        setFormData(prev => ({
+            material_id: prev.material_id,
+            thickness: "0.6",
+            type_item: TypeItem.Machine,
+            ruler_id: "",
+            color_id: "",
+            batch_id: "",
+            width: "",
+            quantity: "",
+            notes: ""
+        }));
+    };
+
+    // Filter customers based on search
+    const filteredCustomers = useMemo(() => {
+        if (!customerSearchTerm) return customers;
+        const term = customerSearchTerm.toLowerCase();
+        return customers.filter(c => 
+            c.name?.toLowerCase().includes(term) || 
+            c.phone?.toLowerCase().includes(term) ||
+            c.city?.toLowerCase().includes(term)
+        );
+    }, [customers, customerSearchTerm]);
+
+    // Customer options for select
+    const customerOptions = useMemo(() => {
+        return filteredCustomers.map(c => ({
+            value: String(c.customer_id),
+            label: customerApi.formatCustomerDisplay(c)
+        }));
+    }, [filteredCustomers]);
+
+    // Color options for select
+    const colorOptions = useMemo(() => {
+        return filteredColorsBySearch.map(c => {
+            const pricingStatus = getColorPricingStatus(c.color_id);
+            return {
+                value: String(c.color_id),
+                label: `${c.color_name} (${c.color_code})${pricingStatus.label}`,
+                disabled: !pricingStatus.priced
+            };
+        });
+    }, [filteredColorsBySearch, getColorPricingStatus]);
+
+    // Batch options for select
+    const batchOptions = useMemo(() => {
+        return batches.map(b => ({
+            value: String(b.batch_id),
+            label: b.batch_number || `دفعة ${b.batch_id}`
+        }));
+    }, [batches]);
+
+    // Scroll table horizontally
+    const scrollTable = (direction) => {
+        if (tableContainerRef.current) {
+            const scrollAmount = 200;
+            const newScrollLeft = tableContainerRef.current.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount);
+            tableContainerRef.current.scrollTo({ left: newScrollLeft, behavior: 'smooth' });
+        }
+    };
+
+    if (loading && viewMode === "create" && materials.length === 0) {
+        return (
+            <div className="h-screen flex items-center justify-center">
+                <LoadingState />
+            </div>
+        );
+    }
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
-            {/* Header - ثابت في الأعلى */}
+            {/* Header */}
             <div className="relative flex-shrink-0">
                 {isHeaderVisible && (
                     <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
@@ -445,10 +713,11 @@ export default function SimpleOrderCreation() {
                                 size="lg"
                                 variant="outline"
                                 onClick={() => setViewMode("create")}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
-                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                    }`}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
+                                    viewMode === "create"
+                                        ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                        : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                }`}
                             >
                                 <ShoppingCart className="w-5 h-5 ml-2" />
                                 طلب جديد
@@ -457,25 +726,17 @@ export default function SimpleOrderCreation() {
                                 size="lg"
                                 variant="outline"
                                 onClick={() => setViewMode("history")}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
-                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                    }`}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
+                                    viewMode === "history"
+                                        ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                        : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                }`}
                             >
                                 <History className="w-5 h-5 ml-2" />
                                 سجل الطلبات
                             </Button>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {/* <Button
-                size="lg"
-                variant="outline"
-                onClick={() => navigate("/profile")}
-                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-              >
-                <User className="w-5 h-5 ml-2" />
-                البروفايل
-              </Button> */}
                             <Button
                                 size="lg"
                                 variant="outline"
@@ -520,46 +781,39 @@ export default function SimpleOrderCreation() {
                 )}
             </div>
 
-            {/* Main Content - يأخذ المساحة المتبقية */}
+            {/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
                 {viewMode === "create" ? (
-                    /* 
-                      توزيع الأعمدة بشكل ديناميكي:
-                      - العمود الأول: 1.2fr (المواد والأرقام)
-                      - العمود الثاني: 2fr (العناصر الوسطى)
-                      - العمود الثالث: 1.8fr (الجدول)
-                    */
-                    <div className="grid grid-cols-1 xl:grid-cols-[1fr_2fr_1fr] gap-1 h-full min-h-0">
-
-                        {/* العمود الأيمن - أزرار المواد والأرقام */}
-                        <div className="flex flex-col gap-1 h-full min-h-0 overflow-hidden">
-                            {/* أزرار المواد - تستخدم Grid ديناميكي */}
+                    <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_2.2fr_1.6fr] gap-3 h-full min-h-0">
+                        {/* العمود الأيمن - المواد والأرقام */}
+                        <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
+                            {/* أزرار المواد */}
                             <Card className="flex-shrink-0 p-4">
                                 <Label className="font-bold text-base mb-3 block">المادة</Label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 auto-rows-fr">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
                                     {materials.map(m => (
                                         <button
                                             key={m.material_id}
-                                            onClick={() => handleFieldChange("material_id", m.material_id)}
+                                            onClick={() => handleFieldChange("material_id", String(m.material_id))}
                                             className={`
-                                            aspect-square rounded-2xl border-4 text-xl sm:text-2xl font-bold 
-                                            transition-all touch-manipulation hover:scale-105 active:scale-95
-                                            flex items-center justify-center p-4
-                                            ${String(formData.material_id) === String(m.material_id)
+                                                aspect-square rounded-xl border-3 text-lg sm:text-xl font-bold 
+                                                transition-all touch-manipulation hover:scale-105 active:scale-95
+                                                flex items-center justify-center p-2
+                                                ${String(formData.material_id) === String(m.material_id)
                                                     ? "border-primary-f bg-secondary-f text-white shadow-lg"
                                                     : "border-gray-300 bg-white hover:border-secondary-s"
                                                 }
-                                        `}
+                                            `}
+                                            title={m.material_name}
                                         >
-                                            {m.material_name}
+                                            <span className="line-clamp-2 text-center">{m.material_name}</span>
                                         </button>
                                     ))}
                                 </div>
                             </Card>
 
-                            {/* الأرقام - تأخذ المساحة المتبقية */}
+                            {/* الأرقام */}
                             <Card className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
-                                {/* شاشة العرض الرقمية - مدمجة أكثر */}
                                 <div className="flex-shrink-0 mb-2">
                                     <div className="flex gap-2 mb-2">
                                         <button
@@ -568,13 +822,13 @@ export default function SimpleOrderCreation() {
                                                 setColorSearchCode("");
                                             }}
                                             className={`
-                    flex-1 py-3 px-2 rounded-lg text-sm font-bold border-2 
-                    touch-manipulation transition-all active:scale-95
-                    ${numpadMode === "colorSearch"
+                                                flex-1 py-2 px-2 rounded-lg text-sm font-bold border-2 
+                                                touch-manipulation transition-all active:scale-95
+                                                ${numpadMode === "colorSearch"
                                                     ? "bg-secondary-s text-white border-secondary-s"
                                                     : "bg-white border-gray-300 hover:bg-gray-100"
                                                 }
-                `}
+                                            `}
                                         >
                                             بحث بالكود
                                         </button>
@@ -584,13 +838,13 @@ export default function SimpleOrderCreation() {
                                                 setActiveField("quantity");
                                             }}
                                             className={`
-                    flex-1 py-3 px-2 rounded-lg text-sm font-bold border-2 
-                    touch-manipulation transition-all active:scale-95
-                    ${numpadMode === "quantity"
+                                                flex-1 py-2 px-2 rounded-lg text-sm font-bold border-2 
+                                                touch-manipulation transition-all active:scale-95
+                                                ${numpadMode === "quantity"
                                                     ? "bg-primary-f text-white border-primary-f"
                                                     : "bg-white border-gray-300 hover:bg-gray-100"
                                                 }
-                `}
+                                            `}
                                         >
                                             كتابة الكمية
                                         </button>
@@ -600,72 +854,65 @@ export default function SimpleOrderCreation() {
                                         <div className="text-xs text-gray-500 mb-0.5">
                                             {numpadMode === "colorSearch" ? "كود اللون" :
                                                 activeField === "quantity" ? "الكمية" :
-                                                    activeField === "width" ? "العرض" : "القيمة"}
+                                                activeField === "width" ? "العرض" : "القيمة"}
                                         </div>
-                                        <div className="text-3xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
+                                        <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
                                             {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* أزرار الأرقام - 4 صفوف فقط (بدون مساحة إضافية) */}
-                                <div className="flex-1 grid grid-rows-4 gap-1.5 min-h-0">
-                                    {/* الصف 1: 7 8 9 */}
-                                    <div className="grid grid-cols-3 gap-1.5">
+                                {/* أزرار الأرقام */}
+                                <div className="flex-1 grid grid-rows-4 gap-1 min-h-0">
+                                    <div className="grid grid-cols-3 gap-1">
                                         {["7", "8", "9"].map(key => (
                                             <button
                                                 key={key}
                                                 onClick={() => handleNumpadPress(key)}
-                                                className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
                                             >
                                                 {key}
                                             </button>
                                         ))}
                                     </div>
-
-                                    {/* الصف 2: 4 5 6 */}
-                                    <div className="grid grid-cols-3 gap-1.5">
+                                    <div className="grid grid-cols-3 gap-1">
                                         {["4", "5", "6"].map(key => (
                                             <button
                                                 key={key}
                                                 onClick={() => handleNumpadPress(key)}
-                                                className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
                                             >
                                                 {key}
                                             </button>
                                         ))}
                                     </div>
-
-                                    {/* الصف 3: 1 2 3 */}
-                                    <div className="grid grid-cols-3 gap-1.5">
+                                    <div className="grid grid-cols-3 gap-1">
                                         {["1", "2", "3"].map(key => (
                                             <button
                                                 key={key}
                                                 onClick={() => handleNumpadPress(key)}
-                                                className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
                                             >
                                                 {key}
                                             </button>
                                         ))}
                                     </div>
-
-                                    {/* الصف 4: . 0 ⌫ مع مسح الكل */}
-                                    <div className="grid grid-cols-3 gap-1.5">
+                                    <div className="grid grid-cols-3 gap-1">
                                         <button
                                             onClick={() => handleNumpadPress(".")}
-                                            className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+                                            className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
                                         >
                                             .
                                         </button>
                                         <button
                                             onClick={() => handleNumpadPress("0")}
-                                            className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+                                            className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
                                         >
                                             0
                                         </button>
                                         <button
                                             onClick={() => handleNumpadPress("clear")}
-                                            className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-xl font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+                                            className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-lg font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
                                         >
                                             مسح
                                         </button>
@@ -676,23 +923,39 @@ export default function SimpleOrderCreation() {
 
                         {/* العمود الأوسط - العناصر الإضافية */}
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
+                            {/* شريط التقدم للتعديل */}
+                            {editingItemId && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">
+                                    <span className="text-blue-700 text-sm font-medium">
+                                        <Edit className="w-4 h-4 inline ml-1" />
+                                        جاري تعديل العنصر
+                                    </span>
+                                    <button
+                                        onClick={cancelEdit}
+                                        className="text-blue-600 hover:text-blue-800 text-sm font-bold"
+                                    >
+                                        إلغاء
+                                    </button>
+                                </div>
+                            )}
+
                             {!isSelectedMaterialBoard && (
-                                <div className="flex-shrink-0 p-4 border-b-4 border-dashed border-gray-300 ">
-                                    {/* <Label className="font-bold text-base mb-3 block">نوع الطلب</Label> */}
-                                    <div className="grid grid-cols-2  mx-auto gap-4">
+                                <div className="flex-shrink-0 p-3 border-b-2 border-dashed border-gray-300">
+                                    <Label className="font-bold text-sm mb-2 block">نوع الطلب</Label>
+                                    <div className="grid grid-cols-2 gap-3">
                                         {TYPE_OPTIONS.map(t => (
                                             <button
                                                 key={t.value}
                                                 onClick={() => handleFieldChange("type_item", t.value)}
                                                 className={`
-                                                max-w-40 max-h-48 rounded-2xl border-4 text-xl sm:text-2xl font-medium
-                                                transition-all touch-manipulation hover:scale-105 active:scale-95
-                                                flex items-center justify-center p-2
-                                                ${formData.type_item === t.value
+                                                    rounded-xl border-3 text-base font-medium
+                                                    transition-all touch-manipulation hover:scale-105 active:scale-95
+                                                    flex items-center justify-center p-2
+                                                    ${formData.type_item === t.value
                                                         ? "border-primary-f bg-primary-f text-white shadow-lg"
                                                         : "border-gray-300 bg-white hover:border-secondary-s"
                                                     }
-                                            `}
+                                                `}
                                             >
                                                 {t.label}
                                             </button>
@@ -702,26 +965,26 @@ export default function SimpleOrderCreation() {
                             )}
 
                             {formData.material_id && !isSelectedMaterialBoard && (
-                                <div className="flex justify-around items-center p-1 pt-0 border-b-4 border-dashed border-gray-300">
-                                    <Label className="font-bold text-base block">
+                                <div className="p-3 border-b-2 border-dashed border-gray-300">
+                                    <Label className="font-bold text-sm mb-2 block">
                                         العرض
-                                        {loadingWidths && <span className="mr-2 text-gray-500 text-sm">جاري التحميل...</span>}
+                                        {loadingWidths && <span className="mr-2 text-gray-500 text-xs">جاري التحميل...</span>}
                                     </Label>
                                     {widthValues.length > 0 ? (
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-fr">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                             {widthValues.map(w => (
                                                 <button
                                                     key={w.id}
                                                     onClick={() => handleFieldChange("width", w.value)}
                                                     className={`
-                                                    min-w-40 max-h-48 rounded-2xl border-4 text-xl sm:text-2xl font-medium
-                                                    transition-all touch-manipulation hover:scale-105 active:scale-95
-                                                    flex items-center justify-center p-4
-                                                    ${formData.width === w.value
+                                                        rounded-xl border-3 text-base font-medium
+                                                        transition-all touch-manipulation hover:scale-105 active:scale-95
+                                                        flex items-center justify-center p-2
+                                                        ${formData.width === w.value
                                                             ? "border-secondary-s bg-secondary-s text-white shadow-lg"
                                                             : "border-gray-300 bg-white hover:border-secondary-s"
                                                         }
-                                                `}
+                                                    `}
                                                 >
                                                     {w.value}
                                                 </button>
@@ -729,33 +992,33 @@ export default function SimpleOrderCreation() {
                                         </div>
                                     ) : (
                                         !loadingWidths && (
-                                            <div className="text-center p-4 text-gray-400 text-base border-2 border-dashed border-gray-300 rounded-xl">
-                                                لا توجد قيم عرض لهذه المادة
+                                            <div className="text-center p-3 text-gray-400 text-sm border-2 border-dashed border-gray-300 rounded-xl">
+                                                لا توجد قيم عرض
                                             </div>
                                         )
                                     )}
                                 </div>
                             )}
 
-                            <div className="flex justify-center items-center p-1 pt-0 border-b-4 border-dashed border-gray-300">
-                                <Label className="font-bold text-base block">المسطرة</Label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-fr">
+                            <div className="p-3 border-b-2 border-dashed border-gray-300">
+                                <Label className="font-bold text-sm mb-2 block">المسطرة</Label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     {availableRulers.length === 0 ? (
-                                        <span className="text-gray-400 text-base col-span-4 text-center p-4">اختر المادة أولاً</span>
+                                        <span className="text-gray-400 text-sm col-span-3 text-center p-2">اختر المادة أولاً</span>
                                     ) : (
                                         availableRulers.map(r => (
                                             <button
                                                 key={r.ruler_id}
-                                                onClick={() => handleFieldChange("ruler_id", r.ruler_id)}
+                                                onClick={() => handleFieldChange("ruler_id", String(r.ruler_id))}
                                                 className={`
-                                               max-w-40 max-h-48 rounded-2xl border-4 text-xl sm:text-2xl font-medium
-                                                transition-all touch-manipulation hover:scale-105 active:scale-95
-                                                flex items-center justify-center p-2
-                                                ${String(formData.ruler_id) === String(r.ruler_id)
+                                                    rounded-xl border-3 text-base font-medium
+                                                    transition-all touch-manipulation hover:scale-105 active:scale-95
+                                                    flex items-center justify-center p-2
+                                                    ${String(formData.ruler_id) === String(r.ruler_id)
                                                         ? "border-secondary-s bg-secondary-s text-white shadow-lg"
                                                         : "border-gray-300 bg-white hover:border-secondary-s"
                                                     }
-                                            `}
+                                                `}
                                             >
                                                 {r.ruler_name}
                                             </button>
@@ -764,75 +1027,50 @@ export default function SimpleOrderCreation() {
                                 </div>
                             </div>
 
-                            <div className="flex-shrink-0 p-1 border-b-4 border-dashed border-gray-300">
-                                <div className="grid grid-cols-[1fr_140px] gap-4 items-end">
+                            <div className="p-3 border-b-2 border-dashed border-gray-300">
+                                <div className="grid grid-cols-[1fr_100px] gap-3 items-end">
                                     <div>
-                                        <Label className="font-bold text-base block">
+                                        <Label className="font-bold text-sm mb-2 block">
                                             اللون
                                             {numpadMode === "colorSearch" && colorSearchCode && (
-                                                <span className="mr-3 text-secondary-s text-sm">(بحث: {colorSearchCode})</span>
+                                                <span className="mr-2 text-secondary-s text-xs">(بحث: {colorSearchCode})</span>
                                             )}
                                         </Label>
                                         <FilterSelect
-                                            value={formData.color_id}
+                                            value={formData.color_id ? String(formData.color_id) : ""}
                                             onChange={(e) => handleFieldChange("color_id", e.target.value)}
                                             disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
-                                            options={filteredColorsBySearch.map(c => {
-                                                const pricingStatus = getColorPricingStatus(c.color_id);
-                                                return {
-                                                    value: c.color_id,
-                                                    label: `${c.color_name} (${c.color_code})${pricingStatus.label}`
-                                                };
-                                            })}
+                                            options={colorOptions}
                                             placeholder={
                                                 !formData.ruler_id
                                                     ? "اختر المسطرة أولاً"
                                                     : (!isSelectedMaterialBoard && !formData.width)
                                                         ? "اختر العرض أولاً"
-                                                        : filteredColorsBySearch.length === 0
+                                                        : colorOptions.length === 0
                                                             ? "لا توجد ألوان مسعرة"
                                                             : "اختر اللون"
                                             }
-                                            className="w-full text-base p-3 min-h-[50px]"
+                                            className="w-full text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <Label className="font-bold text-base block">الصورة</Label>
-                                        <div className="h-24 border-2 border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden">
+                                        <Label className="font-bold text-sm mb-2 block">الصورة</Label>
+                                        <div className="h-16 border-2 border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden">
                                             {selectedColorImage ? (
                                                 <img src={selectedColorImage} alt="" className="h-full w-full object-cover" />
                                             ) : (
-                                                <span className="text-gray-400 text-sm">لا توجد</span>
+                                                <span className="text-gray-400 text-xs">لا توجد</span>
                                             )}
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* <div className="flex-shrink-0 p-1 border-b-4 border-dashed border-gray-300">
-                                <Label className="font-bold text-base block">رقم الطبخة</Label>
-                                <FilterSelect
-                                    value={formData.batch_id}
-                                    onChange={(e) => handleFieldChange("batch_id", e.target.value)}
-                                    disabled={!isSelectedMaterialBoard && !formData.width}
-                                    options={batches.map(b => ({
-                                        value: b.batch_id,
-                                        label: b.batch_number
-                                    }))}
-                                    placeholder={
-                                        (!isSelectedMaterialBoard && !formData.width)
-                                            ? "اختر العرض أولاً"
-                                            : "اختر الطبخة"
-                                    }
-                                    className="w-full text-base p-3 min-h-[50px]"
-                                />
-                            </div> */}
-
-                            <div className="flex-shrink-0 p-1 border-b-4 border-dashed border-gray-300">
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div className="p-3 border-b-2 border-dashed border-gray-300">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div>
-                                        <Label className="font-bold text-base block">الكمية</Label>
-                                        <div className="flex items-center gap-3">
+                                        <Label className="font-bold text-sm mb-2 block">الكمية</Label>
+                                        <div className="flex items-center gap-2">
                                             <Input
                                                 type="number"
                                                 value={formData.quantity}
@@ -841,72 +1079,228 @@ export default function SimpleOrderCreation() {
                                                     setActiveField("quantity");
                                                     setNumpadMode("quantity");
                                                 }}
-                                                className={`h-14 text-xl text-center font-bold flex-1 ${activeField === "quantity" ? "ring-2 ring-blue-400" : ""}`}
+                                                className={`h-12 text-lg text-center font-bold flex-1 ${
+                                                    activeField === "quantity" ? "ring-2 ring-blue-400" : ""
+                                                }`}
                                                 placeholder="0"
                                             />
-                                            <span className="text-lg font-bold text-gray-600 whitespace-nowrap">متر</span>
+                                            <span className="text-base font-bold text-gray-600 whitespace-nowrap">متر</span>
                                         </div>
-
                                     </div>
                                     
                                     <div>
-                                        <Label className="font-bold text-base mb-3 block">السماكة</Label>
-                                        <div className="flex items-center gap-3">
+                                        <Label className="font-bold text-sm mb-2 block">السماكة</Label>
+                                        <div className="flex items-center gap-2">
                                             <Input
                                                 type="number"
                                                 value={formData.thickness}
-                                                className="h-14 text-lg text-center font-bold flex-1 bg-gray-100"
+                                                className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
                                                 placeholder="0.6"
                                                 step="0.1"
                                                 readOnly
                                             />
-                                            <span className="text-lg font-bold text-gray-600 whitespace-nowrap">مم</span>
+                                            <span className="text-base font-bold text-gray-600 whitespace-nowrap">مم</span>
                                         </div>
                                     </div>
-                                    <div>
-                                        <Label className="font-bold text-base block">رقم الطبخة</Label>
+                                    
+                                    <div className="md:col-span-2">
+                                        <Label className="font-bold text-sm mb-2 block">رقم الطبخة</Label>
                                         <FilterSelect
-                                            value={formData.batch_id}
+                                            value={formData.batch_id ? String(formData.batch_id) : ""}
                                             onChange={(e) => handleFieldChange("batch_id", e.target.value)}
                                             disabled={!isSelectedMaterialBoard && !formData.width}
-                                            options={batches.map(b => ({
-                                                value: b.batch_id,
-                                                label: b.batch_number
-                                            }))}
+                                            options={batchOptions}
                                             placeholder={
                                                 (!isSelectedMaterialBoard && !formData.width)
                                                     ? "اختر العرض أولاً"
-                                                    : "اختر الطبخة"
+                                                    : batchOptions.length === 0
+                                                        ? "لا توجد طبخات"
+                                                        : "اختر الطبخة"
                                             }
-                                            className="w-full text-base p-3 min-h-[50px]"
+                                            className="w-full text-sm"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex-shrink-0 p-4">
-                                <Label className="font-bold text-base mb-3 block">الملاحظات</Label>
+                            <div className="p-3">
+                                <Label className="font-bold text-sm mb-2 block">الملاحظات</Label>
                                 <Input
                                     value={formData.notes}
                                     onChange={(e) => handleFieldChange("notes", e.target.value)}
-                                    placeholder="ملاحظات إضافية..."
-                                    className="h-14 text-base"
+                                    placeholder="ملاحظات إضافية للعنصر..."
+                                    className="h-12 text-sm"
                                 />
                             </div>
 
                             <Button
-                                onClick={addItem}
+                                onClick={addOrUpdateItem}
                                 size="lg"
-                                className="h-14 bg-primary-f hover:bg-secondary-f flex-shrink-0 text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform"
+                                className={`h-12 flex-shrink-0 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${
+                                    editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
+                                }`}
                                 disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
                             >
-                                <Plus className="w-6 h-6 ml-2" />
-                                إضافة للطلب
+                                {editingItemId ? (
+                                    <>
+                                        <Save className="w-5 h-5 ml-2" />
+                                        تحديث العنصر
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="w-5 h-5 ml-2" />
+                                        إضافة للطلب
+                                    </>
+                                )}
                             </Button>
                         </div>
 
                         {/* العمود الأيسر - الجدول */}
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
+                            {/* قسم الزبون */}
+                            <Card className="flex-shrink-0 p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <Label className="font-bold text-sm">الزبون</Label>
+                                    <div className="flex gap-1">
+                                        {CUSTOMER_OPTIONS.map(option => {
+                                            const Icon = option.icon;
+                                            return (
+                                                <button
+                                                    key={option.value}
+                                                    onClick={() => setCustomerOption(option.value)}
+                                                    className={`
+                                                        px-2 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1
+                                                        transition-all touch-manipulation active:scale-95
+                                                        ${customerOption === option.value
+                                                            ? option.value === "none"
+                                                                ? "bg-gray-600 text-white"
+                                                                : option.value === "existing"
+                                                                ? "bg-blue-600 text-white"
+                                                                : "bg-green-600 text-white"
+                                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                        }
+                                                    `}
+                                                    title={option.label}
+                                                >
+                                                    <Icon className="w-3 h-3" />
+                                                    <span className="hidden sm:inline">{option.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {customerOption === "existing" && (
+                                    <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                            <div className="flex-1">
+                                                <FilterSelect
+                                                    value={selectedCustomer ? String(selectedCustomer.customer_id) : ""}
+                                                    onChange={(e) => {
+                                                        const customer = customers.find(c => String(c.customer_id) === e.target.value);
+                                                        setSelectedCustomer(customer || null);
+                                                    }}
+                                                    options={customerOptions}
+                                                    placeholder="اختر الزبون..."
+                                                    className="w-full text-sm"
+                                                />
+                                            </div>
+                                            <Input
+                                                type="text"
+                                                placeholder="بحث..."
+                                                value={customerSearchTerm}
+                                                onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                                                className="w-28 h-10 text-sm"
+                                            />
+                                        </div>
+                                        {selectedCustomer && (
+                                            <div className="bg-blue-50 p-2 rounded-lg text-xs">
+                                                <div className="font-bold">{selectedCustomer.name}</div>
+                                                <div className="text-gray-600">{selectedCustomer.phone} - {selectedCustomer.city || "لا يوجد مدينة"}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {customerOption === "new" && (
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Input
+                                                type="text"
+                                                placeholder="الاسم *"
+                                                value={newCustomer.name}
+                                                onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                                                className="h-10 text-sm"
+                                            />
+                                            <Input
+                                                type="text"
+                                                placeholder="رقم الهاتف *"
+                                                value={newCustomer.phone}
+                                                onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                                                className="h-10 text-sm"
+                                            />
+                                            <Input
+                                                type="text"
+                                                placeholder="المدينة"
+                                                value={newCustomer.city}
+                                                onChange={(e) => setNewCustomer({...newCustomer, city: e.target.value})}
+                                                className="h-10 text-sm"
+                                            />
+                                            <Input
+                                                type="text"
+                                                placeholder="العنوان"
+                                                value={newCustomer.address}
+                                                onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})}
+                                                className="h-10 text-sm"
+                                            />
+                                            <div className="col-span-2">
+                                                <Input
+                                                    type="text"
+                                                    placeholder="ملاحظات (اختياري)"
+                                                    value={newCustomer.notes}
+                                                    onChange={(e) => setNewCustomer({...newCustomer, notes: e.target.value})}
+                                                    className="h-10 text-sm w-full"
+                                                />
+                                            </div>
+                                        </div>
+                                        
+                                        {/* معاينة الرقم المنسق */}
+                                        {newCustomer.phone && (
+                                            <div className="text-xs text-green-600 bg-green-50 p-2 rounded-lg">
+                                                <span className="font-bold">الرقم بعد التنسيق:</span> {formatPhoneNumber(newCustomer.phone)}
+                                            </div>
+                                        )}
+                                        
+                                        <div className="flex gap-2 text-xs text-gray-500">
+                                            <span className="bg-gray-100 px-2 py-1 rounded">النوع: زبون</span>
+                                            <span className="bg-gray-100 px-2 py-1 rounded">نشط: نعم</span>
+                                        </div>
+                                        
+                                        <Button
+                                            onClick={handleCreateCustomer}
+                                            disabled={!newCustomer.name || !newCustomer.phone || loading}
+                                            className="w-full h-9 bg-green-600 hover:bg-green-700 text-white text-sm"
+                                        >
+                                            {loading ? (
+                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <UserPlus className="w-4 h-4 ml-1" />
+                                                    إنشاء الزبون
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {customerOption === "none" && (
+                                    <div className="bg-gray-50 p-2 rounded-lg text-center text-gray-500 text-sm">
+                                        <UserX className="w-5 h-5 mx-auto mb-1 opacity-50" />
+                                        الطلب بدون زبون
+                                    </div>
+                                )}
+                            </Card>
+
                             {showPreview && orderItems.length > 0 && (
                                 <StyledDialog
                                     isOpen={showPreview}
@@ -919,92 +1313,195 @@ export default function SimpleOrderCreation() {
                                     confirmVariant="default"
                                     isLoading={loading}
                                 >
-                                    <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                                        <div className="bg-gray-50 rounded-lg p-2">عدد العناصر: <span className="font-bold">{orderItems.length}</span></div>
-                                        <div className="bg-gray-50 rounded-lg p-2">إجمالي الكمية: <span className="font-bold">{totalPreviewQuantity}</span></div>
-                                    </div>
-                                    <div className="max-h-64 overflow-y-auto border rounded-lg">
-                                        <table className="w-full table-fixed border-collapse text-sm">
-                                            <thead className="bg-gray-100 sticky top-0">
-                                                <tr>
-                                                    <th className="p-2 text-right border-b break-words">المادة</th>
-                                                    <th className="p-2 text-right border-b break-words">المسطرة</th>
-                                                    <th className="p-2 text-right border-b break-words">اللون</th>
-                                                    <th className="p-2 text-center border-b break-words">الأبعاد</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {orderItems.map(item => (
-                                                    <tr key={item.id} className="border-b">
-                                                        <td className="p-2 break-words">{item.material_name}</td>
-                                                        <td className="p-2 break-words">{item.ruler_name}</td>
-                                                        <td className="p-2 break-words">{item.color_name}</td>
-                                                        <td className="p-2 text-center break-words">
-                                                            {(item.width || "-")}x{(item.thickness || "0.6")}x{(item.quantity || "-")}
-                                                        </td>
+                                    <div className="space-y-3">
+                                        {/* معلومات الزبون في المعاينة */}
+                                        {customerOption === "existing" && selectedCustomer && (
+                                            <div className="bg-blue-50 p-2 rounded-lg">
+                                                <div className="text-xs text-blue-600 font-bold">الزبون:</div>
+                                                <div className="text-sm">{customerApi.formatCustomerInfo(selectedCustomer)}</div>
+                                            </div>
+                                        )}
+                                        {customerOption === "new" && newCustomer.name && (
+                                            <div className="bg-green-50 p-2 rounded-lg">
+                                                <div className="text-xs text-green-600 font-bold">زبون جديد:</div>
+                                                <div className="text-sm">{newCustomer.name} - {formatPhoneNumber(newCustomer.phone)}</div>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                            <div className="bg-gray-50 rounded-lg p-2">
+                                                عدد العناصر: <span className="font-bold">{orderItems.length}</span>
+                                            </div>
+                                            <div className="bg-gray-50 rounded-lg p-2">
+                                                إجمالي الكمية: <span className="font-bold">{totalPreviewQuantity} م</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="max-h-64 overflow-y-auto border rounded-lg">
+                                            <table className="w-full text-sm">
+                                                <thead className="bg-gray-100 sticky top-0">
+                                                    <tr>
+                                                        <th className="p-2 text-right border-b">المادة</th>
+                                                        <th className="p-2 text-right border-b">المسطرة</th>
+                                                        <th className="p-2 text-right border-b">اللون</th>
+                                                        <th className="p-2 text-center border-b">النوع</th>
+                                                        <th className="p-2 text-center border-b">الكمية</th>
+                                                        <th className="p-2 text-center border-b">السماكة</th>
+                                                        <th className="p-2 text-center border-b">الطبخة</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody>
+                                                    {orderItems.map(item => (
+                                                        <tr key={item.id} className="border-b">
+                                                            <td className="p-2">{item.material_name}</td>
+                                                            <td className="p-2">{item.ruler_name}</td>
+                                                            <td className="p-2">{item.color_name}</td>
+                                                            <td className="p-2 text-center">
+                                                                {item.type_item === TypeItem.Machine ? "مكنة" : "كوي"}
+                                                            </td>
+                                                            <td className="p-2 text-center font-bold">{item.quantity} م</td>
+                                                            <td className="p-2 text-center">{item.thickness || "0.6"}</td>
+                                                            <td className="p-2 text-center">{item.batch_number || "-"}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </StyledDialog>
                             )}
+                            
                             <Card className="flex flex-col h-full min-h-0 overflow-hidden">
-                                {/* رأس الجدول - ثابت */}
-                                <div className="flex justify-between items-center p-3 border-b bg-gray-50 flex-shrink-0">
-                                    <span className="font-bold text-base">العناصر المضافة: {orderItems.length}</span>
-                                    <Button
-                                        size="lg"
-                                        onClick={() => setShowPreview(true)}
-                                        disabled={loading || orderItems.length === 0}
-                                        className="h-12 bg-secondary-s hover:brightness-110 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
-                                    >
-                                        <Check className="w-5 h-5 ml-2" />
-                                        حفظ الطلب
-                                    </Button>
+                                {/* رأس الجدول مع أزرار التحكم */}
+                                <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-sm">العناصر: {orderItems.length}</span>
+                                        {orderItems.length > 0 && (
+                                            <>
+                                                <button
+                                                    onClick={clearAllItems}
+                                                    className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
+                                                    title="مسح الكل"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                                <div className="flex gap-1 mr-2">
+                                                    <button
+                                                        onClick={() => scrollTable('right')}
+                                                        className="bg-gray-200 hover:bg-gray-300 p-1 rounded touch-manipulation"
+                                                        title="التمرير لليسار"
+                                                    >
+                                                        <ChevronRight className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => scrollTable('left')}
+                                                        className="bg-gray-200 hover:bg-gray-300 p-1 rounded touch-manipulation"
+                                                        title="التمرير لليمين"
+                                                    >
+                                                        <ChevronLeft className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="bg-green-50 px-2 py-1 rounded-lg text-xs">
+                                            إجمالي: <span className="font-bold text-primary-f">{totalPreviewQuantity} م</span>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setShowPreview(true)}
+                                            disabled={loading || orderItems.length === 0}
+                                            className="h-8 bg-secondary-s hover:brightness-110 text-xs px-3 text-white touch-manipulation active:scale-95 transition-transform"
+                                        >
+                                            {loading ? (
+                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Check className="w-3 h-3 ml-1" />
+                                                    حفظ
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
                                 </div>
 
-                                {/* الجدول مع التمرير العمودي فقط */}
-                                <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
-                                    <table className="w-full table-fixed border-collapse">
+                                {/* الجدول مع التمرير الأفقي والعمودي */}
+                                <div 
+                                    ref={tableContainerRef}
+                                    className="flex-1 overflow-auto min-h-0"
+                                    style={{ direction: 'rtl' }}
+                                >
+                                    <table className="min-w-[1300px] w-full table-fixed border-collapse">
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
-                                                <th className="p-1 text-sm text-right border-b break-words">المادة</th>
-                                                <th className="p-1 text-sm text-right border-b break-words">المسطرة</th>
-                                                <th className="p-1 text-sm text-right border-b break-words">اللون</th>
-                                                <th className="p-1 text-sm text-right border-b break-words">النوع</th>
-                                                <th className="p-1 text-sm text-right border-b break-words">العرض</th>
-                                                <th className="p-1 text-sm text-right border-b break-words">السماكة</th>
-                                                <th className="p-1 text-sm text-right border-b break-words">الكمية</th>
-                                                <th className="p-1 text-sm text-right border-b break-words">حذف</th>
+                                                <th className="p-2 text-right border-b w-[150px]">المادة</th>
+                                                <th className="p-2 text-right border-b w-[120px]">المسطرة</th>
+                                                <th className="p-2 text-right border-b w-[150px]">اللون</th>
+                                                <th className="p-2 text-center border-b w-[80px]">النوع</th>
+                                                <th className="p-2 text-center border-b w-[100px]">الكمية</th>
+                                                <th className="p-2 text-center border-b w-[90px]">السماكة</th>
+                                                <th className="p-2 text-center border-b w-[120px]">رقم الطبخة</th>
+                                                <th className="p-2 text-center border-b w-[100px]">الإجراءات</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {orderItems.map(item => (
-                                                <tr key={item.id} className="border-b hover:bg-gray-50">
-                                                    <td className="p-3 break-words">{item.material_name}</td>
-                                                    <td className="p-3 break-words">{item.ruler_name}</td>
-                                                    <td className="p-3 break-words">{item.color_name}</td>
-                                                    <td className="p-3 text-center break-words">
-                                                        {item.type_item === "Machine" ? "مكنة" : "كوي"}
+                                                <tr 
+                                                    key={item.id} 
+                                                    className={`border-b hover:bg-gray-50 cursor-pointer transition-colors ${
+                                                        editingItemId === item.id ? 'bg-blue-50 border-blue-300' : ''
+                                                    }`}
+                                                    onClick={() => handleEditItem(item)}
+                                                >
+                                                    <td className="p-2 break-words text-sm" title={item.material_name}>
+                                                        {item.material_name}
                                                     </td>
-                                                    <td className="p-3 text-center break-words">{item.width || "-"}</td>
-                                                    <td className="p-3 text-center break-words">{item.thickness || "0.6"}</td>
-                                                    <td className="p-3 text-center font-bold break-words">{item.quantity} م</td>
-                                                    <td className="p-3 text-center">
-                                                        <button
-                                                            onClick={() => removeItem(item.id)}
-                                                            className="text-red-600 hover:bg-red-50 p-2 rounded-lg touch-manipulation active:scale-95 transition-transform"
-                                                        >
-                                                            <Trash2 className="w-5 h-5" />
-                                                        </button>
+                                                    <td className="p-2 break-words text-sm" title={item.ruler_name}>
+                                                        {item.ruler_name}
+                                                    </td>
+                                                    <td className="p-2 break-words text-sm" title={item.color_name}>
+                                                        {item.color_name}
+                                                    </td>
+                                                    <td className="p-2 text-center text-sm">
+                                                        {item.type_item === TypeItem.Machine ? "مكنة" : "كوي"}
+                                                    </td>
+                                                    <td className="p-2 text-center font-bold text-sm">
+                                                        {item.quantity} م
+                                                    </td>
+                                                    <td className="p-2 text-center text-sm">
+                                                        {item.thickness || "0.6"} مم
+                                                    </td>
+                                                    <td className="p-2 text-center text-sm" title={item.batch_number}>
+                                                        {item.batch_number || "-"}
+                                                    </td>
+                                                    <td className="p-2 text-center">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            {editingItemId === item.id && (
+                                                                <span className="text-blue-600 text-xs ml-1">
+                                                                    <Edit className="w-3 h-3 inline" />
+                                                                </span>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    removeItem(item.id);
+                                                                }}
+                                                                className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
+                                                                title="حذف"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
                                             {orderItems.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="8" className="p-8 text-center text-gray-400 text-base">
-                                                        لا توجد عناصر مضافة
+                                                    <td colSpan="8" className="p-8 text-center text-gray-400">
+                                                        <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                        <span className="text-sm">لا توجد عناصر مضافة</span>
+                                                        <p className="text-xs mt-1">اضغط على العناصر في اليمين لإضافتها</p>
                                                     </td>
                                                 </tr>
                                             )}
@@ -1016,70 +1513,101 @@ export default function SimpleOrderCreation() {
                     </div>
                 ) : (
                     /* وضع السجل */
-                    <Card className="flex flex-col h-full min-h-0 overflow-hidden p-4">
-                        <div className="flex justify-between items-center mb-3 flex-shrink-0">
-                            <h2 className="font-bold text-xl">سجل الطلبات</h2>
+                    <Card className="flex flex-col h-full min-h-0 overflow-hidden p-3">
+                        <div className="flex justify-between items-center mb-2 flex-shrink-0">
+                            <h2 className="font-bold text-lg">سجل الطلبات</h2>
                             <Button
-                                size="lg"
+                                size="sm"
                                 variant="outline"
                                 onClick={loadOrders}
                                 disabled={ordersLoading}
-                                className="px-6 py-3 text-base bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
+                                className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
                             >
-                                <RotateCcw className="w-5 h-5 ml-2" />
+                                <RotateCcw className="w-4 h-4 ml-1" />
                                 تحديث
                             </Button>
                         </div>
 
-                        {/* جدول السجل مع التمرير العمودي فقط */}
-                        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 border rounded-lg bg-white">
-                            <table className="w-full table-fixed border-collapse">
-                                <thead className="bg-gray-100 sticky top-0">
+                        {/* جدول السجل مع التمرير */}
+                        <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
+                            <table className="min-w-[1400px] w-full table-fixed border-collapse">
+                                <thead className="bg-gray-100 sticky top-0 z-20">
                                     <tr>
-                                        <th className="p-3 text-right border-b break-words">#</th>
-                                        <th className="p-3 text-right border-b break-words">التاريخ</th>
-                                        <th className="p-3 text-center border-b break-words">عدد العناصر</th>
-                                        <th className="p-3 text-center border-b break-words">الإجمالي</th>
-                                        <th className="p-3 text-center border-b break-words">المبيعات</th>
-                                        <th className="p-3 text-center border-b break-words">الزبون</th>
-                                        <th className="p-3 text-center border-b break-words">ملاحظات</th>
-                                        <th className="p-3 text-center border-b break-words">الحالة</th>
-                                        <th className="p-3 text-center border-b break-words">عرض</th>
+                                        <th className="p-2 text-right border-b w-16">#</th>
+                                        <th className="p-2 text-right border-b w-28">التاريخ</th>
+                                        <th className="p-2 text-center border-b w-20">العناصر</th>
+                                        <th className="p-2 text-center border-b w-28">الإجمالي</th>
+                                        <th className="p-2 text-center border-b w-28">المبيعات</th>
+                                        <th className="p-2 text-center border-b w-40">الزبون</th>
+                                        <th className="p-2 text-center border-b w-32">ملاحظات</th>
+                                        <th className="p-2 text-center border-b w-24">الحالة</th>
+                                        <th className="p-2 text-center border-b w-20">عرض</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {ordersLoading ? (
                                         <tr><td colSpan="9" className="p-6"><LoadingState /></td></tr>
-                                    ) : orders.map(order => (
-                                        <tr key={order.order_id} className="border-b hover:bg-gray-50">
-                                            <td className="p-3 break-words">{order.order_id}</td>
-                                            <td className="p-3 break-words">{order.created_at?.split("T")[0]}</td>
-                                            <td className="p-3 text-center break-words">{order.count_items ?? order.items?.length ?? 0}</td>
-                                            <td className="p-3 text-center break-words">{order.total_amount ?? "-"}</td>
-                                            <td className="p-3 text-center break-words">{order.sales?.full_name || order.sales?.username || "-"}</td>
-                                            <td className="p-3 text-center break-words">{order.customer?.name || "-"}</td>
-                                            <td className="p-3 text-center break-words">{order.notes || "-"}</td>
-                                            <td className="p-3 text-center break-words">
-                                                <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-sm">
-                                                    {getStatusLabel(order.status)}
-                                                </span>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <Button
-                                                    size="lg"
-                                                    variant="outline"
-                                                    className="h-10 px-3 touch-manipulation active:scale-95 transition-transform"
-                                                    onClick={() => setSelectedOrder(order)}
-                                                >
-                                                    <Eye className="w-4 h-4" />
-                                                </Button>
+                                    ) : orders.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="9" className="p-8 text-center text-gray-400">
+                                                <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                لا توجد طلبات
                                             </td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        orders.map(order => {
+                                            const statusBadge = getStatusBadge(order.status);
+                                            return (
+                                                <tr key={order.order_id} className="border-b hover:bg-gray-50">
+                                                    <td className="p-2 font-medium text-sm">#{order.order_id}</td>
+                                                    <td className="p-2 text-sm">{getFormattedDate(order)}</td>
+                                                    <td className="p-2 text-center">
+                                                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+                                                            {order.count_items ?? order.items?.length ?? 0}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-2 text-center font-bold text-primary-f text-sm">
+                                                        {formatCurrency(order.total_amount)}
+                                                    </td>
+                                                    <td className="p-2 text-center text-sm">{getSalesUserName(order)}</td>
+                                                    <td className="p-2 text-center">
+                                                        {order.customer ? (
+                                                            <div className="text-sm">
+                                                                <div className="font-medium">{order.customer.name}</div>
+                                                                <div className="text-gray-500 text-xs">{order.customer.phone}</div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-400 text-xs">بدون زبون</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
+                                                        {order.notes || "-"}
+                                                    </td>
+                                                    <td className="p-2 text-center">
+                                                        <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
+                                                            {statusBadge.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-2 text-center">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-8 px-2 text-xs touch-manipulation active:scale-95 transition-transform hover:bg-primary-f hover:text-white"
+                                                            onClick={() => setSelectedOrder(order)}
+                                                        >
+                                                            <Eye className="w-3 h-3 ml-1" />
+                                                            عرض
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
                                 </tbody>
                             </table>
                         </div>
 
+                        {/* نافذة تفاصيل الطلب */}
                         {selectedOrder && (
                             <StyledDialog
                                 isOpen={Boolean(selectedOrder)}
@@ -1089,23 +1617,105 @@ export default function SimpleOrderCreation() {
                                 cancelLabel="إغلاق"
                                 showFooter={false}
                             >
-                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-                                    <div className="bg-white p-2 rounded-lg border">الحالة: {getStatusLabel(selectedOrder.status)}</div>
-                                    <div className="bg-white p-2 rounded-lg border">الإجمالي: {selectedOrder.total_amount || "-"}</div>
-                                    <div className="bg-white p-2 rounded-lg border">عدد العناصر: {selectedOrder.count_items ?? selectedOrder.items?.length ?? 0}</div>
-                                    <div className="bg-white p-2 rounded-lg border">المبيعات: {selectedOrder.sales?.full_name || selectedOrder.sales?.username || "-"}</div>
-                                    <div className="bg-white p-2 rounded-lg border">الزبون: {selectedOrder.customer?.name || "-"}</div>
-                                    <div className="bg-white p-2 rounded-lg border">ملاحظات: {selectedOrder.notes || "-"}</div>
-                                </div>
-                                {selectedOrder.items?.length > 0 && (
-                                    <div className="mt-3 grid grid-cols-2 gap-2 text-base">
-                                        {selectedOrder.items.map((item, i) => (
-                                            <div key={i} className="bg-white p-2 rounded-lg border whitespace-nowrap overflow-hidden text-ellipsis">
-                                                {item.type_item === "Machine" ? "مكنة" : "كوي"} | {item.width || "-"} | {item.quantity} م
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                                        <div className="bg-gray-50 p-2 rounded-lg border">
+                                            <div className="text-xs text-gray-500">الحالة</div>
+                                            <div className="font-bold mt-0.5">
+                                                <span className={`px-2 py-0.5 rounded-lg text-xs ${getStatusBadge(selectedOrder.status).className}`}>
+                                                    {getStatusBadge(selectedOrder.status).label}
+                                                </span>
                                             </div>
-                                        ))}
+                                        </div>
+                                        
+                                        <div className="bg-gray-50 p-2 rounded-lg border">
+                                            <div className="text-xs text-gray-500">الإجمالي</div>
+                                            <div className="font-bold mt-0.5 text-base text-primary-f">
+                                                {formatCurrency(selectedOrder.total_amount)}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-gray-50 p-2 rounded-lg border">
+                                            <div className="text-xs text-gray-500">عدد العناصر</div>
+                                            <div className="font-bold mt-0.5 text-base">
+                                                {orderApi.getItemCount(selectedOrder)}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-gray-50 p-2 rounded-lg border col-span-2">
+                                            <div className="text-xs text-gray-500">الزبون</div>
+                                            <div className="font-bold mt-0.5 text-sm">
+                                                {selectedOrder.customer ? 
+                                                    customerApi.formatCustomerInfo(selectedOrder.customer) : 
+                                                    "بدون زبون"
+                                                }
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-gray-50 p-2 rounded-lg border">
+                                            <div className="text-xs text-gray-500">المبيعات</div>
+                                            <div className="font-bold mt-0.5 text-sm">
+                                                {getSalesUserName(selectedOrder)}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-gray-50 p-2 rounded-lg border col-span-3">
+                                            <div className="text-xs text-gray-500">ملاحظات</div>
+                                            <div className="mt-0.5 text-sm">
+                                                {selectedOrder.notes || "لا توجد ملاحظات"}
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
+
+                                    {selectedOrder.items?.length > 0 && (
+                                        <div>
+                                            <h4 className="font-bold mb-2 text-sm">عناصر الطلب</h4>
+                                            <div className="border rounded-lg overflow-x-auto">
+                                                <table className="min-w-[800px] w-full text-sm">
+                                                    <thead className="bg-gray-100">
+                                                        <tr>
+                                                            <th className="p-2 text-right">المنتج</th>
+                                                            <th className="p-2 text-center">النوع</th>
+                                                            <th className="p-2 text-center">الأبعاد</th>
+                                                            <th className="p-2 text-center">الكمية</th>
+                                                            <th className="p-2 text-center">السعر</th>
+                                                            <th className="p-2 text-center">الإجمالي</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedOrder.items.map((item, i) => (
+                                                            <tr key={i} className="border-t">
+                                                                <td className="p-2">
+                                                                    <div>{item.material_name || "غير محدد"}</div>
+                                                                    <div className="text-xs text-gray-500">{item.color_name || ""}</div>
+                                                                </td>
+                                                                <td className="p-2 text-center">
+                                                                    {item.type_item === TypeItem.Machine ? "مكنة" : "كوي"}
+                                                                </td>
+                                                                <td className="p-2 text-center">
+                                                                    {item.width || "-"}x{item.thickness || "0.6"}
+                                                                </td>
+                                                                <td className="p-2 text-center font-bold">{item.quantity} م</td>
+                                                                <td className="p-2 text-center">{formatCurrency(item.price)}</td>
+                                                                <td className="p-2 text-center font-bold text-primary-f">
+                                                                    {formatCurrency(item.subtotal)}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                    <tfoot className="bg-gray-50 font-bold">
+                                                        <tr>
+                                                            <td colSpan="5" className="p-2 text-left">المجموع الكلي:</td>
+                                                            <td className="p-2 text-center text-primary-f">
+                                                                {formatCurrency(calculateOrderTotal(selectedOrder.items))}
+                                                            </td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </StyledDialog>
                         )}
                     </Card>
@@ -1113,6 +1723,1129 @@ export default function SimpleOrderCreation() {
             </div>
         </div>
     );
+}
+// // src/pages/Sales/SimpleOrderCreation.jsx
+// import { useState, useEffect, useMemo } from "react";
+// import { useNavigate } from "react-router-dom";
+// import { orderApi } from "../../api/orderApi";
+// import { materialApi } from "../../api/materialApi";
+// import { rulerApi } from "../../api/rulerApi";
+// import { colorApi } from "../../api/colorApi";
+// import { batchApi } from "../../api/batchApi";
+// import { priceColorApi } from "../../api/priceColorApi";
+// import { constantApi } from "../../api/constantApi";
+// import { Card } from "../../components/ui/card";
+// import { Button } from "../../components/ui/button";
+// import FilterSelect from "../../components/common/FilterSelect";
+// import StyledDialog from "../../components/common/StyledDialog";
+// import { Label } from "../../components/ui/label";
+// import { Input } from "../../components/ui/input";
+// import {
+//     ShoppingCart,
+//     Plus,
+//     History,
+//     Trash2,
+//     Eye,
+//     RotateCcw,
+//     Check,
+//     User,
+//     Users,
+//     LogIn,
+//     EyeOff,
+//     Home
+// } from "lucide-react";
+// import LoadingState from "../../components/common/LoadingState";
+// import { getApiData } from "../../utils/api";
+// import toast from "react-hot-toast";
+
+// export default function SimpleOrderCreation() {
+//     const navigate = useNavigate();
+//     const [viewMode, setViewMode] = useState("create");
+//     const [loading, setLoading] = useState(false);
+//     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+//     const [showPreview, setShowPreview] = useState(false);
+
+//     // Data
+//     const [materials, setMaterials] = useState([]);
+//     const [rulers, setRulers] = useState([]);
+//     const [colors, setColors] = useState([]);
+//     const [batches, setBatches] = useState([]);
+//     const [priceColors, setPriceColors] = useState([]);
+//     const [widthValues, setWidthValues] = useState([]); // قيم العرض حسب المادة
+//     const [loadingWidths, setLoadingWidths] = useState(false); // حالة تحميل قيم العرض
+
+//     // Form State
+//     const [formData, setFormData] = useState({
+//         material_id: "",
+//         type_item: "Machine",
+//         ruler_id: "",
+//         color_id: "",
+//         batch_id: "",
+//         width: "",
+//         thickness: "0.6",
+//         quantity: "",
+//         notes: ""
+//     });
+
+//     const [orderItems, setOrderItems] = useState([]);
+//     const [orders, setOrders] = useState([]);
+//     const [ordersLoading, setOrdersLoading] = useState(false);
+//     const [selectedOrder, setSelectedOrder] = useState(null);
+
+//     // Numpad
+//     const [numpadMode, setNumpadMode] = useState("quantity");
+//     const [colorSearchCode, setColorSearchCode] = useState("");
+//     const [activeField, setActiveField] = useState("quantity");
+
+//     const TYPE_OPTIONS = [
+//         { value: "Machine", label: "مكنة" },
+//         { value: "Presser", label: "كوي" }
+//     ];
+//     const PRICE_BY_TO_WIDTH = {
+//         isByMeter22: 22,
+//         isByMeter44: 44,
+//         isByMeter66: 66,
+//     };
+//     const getWidthFromPriceBy = (priceBy) => PRICE_BY_TO_WIDTH[priceBy] ?? null;
+//     const totalPreviewQuantity = useMemo(() => {
+//         return orderItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+//     }, [orderItems]);
+//     const getStatusLabel = (status) => {
+//         const key = String(status || "").toLowerCase();
+//         if (key === "pending") return "معلق";
+//         if (key === "completed") return "مكتمل";
+//         if (key === "cancelled" || key === "canceled") return "ملغي";
+//         if (key === "processing") return "قيد المعالجة";
+//         if (key === "draft") return "مسودة";
+//         return status || "-";
+//     };
+
+
+//     // Load initial data
+//     useEffect(() => {
+//         loadInitialData();
+//     }, []);
+
+//     useEffect(() => {
+//         if (viewMode === "history") loadOrders();
+//     }, [viewMode]);
+
+//     // Load width values when material changes
+//     useEffect(() => {
+//         if (formData.material_id) {
+//             loadWidthValues(formData.material_id);
+//         } else {
+//             setWidthValues([]);
+//         }
+//     }, [formData.material_id]);
+
+//     const loadInitialData = async () => {
+//         try {
+//             const [matRes, rulerRes, colorRes, batchRes, priceRes] = await Promise.all([
+//                 materialApi.getMaterials(),
+//                 rulerApi.getRulers(),
+//                 colorApi.getColors(),
+//                 batchApi.getBatches(),
+//                 priceColorApi.getPriceColors(),
+//             ]);
+
+//             setMaterials(getApiData(matRes, []) || []);
+//             setRulers(getApiData(rulerRes, []) || []);
+//             setColors(getApiData(colorRes, []) || []);
+//             setBatches(getApiData(batchRes, []) || []);
+//             setPriceColors(getApiData(priceRes, []) || []);
+
+//         } catch (error) {
+//             toast.error("فشل في تحميل البيانات");
+//         }
+//     };
+
+//     // جلب قيم العرض حسب المادة
+//     const loadWidthValues = async (materialId) => {
+//         try {
+//             setLoadingWidths(true);
+//             const response = await constantApi.getConstantValuesByMaterial(materialId, 'width');
+//             const widthData = getApiData(response, []);
+//             setWidthValues(widthData);
+
+//             // إعادة تعيين العرض المحدد عند تغيير المادة
+//             setFormData(prev => ({ ...prev, width: "" }));
+//         } catch (error) {
+//             toast.error("فشل في تحميل قيم العرض");
+//             setWidthValues([]);
+//         } finally {
+//             setLoadingWidths(false);
+//         }
+//     };
+
+//     const loadOrders = async () => {
+//         try {
+//             setOrdersLoading(true);
+//             const response = await orderApi.getOrders();
+//             setOrders(getApiData(response, []) || []);
+//         } catch {
+//             toast.error("فشل في تحميل الطلبات");
+//         } finally {
+//             setOrdersLoading(false);
+//         }
+//     };
+
+//     // التحقق مما إذا كانت المادة المحددة تحتوي على كلمة "لوح" أو مشتقاتها
+//     const isSelectedMaterialBoard = useMemo(() => {
+//         if (!formData.material_id) return false;
+//         const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
+//         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
+
+//         // التحقق من الكلمات المختلفة للواح
+//         const boardKeywords = ["لوح", "ألواح", "board", "boards", "لوحة", "الواح"];
+//         return boardKeywords.some(keyword => materialName.includes(keyword));
+//     }, [formData.material_id, materials]);
+
+//     // Filters
+//     const availableRulers = useMemo(() => {
+//         if (!formData.material_id) return [];
+//         return rulers.filter(r => String(r.material_id) === String(formData.material_id));
+//     }, [formData.material_id, rulers]);
+
+//     const availableColors = useMemo(() => {
+//         if (!formData.ruler_id) return [];
+//         return colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
+//     }, [formData.ruler_id, colors]);
+
+//     // فلترة الألوان المتاحة مع استبعاد غير المسعرة
+//     const availablePricedColors = useMemo(() => {
+//         if (!formData.ruler_id) return [];
+
+//         const filteredColors = colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
+
+//         if (!priceColors || priceColors.length === 0) {
+//             return filteredColors;
+//         }
+
+//         console.log("=== DEBUG PRICING ===");
+//         console.log("formData:", formData);
+//         console.log("filteredColors:", filteredColors);
+//         console.log("priceColors:", priceColors);
+
+//         if (isSelectedMaterialBoard) {
+//             // للمواد اللوحية: تحقق من المسطرة والنوع فقط
+//             return filteredColors.filter(color =>
+//                 priceColors.some(pc =>
+//                     String(pc.color_id) === String(color.color_id) &&
+//                     pc.type_item === formData.type_item
+//                 )
+//             );
+//         }
+
+//         if (!formData.width) return [];
+//         const targetWidth = Number(formData.width);
+
+//         const result = filteredColors.filter(color => {
+//             const hasPricing = priceColors.some(pc =>
+//                 String(pc.color_id) === String(color.color_id) &&
+//                 pc.type_item === formData.type_item &&
+//                 (pc.price_color_By === `isByMeter${targetWidth}` || pc.price_color_By === 'isByBlanck')
+//             );
+
+//             console.log(`Color ${color.color_name} (${color.color_id}):`, {
+//                 hasPricing,
+//                 colorId: color.color_id,
+//                 typeItem: formData.type_item,
+//                 width: targetWidth,
+//                 matchingPrices: priceColors.filter(pc =>
+//                     String(pc.color_id) === String(color.color_id) &&
+//                     pc.type_item === formData.type_item
+//                 )
+//             });
+
+//             return hasPricing;
+//         });
+
+//         console.log("Final result:", result);
+//         console.log("=== END DEBUG ===");
+//         return result;
+//     }, [formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, colors, priceColors]);
+
+//     const filteredColorsBySearch = useMemo(() => {
+//         if (!colorSearchCode || numpadMode !== "colorSearch") return availablePricedColors;
+//         return availablePricedColors.filter(c =>
+//             c.color_code?.toLowerCase().includes(colorSearchCode.toLowerCase())
+//         );
+//     }, [colorSearchCode, availablePricedColors, numpadMode]);
+
+//     const selectedColorImage = useMemo(() => {
+//         const color = colors.find(c => String(c.color_id) === String(formData.color_id));
+//         return color?.imageUrl || color?.image_url || color?.color_image || null;
+//     }, [formData.color_id, colors]);
+
+//     // التحقق مما إذا كان اللون مسعرًا للمسطرة والعرض المحددين
+//     const isColorPriced = useMemo(() => {
+//         if (!formData.color_id || !formData.ruler_id) return false;
+
+//         if (!priceColors || priceColors.length === 0) {
+//             return true;
+//         }
+
+//         if (isSelectedMaterialBoard) {
+//             // للمواد اللوحية: تحقق من المسطرة والنوع فقط
+//             return priceColors.some(pc =>
+//                 String(pc.color_id) === String(formData.color_id) &&
+//                 pc.type_item === formData.type_item
+//             );
+//         }
+
+//         if (!formData.width) return false;
+//         const targetWidth = Number(formData.width);
+
+//         return priceColors.some(pc =>
+//             String(pc.color_id) === String(formData.color_id) &&
+//             pc.type_item === formData.type_item &&
+//             (pc.price_color_By === `isByMeter${targetWidth}` || pc.price_color_By === 'isByBlanck')
+//         );
+//     }, [formData.color_id, formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, priceColors]);
+
+//     const getColorPricingStatus = (colorId) => {
+//         if (!priceColors || priceColors.length === 0) return { priced: true, label: "" };
+
+//         if (isSelectedMaterialBoard) {
+//             const isPriced = priceColors.some(pc =>
+//                 String(pc.color_id) === String(colorId) &&
+//                 pc.type_item === formData.type_item
+//             );
+//             return { priced: isPriced, label: "" };
+//         }
+
+//         if (!formData.width) return { priced: false, label: " (اختر العرض)" };
+
+//         const targetWidth = Number(formData.width);
+//         const isPriced = priceColors.some(pc =>
+//             String(pc.color_id) === String(colorId) &&
+//             pc.type_item === formData.type_item &&
+//             (pc.price_color_By === `isByMeter${targetWidth}` || pc.price_color_By === 'isByBlanck')
+//         );
+//         return { priced: isPriced, label: "" };
+//     };
+
+//     const handleFieldChange = (field, value) => {
+//         setFormData(prev => {
+//             const newData = { ...prev, [field]: value };
+
+//             if (field === "material_id") {
+//                 newData.ruler_id = "";
+//                 newData.color_id = "";
+//                 newData.width = "";
+//             } else if (field === "ruler_id") {
+//                 newData.color_id = "";
+//             } else if (field === "width") {
+//                 newData.color_id = "";
+//             } else if (field === "type_item") {
+//                 newData.color_id = "";
+//             }
+
+//             return newData;
+//         });
+//     };
+
+//     const handleNumpadPress = (val) => {
+//         if (numpadMode === "colorSearch") {
+//             let search = colorSearchCode;
+//             if (val === "clear") search = "";
+//             else if (val === "back") search = search.slice(0, -1);
+//             else search = search + val;
+
+//             setColorSearchCode(search);
+
+//             const matched = availablePricedColors.find(c => c.color_code === search);
+//             if (matched) {
+//                 handleFieldChange("color_id", matched.color_id);
+//                 setNumpadMode("quantity");
+//                 setColorSearchCode("");
+//             }
+//         } else {
+//             let current = String(formData[activeField] || "");
+//             if (val === "clear") current = "";
+//             else if (val === "back") current = current.slice(0, -1);
+//             else if (val === ".") {
+//                 if (!current.includes(".")) current = current ? current + "." : "0.";
+//             } else {
+//                 current = current + val;
+//             }
+//             handleFieldChange(activeField, current);
+//         }
+//     };
+
+//     const addItem = () => {
+//         if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity) {
+//             toast.error("يرجى اكمال جميع البيانات");
+//             return;
+//         }
+
+//         // إذا كانت المادة ليست "لوح" يجب تحديد العرض
+//         if (!isSelectedMaterialBoard && !formData.width) {
+//             toast.error("يرجى اختيار العرض");
+//             return;
+//         }
+
+//         // التحقق من أن اللون مسعر
+//         if (!isColorPriced) {
+//             toast.error("اللون المحدد غير مسعر لهذه المواصفات");
+//             return;
+//         }
+
+//         const material = materials.find(m => String(m.material_id) === String(formData.material_id));
+//         const ruler = rulers.find(r => String(r.ruler_id) === String(formData.ruler_id));
+//         const color = colors.find(c => String(c.color_id) === String(formData.color_id));
+//         const batch = batches.find(b => String(b.batch_id) === String(formData.batch_id));
+
+//         const newItem = {
+//             id: Date.now(),
+//             ...formData,
+//             material_name: material?.material_name,
+//             ruler_name: ruler?.ruler_name,
+//             color_name: color?.color_name,
+//             batch_number: batch?.batch_number,
+//         };
+
+//         setOrderItems(prev => [...prev, newItem]);
+
+//         // Reset form keeping material and thickness
+//         setFormData(prev => ({
+//             material_id: prev.material_id,
+//             thickness: "0.6",
+//             type_item: prev.type_item,
+//             ruler_id: "",
+//             color_id: "",
+//             batch_id: "",
+//             width: "",
+//             quantity: "",
+//             notes: ""
+//         }));
+//         setColorSearchCode("");
+//     };
+
+//     const removeItem = (id) => {
+//         setOrderItems(prev => prev.filter(item => item.id !== id));
+//     };
+
+//     const saveOrder = async () => {
+//         if (orderItems.length === 0) {
+//             toast.error("أضف عنصراً واحداً على الأقل");
+//             return;
+//         }
+
+//         try {
+//             setLoading(true);
+//             const items = orderItems.map(item => ({
+//                 type_item: item.type_item,
+//                 color_id: Number(item.color_id),
+//                 width: Number(item.width) || 0,
+//                 thickness: 0.6,
+//                 batch_id: Number(item.batch_id) || null,
+//                 quantity: Number(item.quantity),
+//                 notes: item.notes
+//             }));
+
+//             await orderApi.createOrder({ status: "pending", items, notes: "" });
+//             toast.success("تم حفظ الطلب بنجاح");
+//             setOrderItems([]);
+//         } catch {
+//             toast.error("فشل في حفظ الطلب");
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+//     const handleConfirmSave = async () => {
+//         await saveOrder();
+//         setShowPreview(false);
+//     };
+
+
+//     return (
+//         <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+//             {/* Header - ثابت في الأعلى */}
+//             <div className="relative flex-shrink-0">
+//                 {isHeaderVisible && (
+//                     <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
+//                         <div className="flex flex-wrap gap-3">
+//                             <Button
+//                                 size="lg"
+//                                 variant="outline"
+//                                 onClick={() => setViewMode("create")}
+//                                 className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
+//                                     ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+//                                     : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+//                                     }`}
+//                             >
+//                                 <ShoppingCart className="w-5 h-5 ml-2" />
+//                                 طلب جديد
+//                             </Button>
+//                             <Button
+//                                 size="lg"
+//                                 variant="outline"
+//                                 onClick={() => setViewMode("history")}
+//                                 className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
+//                                     ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+//                                     : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+//                                     }`}
+//                             >
+//                                 <History className="w-5 h-5 ml-2" />
+//                                 سجل الطلبات
+//                             </Button>
+//                         </div>
+//                         <div className="flex flex-wrap gap-2">
+//                             {/* <Button
+//                 size="lg"
+//                 variant="outline"
+//                 onClick={() => navigate("/profile")}
+//                 className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+//               >
+//                 <User className="w-5 h-5 ml-2" />
+//                 البروفايل
+//               </Button> */}
+//                             <Button
+//                                 size="lg"
+//                                 variant="outline"
+//                                 onClick={() => navigate("/customers")}
+//                                 className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+//                             >
+//                                 <Users className="w-5 h-5 ml-2" />
+//                                 الزبائن
+//                             </Button>
+//                             <Button
+//                                 size="lg"
+//                                 variant="outline"
+//                                 onClick={() => navigate("/dashboard")}
+//                                 className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+//                             >
+//                                 <Home className="w-5 h-5 ml-2" />
+//                                 الرئيسية
+//                             </Button>
+//                             <Button
+//                                 size="lg"
+//                                 variant="outline"
+//                                 onClick={() => setIsHeaderVisible(false)}
+//                                 className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110"
+//                             >
+//                                 <EyeOff className="w-5 h-5" />
+//                             </Button>
+//                         </div>
+//                     </div>
+//                 )}
+//                 {!isHeaderVisible && (
+//                     <div className="absolute top-2 right-2 z-20">
+//                         <Button
+//                             size="lg"
+//                             variant="outline"
+//                             onClick={() => setIsHeaderVisible(true)}
+//                             className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f hover:bg-secondary-f shadow-lg touch-manipulation"
+//                         >
+//                             <Eye className="w-5 h-5 ml-2" />
+//                             إظهار الهيدر
+//                         </Button>
+//                     </div>
+//                 )}
+//             </div>
+
+//             {/* Main Content - يأخذ المساحة المتبقية */}
+//             <div className="flex-1 min-h-0 p-3 overflow-hidden">
+//                 {viewMode === "create" ? (
+//                     /* 
+//                       توزيع الأعمدة بشكل ديناميكي:
+//                       - العمود الأول: 1.2fr (المواد والأرقام)
+//                       - العمود الثاني: 2fr (العناصر الوسطى)
+//                       - العمود الثالث: 1.8fr (الجدول)
+//                     */
+//                     <div className="grid grid-cols-1 xl:grid-cols-[1fr_2fr_1fr] gap-1 h-full min-h-0">
+
+//                         {/* العمود الأيمن - أزرار المواد والأرقام */}
+//                         <div className="flex flex-col gap-1 h-full min-h-0 overflow-hidden">
+//                             {/* أزرار المواد - تستخدم Grid ديناميكي */}
+//                             <Card className="flex-shrink-0 p-4">
+//                                 <Label className="font-bold text-base mb-3 block">المادة</Label>
+//                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 auto-rows-fr">
+//                                     {materials.map(m => (
+//                                         <button
+//                                             key={m.material_id}
+//                                             onClick={() => handleFieldChange("material_id", m.material_id)}
+//                                             className={`
+//                                             aspect-square rounded-2xl border-4 text-xl sm:text-2xl font-bold 
+//                                             transition-all touch-manipulation hover:scale-105 active:scale-95
+//                                             flex items-center justify-center p-4
+//                                             ${String(formData.material_id) === String(m.material_id)
+//                                                     ? "border-primary-f bg-secondary-f text-white shadow-lg"
+//                                                     : "border-gray-300 bg-white hover:border-secondary-s"
+//                                                 }
+//                                         `}
+//                                         >
+//                                             {m.material_name}
+//                                         </button>
+//                                     ))}
+//                                 </div>
+//                             </Card>
+
+//                             {/* الأرقام - تأخذ المساحة المتبقية */}
+//                             <Card className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
+//                                 {/* شاشة العرض الرقمية - مدمجة أكثر */}
+//                                 <div className="flex-shrink-0 mb-2">
+//                                     <div className="flex gap-2 mb-2">
+//                                         <button
+//                                             onClick={() => {
+//                                                 setNumpadMode("colorSearch");
+//                                                 setColorSearchCode("");
+//                                             }}
+//                                             className={`
+//                     flex-1 py-3 px-2 rounded-lg text-sm font-bold border-2 
+//                     touch-manipulation transition-all active:scale-95
+//                     ${numpadMode === "colorSearch"
+//                                                     ? "bg-secondary-s text-white border-secondary-s"
+//                                                     : "bg-white border-gray-300 hover:bg-gray-100"
+//                                                 }
+//                 `}
+//                                         >
+//                                             بحث بالكود
+//                                         </button>
+//                                         <button
+//                                             onClick={() => {
+//                                                 setNumpadMode("quantity");
+//                                                 setActiveField("quantity");
+//                                             }}
+//                                             className={`
+//                     flex-1 py-3 px-2 rounded-lg text-sm font-bold border-2 
+//                     touch-manipulation transition-all active:scale-95
+//                     ${numpadMode === "quantity"
+//                                                     ? "bg-primary-f text-white border-primary-f"
+//                                                     : "bg-white border-gray-300 hover:bg-gray-100"
+//                                                 }
+//                 `}
+//                                         >
+//                                             كتابة الكمية
+//                                         </button>
+//                                     </div>
+
+//                                     <div className="bg-gray-100 rounded-lg py-2 px-3">
+//                                         <div className="text-xs text-gray-500 mb-0.5">
+//                                             {numpadMode === "colorSearch" ? "كود اللون" :
+//                                                 activeField === "quantity" ? "الكمية" :
+//                                                     activeField === "width" ? "العرض" : "القيمة"}
+//                                         </div>
+//                                         <div className="text-3xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
+//                                             {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
+//                                         </div>
+//                                     </div>
+//                                 </div>
+
+//                                 {/* أزرار الأرقام - 4 صفوف فقط (بدون مساحة إضافية) */}
+//                                 <div className="flex-1 grid grid-rows-4 gap-1.5 min-h-0">
+//                                     {/* الصف 1: 7 8 9 */}
+//                                     <div className="grid grid-cols-3 gap-1.5">
+//                                         {["7", "8", "9"].map(key => (
+//                                             <button
+//                                                 key={key}
+//                                                 onClick={() => handleNumpadPress(key)}
+//                                                 className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+//                                             >
+//                                                 {key}
+//                                             </button>
+//                                         ))}
+//                                     </div>
+
+//                                     {/* الصف 2: 4 5 6 */}
+//                                     <div className="grid grid-cols-3 gap-1.5">
+//                                         {["4", "5", "6"].map(key => (
+//                                             <button
+//                                                 key={key}
+//                                                 onClick={() => handleNumpadPress(key)}
+//                                                 className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+//                                             >
+//                                                 {key}
+//                                             </button>
+//                                         ))}
+//                                     </div>
+
+//                                     {/* الصف 3: 1 2 3 */}
+//                                     <div className="grid grid-cols-3 gap-1.5">
+//                                         {["1", "2", "3"].map(key => (
+//                                             <button
+//                                                 key={key}
+//                                                 onClick={() => handleNumpadPress(key)}
+//                                                 className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+//                                             >
+//                                                 {key}
+//                                             </button>
+//                                         ))}
+//                                     </div>
+
+//                                     {/* الصف 4: . 0 ⌫ مع مسح الكل */}
+//                                     <div className="grid grid-cols-3 gap-1.5">
+//                                         <button
+//                                             onClick={() => handleNumpadPress(".")}
+//                                             className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+//                                         >
+//                                             .
+//                                         </button>
+//                                         <button
+//                                             onClick={() => handleNumpadPress("0")}
+//                                             className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+//                                         >
+//                                             0
+//                                         </button>
+//                                         <button
+//                                             onClick={() => handleNumpadPress("clear")}
+//                                             className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-xl font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 max-w-30 max-h-25"
+//                                         >
+//                                             مسح
+//                                         </button>
+//                                     </div>
+//                                 </div>
+//                             </Card>
+//                         </div>
+
+//                         {/* العمود الأوسط - العناصر الإضافية */}
+//                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
+//                             {!isSelectedMaterialBoard && (
+//                                 <div className="flex-shrink-0 p-4 border-b-4 border-dashed border-gray-300 ">
+//                                     {/* <Label className="font-bold text-base mb-3 block">نوع الطلب</Label> */}
+//                                     <div className="grid grid-cols-2  mx-auto gap-4">
+//                                         {TYPE_OPTIONS.map(t => (
+//                                             <button
+//                                                 key={t.value}
+//                                                 onClick={() => handleFieldChange("type_item", t.value)}
+//                                                 className={`
+//                                                 max-w-40 max-h-48 rounded-2xl border-4 text-xl sm:text-2xl font-medium
+//                                                 transition-all touch-manipulation hover:scale-105 active:scale-95
+//                                                 flex items-center justify-center p-2
+//                                                 ${formData.type_item === t.value
+//                                                         ? "border-primary-f bg-primary-f text-white shadow-lg"
+//                                                         : "border-gray-300 bg-white hover:border-secondary-s"
+//                                                     }
+//                                             `}
+//                                             >
+//                                                 {t.label}
+//                                             </button>
+//                                         ))}
+//                                     </div>
+//                                 </div>
+//                             )}
+
+//                             {formData.material_id && !isSelectedMaterialBoard && (
+//                                 <div className="flex justify-around items-center p-1 pt-0 border-b-4 border-dashed border-gray-300">
+//                                     <Label className="font-bold text-base block">
+//                                         العرض
+//                                         {loadingWidths && <span className="mr-2 text-gray-500 text-sm">جاري التحميل...</span>}
+//                                     </Label>
+//                                     {widthValues.length > 0 ? (
+//                                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-fr">
+//                                             {widthValues.map(w => (
+//                                                 <button
+//                                                     key={w.id}
+//                                                     onClick={() => handleFieldChange("width", w.value)}
+//                                                     className={`
+//                                                     min-w-40 max-h-48 rounded-2xl border-4 text-xl sm:text-2xl font-medium
+//                                                     transition-all touch-manipulation hover:scale-105 active:scale-95
+//                                                     flex items-center justify-center p-4
+//                                                     ${formData.width === w.value
+//                                                             ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+//                                                             : "border-gray-300 bg-white hover:border-secondary-s"
+//                                                         }
+//                                                 `}
+//                                                 >
+//                                                     {w.value}
+//                                                 </button>
+//                                             ))}
+//                                         </div>
+//                                     ) : (
+//                                         !loadingWidths && (
+//                                             <div className="text-center p-4 text-gray-400 text-base border-2 border-dashed border-gray-300 rounded-xl">
+//                                                 لا توجد قيم عرض لهذه المادة
+//                                             </div>
+//                                         )
+//                                     )}
+//                                 </div>
+//                             )}
+
+//                             <div className="flex justify-center items-center p-1 pt-0 border-b-4 border-dashed border-gray-300">
+//                                 <Label className="font-bold text-base block">المسطرة</Label>
+//                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-fr">
+//                                     {availableRulers.length === 0 ? (
+//                                         <span className="text-gray-400 text-base col-span-4 text-center p-4">اختر المادة أولاً</span>
+//                                     ) : (
+//                                         availableRulers.map(r => (
+//                                             <button
+//                                                 key={r.ruler_id}
+//                                                 onClick={() => handleFieldChange("ruler_id", r.ruler_id)}
+//                                                 className={`
+//                                                max-w-40 max-h-48 rounded-2xl border-4 text-xl sm:text-2xl font-medium
+//                                                 transition-all touch-manipulation hover:scale-105 active:scale-95
+//                                                 flex items-center justify-center p-2
+//                                                 ${String(formData.ruler_id) === String(r.ruler_id)
+//                                                         ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+//                                                         : "border-gray-300 bg-white hover:border-secondary-s"
+//                                                     }
+//                                             `}
+//                                             >
+//                                                 {r.ruler_name}
+//                                             </button>
+//                                         ))
+//                                     )}
+//                                 </div>
+//                             </div>
+
+//                             <div className="flex-shrink-0 p-1 border-b-4 border-dashed border-gray-300">
+//                                 <div className="grid grid-cols-[1fr_140px] gap-4 items-end">
+//                                     <div>
+//                                         <Label className="font-bold text-base block">
+//                                             اللون
+//                                             {numpadMode === "colorSearch" && colorSearchCode && (
+//                                                 <span className="mr-3 text-secondary-s text-sm">(بحث: {colorSearchCode})</span>
+//                                             )}
+//                                         </Label>
+//                                         <FilterSelect
+//                                             value={formData.color_id}
+//                                             onChange={(e) => handleFieldChange("color_id", e.target.value)}
+//                                             disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
+//                                             options={filteredColorsBySearch.map(c => {
+//                                                 const pricingStatus = getColorPricingStatus(c.color_id);
+//                                                 return {
+//                                                     value: c.color_id,
+//                                                     label: `${c.color_name} (${c.color_code})${pricingStatus.label}`
+//                                                 };
+//                                             })}
+//                                             placeholder={
+//                                                 !formData.ruler_id
+//                                                     ? "اختر المسطرة أولاً"
+//                                                     : (!isSelectedMaterialBoard && !formData.width)
+//                                                         ? "اختر العرض أولاً"
+//                                                         : filteredColorsBySearch.length === 0
+//                                                             ? "لا توجد ألوان مسعرة"
+//                                                             : "اختر اللون"
+//                                             }
+//                                             className="w-full text-base p-3 min-h-[50px]"
+//                                         />
+//                                     </div>
+//                                     <div>
+//                                         <Label className="font-bold text-base block">الصورة</Label>
+//                                         <div className="h-24 border-2 border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden">
+//                                             {selectedColorImage ? (
+//                                                 <img src={selectedColorImage} alt="" className="h-full w-full object-cover" />
+//                                             ) : (
+//                                                 <span className="text-gray-400 text-sm">لا توجد</span>
+//                                             )}
+//                                         </div>
+//                                     </div>
+//                                 </div>
+//                             </div>
+
+//                             {/* <div className="flex-shrink-0 p-1 border-b-4 border-dashed border-gray-300">
+//                                 <Label className="font-bold text-base block">رقم الطبخة</Label>
+//                                 <FilterSelect
+//                                     value={formData.batch_id}
+//                                     onChange={(e) => handleFieldChange("batch_id", e.target.value)}
+//                                     disabled={!isSelectedMaterialBoard && !formData.width}
+//                                     options={batches.map(b => ({
+//                                         value: b.batch_id,
+//                                         label: b.batch_number
+//                                     }))}
+//                                     placeholder={
+//                                         (!isSelectedMaterialBoard && !formData.width)
+//                                             ? "اختر العرض أولاً"
+//                                             : "اختر الطبخة"
+//                                     }
+//                                     className="w-full text-base p-3 min-h-[50px]"
+//                                 />
+//                             </div> */}
+
+//                             <div className="flex-shrink-0 p-1 border-b-4 border-dashed border-gray-300">
+//                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+//                                     <div>
+//                                         <Label className="font-bold text-base block">الكمية</Label>
+//                                         <div className="flex items-center gap-3">
+//                                             <Input
+//                                                 type="number"
+//                                                 value={formData.quantity}
+//                                                 onChange={(e) => handleFieldChange("quantity", e.target.value)}
+//                                                 onClick={() => {
+//                                                     setActiveField("quantity");
+//                                                     setNumpadMode("quantity");
+//                                                 }}
+//                                                 className={`h-14 text-xl text-center font-bold flex-1 ${activeField === "quantity" ? "ring-2 ring-blue-400" : ""}`}
+//                                                 placeholder="0"
+//                                             />
+//                                             <span className="text-lg font-bold text-gray-600 whitespace-nowrap">متر</span>
+//                                         </div>
+
+//                                     </div>
+                                    
+//                                     <div>
+//                                         <Label className="font-bold text-base mb-3 block">السماكة</Label>
+//                                         <div className="flex items-center gap-3">
+//                                             <Input
+//                                                 type="number"
+//                                                 value={formData.thickness}
+//                                                 className="h-14 text-lg text-center font-bold flex-1 bg-gray-100"
+//                                                 placeholder="0.6"
+//                                                 step="0.1"
+//                                                 readOnly
+//                                             />
+//                                             <span className="text-lg font-bold text-gray-600 whitespace-nowrap">مم</span>
+//                                         </div>
+//                                     </div>
+//                                     <div>
+//                                         <Label className="font-bold text-base block">رقم الطبخة</Label>
+//                                         <FilterSelect
+//                                             value={formData.batch_id}
+//                                             onChange={(e) => handleFieldChange("batch_id", e.target.value)}
+//                                             disabled={!isSelectedMaterialBoard && !formData.width}
+//                                             options={batches.map(b => ({
+//                                                 value: b.batch_id,
+//                                                 label: b.batch_number
+//                                             }))}
+//                                             placeholder={
+//                                                 (!isSelectedMaterialBoard && !formData.width)
+//                                                     ? "اختر العرض أولاً"
+//                                                     : "اختر الطبخة"
+//                                             }
+//                                             className="w-full text-base p-3 min-h-[50px]"
+//                                         />
+//                                     </div>
+//                                 </div>
+//                             </div>
+
+//                             <div className="flex-shrink-0 p-4">
+//                                 <Label className="font-bold text-base mb-3 block">الملاحظات</Label>
+//                                 <Input
+//                                     value={formData.notes}
+//                                     onChange={(e) => handleFieldChange("notes", e.target.value)}
+//                                     placeholder="ملاحظات إضافية..."
+//                                     className="h-14 text-base"
+//                                 />
+//                             </div>
+
+//                             <Button
+//                                 onClick={addItem}
+//                                 size="lg"
+//                                 className="h-14 bg-primary-f hover:bg-secondary-f flex-shrink-0 text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform"
+//                                 disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
+//                             >
+//                                 <Plus className="w-6 h-6 ml-2" />
+//                                 إضافة للطلب
+//                             </Button>
+//                         </div>
+
+//                         {/* العمود الأيسر - الجدول */}
+//                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
+//                             {showPreview && orderItems.length > 0 && (
+//                                 <StyledDialog
+//                                     isOpen={showPreview}
+//                                     onOpenChange={setShowPreview}
+//                                     title="تفاصيل الطلب قبل الحفظ"
+//                                     onCancel={() => setShowPreview(false)}
+//                                     onConfirm={handleConfirmSave}
+//                                     confirmLabel="تأكيد الحفظ"
+//                                     cancelLabel="إلغاء"
+//                                     confirmVariant="default"
+//                                     isLoading={loading}
+//                                 >
+//                                     <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+//                                         <div className="bg-gray-50 rounded-lg p-2">عدد العناصر: <span className="font-bold">{orderItems.length}</span></div>
+//                                         <div className="bg-gray-50 rounded-lg p-2">إجمالي الكمية: <span className="font-bold">{totalPreviewQuantity}</span></div>
+//                                     </div>
+//                                     <div className="max-h-64 overflow-y-auto border rounded-lg">
+//                                         <table className="w-full table-fixed border-collapse text-sm">
+//                                             <thead className="bg-gray-100 sticky top-0">
+//                                                 <tr>
+//                                                     <th className="p-2 text-right border-b break-words">المادة</th>
+//                                                     <th className="p-2 text-right border-b break-words">المسطرة</th>
+//                                                     <th className="p-2 text-right border-b break-words">اللون</th>
+//                                                     <th className="p-2 text-center border-b break-words">الأبعاد</th>
+//                                                 </tr>
+//                                             </thead>
+//                                             <tbody>
+//                                                 {orderItems.map(item => (
+//                                                     <tr key={item.id} className="border-b">
+//                                                         <td className="p-2 break-words">{item.material_name}</td>
+//                                                         <td className="p-2 break-words">{item.ruler_name}</td>
+//                                                         <td className="p-2 break-words">{item.color_name}</td>
+//                                                         <td className="p-2 text-center break-words">
+//                                                             {(item.width || "-")}x{(item.thickness || "0.6")}x{(item.quantity || "-")}
+//                                                         </td>
+//                                                     </tr>
+//                                                 ))}
+//                                             </tbody>
+//                                         </table>
+//                                     </div>
+//                                 </StyledDialog>
+//                             )}
+//                             <Card className="flex flex-col h-full min-h-0 overflow-hidden">
+//                                 {/* رأس الجدول - ثابت */}
+//                                 <div className="flex justify-between items-center p-3 border-b bg-gray-50 flex-shrink-0">
+//                                     <span className="font-bold text-base">العناصر المضافة: {orderItems.length}</span>
+//                                     <Button
+//                                         size="lg"
+//                                         onClick={() => setShowPreview(true)}
+//                                         disabled={loading || orderItems.length === 0}
+//                                         className="h-12 bg-secondary-s hover:brightness-110 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
+//                                     >
+//                                         <Check className="w-5 h-5 ml-2" />
+//                                         حفظ الطلب
+//                                     </Button>
+//                                 </div>
+
+//                                 {/* الجدول مع التمرير العمودي فقط */}
+//                                 <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+//                                     <table className="w-full table-fixed border-collapse">
+//                                         <thead className="bg-gray-100 sticky top-0 z-10">
+//                                             <tr>
+//                                                 <th className="p-1 text-sm text-right border-b break-words">المادة</th>
+//                                                 <th className="p-1 text-sm text-right border-b break-words">المسطرة</th>
+//                                                 <th className="p-1 text-sm text-right border-b break-words">اللون</th>
+//                                                 <th className="p-1 text-sm text-right border-b break-words">النوع</th>
+//                                                 <th className="p-1 text-sm text-right border-b break-words">العرض</th>
+//                                                 <th className="p-1 text-sm text-right border-b break-words">السماكة</th>
+//                                                 <th className="p-1 text-sm text-right border-b break-words">الكمية</th>
+//                                                 <th className="p-1 text-sm text-right border-b break-words">حذف</th>
+//                                             </tr>
+//                                         </thead>
+//                                         <tbody>
+//                                             {orderItems.map(item => (
+//                                                 <tr key={item.id} className="border-b hover:bg-gray-50">
+//                                                     <td className="p-3 break-words">{item.material_name}</td>
+//                                                     <td className="p-3 break-words">{item.ruler_name}</td>
+//                                                     <td className="p-3 break-words">{item.color_name}</td>
+//                                                     <td className="p-3 text-center break-words">
+//                                                         {item.type_item === "Machine" ? "مكنة" : "كوي"}
+//                                                     </td>
+//                                                     <td className="p-3 text-center break-words">{item.width || "-"}</td>
+//                                                     <td className="p-3 text-center break-words">{item.thickness || "0.6"}</td>
+//                                                     <td className="p-3 text-center font-bold break-words">{item.quantity} م</td>
+//                                                     <td className="p-3 text-center">
+//                                                         <button
+//                                                             onClick={() => removeItem(item.id)}
+//                                                             className="text-red-600 hover:bg-red-50 p-2 rounded-lg touch-manipulation active:scale-95 transition-transform"
+//                                                         >
+//                                                             <Trash2 className="w-5 h-5" />
+//                                                         </button>
+//                                                     </td>
+//                                                 </tr>
+//                                             ))}
+//                                             {orderItems.length === 0 && (
+//                                                 <tr>
+//                                                     <td colSpan="8" className="p-8 text-center text-gray-400 text-base">
+//                                                         لا توجد عناصر مضافة
+//                                                     </td>
+//                                                 </tr>
+//                                             )}
+//                                         </tbody>
+//                                     </table>
+//                                 </div>
+//                             </Card>
+//                         </div>
+//                     </div>
+//                 ) : (
+//                     /* وضع السجل */
+//                     <Card className="flex flex-col h-full min-h-0 overflow-hidden p-4">
+//                         <div className="flex justify-between items-center mb-3 flex-shrink-0">
+//                             <h2 className="font-bold text-xl">سجل الطلبات</h2>
+//                             <Button
+//                                 size="lg"
+//                                 variant="outline"
+//                                 onClick={loadOrders}
+//                                 disabled={ordersLoading}
+//                                 className="px-6 py-3 text-base bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
+//                             >
+//                                 <RotateCcw className="w-5 h-5 ml-2" />
+//                                 تحديث
+//                             </Button>
+//                         </div>
+
+//                         {/* جدول السجل مع التمرير العمودي فقط */}
+//                         <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 border rounded-lg bg-white">
+//                             <table className="w-full table-fixed border-collapse">
+//                                 <thead className="bg-gray-100 sticky top-0">
+//                                     <tr>
+//                                         <th className="p-3 text-right border-b break-words">#</th>
+//                                         <th className="p-3 text-right border-b break-words">التاريخ</th>
+//                                         <th className="p-3 text-center border-b break-words">عدد العناصر</th>
+//                                         <th className="p-3 text-center border-b break-words">الإجمالي</th>
+//                                         <th className="p-3 text-center border-b break-words">المبيعات</th>
+//                                         <th className="p-3 text-center border-b break-words">الزبون</th>
+//                                         <th className="p-3 text-center border-b break-words">ملاحظات</th>
+//                                         <th className="p-3 text-center border-b break-words">الحالة</th>
+//                                         <th className="p-3 text-center border-b break-words">عرض</th>
+//                                     </tr>
+//                                 </thead>
+//                                 <tbody>
+//                                     {ordersLoading ? (
+//                                         <tr><td colSpan="9" className="p-6"><LoadingState /></td></tr>
+//                                     ) : orders.map(order => (
+//                                         <tr key={order.order_id} className="border-b hover:bg-gray-50">
+//                                             <td className="p-3 break-words">{order.order_id}</td>
+//                                             <td className="p-3 break-words">{order.created_at?.split("T")[0]}</td>
+//                                             <td className="p-3 text-center break-words">{order.count_items ?? order.items?.length ?? 0}</td>
+//                                             <td className="p-3 text-center break-words">{order.total_amount ?? "-"}</td>
+//                                             <td className="p-3 text-center break-words">{order.sales?.full_name || order.sales?.username || "-"}</td>
+//                                             <td className="p-3 text-center break-words">{order.customer?.name || "-"}</td>
+//                                             <td className="p-3 text-center break-words">{order.notes || "-"}</td>
+//                                             <td className="p-3 text-center break-words">
+//                                                 <span className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-sm">
+//                                                     {getStatusLabel(order.status)}
+//                                                 </span>
+//                                             </td>
+//                                             <td className="p-3 text-center">
+//                                                 <Button
+//                                                     size="lg"
+//                                                     variant="outline"
+//                                                     className="h-10 px-3 touch-manipulation active:scale-95 transition-transform"
+//                                                     onClick={() => setSelectedOrder(order)}
+//                                                 >
+//                                                     <Eye className="w-4 h-4" />
+//                                                 </Button>
+//                                             </td>
+//                                         </tr>
+//                                     ))}
+//                                 </tbody>
+//                             </table>
+//                         </div>
+
+//                         {selectedOrder && (
+//                             <StyledDialog
+//                                 isOpen={Boolean(selectedOrder)}
+//                                 onOpenChange={(open) => { if (!open) setSelectedOrder(null); }}
+//                                 title={`تفاصيل الطلب #${selectedOrder.order_id}`}
+//                                 onCancel={() => setSelectedOrder(null)}
+//                                 cancelLabel="إغلاق"
+//                                 showFooter={false}
+//                             >
+//                                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+//                                     <div className="bg-white p-2 rounded-lg border">الحالة: {getStatusLabel(selectedOrder.status)}</div>
+//                                     <div className="bg-white p-2 rounded-lg border">الإجمالي: {selectedOrder.total_amount || "-"}</div>
+//                                     <div className="bg-white p-2 rounded-lg border">عدد العناصر: {selectedOrder.count_items ?? selectedOrder.items?.length ?? 0}</div>
+//                                     <div className="bg-white p-2 rounded-lg border">المبيعات: {selectedOrder.sales?.full_name || selectedOrder.sales?.username || "-"}</div>
+//                                     <div className="bg-white p-2 rounded-lg border">الزبون: {selectedOrder.customer?.name || "-"}</div>
+//                                     <div className="bg-white p-2 rounded-lg border">ملاحظات: {selectedOrder.notes || "-"}</div>
+//                                 </div>
+//                                 {selectedOrder.items?.length > 0 && (
+//                                     <div className="mt-3 grid grid-cols-2 gap-2 text-base">
+//                                         {selectedOrder.items.map((item, i) => (
+//                                             <div key={i} className="bg-white p-2 rounded-lg border whitespace-nowrap overflow-hidden text-ellipsis">
+//                                                 {item.type_item === "Machine" ? "مكنة" : "كوي"} | {item.width || "-"} | {item.quantity} م
+//                                             </div>
+//                                         ))}
+//                                     </div>
+//                                 )}
+//                             </StyledDialog>
+//                         )}
+//                     </Card>
+//                 )}
+//             </div>
+//         </div>
+//     );
+//   }
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 
     // return (
     //     <div className="h-screen flex flex-col">
@@ -1589,4 +3322,4 @@ export default function SimpleOrderCreation() {
     //         </div>
     //     </div>
     // );
-}
+// }
