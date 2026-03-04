@@ -69,13 +69,20 @@ export const customerApi = {
     return customer?.address || 'غير محدد';
   },
 
+  formatPhoneNumber(phone) {
+    if (!phone || phone === 'غير محدد') return 'غير محدد';
+    // استخدام حرف التحكم في الاتجاه بدلاً من HTML
+    return `\u202A${phone}\u202C`; // يخفي الوسوم ويعرض الرقم فقط
+  },
+
   formatCustomerInfo: (customer) => {
     if (!customer) return 'غير محدد';
     
     const name = customer.name || 'غير محدد';
     const phone = customer.phone || 'غير محدد';
     const city = customer.city || 'غير محدد';
-    return `${name} - ${phone} (${city})`;
+    const formattedPhone = phone !== 'غير محدد' ? customerApi.formatPhoneNumber(phone) : phone;
+    return `${name} - ${formattedPhone} (${city})`;
   },
 
   formatCustomerDisplay: (customer) => {
@@ -83,6 +90,7 @@ export const customerApi = {
     
     const name = customer.name || 'غير محدد';
     const phone = customer.phone || 'غير محدد';
-    return `${name} (${phone})`;
+    const formattedPhone = phone !== 'غير محدد' ? customerApi.formatPhoneNumber(phone) : phone;
+    return `${name} (${formattedPhone})`;
   }
 };

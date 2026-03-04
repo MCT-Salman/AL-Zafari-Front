@@ -105,7 +105,7 @@ export default function OrderManagementNew() {
         setOrderForm(prev => ({ ...prev, thickness: thicknessConstant.constant_value }));
       }
     } catch (error) {
-      console.error("Failed to load data:", error);
+      // console.error("Failed to load data:", error);
       setError("فشل في تحميل البيانات");
     } finally {
       setLoading(false);

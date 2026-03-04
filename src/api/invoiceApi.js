@@ -32,13 +32,13 @@ export const invoiceApi = {
     }
   },
 
-  // Get invoices by order ID
-  getInvoicesByOrderId: async (orderId, params = {}) => {
+  // Get price for material
+  getMaterialPrice: async (priceData) => {
     try {
-      const response = await axiosInstance.get(`/invoice/order/${orderId}`, { params });
+      const response = await axiosInstance.post('/invoice/price-material', priceData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب فواتير الطلب' };
+      throw error.response?.data || { message: 'حدث خطأ في جلب سعر المادة' };
     }
   },
 
@@ -63,9 +63,9 @@ export const invoiceApi = {
   },
 
   // Delete invoice
-  deleteInvoice: async (id) => {
+  deleteInvoice: async (id, deleteData = {}) => {
     try {
-      const response = await axiosInstance.delete(`/invoice/${id}`);
+      const response = await axiosInstance.delete(`/invoice/${id}`, { data: deleteData });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'حدث خطأ في حذف الفاتورة' };
@@ -130,5 +130,40 @@ export const invoiceApi = {
   formatUserInfo: (user) => {
     if (!user) return 'غير محدد';
     return user.full_name || user.username || 'غير محدد';
+  },
+
+  // Helper function to extract invoice items
+  getInvoiceItems: (invoice) => {
+    return invoice?.invoiceItems || [];
+  },
+
+  // Helper function to get customer from invoice
+  getCustomerFromInvoice: (invoice) => {
+    return invoice?.customer || null;
+  },
+
+  // Helper function to get user from invoice
+  getUserFromInvoice: (invoice) => {
+    return invoice?.user || null;
+  },
+
+  // Helper function to get batch details
+  getBatchDetails: (invoiceItem) => {
+    return invoiceItem?.batch || null;
+  },
+
+  // Helper function to get color details
+  getColorDetails: (invoiceItem) => {
+    return invoiceItem?.color || null;
+  },
+
+  // Helper function to get ruler details from color
+  getRulerFromColor: (color) => {
+    return color?.ruler || null;
+  },
+
+  // Helper function to get material details from ruler
+  getMaterialFromRuler: (ruler) => {
+    return ruler?.material || null;
   }
 };

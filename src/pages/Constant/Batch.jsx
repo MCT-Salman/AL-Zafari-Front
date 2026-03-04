@@ -130,7 +130,7 @@ export default function Batch() {
       const response = await materialApi.getMaterials();
       setMaterials(getApiData(response, []) || []);
     } catch (error) {
-      console.error("Failed to load materials:", error);
+      // console.error("Failed to load materials:", error);
     }
   };
 

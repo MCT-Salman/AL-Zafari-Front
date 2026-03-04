@@ -124,7 +124,7 @@ export default function ProductionManager() {
             setRulers(getApiData(rulerRes, []) || []);
 
         } catch (error) {
-            console.error("Error loading data:", error);
+            // console.error("Error loading data:", error);
             toast.error("فشل في تحميل البيانات");
         } finally {
             setLoading(false);
@@ -137,7 +137,7 @@ export default function ProductionManager() {
             const response = await productionApi.getProductionOrders();
             setProductionOrders(getApiData(response.data?.orders || response, []) || []);
         } catch (error) {
-            console.error("Error loading production orders:", error);
+            // console.error("Error loading production orders:", error);
             toast.error("فشل في تحميل طلبات الإنتاج");
         } finally {
             setLoadingOrders(false);
@@ -149,7 +149,7 @@ export default function ProductionManager() {
             const response = await productionApi.getProductionOrderItems(orderId);
             setSelectedOrderItems(getApiData(response.data || response, []) || []);
         } catch (error) {
-            console.error("Error loading order items:", error);
+            // console.error("Error loading order items:", error);
             toast.error("فشل في تحميل عناصر الطلب");
         }
     };
@@ -291,7 +291,7 @@ export default function ProductionManager() {
                 items: items
             };
 
-            console.log("Saving production order:", orderData);
+            // console.log("Saving production order:", orderData);
 
             if (editingOrderId) {
                 // تحديث طلب موجود
@@ -322,7 +322,7 @@ export default function ProductionManager() {
             }
 
         } catch (error) {
-            console.error("Error saving production order:", error);
+            // console.error("Error saving production order:", error);
             toast.error(error.response?.data?.message || "فشل في حفظ طلب الإنتاج");
         } finally {
             setLoading(false);
@@ -338,7 +338,7 @@ export default function ProductionManager() {
             toast.success("تم حذف الطلب بنجاح");
             loadProductionOrders();
         } catch (error) {
-            console.error("Error deleting order:", error);
+            // console.error("Error deleting order:", error);
             toast.error("فشل في حذف الطلب");
         } finally {
             setLoading(false);

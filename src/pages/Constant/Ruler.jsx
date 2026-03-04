@@ -131,7 +131,7 @@ export default function Ruler() {
       const response = await materialApi.getMaterials();
       setMaterials(getApiData(response, []) || []);
     } catch (error) {
-      console.error("Failed to load materials:", error);
+      // console.error("Failed to load materials:", error);
     }
   };
 
@@ -297,7 +297,7 @@ export default function Ruler() {
           formattedEntryDate = `${year}-${month}-${day}`;
         }
       } catch (error) {
-        console.error('Error formatting date for edit:', error);
+        // console.error('Error formatting date for edit:', error);
         // Fallback to original value if parsing fails
         formattedEntryDate = ruler.entry_date;
       }

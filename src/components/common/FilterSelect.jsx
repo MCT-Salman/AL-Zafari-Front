@@ -151,7 +151,7 @@ const FilterSelect = ({
                   onMouseDown={(event) => event.preventDefault()}
                   disabled={optionDisabled}
                   onClick={() => handleSelect(optionValue)}
-                  className={`flex w-full items-center justify-end rounded-sm px-3 py-2 text-right text-sm transition-colors hover:bg-secondary-f hover:text-primary-s disabled:cursor-not-allowed disabled:opacity-50 ${
+                  className={`flex w-full items-center justify-start rounded-sm px-3 py-2 text-right text-sm transition-colors hover:bg-secondary-f hover:text-primary-s disabled:cursor-not-allowed disabled:opacity-50 ${
                     isSelected ? "bg-secondary-f/20 font-semibold" : ""
                   }`}
                 >

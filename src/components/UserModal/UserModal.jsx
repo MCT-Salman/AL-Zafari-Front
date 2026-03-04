@@ -37,7 +37,7 @@ export default function UserModal({ user, onClose, onSave }) {
         try {
           const response = await userApi.getUserById(user.id);
           const userData = getApiData(response, null);
-          console.log("Loaded user details:", userData); // Debug log
+          // console.log("Loaded user details:", userData); // Debug log
           setFormData({
             username: userData.username || "",
             full_name: userData.full_name || "",
@@ -46,7 +46,7 @@ export default function UserModal({ user, onClose, onSave }) {
             password: "",
           });
         } catch (err) {
-          console.error("Error loading user details:", err);
+          // console.error("Error loading user details:", err);
           // Fallback to the user object passed as prop
           setFormData({
             username: user.username || "",
@@ -79,7 +79,7 @@ export default function UserModal({ user, onClose, onSave }) {
   };
 
   const handleRoleChange = (value) => {
-    console.log("Role changed to:", value); // Debug log
+    // console.log("Role changed to:", value); // Debug log
     setFormData((prev) => ({
       ...prev,
       role: value,

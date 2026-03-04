@@ -44,7 +44,7 @@ export default function Settings() {
         });
       }
       } catch (err) {
-        console.error("Error loading profile:", err);
+        // console.error("Error loading profile:", err);
       }
     };
     loadProfile();

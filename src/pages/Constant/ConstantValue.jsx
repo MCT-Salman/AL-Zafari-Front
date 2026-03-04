@@ -367,7 +367,7 @@ export default function ConstantValue() {
 
     } catch (error) {
 
-      console.error("Failed to load materials:", error);
+      // console.error("Failed to load materials:", error);
 
     }
 

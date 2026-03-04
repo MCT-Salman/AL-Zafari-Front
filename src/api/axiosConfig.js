@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const baseURL = import.meta.env.VITE_API_URL;
 
-console.log('API Base URL:', baseURL);
+// console.log('API Base URL:', baseURL);
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
@@ -20,17 +20,17 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log('API Request:', {
-      method: config.method,
-      url: config.url,
-      baseURL: config.baseURL,
-      fullURL: config.baseURL + config.url,
-      hasToken: !!token,
-    });
+    // console.log('API Request:', {
+    //   method: config.method,
+    //   url: config.url,
+    //   baseURL: config.baseURL,
+    //   fullURL: config.baseURL + config.url,
+    //   hasToken: !!token,
+    // });
     return config;
   },
   (error) => {
-    console.error('Request Error:', error);
+    // console.error('Request Error:');
     return Promise.reject(error);
   }
 );
@@ -38,20 +38,20 @@ axiosInstance.interceptors.request.use(
 // رد interceptor للتعامل مع الأخطاء
 axiosInstance.interceptors.response.use(
   (response) => {
-    console.log('API Response Success:', {
-      status: response.status,
-      url: response.config.url,
-      data: response.data,
-    });
+    // console.log('API Response Success:', {
+    //   status: response.status,
+    //   url: response.config.url,
+    //   data: response.data,
+    // });
     return response;
   },
   async (error) => {
-    console.error('API Response Error:', {
-      status: error.response?.status,
-      url: error.config?.url,
-      message: error.message,
-      data: error.response?.data,
-    });
+    // console.error('API Response Error:', {
+    //   status: error.response?.status,
+    //   url: error.config?.url,
+    //   message: error.message,
+    //   data: error.response?.data,
+    // });
 
     // Normalize error message to server message if present
     const serverMessage =

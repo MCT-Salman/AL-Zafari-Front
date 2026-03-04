@@ -154,7 +154,7 @@ export default function Color() {
       const response = await materialApi.getMaterials();
       setMaterials(getApiData(response, []) || []);
     } catch (error) {
-      console.error("Failed to load materials:", error);
+      // console.error("Failed to load materials:", error);
     }
   };
 
@@ -164,7 +164,7 @@ export default function Color() {
       const response = await rulerApi.getRulers();
       setRulers(getApiData(response, []) || []);
     } catch (error) {
-      console.error("Failed to load rulers:", error);
+      // console.error("Failed to load rulers:", error);
     }
   };
 

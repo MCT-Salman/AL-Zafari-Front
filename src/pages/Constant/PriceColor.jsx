@@ -162,7 +162,7 @@ export default function PriceColor() {
       // Handle both { data: [...] } and [...] structures
       setColors(getApiData(response, []) || []);
     } catch (error) {
-      console.error("Failed to load colors:", error);
+      // console.error("Failed to load colors:", error);
     }
   };
 
@@ -172,7 +172,7 @@ export default function PriceColor() {
       const response = await rulerApi.getRulers();
       setRulers(getApiData(response, []) || []);
     } catch (error) {
-      console.error("Failed to load rulers:", error);
+      // console.error("Failed to load rulers:", error);
     }
   };
 
@@ -182,7 +182,7 @@ export default function PriceColor() {
       const response = await materialApi.getMaterials();
       setMaterials(getApiData(response, []) || []);
     } catch (error) {
-      console.error("Failed to load materials:", error);
+      // console.error("Failed to load materials:", error);
     }
   };
 

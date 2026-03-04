@@ -16,7 +16,7 @@ export const authApi = {
       const refreshToken = localStorage.getItem('refreshToken');
       await axiosInstance.post('/auth/logout', { refreshToken });
     } catch (error) {
-      console.error('Logout error:', error);
+      // console.error('Logout error:');
     } finally {
       localStorage.clear();
     }

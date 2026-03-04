@@ -3733,9 +3733,142 @@ Headers (21)
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
-الان اريد بناء هذه الصفحة كالسابق
-وايضا ملف ال api
+اريد منك تغيير هذه ال endpoints 
+// src/api/invoiceApi.js
+import axiosInstance from "./axiosConfig";
 
+export const invoiceApi = {
+  // Get all invoices
+  getInvoices: async (params = {}) => {
+    try {
+      const response = await axiosInstance.get('/invoice', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في جلب الفواتير' };
+    }
+  },
+
+  // Get invoice by ID
+  getInvoiceById: async (id) => {
+    try {
+      const response = await axiosInstance.get(`/invoice/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في جلب الفاتورة' };
+    }
+  },
+
+  // Get invoices by customer ID
+  getInvoicesByCustomerId: async (customerId, params = {}) => {
+    try {
+      const response = await axiosInstance.get(`/invoice/customer/${customerId}`, { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في جلب فواتير العميل' };
+    }
+  },
+
+  // Get invoices by order ID
+  getInvoicesByOrderId: async (orderId, params = {}) => {
+    try {
+      const response = await axiosInstance.get(`/invoice/order/${orderId}`, { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في جلب فواتير الطلب' };
+    }
+  },
+
+  // Create new invoice
+  createInvoice: async (invoiceData) => {
+    try {
+      const response = await axiosInstance.post('/invoice', invoiceData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في إنشاء الفاتورة' };
+    }
+  },
+
+  // Update invoice
+  updateInvoice: async (id, invoiceData) => {
+    try {
+      const response = await axiosInstance.put(`/invoice/${id}`, invoiceData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في تحديث الفاتورة' };
+    }
+  },
+
+  // Delete invoice
+  deleteInvoice: async (id) => {
+    try {
+      const response = await axiosInstance.delete(`/invoice/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في حذف الفاتورة' };
+    }
+  },
+
+  // Add payment to invoice
+  addPayment: async (id, paymentData) => {
+    try {
+      const response = await axiosInstance.post(`/invoice/${id}/payment`, paymentData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في إضافة الدفعة' };
+    }
+  },
+
+  // Helper functions
+  getFormattedDate: (dateString) => {
+    if (!dateString) return 'غير محدد';
+    return new Date(dateString).toLocaleDateString("ar-EG", {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  },
+
+  formatCurrency: (amount) => {
+    const num = parseFloat(amount) || 0;
+    const formatted = new Intl.NumberFormat("ar-EG", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(num);
+    return `${formatted} ل.س`;
+  },
+
+  getPaymentStatus: (total, paid) => {
+    const totalNum = parseFloat(total) || 0;
+    const paidNum = parseFloat(paid) || 0;
+    
+    if (totalNum === 0) return { label: 'غير محدد', className: 'bg-gray-100 text-gray-800' };
+    if (paidNum >= totalNum) return { label: 'مدفوع بالكامل', className: 'bg-green-100 text-green-800' };
+    if (paidNum === 0) return { label: 'غير مدفوع', className: 'bg-red-100 text-red-800' };
+    return { label: 'مدفوع جزئياً', className: 'bg-yellow-100 text-yellow-800' };
+  },
+
+  getPaymentProgress: (total, paid) => {
+    const totalNum = parseFloat(total) || 0;
+    const paidNum = parseFloat(paid) || 0;
+    if (totalNum === 0) return 0;
+    return Math.min((paidNum / totalNum) * 100, 100);
+  },
+
+  formatCustomerInfo: (customer) => {
+    if (!customer) return 'غير محدد';
+    const name = customer.name || 'غير محدد';
+    const phone = customer.phone || 'غير محدد';
+    return `${name} - ${phone}`;
+  },
+
+  formatUserInfo: (user) => {
+    if (!user) return 'غير محدد';
+    return user.full_name || user.username || 'غير محدد';
+  }
+};
+الى هذه 
 GET
 get invoice
 {{autolocal}}/invoice
@@ -3751,30 +3884,59 @@ curl --location -g '{{autolocal}}/invoice'
 200 OK
 Example Response
 Body
-Headers (20)
+Headers (21)
 {
   "success": true,
   "message": "تم جلب الفواتير بنجاح",
   "data": [
     {
-      "invoice_id": 8,
-      "order_id": 1,
+      "invoice_id": 9,
+      "order_id": null,
       "customer_id": 1,
-      "total_amount": "1194000",
-      "paid_amount": "1190000",
-      "remaining_amount": "4000",
+      "discount": "200",
+      "total_amount": "5000000",
+      "paid_amount": "4555000",
+      "remaining_amount": "444800",
       "issued_by": 1,
-      "issued_at": "2026-02-08T12:20:42.834Z",
-      "notes": "دفعة أولى",
-      "order": {
-        "order_id": 1,
-        "customer_id": 1,
-        "sales_user_id": 1,
-        "status": "completed",
-        "total_amount": "1194000",
-        "created_at": "2026-02-03T13:17:30.945Z",
-        "notes": "تحديث ملاحظات الطلب"
-      },
+      "issued_at": "2026-03-04T07:50:53.459Z",
+      "notes": null,
+      "invoiceItems": [
+        {
+          "invoice_item_id": 5,
+          "invoice_id": 9,
+          "type_item": "Machine",
+          "color_id": 1,
+          "width": "22",
+          "length": "150",
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "5000",
+          "subtotal": "250000",
+          "notes": null,
+          "color": {
+            "color_id": 1,
+            "ruler_id": 2,
+            "color_code": "RED003",
+            "color_name": "أحمر غامق",
+            "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+            "notes": "ملاحظات",
+            "ruler": {
+              "ruler_id": 2,
+              "ruler_name": "مسطرة قديمة",
+              "entry_date": "2024-01-15T10:30:00.000Z",
+              "material_id": 1,
+              "notes": "ملاحظات",
+              "material": {
+                "material_id": 1,
+                "material_name": "أحرف PVC",
+                "constant_value_unit": "متر",
+                "notes": "ملاحظات"
+              }
+            }
+          }
+        }
+      ],
       "customer": {
         "customer_id": 1,
         "name": "الزفري",
@@ -3784,338 +3946,66 @@ Headers (20)
         "address": "عربين",
         "country": "SY",
         "countryCode": "+963",
-        "balance": "4000",
+        "balance": "376179200",
         "is_active": true,
         "fcmToken": null,
         "notes": "ملاحظات",
-        "created_at": "2026-02-03T10:12:30.517Z"
-      },
-      "user": {
-        "id": 1,
-        "username": "admin",
-        "full_name": "Administrator"
-      }
-    }
-  ],
-  "total": 1
-}
----------------------
-GET
-get invoicebyid
-{{autolocal}}/invoice/8
-AUTHORIZATION
-Bearer Token
-Token
-<token>
-
-Example Request
-true
-curl
-curl --location -g '{{autolocal}}/invoice/8'
-200 OK
-Example Response
-Body
-Headers (21)
-{
-  "success": true,
-  "message": "تم جلب الفاتورة بنجاح",
-  "data": {
-    "invoice_id": 8,
-    "order_id": 1,
-    "customer_id": 1,
-    "total_amount": "1194000",
-    "paid_amount": "1190000",
-    "remaining_amount": "4000",
-    "issued_by": 1,
-    "issued_at": "2026-02-08T12:20:42.834Z",
-    "notes": "دفعة أولى",
-    "order": {
-      "order_id": 1,
-      "customer_id": 1,
-      "sales_user_id": 1,
-      "status": "completed",
-      "total_amount": "1194000",
-      "created_at": "2026-02-03T13:17:30.945Z",
-      "notes": "تحديث ملاحظات الطلب",
-      "items": [
-        {
-          "order_item_id": 47,
-          "order_id": 1,
-          "type_item": 7,
-          "ruler_id": 1,
-          "constant_width": "22",
-          "length": "100",
-          "constant_thickness": "0.6",
-          "batch_id": 1,
-          "quantity": 50,
-          "unit_price": "150",
-          "subtotal": "746250",
-          "notes": "تحديث ملاحظات العنصر",
-          "ruler": {
-            "ruler_id": 1,
-            "ruler_type": "new",
-            "material_id": 2,
-            "color_id": 2,
-            "notes": "ملاحظات",
-            "material": {
-              "material_id": 2,
-              "material_name": "pvc",
-              "type": "Role",
-              "constant_height_id": 5,
-              "constant_width_id": 3,
-              "constant_thickness_id": 6,
-              "constant_value_unit": "متر",
-              "notes": "ملاحظات"
-            },
-            "color": {
-              "color_id": 2,
-              "material_id": 2,
-              "color_code": "RED002",
-              "color_name": "أحمر لولي",
-              "notes": "ملاحظات"
-            }
-          },
-          "batch": {
-            "batch_id": 1,
-            "batch_number": "BATCH-2024-001",
-            "entry_date": "2024-01-15T10:30:00.000Z",
-            "material_id": 2,
-            "notes": "ملاحظات"
-          }
-        },
-        {
-          "order_item_id": 48,
-          "order_id": 1,
-          "type_item": 8,
-          "ruler_id": 2,
-          "constant_width": "44",
-          "length": "100",
-          "constant_thickness": "0.6",
-          "batch_id": 1,
-          "quantity": 30,
-          "unit_price": "50",
-          "subtotal": "149250",
-          "notes": "عنصر جديد",
-          "ruler": {
-            "ruler_id": 2,
-            "ruler_type": "old",
-            "material_id": 2,
-            "color_id": 2,
-            "notes": "ملاحظات",
-            "material": {
-              "material_id": 2,
-              "material_name": "pvc",
-              "type": "Role",
-              "constant_height_id": 5,
-              "constant_width_id": 3,
-              "constant_thickness_id": 6,
-              "constant_value_unit": "متر",
-              "notes": "ملاحظات"
-            },
-            "color": {
-              "color_id": 2,
-              "material_id": 2,
-              "color_code": "RED002",
-              "color_name": "أحمر لولي",
-              "notes": "ملاحظات"
-            }
-          },
-          "batch": {
-            "batch_id": 1,
-            "batch_number": "BATCH-2024-001",
-            "entry_date": "2024-01-15T10:30:00.000Z",
-            "material_id": 2,
-            "notes": "ملاحظات"
-          }
-        },
-        {
-          "order_item_id": 49,
-          "order_id": 1,
-          "type_item": 8,
-          "ruler_id": 2,
-          "constant_width": "44",
-          "length": "100",
-          "constant_thickness": "0.6",
-          "batch_id": 1,
-          "quantity": 30,
-          "unit_price": "50",
-          "subtotal": "149250",
-          "notes": "عنصر جديد",
-          "ruler": {
-            "ruler_id": 2,
-            "ruler_type": "old",
-            "material_id": 2,
-            "color_id": 2,
-            "notes": "ملاحظات",
-            "material": {
-              "material_id": 2,
-              "material_name": "pvc",
-              "type": "Role",
-              "constant_height_id": 5,
-              "constant_width_id": 3,
-              "constant_thickness_id": 6,
-              "constant_value_unit": "متر",
-              "notes": "ملاحظات"
-            },
-            "color": {
-              "color_id": 2,
-              "material_id": 2,
-              "color_code": "RED002",
-              "color_name": "أحمر لولي",
-              "notes": "ملاحظات"
-            }
-          },
-          "batch": {
-            "batch_id": 1,
-            "batch_number": "BATCH-2024-001",
-            "entry_date": "2024-01-15T10:30:00.000Z",
-            "material_id": 2,
-            "notes": "ملاحظات"
-          }
-        },
-        {
-          "order_item_id": 50,
-          "order_id": 1,
-          "type_item": 8,
-          "ruler_id": 2,
-          "constant_width": "44",
-          "length": "100",
-          "constant_thickness": "0.6",
-          "batch_id": 1,
-          "quantity": 30,
-          "unit_price": "50",
-          "subtotal": "149250",
-          "notes": "عنصر جديد",
-          "ruler": {
-            "ruler_id": 2,
-            "ruler_type": "old",
-            "material_id": 2,
-            "color_id": 2,
-            "notes": "ملاحظات",
-            "material": {
-              "material_id": 2,
-              "material_name": "pvc",
-              "type": "Role",
-              "constant_height_id": 5,
-              "constant_width_id": 3,
-              "constant_thickness_id": 6,
-              "constant_value_unit": "متر",
-              "notes": "ملاحظات"
-            },
-            "color": {
-              "color_id": 2,
-              "material_id": 2,
-              "color_code": "RED002",
-              "color_name": "أحمر لولي",
-              "notes": "ملاحظات"
-            }
-          },
-          "batch": {
-            "batch_id": 1,
-            "batch_number": "BATCH-2024-001",
-            "entry_date": "2024-01-15T10:30:00.000Z",
-            "material_id": 2,
-            "notes": "ملاحظات"
-          }
-        }
-      ]
-    },
-    "customer": {
-      "customer_id": 1,
-      "name": "الزفري",
-      "phone": "+963912345678",
-      "customer_type": "customer",
-      "city": "دمشق",
-      "address": "عربين",
-      "country": "SY",
-      "countryCode": "+963",
-      "balance": "4000",
-      "is_active": true,
-      "fcmToken": null,
-      "notes": "ملاحظات",
-      "created_at": "2026-02-03T10:12:30.517Z"
-    },
-    "user": {
-      "id": 1,
-      "username": "admin",
-      "full_name": "Administrator"
-    }
-  }
-}
-------------------------
-GET
-getInvoicesbyCustomerId
-Example Request
-true
-curl
-curl --location -g '{{autolocal}}/invoice/customer/1'
-200 OK
-Example Response
-Body
-Headers (20)
-{
-  "success": true,
-  "message": "تم جلب الفواتير بنجاح",
-  "data": [
-    {
-      "invoice_id": 1,
-      "order_id": 1,
-      "customer_id": 1,
-      "total_amount": "18000000000",
-      "paid_amount": "801800000",
-      "remaining_amount": "17198200000",
-      "issued_by": 1,
-      "issued_at": "2026-02-24T08:44:05.091Z",
-      "notes": "دفعة أولى",
-      "order": {
-        "order_id": 1,
-        "customer_id": 1,
-        "sales_user_id": 1,
-        "status": "completed",
-        "total_amount": "18000000000",
-        "created_at": "2026-02-24T08:10:11.103Z",
-        "notes": "ملاحظات الطلب"
+        "created_at": "2026-02-24T08:04:30.900Z"
       },
       "user": {
         "id": 1,
         "username": "admin",
         "full_name": "System Administrator"
       }
-    }
-  ]
-}
-----------------------
-GET
-getInvoicesbyOrderId
-{{autolocal}}/invoice/order/1
-AUTHORIZATION
-Bearer Token
-Token
-<token>
-
-Example Request
-true
-curl
-curl --location -g '{{autolocal}}/invoice/order/1'
-200 OK
-Example Response
-Body
-Headers (20)
------------------------------
-{
-  "success": true,
-  "message": "تم جلب الفواتير بنجاح",
-  "data": [
+    },
     {
-      "invoice_id": 1,
-      "order_id": 1,
+      "invoice_id": 8,
+      "order_id": null,
       "customer_id": 1,
-      "total_amount": "18000000000",
-      "paid_amount": "801800000",
-      "remaining_amount": "17198200000",
+      "discount": "200",
+      "total_amount": "5000000",
+      "paid_amount": "4555000",
+      "remaining_amount": "444800",
       "issued_by": 1,
-      "issued_at": "2026-02-24T08:44:05.091Z",
-      "notes": "دفعة أولى",
+      "issued_at": "2026-03-03T13:49:47.102Z",
+      "notes": null,
+      "invoiceItems": [
+        {
+          "invoice_item_id": 4,
+          "invoice_id": 8,
+          "type_item": "Machine",
+          "color_id": 1,
+          "width": "22",
+          "length": "150",
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "5000",
+          "subtotal": "250000",
+          "notes": null,
+          "color": {
+            "color_id": 1,
+            "ruler_id": 2,
+            "color_code": "RED003",
+            "color_name": "أحمر غامق",
+            "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+            "notes": "ملاحظات",
+            "ruler": {
+              "ruler_id": 2,
+              "ruler_name": "مسطرة قديمة",
+              "entry_date": "2024-01-15T10:30:00.000Z",
+              "material_id": 1,
+              "notes": "ملاحظات",
+              "material": {
+                "material_id": 1,
+                "material_name": "أحرف PVC",
+                "constant_value_unit": "متر",
+                "notes": "ملاحظات"
+              }
+            }
+          }
+        }
+      ],
       "customer": {
         "customer_id": 1,
         "name": "الزفري",
@@ -4125,7 +4015,145 @@ Headers (20)
         "address": "عربين",
         "country": "SY",
         "countryCode": "+963",
-        "balance": "17198200000",
+        "balance": "376179200",
+        "is_active": true,
+        "fcmToken": null,
+        "notes": "ملاحظات",
+        "created_at": "2026-02-24T08:04:30.900Z"
+      },
+      "user": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "System Administrator"
+      }
+    },
+    {
+      "invoice_id": 7,
+      "order_id": null,
+      "customer_id": 1,
+      "discount": "200",
+      "total_amount": "5000000",
+      "paid_amount": "4555000",
+      "remaining_amount": "444800",
+      "issued_by": 1,
+      "issued_at": "2026-03-03T13:49:25.652Z",
+      "notes": null,
+      "invoiceItems": [
+        {
+          "invoice_item_id": 3,
+          "invoice_id": 7,
+          "type_item": "Machine",
+          "color_id": 1,
+          "width": "22",
+          "length": "150",
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "5000",
+          "subtotal": "250000",
+          "notes": null,
+          "color": {
+            "color_id": 1,
+            "ruler_id": 2,
+            "color_code": "RED003",
+            "color_name": "أحمر غامق",
+            "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+            "notes": "ملاحظات",
+            "ruler": {
+              "ruler_id": 2,
+              "ruler_name": "مسطرة قديمة",
+              "entry_date": "2024-01-15T10:30:00.000Z",
+              "material_id": 1,
+              "notes": "ملاحظات",
+              "material": {
+                "material_id": 1,
+                "material_name": "أحرف PVC",
+                "constant_value_unit": "متر",
+                "notes": "ملاحظات"
+              }
+            }
+          }
+        }
+      ],
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين",
+        "country": "SY",
+        "countryCode": "+963",
+        "balance": "376179200",
+        "is_active": true,
+        "fcmToken": null,
+        "notes": "ملاحظات",
+        "created_at": "2026-02-24T08:04:30.900Z"
+      },
+      "user": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "System Administrator"
+      }
+    },
+    {
+      "invoice_id": 6,
+      "order_id": null,
+      "customer_id": 1,
+      "discount": "200",
+      "total_amount": "5000000",
+      "paid_amount": "4555000",
+      "remaining_amount": "444800",
+      "issued_by": 1,
+      "issued_at": "2026-03-03T13:49:07.540Z",
+      "notes": null,
+      "invoiceItems": [
+        {
+          "invoice_item_id": 2,
+          "invoice_id": 6,
+          "type_item": "Machine",
+          "color_id": 1,
+          "width": "22",
+          "length": "150",
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "5000",
+          "subtotal": "250000",
+          "notes": null,
+          "color": {
+            "color_id": 1,
+            "ruler_id": 2,
+            "color_code": "RED003",
+            "color_name": "أحمر غامق",
+            "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+            "notes": "ملاحظات",
+            "ruler": {
+              "ruler_id": 2,
+              "ruler_name": "مسطرة قديمة",
+              "entry_date": "2024-01-15T10:30:00.000Z",
+              "material_id": 1,
+              "notes": "ملاحظات",
+              "material": {
+                "material_id": 1,
+                "material_name": "أحرف PVC",
+                "constant_value_unit": "متر",
+                "notes": "ملاحظات"
+              }
+            }
+          }
+        }
+      ],
+      "customer": {
+        "customer_id": 1,
+        "name": "الزفري",
+        "phone": "+963912345678",
+        "customer_type": "customer",
+        "city": "دمشق",
+        "address": "عربين",
+        "country": "SY",
+        "countryCode": "+963",
+        "balance": "376179200",
         "is_active": true,
         "fcmToken": null,
         "notes": "ملاحظات",
@@ -4137,9 +4165,399 @@ Headers (20)
         "full_name": "System Administrator"
       }
     }
+  ],
+  "total": 4
+}
+-------------------
+GET
+get invoicebyid
+{{autolocal}}/invoice/8
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/invoice/9'
+200 OK
+Example Response
+Body
+Headers (21)
+{
+  "success": true,
+  "message": "تم جلب الفاتورة بنجاح",
+  "data": {
+    "invoice_id": 9,
+    "order_id": null,
+    "customer_id": 1,
+    "discount": "200",
+    "total_amount": "5000000",
+    "paid_amount": "4555000",
+    "remaining_amount": "444800",
+    "issued_by": 1,
+    "issued_at": "2026-03-04T07:50:53.459Z",
+    "notes": null,
+    "invoiceItems": [
+      {
+        "invoice_item_id": 5,
+        "invoice_id": 9,
+        "type_item": "Machine",
+        "color_id": 1,
+        "width": "22",
+        "length": "150",
+        "thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 50,
+        "unit_price": "5000",
+        "subtotal": "250000",
+        "notes": null,
+        "color": {
+          "color_id": 1,
+          "ruler_id": 2,
+          "color_code": "RED003",
+          "color_name": "أحمر غامق",
+          "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+          "notes": "ملاحظات",
+          "ruler": {
+            "ruler_id": 2,
+            "ruler_name": "مسطرة قديمة",
+            "entry_date": "2024-01-15T10:30:00.000Z",
+            "material_id": 1,
+            "notes": "ملاحظات",
+            "material": {
+              "material_id": 1,
+              "material_name": "أحرف PVC",
+              "constant_value_unit": "متر",
+              "notes": "ملاحظات"
+            }
+          }
+        },
+        "batch": {
+          "batch_id": 1,
+          "batch_number": "2024-001",
+          "entry_date": "2024-01-15T10:30:00.000Z",
+          "material_id": 2,
+          "notes": "ملاحظات"
+        }
+      }
+    ],
+    "customer": {
+      "customer_id": 1,
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين",
+      "country": "SY",
+      "countryCode": "+963",
+      "balance": "376179200",
+      "is_active": true,
+      "fcmToken": null,
+      "notes": "ملاحظات",
+      "created_at": "2026-02-24T08:04:30.900Z"
+    },
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "full_name": "System Administrator"
+    }
+  }
+}
+--------------------------
+GET
+getInvoicesbyCustomerId
+{{autolocal}}/invoice/customer/1
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/invoice/customer/1'
+200 OK
+Example Response
+Body
+Headers (21)
+{
+  "success": true,
+  "message": "تم جلب الفواتير بنجاح",
+  "data": [
+    {
+      "invoice_id": 9,
+      "order_id": null,
+      "customer_id": 1,
+      "discount": "200",
+      "total_amount": "5000000",
+      "paid_amount": "4555000",
+      "remaining_amount": "444800",
+      "issued_by": 1,
+      "issued_at": "2026-03-04T07:50:53.459Z",
+      "notes": null,
+      "invoiceItems": [
+        {
+          "invoice_item_id": 5,
+          "invoice_id": 9,
+          "type_item": "Machine",
+          "color_id": 1,
+          "width": "22",
+          "length": "150",
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "5000",
+          "subtotal": "250000",
+          "notes": null,
+          "color": {
+            "color_id": 1,
+            "ruler_id": 2,
+            "color_code": "RED003",
+            "color_name": "أحمر غامق",
+            "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+            "notes": "ملاحظات",
+            "ruler": {
+              "ruler_id": 2,
+              "ruler_name": "مسطرة قديمة",
+              "entry_date": "2024-01-15T10:30:00.000Z",
+              "material_id": 1,
+              "notes": "ملاحظات",
+              "material": {
+                "material_id": 1,
+                "material_name": "أحرف PVC",
+                "constant_value_unit": "متر",
+                "notes": "ملاحظات"
+              }
+            }
+          }
+        }
+      ],
+      "order": null,
+      "user": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "System Administrator"
+      }
+    },
+    {
+      "invoice_id": 8,
+      "order_id": null,
+      "customer_id": 1,
+      "discount": "200",
+      "total_amount": "5000000",
+      "paid_amount": "4555000",
+      "remaining_amount": "444800",
+      "issued_by": 1,
+      "issued_at": "2026-03-03T13:49:47.102Z",
+      "notes": null,
+      "invoiceItems": [
+        {
+          "invoice_item_id": 4,
+          "invoice_id": 8,
+          "type_item": "Machine",
+          "color_id": 1,
+          "width": "22",
+          "length": "150",
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "5000",
+          "subtotal": "250000",
+          "notes": null,
+          "color": {
+            "color_id": 1,
+            "ruler_id": 2,
+            "color_code": "RED003",
+            "color_name": "أحمر غامق",
+            "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+            "notes": "ملاحظات",
+            "ruler": {
+              "ruler_id": 2,
+              "ruler_name": "مسطرة قديمة",
+              "entry_date": "2024-01-15T10:30:00.000Z",
+              "material_id": 1,
+              "notes": "ملاحظات",
+              "material": {
+                "material_id": 1,
+                "material_name": "أحرف PVC",
+                "constant_value_unit": "متر",
+                "notes": "ملاحظات"
+              }
+            }
+          }
+        }
+      ],
+      "order": null,
+      "user": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "System Administrator"
+      }
+    },
+    {
+      "invoice_id": 7,
+      "order_id": null,
+      "customer_id": 1,
+      "discount": "200",
+      "total_amount": "5000000",
+      "paid_amount": "4555000",
+      "remaining_amount": "444800",
+      "issued_by": 1,
+      "issued_at": "2026-03-03T13:49:25.652Z",
+      "notes": null,
+      "invoiceItems": [
+        {
+          "invoice_item_id": 3,
+          "invoice_id": 7,
+          "type_item": "Machine",
+          "color_id": 1,
+          "width": "22",
+          "length": "150",
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "5000",
+          "subtotal": "250000",
+          "notes": null,
+          "color": {
+            "color_id": 1,
+            "ruler_id": 2,
+            "color_code": "RED003",
+            "color_name": "أحمر غامق",
+            "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+            "notes": "ملاحظات",
+            "ruler": {
+              "ruler_id": 2,
+              "ruler_name": "مسطرة قديمة",
+              "entry_date": "2024-01-15T10:30:00.000Z",
+              "material_id": 1,
+              "notes": "ملاحظات",
+              "material": {
+                "material_id": 1,
+                "material_name": "أحرف PVC",
+                "constant_value_unit": "متر",
+                "notes": "ملاحظات"
+              }
+            }
+          }
+        }
+      ],
+      "order": null,
+      "user": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "System Administrator"
+      }
+    },
+    {
+      "invoice_id": 6,
+      "order_id": null,
+      "customer_id": 1,
+      "discount": "200",
+      "total_amount": "5000000",
+      "paid_amount": "4555000",
+      "remaining_amount": "444800",
+      "issued_by": 1,
+      "issued_at": "2026-03-03T13:49:07.540Z",
+      "notes": null,
+      "invoiceItems": [
+        {
+          "invoice_item_id": 2,
+          "invoice_id": 6,
+          "type_item": "Machine",
+          "color_id": 1,
+          "width": "22",
+          "length": "150",
+          "thickness": "0.6",
+          "batch_id": 1,
+          "quantity": 50,
+          "unit_price": "5000",
+          "subtotal": "250000",
+          "notes": null,
+          "color": {
+            "color_id": 1,
+            "ruler_id": 2,
+            "color_code": "RED003",
+            "color_name": "أحمر غامق",
+            "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+            "notes": "ملاحظات",
+            "ruler": {
+              "ruler_id": 2,
+              "ruler_name": "مسطرة قديمة",
+              "entry_date": "2024-01-15T10:30:00.000Z",
+              "material_id": 1,
+              "notes": "ملاحظات",
+              "material": {
+                "material_id": 1,
+                "material_name": "أحرف PVC",
+                "constant_value_unit": "متر",
+                "notes": "ملاحظات"
+              }
+            }
+          }
+        }
+      ],
+      "order": null,
+      "user": {
+        "id": 1,
+        "username": "admin",
+        "full_name": "System Administrator"
+      }
+    }
   ]
 }
----------------------------
+-------------------------
+POST
+get price
+{{autolocal}}/invoice/price-material
+AUTHORIZATION
+Bearer Token
+Token
+<token>
+
+Body
+raw (json)
+json
+{
+    "type_item": "Machine",
+    "color_id": 1,
+    "width": 22,
+    "length": 150.0,
+    "quantity": 50
+}
+Example Request
+true
+curl
+curl --location -g '{{autolocal}}/invoice/price-material' \
+--data '{
+    "type_item": "Machine",
+    "color_id": 1,
+    "width": 22,
+    "length": 150.0,
+    "quantity": 50
+}'
+200 OK
+Example Response
+Body
+Headers (20)
+{
+  "success": true,
+  "message": "تم جلب سعر المتر بنجاح",
+  "data": {
+    "unitPrice": 1200000,
+    "quantity": 50,
+    "length": 150,
+    "totalQuantity": 7500,
+    "subtotal": 9000000000,
+    "discountType": "percentage",
+    "discountValue": 0.5,
+    "discount": 45000000,
+    "total": 8955000000
+  }
+}
+------------------------
 POST
 create invoice
 {{autolocal}}/invoice
@@ -4150,38 +4568,84 @@ Token
 
 Body
 raw (json)
-json
 {
-  "order_id": 1,          
-  "paid_amount":  20000,
-  "notes": "دفعة أولى"     
+    "customer_id": 1,
+    "total_amount": 5000000,
+    "discount": 200,
+    "paid_amount": 4555000,
+    "items": [
+        {
+            "type_item": "Machine",
+            "color_id": 1,
+            "width": 22,
+            "length": 150.0,
+            "thickness": 0.6,
+            "batch_id": 1,
+            "quantity": 50,
+            "unit_price": 5000,
+            "subtotal": 250000,
+            "notes": "ملاحظات العنصر"
+        }
+    ]
 }
-Example Request
-true
-curl
-curl --location -g '{{autolocal}}/invoice' \
---data '{
-  "order_id": 2,          
-  "paid_amount":  0,
-  "notes": "دفعة أولى"     
-}'
-201 Created
-Example Response
-Body
-Headers (21)
 {
   "success": true,
   "message": "تم إنشاء الفاتورة بنجاح",
   "data": {
-    "invoice_id": 4,
-    "order_id": 2,
+    "invoice_id": 10,
+    "order_id": null,
     "customer_id": 1,
-    "total_amount": "124800000",
-    "paid_amount": "0",
-    "remaining_amount": "124800000",
+    "discount": "200",
+    "total_amount": "5000000",
+    "paid_amount": "4555000",
+    "remaining_amount": "444800",
     "issued_by": 1,
-    "issued_at": "2026-02-24T09:30:38.490Z",
-    "notes": "دفعة أولى",
+    "issued_at": "2026-03-04T08:21:46.367Z",
+    "notes": null,
+    "invoiceItems": [
+      {
+        "invoice_item_id": 6,
+        "invoice_id": 10,
+        "type_item": "Machine",
+        "color_id": 1,
+        "width": "22",
+        "length": "150",
+        "thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 50,
+        "unit_price": "5000",
+        "subtotal": "250000",
+        "notes": null,
+        "color": {
+          "color_id": 1,
+          "ruler_id": 2,
+          "color_code": "RED003",
+          "color_name": "أحمر غامق",
+          "imageUrl": "/uploads/images/colors/1771920129415-555477717.png",
+          "notes": "ملاحظات",
+          "ruler": {
+            "ruler_id": 2,
+            "ruler_name": "مسطرة قديمة",
+            "entry_date": "2024-01-15T10:30:00.000Z",
+            "material_id": 1,
+            "notes": "ملاحظات",
+            "material": {
+              "material_id": 1,
+              "material_name": "أحرف PVC",
+              "constant_value_unit": "متر",
+              "notes": "ملاحظات"
+            }
+          }
+        },
+        "batch": {
+          "batch_id": 1,
+          "batch_number": "2024-001",
+          "entry_date": "2024-01-15T10:30:00.000Z",
+          "material_id": 2,
+          "notes": "ملاحظات"
+        }
+      }
+    ],
     "customer": {
       "customer_id": 1,
       "name": "الزفري",
@@ -4191,7 +4655,7 @@ Headers (21)
       "address": "عربين",
       "country": "SY",
       "countryCode": "+963",
-      "balance": "249600000",
+      "balance": "376624000",
       "is_active": true,
       "fcmToken": null,
       "notes": "ملاحظات",
@@ -4201,52 +4665,13 @@ Headers (21)
       "id": 1,
       "username": "admin",
       "full_name": "System Administrator"
-    },
-    "order": {
-      "order_id": 2,
-      "customer_id": 1,
-      "sales_user_id": 1,
-      "status": "completed",
-      "total_amount": "124800000",
-      "created_at": "2026-02-24T08:32:56.937Z",
-      "notes": "ملاحظات الطلب",
-      "items": [
-        {
-          "order_item_id": 3,
-          "order_id": 2,
-          "type_item": null,
-          "color_id": 3,
-          "width": null,
-          "length": null,
-          "thickness": "0.6",
-          "batch_id": 1,
-          "quantity": 50,
-          "unit_price": "1560000",
-          "subtotal": "78000000",
-          "notes": "ملاحظات العنصر"
-        },
-        {
-          "order_item_id": 4,
-          "order_id": 2,
-          "type_item": null,
-          "color_id": 3,
-          "width": null,
-          "length": "1",
-          "thickness": "0.6",
-          "batch_id": 1,
-          "quantity": 30,
-          "unit_price": "1560000",
-          "subtotal": "46800000",
-          "notes": "عنصر جديد"
-        }
-      ]
     }
   }
 }
-----------------------------------
+----------------------
 PUT
 put invoice
-{{autolocal}}/invoice/6
+{{autolocal}}/invoice/10
 AUTHORIZATION
 Bearer Token
 Token
@@ -4254,42 +4679,115 @@ Token
 
 Body
 raw (json)
-json
 {
-  "paid_amount": 300000,   
-  "notes": "تم التعديل"     
+   // "customer_id": 1,
+    "total_amount": 5000000,
+    "discount": 200,
+    "paid_amount": 4555000,
+    "items": [
+        {
+            "type_item": "Machine",
+            "color_id": 1,
+            "width": 22,
+            "length": 150.0,
+            "thickness": 0.6,
+            "batch_id": 1,
+            "quantity": 50,
+            "unit_price": 5000,
+            "subtotal": 250000,
+            "notes": "ملاحظات العنصر"
+        },
+         {
+            "color_id": 3,
+            "batch_id": 1,
+            "quantity": 50,
+            "unit_price": 5000,
+            "subtotal": 250000,
+            "notes": "ملاحظات العنصر"
+        }
+    ]
 }
-Example Request
-true
-curl
-curl --location -g --request PUT '{{autolocal}}/invoice/6' \
---data '{
-  "paid_amount": 300000,   
-  "notes": "تم التعديل"     
-}'
-200 OK
-Example Response
-Body
-Headers (20)
 {
   "success": true,
   "message": "تم تحديث الفاتورة بنجاح",
   "data": {
-    "invoice_id": 6,
-    "order_id": 1,
+    "invoice_id": 10,
+    "order_id": null,
     "customer_id": 1,
-    "total_amount": "1194000",
-    "paid_amount": "300000",
-    "remaining_amount": "894000",
+    "discount": "200",
+    "total_amount": "5000000",
+    "paid_amount": "4555000",
+    "remaining_amount": "444800",
     "issued_by": 1,
-    "issued_at": "2026-02-08T12:13:01.456Z",
-    "notes": "تم التعديل"
+    "issued_at": "2026-03-04T08:21:46.367Z",
+    "notes": null,
+    "invoiceItems": [
+      {
+        "invoice_item_id": 11,
+        "invoice_id": 10,
+        "type_item": "Machine",
+        "color_id": 1,
+        "width": "22",
+        "length": "150",
+        "thickness": "0.6",
+        "batch_id": 1,
+        "quantity": 50,
+        "unit_price": "5000",
+        "subtotal": "250000",
+        "notes": "ملاحظات العنصر"
+      },
+      {
+        "invoice_item_id": 12,
+        "invoice_id": 10,
+        "type_item": null,
+        "color_id": 3,
+        "width": null,
+        "length": null,
+        "thickness": null,
+        "batch_id": 1,
+        "quantity": 50,
+        "unit_price": "5000",
+        "subtotal": "250000",
+        "notes": "ملاحظات العنصر"
+      }
+    ],
+    "customer": {
+      "customer_id": 1,
+      "name": "الزفري",
+      "phone": "+963912345678",
+      "customer_type": "customer",
+      "city": "دمشق",
+      "address": "عربين",
+      "country": "SY",
+      "countryCode": "+963",
+      "balance": "376624000",
+      "is_active": true,
+      "fcmToken": null,
+      "notes": "ملاحظات",
+      "created_at": "2026-02-24T08:04:30.900Z"
+    },
+    "user": {
+      "id": 1,
+      "phone": "0599000000",
+      "username": "admin",
+      "password": "$2b$10$dvkG8Ssq6U30RR.GrXt7n.AknNezRq5CzSaFbUPmTGRMZv4M2ZAF.",
+      "full_name": "System Administrator",
+      "role": "admin",
+      "country": null,
+      "countryCode": null,
+      "is_active": true,
+      "currentSessionId": "cmmbqls7d0001vpa0emr5zqwu",
+      "fcmToken": null,
+      "notes": null,
+      "created_at": "2026-02-24T07:56:52.486Z",
+      "updated_at": "2026-03-04T07:50:35.793Z"
+    }
   }
 }
----------------------------
+----------------------
 DELETE
 del invoice
-{{autolocal}}/invoice/1
+{{autolocal}}/invoice/10
 AUTHORIZATION
 Bearer Token
 Token
@@ -4319,10 +4817,10 @@ Headers (20)
   "success": true,
   "message": "تم حذف الفاتورة بنجاح"
 }
------------------------------------
+--------------------------
 POST
 add payment
-{{autolocal}}/invoice/1/payment
+{{autolocal}}/invoice/9/payment
 AUTHORIZATION
 Bearer Token
 Token
@@ -4332,33 +4830,35 @@ Body
 raw (json)
 json
 {
-  "payment_amount": 799800000  
+  "payment_amount": 
+	444800.00  
 }
 Example Request
 true
 curl
-curl --location -g '{{autolocal}}/invoice/8/payment' \
+curl --location -g '{{autolocal}}/invoice/9/payment' \
 --data '{
-  "payment_amount": 1170000  
+  "payment_amount": 
+	444800.00  
 }'
 200 OK
 Example Response
 Body
 Headers (20)
-
 {
   "success": true,
   "message": "تم إضافة الدفعة بنجاح",
   "data": {
-    "invoice_id": 8,
-    "order_id": 1,
+    "invoice_id": 9,
+    "order_id": null,
     "customer_id": 1,
-    "total_amount": "1194000",
-    "paid_amount": "1190000",
-    "remaining_amount": "4000",
+    "discount": "200",
+    "total_amount": "5000000",
+    "paid_amount": "4999800",
+    "remaining_amount": "0",
     "issued_by": 1,
-    "issued_at": "2026-02-08T12:20:42.834Z",
-    "notes": "دفعة أولى",
+    "issued_at": "2026-03-04T07:50:53.459Z",
+    "notes": null,
     "customer": {
       "customer_id": 1,
       "name": "الزفري",
@@ -4368,19 +4868,16 @@ Headers (20)
       "address": "عربين",
       "country": "SY",
       "countryCode": "+963",
-      "balance": "1174000",
+      "balance": "376179200",
       "is_active": true,
       "fcmToken": null,
       "notes": "ملاحظات",
-      "created_at": "2026-02-03T10:12:30.517Z"
+      "created_at": "2026-02-24T08:04:30.900Z"
     },
     "user": {
       "id": 1,
       "username": "admin",
-      "full_name": "Administrator"
+      "full_name": "System Administrator"
     }
   }
 }
-حيث اريد ان تكون الصفحة مشابهة لصفحة الطلبات المبيعات 
-ولكن في البداية يكون الجدول ثابت على اليسار كما هو اما على اليمين والنصف يكون هناك تابات بالاعلى اختار اما مسح عبر QR Code او كتابه الكود بمربع نصي 
-او اختيار ادخال يدوي وتصبح الصفحة مثل الطلبات 

@@ -36,7 +36,7 @@ export function AuthTemplate({
       await onSubmit(formData);
       // تم تسجيل الدخول بنجاح، التوجيه سيتم عبر الأب
     } catch (err) {
-      console.error(err);
+      // console.error(err);
       // الخطأ يتم التعامل معه في الأب غالباً، لكن هنا نوقف التحميل
     } finally {
       setInternalLoading(false);

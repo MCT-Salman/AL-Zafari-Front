@@ -53,7 +53,7 @@ const Profile = () => {
           });
         }
       } catch (err) {
-        console.error('Error loading profile:', err);
+        // console.error('Error loading profile:', err);
         setError('فشل في تحميل البيانات الشخصية');
       }
     };
@@ -98,7 +98,7 @@ const Profile = () => {
       }
     } catch (err) {
       setError(err.message || 'حدث خطأ في تحديث الملف الشخصي');
-      console.error('Update profile error:', err);
+      // console.error('Update profile error:', err);
     } finally {
       setLoading(false);
     }

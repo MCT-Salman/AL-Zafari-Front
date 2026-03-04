@@ -34,7 +34,8 @@ import {
     ChevronRight,
     UserPlus,
     User,
-    UserX
+    UserX,
+    FileText
 } from "lucide-react";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
@@ -94,6 +95,9 @@ export default function SimpleOrderCreation() {
     const [orders, setOrders] = useState([]);
     const [ordersLoading, setOrdersLoading] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+
+    const [orderDetails, setOrderDetails] = useState(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
 
     // Numpad
     const [numpadMode, setNumpadMode] = useState("quantity");
@@ -199,7 +203,7 @@ export default function SimpleOrderCreation() {
             setPriceColors(getApiData(priceRes, []) || []);
 
         } catch (error) {
-            console.error("Error loading data:", error);
+            // console.error("Error loading data:", error);
             toast.error("فشل في تحميل البيانات");
         } finally {
             setLoading(false);
@@ -212,7 +216,7 @@ export default function SimpleOrderCreation() {
             const response = await customerApi.getCustomers();
             setCustomers(getApiData(response, []) || []);
         } catch (error) {
-            console.error("Error loading customers:", error);
+            // console.error("Error loading customers:", error);
             toast.error("فشل في تحميل العملاء");
         } finally {
             setLoadingCustomers(false);
@@ -227,7 +231,7 @@ export default function SimpleOrderCreation() {
             setWidthValues(widthData);
             setFormData(prev => ({ ...prev, width: "" }));
         } catch (error) {
-            console.error("Error loading widths:", error);
+            // console.error("Error loading widths:", error);
             toast.error("فشل في تحميل قيم العرض");
             setWidthValues([]);
         } finally {
@@ -241,7 +245,7 @@ export default function SimpleOrderCreation() {
             const response = await orderApi.getOrders();
             setOrders(getApiData(response, []) || []);
         } catch (error) {
-            console.error("Error loading orders:", error);
+            // console.error("Error loading orders:", error);
             toast.error("فشل في تحميل الطلبات");
         } finally {
             setOrdersLoading(false);
@@ -269,7 +273,7 @@ export default function SimpleOrderCreation() {
                 notes: newCustomer.notes || ""
             };
 
-            console.log("Creating customer with data:", customerData);
+            // console.log("Creating customer with data:", customerData);
             
             const response = await customerApi.createCustomer(customerData);
             const createdCustomer = getApiData(response, {});
@@ -290,7 +294,7 @@ export default function SimpleOrderCreation() {
                 });
             }
         } catch (error) {
-            console.error("Error creating customer:", error);
+            // console.error("Error creating customer:", error);
             toast.error(error.response?.data?.message || "فشل في إنشاء الزبون");
         } finally {
             setLoading(false);
@@ -589,7 +593,7 @@ export default function SimpleOrderCreation() {
                 orderData.customer_id = Number(selectedCustomer.customer_id);
             }
 
-            console.log("Saving order:", orderData);
+            // console.log("Saving order:", orderData);
             await orderApi.createOrder(orderData);
             
             toast.success("تم حفظ الطلب بنجاح");
@@ -601,7 +605,7 @@ export default function SimpleOrderCreation() {
             setEditingItemId(null);
             
         } catch (error) {
-            console.error("Error saving order:", error);
+            // console.error("Error saving order:", error);
             toast.error("فشل في حفظ الطلب");
         } finally {
             setLoading(false);
@@ -611,6 +615,26 @@ export default function SimpleOrderCreation() {
     const handleConfirmSave = async () => {
         await saveOrder();
     };
+
+    const handleViewOrderDetails = async (order) => {
+    try {
+        setLoadingDetails(true);
+        // استخدم order.order_id لأن order هو من قائمة الطلبات
+        const response = await orderApi.getOrderById(order.order_id);
+        
+        if (response.success && response.data) {
+            // البيانات الكاملة موجودة في response.data
+            setOrderDetails(response.data);
+        } else {
+            toast.error("فشل في جلب تفاصيل الطلب");
+        }
+    } catch (error) {
+        console.error("Error fetching order details:", error);
+        toast.error("حدث خطأ في جلب تفاصيل الطلب");
+    } finally {
+        setLoadingDetails(false);
+    }
+};
 
     const clearAllItems = () => {
         if (orderItems.length > 0) {
@@ -740,6 +764,15 @@ export default function SimpleOrderCreation() {
                             <Button
                                 size="lg"
                                 variant="outline"
+                                onClick={() => navigate("/invoice")}
+                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            >
+                                <FileText className="w-5 h-5 ml-2" />
+                                الفواتير
+                            </Button>
+                            <Button
+                                size="lg"
+                                variant="outline"
                                 onClick={() => navigate("/customers")}
                                 className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
                             >
@@ -784,11 +817,11 @@ export default function SimpleOrderCreation() {
             {/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
                 {viewMode === "create" ? (
-                    <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_2.2fr_1.6fr] gap-3 h-full min-h-0">
+                    <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-3 h-full min-h-0">
                         {/* العمود الأيمن - المواد والأرقام */}
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
                             {/* أزرار المواد */}
-                            <Card className="flex-shrink-0 p-4">
+                            <Card className="flex-1 p-4 flex flex-col">
                                 <Label className="font-bold text-base mb-3 block">المادة</Label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
                                     {materials.map(m => (
@@ -815,7 +848,7 @@ export default function SimpleOrderCreation() {
                             {/* الأرقام */}
                             <Card className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
                                 <div className="flex-shrink-0 mb-2">
-                                    <div className="flex gap-2 mb-2">
+                                    {/* <div className="flex gap-2 mb-2">
                                         <button
                                             onClick={() => {
                                                 setNumpadMode("colorSearch");
@@ -848,7 +881,7 @@ export default function SimpleOrderCreation() {
                                         >
                                             كتابة الكمية
                                         </button>
-                                    </div>
+                                    </div> */}
 
                                     <div className="bg-gray-100 rounded-lg py-2 px-3">
                                         <div className="text-xs text-gray-500 mb-0.5">
@@ -941,7 +974,7 @@ export default function SimpleOrderCreation() {
 
                             {!isSelectedMaterialBoard && (
                                 <div className="flex-shrink-0 p-3 border-b-2 border-dashed border-gray-300">
-                                    <Label className="font-bold text-sm mb-2 block">نوع الطلب</Label>
+                                    {/* <Label className="font-bold text-sm mb-2 block">نوع الطلب</Label> */}
                                     <div className="grid grid-cols-2 gap-3">
                                         {TYPE_OPTIONS.map(t => (
                                             <button
@@ -1067,7 +1100,7 @@ export default function SimpleOrderCreation() {
                             </div>
 
                             <div className="p-3 border-b-2 border-dashed border-gray-300">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div>
                                         <Label className="font-bold text-sm mb-2 block">الكمية</Label>
                                         <div className="flex items-center gap-2">
@@ -1103,7 +1136,7 @@ export default function SimpleOrderCreation() {
                                         </div>
                                     </div>
                                     
-                                    <div className="md:col-span-2">
+                                    <div >
                                         <Label className="font-bold text-sm mb-2 block">رقم الطبخة</Label>
                                         <FilterSelect
                                             value={formData.batch_id ? String(formData.batch_id) : ""}
@@ -1122,21 +1155,22 @@ export default function SimpleOrderCreation() {
                                     </div>
                                 </div>
                             </div>
+<div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
 
-                            <div className="p-3">
+                            <div className="">
                                 <Label className="font-bold text-sm mb-2 block">الملاحظات</Label>
                                 <Input
                                     value={formData.notes}
                                     onChange={(e) => handleFieldChange("notes", e.target.value)}
                                     placeholder="ملاحظات إضافية للعنصر..."
                                     className="h-12 text-sm"
-                                />
+                                    />
                             </div>
 
                             <Button
                                 onClick={addOrUpdateItem}
                                 size="lg"
-                                className={`h-12 flex-shrink-0 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${
+                                className={`h-12 flex-shrink-0  text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${
                                     editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
                                 }`}
                                 disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
@@ -1153,6 +1187,7 @@ export default function SimpleOrderCreation() {
                                     </>
                                 )}
                             </Button>
+                                </div>
                         </div>
 
                         {/* العمود الأيسر - الجدول */}
@@ -1173,10 +1208,10 @@ export default function SimpleOrderCreation() {
                                                         transition-all touch-manipulation active:scale-95
                                                         ${customerOption === option.value
                                                             ? option.value === "none"
-                                                                ? "bg-gray-600 text-white"
+                                                                ? "bg-secondary-s text-white"
                                                                 : option.value === "existing"
-                                                                ? "bg-blue-600 text-white"
-                                                                : "bg-green-600 text-white"
+                                                                ? "bg-secondary-f text-white"
+                                                                : "bg-primary-f text-white"
                                                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                                         }
                                                     `}
@@ -1202,21 +1237,15 @@ export default function SimpleOrderCreation() {
                                                     }}
                                                     options={customerOptions}
                                                     placeholder="اختر الزبون..."
-                                                    className="w-full text-sm"
+                                                    className="w-full text-sm" 
                                                 />
                                             </div>
-                                            <Input
-                                                type="text"
-                                                placeholder="بحث..."
-                                                value={customerSearchTerm}
-                                                onChange={(e) => setCustomerSearchTerm(e.target.value)}
-                                                className="w-28 h-10 text-sm"
-                                            />
+
                                         </div>
                                         {selectedCustomer && (
                                             <div className="bg-blue-50 p-2 rounded-lg text-xs">
                                                 <div className="font-bold">{selectedCustomer.name}</div>
-                                                <div className="text-gray-600">{selectedCustomer.phone} - {selectedCustomer.city || "لا يوجد مدينة"}</div>
+                                                <div className="text-gray-600"><span dir="ltr">{selectedCustomer.phone}</span> - {selectedCustomer.city || "لا يوجد مدينة"}</div>
                                             </div>
                                         )}
                                     </div>
@@ -1267,14 +1296,14 @@ export default function SimpleOrderCreation() {
                                         {/* معاينة الرقم المنسق */}
                                         {newCustomer.phone && (
                                             <div className="text-xs text-green-600 bg-green-50 p-2 rounded-lg">
-                                                <span className="font-bold">الرقم بعد التنسيق:</span> {formatPhoneNumber(newCustomer.phone)}
+                                                <span className="font-bold">الرقم بعد التنسيق:</span> <span dir="ltr">{formatPhoneNumber(newCustomer.phone)}</span>
                                             </div>
                                         )}
                                         
-                                        <div className="flex gap-2 text-xs text-gray-500">
+                                        {/* <div className="flex gap-2 text-xs text-gray-500">
                                             <span className="bg-gray-100 px-2 py-1 rounded">النوع: زبون</span>
                                             <span className="bg-gray-100 px-2 py-1 rounded">نشط: نعم</span>
-                                        </div>
+                                        </div> */}
                                         
                                         <Button
                                             onClick={handleCreateCustomer}
@@ -1317,13 +1346,13 @@ export default function SimpleOrderCreation() {
                                         {/* معلومات الزبون في المعاينة */}
                                         {customerOption === "existing" && selectedCustomer && (
                                             <div className="bg-blue-50 p-2 rounded-lg">
-                                                <div className="text-xs text-blue-600 font-bold">الزبون:</div>
+                                                <div className="text-xs text-secondary-f font-bold">الزبون:</div>
                                                 <div className="text-sm">{customerApi.formatCustomerInfo(selectedCustomer)}</div>
                                             </div>
                                         )}
                                         {customerOption === "new" && newCustomer.name && (
                                             <div className="bg-green-50 p-2 rounded-lg">
-                                                <div className="text-xs text-green-600 font-bold">زبون جديد:</div>
+                                                <div className="text-xs text-primary-f font-bold">زبون جديد:</div>
                                                 <div className="text-sm">{newCustomer.name} - {formatPhoneNumber(newCustomer.phone)}</div>
                                             </div>
                                         )}
@@ -1380,7 +1409,7 @@ export default function SimpleOrderCreation() {
                                             <>
                                                 <button
                                                     onClick={clearAllItems}
-                                                    className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
+                                                    className="text-secondary-s hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
                                                     title="مسح الكل"
                                                 >
                                                     <X className="w-4 h-4" />
@@ -1432,14 +1461,14 @@ export default function SimpleOrderCreation() {
                                     className="flex-1 overflow-auto min-h-0"
                                     style={{ direction: 'rtl' }}
                                 >
-                                    <table className="min-w-[1300px] w-full table-fixed border-collapse">
+                                    <table className="max-w-[1300px] w-full table-fixed border-collapse">
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
-                                                <th className="p-2 text-right border-b w-[150px]">المادة</th>
-                                                <th className="p-2 text-right border-b w-[120px]">المسطرة</th>
-                                                <th className="p-2 text-right border-b w-[150px]">اللون</th>
-                                                <th className="p-2 text-center border-b w-[80px]">النوع</th>
-                                                <th className="p-2 text-center border-b w-[100px]">الكمية</th>
+                                                <th className="p-2 text-right border-b w-[100px]">المادة</th>
+                                                <th className="p-2 text-right border-b w-[100px]">المسطرة</th>
+                                                <th className="p-2 text-right border-b w-[100px]">اللون</th>
+                                                <th className="p-2 text-center border-b w-[50px]">النوع</th>
+                                                <th className="p-2 text-center border-b w-[60px]">الكمية</th>
                                                 <th className="p-2 text-center border-b w-[90px]">السماكة</th>
                                                 <th className="p-2 text-center border-b w-[120px]">رقم الطبخة</th>
                                                 <th className="p-2 text-center border-b w-[100px]">الإجراءات</th>
@@ -1487,7 +1516,7 @@ export default function SimpleOrderCreation() {
                                                                     e.stopPropagation();
                                                                     removeItem(item.id);
                                                                 }}
-                                                                className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
+                                                                className="text-secondary-s hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
                                                                 title="حذف"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
@@ -1498,7 +1527,7 @@ export default function SimpleOrderCreation() {
                                             ))}
                                             {orderItems.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="8" className="p-8 text-center text-gray-400">
+                                                    <td colSpan="8" className="p-8 text-center text-primary-f">
                                                         <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                         <span className="text-sm">لا توجد عناصر مضافة</span>
                                                         <p className="text-xs mt-1">اضغط على العناصر في اليمين لإضافتها</p>
@@ -1536,7 +1565,6 @@ export default function SimpleOrderCreation() {
                                         <th className="p-2 text-right border-b w-16">#</th>
                                         <th className="p-2 text-right border-b w-28">التاريخ</th>
                                         <th className="p-2 text-center border-b w-20">العناصر</th>
-                                        <th className="p-2 text-center border-b w-28">الإجمالي</th>
                                         <th className="p-2 text-center border-b w-28">المبيعات</th>
                                         <th className="p-2 text-center border-b w-40">الزبون</th>
                                         <th className="p-2 text-center border-b w-32">ملاحظات</th>
@@ -1566,15 +1594,12 @@ export default function SimpleOrderCreation() {
                                                             {order.count_items ?? order.items?.length ?? 0}
                                                         </span>
                                                     </td>
-                                                    <td className="p-2 text-center font-bold text-primary-f text-sm">
-                                                        {formatCurrency(order.total_amount)}
-                                                    </td>
                                                     <td className="p-2 text-center text-sm">{getSalesUserName(order)}</td>
                                                     <td className="p-2 text-center">
                                                         {order.customer ? (
                                                             <div className="text-sm">
                                                                 <div className="font-medium">{order.customer.name}</div>
-                                                                <div className="text-gray-500 text-xs">{order.customer.phone}</div>
+                                                                <div className="text-gray-500 text-xs" dir="ltr">{order.customer.phone}</div>
                                                             </div>
                                                         ) : (
                                                             <span className="text-gray-400 text-xs">بدون زبون</span>
@@ -1590,14 +1615,19 @@ export default function SimpleOrderCreation() {
                                                     </td>
                                                     <td className="p-2 text-center">
                                                         <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-8 px-2 text-xs touch-manipulation active:scale-95 transition-transform hover:bg-primary-f hover:text-white"
-                                                            onClick={() => setSelectedOrder(order)}
-                                                        >
-                                                            <Eye className="w-3 h-3 ml-1" />
-                                                            عرض
-                                                        </Button>
+    size="sm"
+    variant="outline"
+    className="h-8 px-2 text-xs touch-manipulation active:scale-95 transition-transform hover:bg-primary-f hover:text-white"
+    onClick={() => handleViewOrderDetails(order)}
+    disabled={loadingDetails}
+>
+    {loadingDetails ? (
+        <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin ml-1" />
+    ) : (
+        <Eye className="w-3 h-3 ml-1" />
+    )}
+    عرض
+</Button>
                                                     </td>
                                                 </tr>
                                             );
@@ -1608,116 +1638,196 @@ export default function SimpleOrderCreation() {
                         </div>
 
                         {/* نافذة تفاصيل الطلب */}
-                        {selectedOrder && (
-                            <StyledDialog
-                                isOpen={Boolean(selectedOrder)}
-                                onOpenChange={(open) => { if (!open) setSelectedOrder(null); }}
-                                title={`تفاصيل الطلب #${selectedOrder.order_id}`}
-                                onCancel={() => setSelectedOrder(null)}
-                                cancelLabel="إغلاق"
-                                showFooter={false}
-                            >
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                                        <div className="bg-gray-50 p-2 rounded-lg border">
-                                            <div className="text-xs text-gray-500">الحالة</div>
-                                            <div className="font-bold mt-0.5">
-                                                <span className={`px-2 py-0.5 rounded-lg text-xs ${getStatusBadge(selectedOrder.status).className}`}>
-                                                    {getStatusBadge(selectedOrder.status).label}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="bg-gray-50 p-2 rounded-lg border">
-                                            <div className="text-xs text-gray-500">الإجمالي</div>
-                                            <div className="font-bold mt-0.5 text-base text-primary-f">
-                                                {formatCurrency(selectedOrder.total_amount)}
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="bg-gray-50 p-2 rounded-lg border">
-                                            <div className="text-xs text-gray-500">عدد العناصر</div>
-                                            <div className="font-bold mt-0.5 text-base">
-                                                {orderApi.getItemCount(selectedOrder)}
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="bg-gray-50 p-2 rounded-lg border col-span-2">
-                                            <div className="text-xs text-gray-500">الزبون</div>
-                                            <div className="font-bold mt-0.5 text-sm">
-                                                {selectedOrder.customer ? 
-                                                    customerApi.formatCustomerInfo(selectedOrder.customer) : 
-                                                    "بدون زبون"
-                                                }
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="bg-gray-50 p-2 rounded-lg border">
-                                            <div className="text-xs text-gray-500">المبيعات</div>
-                                            <div className="font-bold mt-0.5 text-sm">
-                                                {getSalesUserName(selectedOrder)}
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="bg-gray-50 p-2 rounded-lg border col-span-3">
-                                            <div className="text-xs text-gray-500">ملاحظات</div>
-                                            <div className="mt-0.5 text-sm">
-                                                {selectedOrder.notes || "لا توجد ملاحظات"}
-                                            </div>
-                                        </div>
-                                    </div>
+                      {/* نافذة تفاصيل الطلب */}
+{orderDetails && (
+    <StyledDialog
+        isOpen={Boolean(orderDetails)}
+        onOpenChange={(open) => { if (!open) setOrderDetails(null); }}
+        title={`تفاصيل الطلب #${orderDetails.order_id}`}
+        onCancel={() => setOrderDetails(null)}
+        cancelLabel="إغلاق"
+        showFooter={false}
+        className="w-[98vw] max-w-[1800px]"
+    >
+        <div className="space-y-4 p-1">
+            {/* معلومات أساسية للطلب - استخدم orderDetails مباشرة */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="bg-gray-50 p-3 rounded-lg border">
+                    <div className="text-xs text-gray-500">رقم الطلب</div>
+                    <div className="font-bold text-base">#{orderDetails.order_id}</div>
+                </div>
+                
+                <div className="bg-gray-50 p-3 rounded-lg border">
+                    <div className="text-xs text-gray-500">تاريخ الإنشاء</div>
+                    <div className="font-bold text-sm">
+                        {new Date(orderDetails.created_at).toLocaleDateString('ar-SA', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}
+                    </div>
+                </div>
+                
+                <div className="bg-gray-50 p-3 rounded-lg border">
+                    <div className="text-xs text-gray-500">الحالة</div>
+                    <div className="mt-1">
+                        <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusBadge(orderDetails.status).className}`}>
+                            {getStatusBadge(orderDetails.status).label}
+                        </span>
+                    </div>
+                </div>
+                
+            </div>
 
-                                    {selectedOrder.items?.length > 0 && (
-                                        <div>
-                                            <h4 className="font-bold mb-2 text-sm">عناصر الطلب</h4>
-                                            <div className="border rounded-lg overflow-x-auto">
-                                                <table className="min-w-[800px] w-full text-sm">
-                                                    <thead className="bg-gray-100">
-                                                        <tr>
-                                                            <th className="p-2 text-right">المنتج</th>
-                                                            <th className="p-2 text-center">النوع</th>
-                                                            <th className="p-2 text-center">الأبعاد</th>
-                                                            <th className="p-2 text-center">الكمية</th>
-                                                            <th className="p-2 text-center">السعر</th>
-                                                            <th className="p-2 text-center">الإجمالي</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {selectedOrder.items.map((item, i) => (
-                                                            <tr key={i} className="border-t">
-                                                                <td className="p-2">
-                                                                    <div>{item.material_name || "غير محدد"}</div>
-                                                                    <div className="text-xs text-gray-500">{item.color_name || ""}</div>
-                                                                </td>
-                                                                <td className="p-2 text-center">
-                                                                    {item.type_item === TypeItem.Machine ? "مكنة" : "كوي"}
-                                                                </td>
-                                                                <td className="p-2 text-center">
-                                                                    {item.width || "-"}x{item.thickness || "0.6"}
-                                                                </td>
-                                                                <td className="p-2 text-center font-bold">{item.quantity} م</td>
-                                                                <td className="p-2 text-center">{formatCurrency(item.price)}</td>
-                                                                <td className="p-2 text-center font-bold text-primary-f">
-                                                                    {formatCurrency(item.subtotal)}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                    <tfoot className="bg-gray-50 font-bold">
-                                                        <tr>
-                                                            <td colSpan="5" className="p-2 text-left">المجموع الكلي:</td>
-                                                            <td className="p-2 text-center text-primary-f">
-                                                                {formatCurrency(calculateOrderTotal(selectedOrder.items))}
-                                                            </td>
-                                                        </tr>
-                                                    </tfoot>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </StyledDialog>
-                        )}
+            {/* معلومات الزبون */}
+            {orderDetails.customer && (
+                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-200">
+                    <h4 className="font-bold text-blue-700 mb-2 text-sm flex items-center gap-2">
+                        <span>معلومات الزبون</span>
+                        <span className="text-xs bg-blue-200 px-2 py-0.5 rounded-full">
+                            {orderDetails.customer.customer_type === 'customer' ? 'زبون' : 'مورد'}
+                        </span>
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                            <div className="text-xs text-gray-600">الاسم</div>
+                            <div className="font-medium text-sm">{orderDetails.customer.name}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs text-gray-600">رقم الهاتف</div>
+                            <div className="font-medium text-sm text-right" dir="ltr">{orderDetails.customer.phone}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs text-gray-600">المدينة</div>
+                            <div className="font-medium text-sm">{orderDetails.customer.city || 'غير محدد'}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs text-gray-600">العنوان</div>
+                            <div className="font-medium text-sm">{orderDetails.customer.address || 'غير محدد'}</div>
+                        </div>
+                       
+                    </div>
+                </div>
+            )}
+
+            {/* معلومات مندوب المبيعات */}
+            {orderDetails.sales && (
+                <div className="bg-green-50/50 p-3 rounded-lg border border-green-200">
+                    <h4 className="font-bold text-green-700 mb-2 text-sm">مندوب المبيعات</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div>
+                            <div className="text-xs text-gray-600">الاسم</div>
+                            <div className="font-medium text-sm">{orderDetails.sales.full_name}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs text-gray-600">اسم المستخدم</div>
+                            <div className="font-medium text-sm">{orderDetails.sales.username}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs text-gray-600">رقم الموظف</div>
+                            <div className="font-medium text-sm">#{orderDetails.sales_user_id}</div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ملاحظات الطلب */}
+            {orderDetails.notes && (
+                <div className="bg-yellow-50/50 p-3 rounded-lg border border-yellow-200">
+                    <h4 className="font-bold text-yellow-700 mb-1 text-sm">ملاحظات الطلب</h4>
+                    <div className="text-sm">{orderDetails.notes}</div>
+                </div>
+            )}
+
+            {/* عناصر الطلب */}
+            {orderDetails.items && orderDetails.items.length > 0 ? (
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-bold text-base flex items-center gap-2">
+                            <span>عناصر الطلب</span>
+                            <span className="text-xs bg-gray-200 px-2 py-1 rounded-full">
+                                {orderDetails.items.length} عنصر
+                            </span>
+                        </h4>
+                        <div className="text-sm bg-gray-100 px-3 py-1 rounded-lg">
+                            عدد العناصر: <span className="font-bold">{orderDetails.count_items}</span>
+                        </div>
+                    </div>
+
+                    <div className="border rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="max-w-[1200px] w-full text-sm">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th className="p-3 text-right">#</th>
+                                        <th className="p-3 text-right">المادة</th>
+                                        <th className="p-3 text-center">النوع</th>
+                                        <th className="p-3 text-center">اللون</th>
+                                        <th className="p-3 text-center">الأبعاد (عرض × سماكة)</th>
+                                        <th className="p-3 text-center">الكمية</th>
+                                        <th className="p-3 text-center">نوع المسطرة</th>
+                                        <th className="p-3 text-center">رقم الدفعة</th>
+                                        <th className="p-3 text-center">ملاحظات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {orderDetails.items.map((item, index) => (
+                                        <tr key={index} className="border-t hover:bg-gray-50">
+                                            <td className="p-3 text-center font-medium">{index + 1}</td>
+                                            <td className="p-3 font-medium">{item.material_name || 'غير محدد'}</td>
+                                            <td className="p-3 text-center">
+                                                <span className={`px-2 py-1 rounded-full text-xs ${
+                                                    item.type_item === 'Machine' 
+                                                        ? 'bg-purple-100 text-purple-700' 
+                                                        : 'bg-green-100 text-green-700'
+                                                }`}>
+                                                    {item.type_item === 'Machine' ? 'مكنة' : 'كوي'}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                               <span className="flex flex-col"> {item.color_name || '-'}</span>
+                                                <span className="px-2 py-1 rounded-full text-xs  text-purple-700">{item.color_code || '-'}</span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                {item.width || '-'} × {item.thickness || '0.6'}
+                                            </td>
+                                            <td className="p-3 text-center font-bold">{item.quantity} م</td>
+                                            <td className="p-3 text-center">{item.ruler_type || '-'}</td>
+                                            <td className="p-3 text-center font-mono text-xs">{item.batch_number || '-'}</td>
+                                            <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
+                                                {item.notes || '-'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* ملاحظات العناصر المنفصلة */}
+                    {orderDetails.items.some(item => item.notes) && (
+                        <div className="mt-3 space-y-2">
+                            <h5 className="font-bold text-sm text-gray-600">ملاحظات العناصر:</h5>
+                            {orderDetails.items.map((item, index) => (
+                                item.notes && (
+                                    <div key={index} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-sm">
+                                        <span className="font-bold">العنصر {index + 1}:</span> {item.notes}
+                                    </div>
+                                )
+                            ))}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="text-center py-8 text-gray-400 border rounded-lg">
+                    لا توجد عناصر في هذا الطلب
+                </div>
+            )}
+        </div>
+    </StyledDialog>
+)}
                     </Card>
                 )}
             </div>

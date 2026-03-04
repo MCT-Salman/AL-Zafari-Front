@@ -219,7 +219,7 @@ export const useCrud = (api, options = {}) => {
   // Toggle status (if available)
   const toggleStatus = useCallback(async (id) => {
     if (!api.toggleStatus) {
-      console.warn('toggleStatus method not available in API');
+      // console.warn('toggleStatus method not available in API');
       return;
     }
     try {
