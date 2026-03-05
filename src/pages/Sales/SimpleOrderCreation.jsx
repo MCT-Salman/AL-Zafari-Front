@@ -110,6 +110,15 @@ export default function SimpleOrderCreation() {
     const [qrPreview, setQrPreview] = useState({ open: false, url: "", title: "" });
     const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
 
+    // QR Generation Dialog State with quantity editing
+    const [qrGenDialog, setQrGenDialog] = useState({
+        open: false,
+        item: null,
+        quantity: "",
+        qrUrl: "",
+        qrData: ""
+    });
+
     // Helper functions from orderApi
     const getOrderStatus = (order) => orderApi.getOrderStatus(order);
     const getFormattedDate = (order) => orderApi.getFormattedDate(order);
@@ -302,6 +311,45 @@ export default function SimpleOrderCreation() {
 
     const openQrPreview = (url, title = "") => {
         setQrPreview({ open: true, url, title });
+    };
+
+    const openQrGenDialog = (item) => {
+        const initialQty = item?.quantity ? String(item.quantity) : "";
+        const itemWithQty = { ...item, quantity: initialQty };
+        const qrData = buildItemQrData(itemWithQty);
+        const qrUrl = getQrUrl(qrData);
+        
+        setQrGenDialog({
+            open: true,
+            item: item,
+            quantity: initialQty,
+            qrUrl: qrUrl,
+            qrData: qrData
+        });
+    };
+
+    const updateQrGenQuantity = (newQuantity) => {
+        setQrGenDialog(prev => {
+            const updatedItem = { ...prev.item, quantity: newQuantity };
+            const newQrData = buildItemQrData(updatedItem);
+            const newQrUrl = getQrUrl(newQrData);
+            return {
+                ...prev,
+                quantity: newQuantity,
+                qrUrl: newQrUrl,
+                qrData: newQrData
+            };
+        });
+    };
+
+    const closeQrGenDialog = () => {
+        setQrGenDialog({
+            open: false,
+            item: null,
+            quantity: "",
+            qrUrl: "",
+            qrData: ""
+        });
     };
 
     const printQr = (url, title = "QR") => {
@@ -1725,7 +1773,6 @@ export default function SimpleOrderCreation() {
                                                 <th className="p-2 text-center border-b w-[60px]">الكمية</th>
                                                 <th className="p-2 text-center border-b w-[90px]">السماكة</th>
                                                 <th className="p-2 text-center border-b w-[120px]">رقم الطبخة</th>
-                                                <th className="p-2 text-center border-b w-[90px]">QR</th>
                                                 <th className="p-2 text-center border-b w-[100px]">الإجراءات</th>
                                             </tr>
                                         </thead>
@@ -1760,24 +1807,6 @@ export default function SimpleOrderCreation() {
                                                         {item.batch_number || "-"}
                                                     </td>
                                                     <td className="p-2 text-center">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const url = item.qrUrl || getQrUrl(buildItemQrData(item));
-                                                                openQrPreview(url, `QR - عنصر ${item.color_name || ""}`);
-                                                            }}
-                                                            className="inline-flex items-center justify-center"
-                                                            title="عرض QR"
-                                                        >
-                                                            <img
-                                                                src={item.qrUrl || getQrUrl(buildItemQrData(item))}
-                                                                alt="qr"
-                                                                className="h-9 w-9 border rounded"
-                                                            />
-                                                        </button>
-                                                    </td>
-                                                    <td className="p-2 text-center">
                                                         <div className="flex items-center justify-center gap-1">
                                                             {editingItemId === item.id && (
                                                                 <span className="text-blue-600 text-xs ml-1">
@@ -1800,7 +1829,7 @@ export default function SimpleOrderCreation() {
                                             ))}
                                             {orderItems.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="9" className="p-8 text-center text-primary-f">
+                                                    <td colSpan="8" className="p-8 text-center text-primary-f">
                                                         <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                         <span className="text-sm">لا توجد عناصر مضافة</span>
                                                         <p className="text-xs mt-1">اضغط على العناصر في اليمين لإضافتها</p>
@@ -2073,8 +2102,7 @@ export default function SimpleOrderCreation() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {orderDetails.items.map((item, index) => (
-                                        (() => {
+                                    {orderDetails.items.map((item, index) => {
                                             const rawColorId = item.color_id ?? item.color?.color_id ?? item.colorId ?? null;
                                             const resolvedColor = rawColorId
                                                 ? colors.find((c) => String(c.color_id) === String(rawColorId))
@@ -2085,7 +2113,7 @@ export default function SimpleOrderCreation() {
                                                 : null;
                                             const resolvedRulerName = item.ruler_name ?? item.ruler?.ruler_name ?? item.ruler_type ?? resolvedRuler?.ruler_name ?? "-";
 
-                                            const local = {
+                                            const localItem = {
                                                 id: `${orderDetails.order_id}-${index + 1}`,
                                                 material_name: item.material_name,
                                                 ruler_name: resolvedRulerName,
@@ -2096,8 +2124,6 @@ export default function SimpleOrderCreation() {
                                                 quantity: item.quantity,
                                                 batch_number: item.batch_number,
                                             };
-                                            const qrData = buildItemQrData(local);
-                                            const url = getQrUrl(qrData);
                                             return (
                                         <tr key={index} className="border-t hover:bg-gray-50">
                                             <td className="p-3 text-center font-medium">{index + 1}</td>
@@ -2122,22 +2148,21 @@ export default function SimpleOrderCreation() {
                                             <td className="p-3 text-center font-bold">{item.quantity} م</td>
                                             <td className="p-3 text-center font-mono text-xs">{item.batch_number || '-'}</td>
                                             <td className="p-3 text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openQrPreview(url, `QR - طلب #${orderDetails.order_id} - عنصر ${index + 1}`)}
-                                                    className="inline-flex items-center justify-center"
-                                                    title="عرض QR"
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => openQrGenDialog(localItem)}
+                                                    className="h-8 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
                                                 >
-                                                    <img src={url} alt="qr" className="h-10 w-10 border rounded" />
-                                                </button>
+                                                    توليد QR
+                                                </Button>
                                             </td>
                                             <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
                                                 {item.notes || '-'}
                                             </td>
                                         </tr>
                                             );
-                                        })()
-                                    ))}
+                                        })}
                                 </tbody>
                             </table>
                         </div>
@@ -2193,6 +2218,99 @@ export default function SimpleOrderCreation() {
                         >
                             طباعة
                         </Button>
+                    </div>
+                </div>
+            </StyledDialog>
+
+            {/* QR Generation Dialog with Quantity Editing */}
+            <StyledDialog
+                isOpen={qrGenDialog.open}
+                onOpenChange={(open) => { if (!open) closeQrGenDialog(); }}
+                title="توليد QR - تعديل الكمية"
+                onCancel={closeQrGenDialog}
+                cancelLabel="إغلاق"
+                showFooter={false}
+            >
+                <div className="space-y-4 p-2">
+                    {/* معلومات العنصر */}
+                    {qrGenDialog.item && (
+                        <div className="bg-gray-50 p-3 rounded-lg border space-y-2">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                    <span className="text-gray-500">المادة:</span>
+                                    <span className="font-medium mr-1">{qrGenDialog.item.material_name}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500">المسطرة:</span>
+                                    <span className="font-medium mr-1">{qrGenDialog.item.ruler_name}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500">اللون:</span>
+                                    <span className="font-medium mr-1">{qrGenDialog.item.color_name}</span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-500">الكود:</span>
+                                    <span className="font-medium mr-1">{qrGenDialog.item.color_code || '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* تعديل الكمية */}
+                    <div className="space-y-2">
+                        <Label className="font-bold">الكمية (متر)</Label>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                type="number"
+                                value={qrGenDialog.quantity}
+                                onChange={(e) => updateQrGenQuantity(e.target.value)}
+                                className="h-12 text-lg font-bold text-center"
+                                placeholder="0"
+                            />
+                            <span className="text-gray-500 font-medium">م</span>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                            الكمية الأصلية: {qrGenDialog.item?.quantity} م
+                        </div>
+                    </div>
+
+                    {/* معاينة QR */}
+                    {qrGenDialog.qrUrl && (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-center bg-gray-50 p-4 rounded-lg border">
+                                <img 
+                                    src={qrGenDialog.qrUrl} 
+                                    alt="qr" 
+                                    className="h-64 w-64 border rounded shadow-sm" 
+                                />
+                            </div>
+                            <div className="flex items-center justify-center gap-2">
+                                <Button
+                                    size="sm"
+                                    className="bg-secondary-s hover:brightness-110 text-white"
+                                    onClick={() => printQr(qrGenDialog.qrUrl, `QR - ${qrGenDialog.item?.color_name || ''}`)}
+                                >
+                                    طباعة QR
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        const url = qrGenDialog.qrUrl;
+                                        const title = `QR - ${qrGenDialog.item?.color_name || ''}`;
+                                        openQrPreview(url, title);
+                                        closeQrGenDialog();
+                                    }}
+                                >
+                                    فتح في نافذة منفصلة
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ملاحظات */}
+                    <div className="text-xs text-gray-500 bg-yellow-50 p-2 rounded border border-yellow-200">
+                        <span className="font-bold">ملاحظة:</span> عند تعديل الكمية، سيتم تحديث QR تلقائياً. يمكنك الطباعة أو فتح QR في نافذة منفصلة.
                     </div>
                 </div>
             </StyledDialog>

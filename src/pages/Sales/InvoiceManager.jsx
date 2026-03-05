@@ -298,9 +298,9 @@ export default function InvoiceManager() {
     useEffect(() => {
         loadInitialData();
         loadCustomers();
+        loadOrders();
         if (viewMode === "history") {
             loadInvoices();
-            loadOrders();
         }
     }, [viewMode]);
 
@@ -540,7 +540,7 @@ export default function InvoiceManager() {
 
     const orderOptions = useMemo(() => {
         return orders.map(o => ({
-            value: String(o.order_id),
+            value: o.order_id,
             label: `طلب #${o.order_id} - ${o.customer?.name || 'بدون زبون'} - ${invoiceApi.formatCurrency(o.total_amount)}`
         }));
     }, [orders]);
@@ -566,7 +566,7 @@ export default function InvoiceManager() {
             String(inv.invoice_id).includes(term) ||
             inv.customer?.name?.toLowerCase().includes(term) ||
             inv.customer?.phone?.toLowerCase().includes(term) ||
-            String(inv.order_id).includes(term)
+            (inv.order_id && String(inv.order_id).includes(term))
         );
     }, [invoices, searchTerm]);
 
@@ -761,7 +761,7 @@ export default function InvoiceManager() {
             toast.error("يرجى إدخال رمز QR");
             return;
         }
-        const foundOrder = orders.find(o => String(o.order_id) === qrCode);
+        const foundOrder = orders.find(o => o.order_id === parseInt(qrCode));
         if (foundOrder) {
             setSelectedOrder(foundOrder);
             setFormData(prev => ({ ...prev, order_id: String(foundOrder.order_id) }));
@@ -776,7 +776,7 @@ export default function InvoiceManager() {
             toast.error("يرجى إدخال كود الطلب");
             return;
         }
-        const foundOrder = orders.find(o => String(o.order_id) === manualCode);
+        const foundOrder = orders.find(o => o.order_id === parseInt(manualCode));
         if (foundOrder) {
             setSelectedOrder(foundOrder);
             setFormData(prev => ({ ...prev, order_id: String(foundOrder.order_id) }));
@@ -787,31 +787,30 @@ export default function InvoiceManager() {
     }, [manualCode, orders]);
 
     const saveInvoice = useCallback(async () => {
-        if (!selectedOrder) {
-            toast.error("يرجى اختيار الطلب");
-            return;
-        }
-
         const paidAmount = parseFloat(formData.paid_amount);
         if (isNaN(paidAmount) || paidAmount < 0) {
             toast.error("يرجى إدخال مبلغ صحيح");
             return;
         }
 
+        // حساب المبلغ الكامل من العناصر إذا لم يكن هناك طلب
+        const totalAmount = selectedOrder?.total_amount || orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+
         try {
             // حساب الخصم
             let discount = parseFloat(formData.discount) || 0;
             if (formData.discount_type === "percentage") {
-                discount = (parseFloat(selectedOrder.total_amount) * discount) / 100;
+                discount = (parseFloat(totalAmount) * discount) / 100;
             }
 
             const invoiceData = {
-                customer_id: selectedOrder.customer_id,
-                total_amount: parseFloat(selectedOrder.total_amount),
+                order_id: selectedOrder?.order_id || null,
+                customer_id: selectedOrder?.customer_id || selectedCustomer?.customer_id || null,
+                total_amount: parseFloat(totalAmount),
                 discount: discount,
                 paid_amount: paidAmount,
                 notes: formData.notes || "",
-                items: orderItems.map(item => ({  // 🔴 استخدم orderItems بدلاً من selectedOrder.items
+                items: orderItems.map(item => ({
                     type_item: item.type_item,
                     color_id: parseInt(item.color_id),
                     width: parseFloat(item.width) || 0,
@@ -839,6 +838,8 @@ export default function InvoiceManager() {
                 setShowPreview(false);
                 setEditingInvoiceId(null);
                 setSelectedOrder(null);
+                setSelectedCustomer(null);
+                setCustomerOption("none");
                 setOrderItems([]);
                 setFormData(prev => ({
                     material_id: "",
@@ -867,7 +868,7 @@ export default function InvoiceManager() {
         } catch (error) {
             toast.error(error.message || "فشل في حفظ الفاتورة");
         }
-    }, [selectedOrder, formData, editingInvoiceId, viewMode, loadInvoices, orderItems, setOrderItems]);
+    }, [selectedOrder, formData, editingInvoiceId, viewMode, loadInvoices, orderItems, setOrderItems, selectedCustomer]);
 
     const handleAddPayment = useCallback(async () => {
         if (!selectedInvoiceForPayment) return;
@@ -1161,8 +1162,6 @@ export default function InvoiceManager() {
                                 </Card>
                             )}
 
-                            
-
                             {inputMode === "manual" && (
                                 <>
                                     {/* أزرار المواد - مثل صفحة المبيعات */}
@@ -1325,9 +1324,9 @@ export default function InvoiceManager() {
                                     <Card className="p-4">
                                         <Label className="font-bold text-base mb-3 block">رقم الطلب</Label>
                                         <FilterSelect
-                                            value={selectedOrder ? String(selectedOrder.order_id) : ""}
+                                            value={selectedOrder ? selectedOrder.order_id : ""}
                                             onChange={(e) => {
-                                                const order = orders.find(o => String(o.order_id) === e.target.value);
+                                                const order = orders.find(o => o.order_id === parseInt(e.target.value));
                                                 setSelectedOrder(order || null);
                                             }}
                                             options={orderOptions}
@@ -1589,7 +1588,7 @@ export default function InvoiceManager() {
                                 size="lg"
                                 className={`h-12 flex-shrink-0 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingInvoiceId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
                                     }`}
-                                disabled={!selectedOrder || orderItems.length === 0}
+                                disabled={orderItems.length === 0}
                             >
                                 {editingInvoiceId ? (
                                     <>
@@ -1752,7 +1751,7 @@ export default function InvoiceManager() {
                             </Card>
 
                             {/* نافذة المعاينة */}
-                            {showPreview && selectedOrder && (
+                            {showPreview && (
                                 <StyledDialog
                                     isOpen={showPreview}
                                     onOpenChange={setShowPreview}
@@ -1779,11 +1778,26 @@ export default function InvoiceManager() {
                                             </div>
                                         )}
 
-                                        {/* معلومات الطلب */}
+                                        {/* معلومات الفاتورة */}
                                         <div className="bg-purple-50 p-2 rounded-lg">
-                                            <div className="text-xs text-purple-600 font-bold">الطلب:</div>
+                                            <div className="text-xs text-purple-600 font-bold">معلومات الفاتورة:</div>
                                             <div className="text-sm">
-                                                #{selectedOrder.order_id} - {invoiceApi.formatCurrency(selectedOrder.total_amount)}
+                                                {selectedOrder ? (
+                                                    <>طلب #{selectedOrder.order_id} - {invoiceApi.formatCurrency(selectedOrder.total_amount)}</>
+                                                ) : (
+                                                    <>فاتورة يدوية - {invoiceApi.formatCurrency(orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0))}</>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* معلومات الدفع */}
+                                        <div className="bg-green-50 p-2 rounded-lg">
+                                            <div className="text-xs text-green-600 font-bold">معلومات الدفع:</div>
+                                            <div className="text-sm">
+                                                المدفوع: {invoiceApi.formatCurrency(formData.paid_amount || 0)}
+                                                {formData.discount && parseFloat(formData.discount) > 0 && (
+                                                    <> - الخصم: {invoiceApi.formatCurrency(formData.discount)}</>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1799,7 +1813,7 @@ export default function InvoiceManager() {
                             )}
 
                             {/* بوب أب معلومات الدفع عند إنشاء الفاتورة */}
-                            {showPaymentPopup && selectedOrder && (
+                            {showPaymentPopup && (
                                 <StyledDialog
                                     isOpen={showPaymentPopup}
                                     onOpenChange={setShowPaymentPopup}
@@ -1834,10 +1848,19 @@ export default function InvoiceManager() {
                                         <div className="bg-blue-50 p-3 rounded-lg">
                                             <div className="text-sm font-bold mb-2 text-blue-700">معلومات الفاتورة</div>
                                             <div className="grid grid-cols-2 gap-2 text-xs">
-                                                <div>رقم الطلب: #{selectedOrder.order_id}</div>
-                                                <div>الزبون: {selectedOrder.customer?.name || 'غير محدد'}</div>
+                                                {selectedOrder ? (
+                                                    <>
+                                                        <div>رقم الطلب: #{selectedOrder.order_id}</div>
+                                                        <div>الزبون: {selectedOrder.customer?.name || 'غير محدد'}</div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div>نوع الفاتورة: يدوية</div>
+                                                        <div>الزبون: {selectedCustomer?.name || 'غير محدد'}</div>
+                                                    </>
+                                                )}
                                                 <div className="col-span-2 font-bold text-base">
-                                                    المبلغ الكامل: {invoiceApi.formatCurrency(selectedOrder.total_amount)}
+                                                    المبلغ الكامل: {invoiceApi.formatCurrency(selectedOrder?.total_amount || orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0))}
                                                 </div>
                                             </div>
                                         </div>
@@ -1862,7 +1885,7 @@ export default function InvoiceManager() {
                                                     <span className="text-lg font-bold text-gray-600 whitespace-nowrap">ل.س</span>
                                                 </div>
                                                 <div className="text-xs text-gray-500 mt-1">
-                                                    المبلغ الكامل: {invoiceApi.formatCurrency(selectedOrder.total_amount)}
+                                                    المبلغ الكامل: {invoiceApi.formatCurrency(selectedOrder?.total_amount || orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0))}
                                                 </div>
                                             </div>
 
@@ -1884,7 +1907,7 @@ export default function InvoiceManager() {
                                         {paymentFormData.paid_amount && (
                                             <div className="bg-green-50 p-3 rounded-lg border border-green-200">
                                                 {(() => {
-                                                    const total = parseFloat(selectedOrder.total_amount);
+                                                    const total = parseFloat(selectedOrder?.total_amount || orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0));
                                                     const discount = parseFloat(paymentFormData.discount) || 0;
                                                     const paid = parseFloat(paymentFormData.paid_amount) || 0;
                                                     const afterDiscount = total - discount;
