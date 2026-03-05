@@ -278,6 +278,13 @@ export default function InvoiceManager() {
     const [qrCode, setQrCode] = useState("");
     const [manualCode, setManualCode] = useState("");
 
+    const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+    const [paymentFormData, setPaymentFormData] = useState({
+        paid_amount: "",
+        discount: "0",
+        discount_type: "fixed"
+    });
+
     // Numpad
     const [numpadMode, setNumpadMode] = useState("quantity");
     const [colorSearchCode, setColorSearchCode] = useState("");
@@ -847,6 +854,11 @@ export default function InvoiceManager() {
                     discount_type: "fixed",
                     notes: ""
                 }));
+                setPaymentFormData({
+                    paid_amount: "",
+                    discount: "0",
+                    discount_type: "fixed"
+                });
 
                 if (viewMode === "history") {
                     loadInvoices();
@@ -937,11 +949,18 @@ export default function InvoiceManager() {
             quantity: "",
             notes: ""
         });
+        setPaymentFormData({
+            paid_amount: "",
+            discount: "0",
+            discount_type: "fixed"
+        });
         setSelectedOrder(null);
         setQrCode("");
         setManualCode("");
         setEditingInvoiceId(null);
         setPriceCalculation(null);
+        setShowPaymentPopup(false);
+        setShowPreview(false);
     }, []);
 
     const scrollTable = useCallback((direction) => {
@@ -1552,133 +1571,25 @@ export default function InvoiceManager() {
                                 </Card>
                             )}
 
-                            {/* حقل المبلغ المدفوع (يظهر في جميع الأوضاع) */}
+                            {/* حقل الملاحظات فقط */}
                             <Card className="p-4">
-                                <Label className="font-bold text-base mb-3 block">معلومات الدفع</Label>
-
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-3">
-
-                                        <div>
-                                            <Label className="font-bold text-sm mb-2 block">المبلغ المدفوع</Label>
-                                            <div className="flex items-center gap-2">
-                                                <Input
-                                                    type="number"
-                                                    value={formData.paid_amount}
-                                                    onChange={(e) => handleFieldChange("paid_amount", e.target.value)}
-                                                    onClick={() => {
-                                                        setActiveField("paid_amount");
-                                                        setNumpadMode("paid");
-                                                    }}
-                                                    placeholder="0.00"
-                                                    className={`h-14 text-xl text-center font-bold flex-1 ${activeField === "paid_amount" ? "ring-2 ring-green-400" : ""
-                                                        }`}
-                                                    step="0.01"
-                                                    min="0"
-                                                />
-                                                <span className="text-lg font-bold text-gray-600 whitespace-nowrap">ل.س</span>
-                                            </div>
-                                        </div>
-
-                                         <div>
-                                            <Label className="font-bold text-sm mb-2 block">قيمة الخصم</Label>
-                                            <Input
-                                                type="number"
-                                                value={formData.discount}
-                                                onChange={(e) => handleFieldChange("discount", e.target.value)}
-                                                placeholder="0"
-                                                className="h-12 text-lg text-center font-bold"
-                                                min="0"
-                                                step={formData.discount_type === "percentage" ? "1" : "0.01"}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {selectedOrder && formData.paid_amount && (
-                                        <div className="bg-green-50 p-3 rounded-lg">
-                                            {(() => {
-                                                const total = parseFloat(selectedOrder.total_amount);
-                                                const paid = parseFloat(formData.paid_amount) || 0;
-                                                const remaining = total - paid;
-                                                const paymentStatus = invoiceApi.getPaymentStatus(total, paid);
-                                                return (
-                                                    <div className="space-y-1 text-sm">
-                                                        <div className="flex justify-between">
-                                                            <span>إجمالي الطلب:</span>
-                                                            <span className="font-bold">{invoiceApi.formatCurrency(total)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span>المدفوع:</span>
-                                                            <span className="font-bold text-green-600">{invoiceApi.formatCurrency(paid)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between border-t pt-1 mt-1">
-                                                            <span>المتبقي:</span>
-                                                            <span className={`font-bold ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                                {invoiceApi.formatCurrency(Math.max(remaining, 0))}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-2">
-                                                            <span className={`px-2 py-1 rounded-full text-xs ${paymentStatus.className}`}>
-                                                                {paymentStatus.label}
-                                                            </span>
-                                                        </div>
-                                                        <ProgressBar value={paid} max={total} className="mt-2" />
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
-                                    )}
-
-                                    {/* حقل الخصم */}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {/* <div>
-        <Label className="font-bold text-sm mb-2 block">نوع الخصم</Label>
-        <div className="flex gap-2">
-            <button
-                onClick={() => handleFieldChange("discount_type", "fixed")}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
-                    formData.discount_type === "fixed"
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white border-gray-300"
-                }`}
-            >
-                قيمة ثابتة
-            </button>
-            <button
-                onClick={() => handleFieldChange("discount_type", "percentage")}
-                className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
-                    formData.discount_type === "percentage"
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white border-gray-300"
-                }`}
-            >
-                نسبة مئوية
-            </button>
-        </div>
-    </div> */}
-                                       
-                                    </div>
-
-                                    <div>
-                                        <Label className="font-bold text-sm mb-2 block">ملاحظات</Label>
-                                        <Input
-                                            type="text"
-                                            value={formData.notes}
-                                            onChange={(e) => handleFieldChange("notes", e.target.value)}
-                                            placeholder="ملاحظات إضافية..."
-                                            className="h-12 text-base"
-                                        />
-                                    </div>
-                                </div>
+                                <Label className="font-bold text-sm mb-2 block">ملاحظات</Label>
+                                <Input
+                                    type="text"
+                                    value={formData.notes}
+                                    onChange={(e) => handleFieldChange("notes", e.target.value)}
+                                    placeholder="ملاحظات إضافية..."
+                                    className="h-12 text-base"
+                                />
                             </Card>
 
-                            {/* زر إنشاء الفاتورة */}
+                            {/* زر إنشاء الفاتورة - يفتح بوب أب الدفع */}
                             <Button
-                                onClick={() => setShowPreview(true)}
+                                onClick={() => setShowPaymentPopup(true)}
                                 size="lg"
                                 className={`h-12 flex-shrink-0 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingInvoiceId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
                                     }`}
-                                disabled={!selectedOrder || !formData.paid_amount}
+                                disabled={!selectedOrder || orderItems.length === 0}
                             >
                                 {editingInvoiceId ? (
                                     <>
@@ -1694,7 +1605,7 @@ export default function InvoiceManager() {
                             </Button>
 
                             {/* زر مسح الكل */}
-                            {(selectedOrder || formData.paid_amount || formData.notes) && (
+                            {(selectedOrder || formData.notes) && (
                                 <Button
                                     onClick={clearForm}
                                     variant="outline"
@@ -1876,22 +1787,146 @@ export default function InvoiceManager() {
                                             </div>
                                         </div>
 
-                                        {/* معلومات الدفع */}
-                                        <div className="bg-green-50 p-2 rounded-lg">
-                                            <div className="text-xs text-green-600 font-bold">الدفع:</div>
-                                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                                <div>المدفوع: {invoiceApi.formatCurrency(parseFloat(formData.paid_amount) || 0)}</div>
-                                                <div>المتبقي: {invoiceApi.formatCurrency(
-                                                    parseFloat(selectedOrder.total_amount) - (parseFloat(formData.paid_amount) || 0)
-                                                )}</div>
-                                            </div>
-                                        </div>
-
                                         {/* ملاحظات */}
                                         {formData.notes && (
                                             <div className="bg-gray-50 p-2 rounded-lg">
                                                 <div className="text-xs text-gray-500">ملاحظات:</div>
                                                 <div className="text-sm">{formData.notes}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </StyledDialog>
+                            )}
+
+                            {/* بوب أب معلومات الدفع عند إنشاء الفاتورة */}
+                            {showPaymentPopup && selectedOrder && (
+                                <StyledDialog
+                                    isOpen={showPaymentPopup}
+                                    onOpenChange={setShowPaymentPopup}
+                                    title={editingInvoiceId ? "تحديث الفاتورة - معلومات الدفع" : "إنشاء فاتورة جديدة - معلومات الدفع"}
+                                    onCancel={() => {
+                                        setShowPaymentPopup(false);
+                                        setPaymentFormData({
+                                            paid_amount: "",
+                                            discount: "0",
+                                            discount_type: "fixed"
+                                        });
+                                    }}
+                                    onConfirm={() => {
+                                        // نسخ بيانات الدفع إلى formData ثم حفظ
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            paid_amount: paymentFormData.paid_amount,
+                                            discount: paymentFormData.discount,
+                                            discount_type: paymentFormData.discount_type
+                                        }));
+                                        setShowPreview(true);
+                                        setShowPaymentPopup(false);
+                                    }}
+                                    confirmLabel="متابعة"
+                                    cancelLabel="إلغاء"
+                                    confirmVariant="default"
+                                    isLoading={invoicesLoading}
+                                    disabled={!paymentFormData.paid_amount}
+                                >
+                                    <div className="space-y-4">
+                                        {/* معلومات الفاتورة */}
+                                        <div className="bg-blue-50 p-3 rounded-lg">
+                                            <div className="text-sm font-bold mb-2 text-blue-700">معلومات الفاتورة</div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div>رقم الطلب: #{selectedOrder.order_id}</div>
+                                                <div>الزبون: {selectedOrder.customer?.name || 'غير محدد'}</div>
+                                                <div className="col-span-2 font-bold text-base">
+                                                    المبلغ الكامل: {invoiceApi.formatCurrency(selectedOrder.total_amount)}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* المبلغ المدفوع والخصم */}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <Label className="font-bold text-sm mb-2 block">
+                                                    المبلغ المدفوع
+                                                    <span className="text-xs text-gray-500 font-normal mr-1">(hint)</span>
+                                                </Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        value={paymentFormData.paid_amount}
+                                                        onChange={(e) => setPaymentFormData(prev => ({ ...prev, paid_amount: e.target.value }))}
+                                                        placeholder="0.00"
+                                                        className="h-12 text-lg text-center font-bold flex-1"
+                                                        step="0.01"
+                                                        min="0"
+                                                    />
+                                                    <span className="text-lg font-bold text-gray-600 whitespace-nowrap">ل.س</span>
+                                                </div>
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    المبلغ الكامل: {invoiceApi.formatCurrency(selectedOrder.total_amount)}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <Label className="font-bold text-sm mb-2 block">قيمة الخصم</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={paymentFormData.discount}
+                                                    onChange={(e) => setPaymentFormData(prev => ({ ...prev, discount: e.target.value }))}
+                                                    placeholder="0"
+                                                    className="h-12 text-lg text-center font-bold"
+                                                    min="0"
+                                                    step="0.01"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* حساب الذمة (المتبقي) */}
+                                        {paymentFormData.paid_amount && (
+                                            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                                                {(() => {
+                                                    const total = parseFloat(selectedOrder.total_amount);
+                                                    const discount = parseFloat(paymentFormData.discount) || 0;
+                                                    const paid = parseFloat(paymentFormData.paid_amount) || 0;
+                                                    const afterDiscount = total - discount;
+                                                    const remaining = afterDiscount - paid;
+                                                    const paymentStatus = invoiceApi.getPaymentStatus(afterDiscount, paid);
+                                                    return (
+                                                        <div className="space-y-2">
+                                                            <div className="text-sm font-bold text-green-700 mb-2">حساب الذمة</div>
+                                                            <div className="space-y-1 text-sm">
+                                                                <div className="flex justify-between">
+                                                                    <span>المبلغ الكامل:</span>
+                                                                    <span className="font-bold">{invoiceApi.formatCurrency(total)}</span>
+                                                                </div>
+                                                                {discount > 0 && (
+                                                                    <div className="flex justify-between text-red-600">
+                                                                        <span>الخصم:</span>
+                                                                        <span className="font-bold">-{invoiceApi.formatCurrency(discount)}</span>
+                                                                    </div>
+                                                                )}
+                                                                <div className="flex justify-between">
+                                                                    <span>المبلغ بعد الخصم:</span>
+                                                                    <span className="font-bold">{invoiceApi.formatCurrency(afterDiscount)}</span>
+                                                                </div>
+                                                                <div className="flex justify-between text-green-600">
+                                                                    <span>المدفوع:</span>
+                                                                    <span className="font-bold">{invoiceApi.formatCurrency(paid)}</span>
+                                                                </div>
+                                                                <div className="flex justify-between border-t pt-2 mt-2">
+                                                                    <span className="font-bold">الذمة (المتبقي):</span>
+                                                                    <span className={`font-bold ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                                        {invoiceApi.formatCurrency(Math.max(remaining, 0))}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="mt-2">
+                                                                    <span className={`px-2 py-1 rounded-full text-xs ${paymentStatus.className}`}>
+                                                                        {paymentStatus.label}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         )}
                                     </div>

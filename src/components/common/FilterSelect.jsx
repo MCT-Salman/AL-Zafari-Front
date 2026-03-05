@@ -16,6 +16,9 @@ const FilterSelect = ({
   value = "",
   onChange = () => {},
   onValueChange,
+  searchValue,
+  onSearchValueChange,
+  onInputFocus,
   options = [],
   className = "",
   disabled = false,
@@ -26,7 +29,7 @@ const FilterSelect = ({
   const inputRef = useRef(null);
 
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [internalSearchTerm, setInternalSearchTerm] = useState("");
 
   const normalizedValue = toStringValue(value);
 
@@ -35,21 +38,24 @@ const FilterSelect = ({
     [options, normalizedValue]
   );
 
+  const effectiveSearchTerm = typeof searchValue === "string" ? searchValue : internalSearchTerm;
+
   const filteredOptions = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
+    const query = effectiveSearchTerm.trim().toLowerCase();
     if (!query) return options;
     return options.filter((option) => {
       const labelText = String(option?.label ?? "").toLowerCase();
       const valueText = String(option?.value ?? "").toLowerCase();
       return labelText.includes(query) || valueText.includes(query);
     });
-  }, [options, searchTerm]);
+  }, [effectiveSearchTerm, options]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (!wrapperRef.current?.contains(event.target)) {
         setIsOpen(false);
-        setSearchTerm("");
+        if (typeof onSearchValueChange === "function") onSearchValueChange("");
+        setInternalSearchTerm("");
       }
     };
 
@@ -64,23 +70,28 @@ const FilterSelect = ({
     }
     onChange(buildEventLike(nextValue));
     setIsOpen(false);
-    setSearchTerm("");
+    if (typeof onSearchValueChange === "function") onSearchValueChange("");
+    setInternalSearchTerm("");
   };
 
   const handleInputFocus = () => {
     if (disabled) return;
     setIsOpen(true);
+    if (typeof onInputFocus === "function") onInputFocus();
   };
 
   const handleInputChange = (event) => {
-    setSearchTerm(event.target.value);
+    const next = event.target.value;
+    if (typeof onSearchValueChange === "function") onSearchValueChange(next);
+    setInternalSearchTerm(next);
     if (!isOpen) setIsOpen(true);
   };
 
   const handleKeyDown = (event) => {
     if (event.key === "Escape") {
       setIsOpen(false);
-      setSearchTerm("");
+      if (typeof onSearchValueChange === "function") onSearchValueChange("");
+      setInternalSearchTerm("");
       inputRef.current?.blur();
       return;
     }
@@ -92,7 +103,7 @@ const FilterSelect = ({
   };
 
   const inputText = isOpen
-    ? searchTerm
+    ? effectiveSearchTerm
     : String(selectedOption?.label ?? (normalizedValue ? normalizedValue : ""));
 
   return (

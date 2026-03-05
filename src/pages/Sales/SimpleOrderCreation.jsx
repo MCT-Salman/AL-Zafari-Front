@@ -49,6 +49,7 @@ export default function SimpleOrderCreation() {
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [showPreview, setShowPreview] = useState(false);
     const [editingItemId, setEditingItemId] = useState(null);
+    const [editingOrderId, setEditingOrderId] = useState(null);
     const tableContainerRef = useRef(null);
 
     // Data
@@ -101,8 +102,13 @@ export default function SimpleOrderCreation() {
 
     // Numpad
     const [numpadMode, setNumpadMode] = useState("quantity");
+    const [activeTextTarget, setActiveTextTarget] = useState(null); // color_search | batch_search | customer_search
     const [colorSearchCode, setColorSearchCode] = useState("");
+    const [batchSearchTerm, setBatchSearchTerm] = useState("");
     const [activeField, setActiveField] = useState("quantity");
+
+    const [qrPreview, setQrPreview] = useState({ open: false, url: "", title: "" });
+    const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
 
     // Helper functions from orderApi
     const getOrderStatus = (order) => orderApi.getOrderStatus(order);
@@ -133,6 +139,21 @@ export default function SimpleOrderCreation() {
         [PriceColorBy.isByMeter44]: 44,
         [PriceColorBy.isByMeter66]: 66,
         [PriceColorBy.isByBlanck]: null
+    };
+
+    const handleUpdateOrderStatus = async (nextStatus) => {
+        if (!orderDetails?.order_id) return;
+        try {
+            setUpdatingOrderStatus(true);
+            await orderApi.updateOrderStatus(orderDetails.order_id, nextStatus);
+            setOrderDetails((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+            setOrders((prev) => prev.map((o) => (o.order_id === orderDetails.order_id ? { ...o, status: nextStatus } : o)));
+            toast.success("تم تحديث الحالة");
+        } catch (error) {
+            toast.error("فشل في تحديث الحالة");
+        } finally {
+            setUpdatingOrderStatus(false);
+        }
     };
 
     const totalPreviewQuantity = useMemo(() => {
@@ -174,6 +195,12 @@ export default function SimpleOrderCreation() {
 
     useEffect(() => {
         if (viewMode === "history") loadOrders();
+    }, [viewMode]);
+
+    useEffect(() => {
+        if (qrPreview.open) {
+            setQrPreview((prev) => ({ ...prev, open: false }));
+        }
     }, [viewMode]);
 
     // Load width values when material changes
@@ -250,6 +277,42 @@ export default function SimpleOrderCreation() {
         } finally {
             setOrdersLoading(false);
         }
+    };
+
+    const getQrUrl = (data) => {
+        const encoded = encodeURIComponent(String(data || ""));
+        return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encoded}`;
+    };
+
+    const buildItemQrData = (item) => {
+        const payload = {
+            kind: "order_item",
+            local_item_id: item?.id ?? null,
+            material: item?.material_name ?? item?.material_name ?? "",
+            ruler: item?.ruler_name ?? item?.ruler_type ?? item?.rulerType ?? item?.ruler?.ruler_name ?? item?.ruler?.ruler_type ?? "",
+            color: item?.color_name ?? item?.color_name ?? "",
+            color_code: item?.color_code ?? item?.color_code ?? "",
+            width: item?.width ?? "",
+            thickness: item?.thickness ?? "0.6",
+            quantity: item?.quantity ?? "",
+            batch: item?.batch_number ?? "",
+        };
+        return JSON.stringify(payload);
+    };
+
+    const openQrPreview = (url, title = "") => {
+        setQrPreview({ open: true, url, title });
+    };
+
+    const printQr = (url, title = "QR") => {
+        const w = window.open("", "_blank", "width=600,height=700");
+        if (!w) return;
+        w.document.write(`<!doctype html><html><head><title>${title}</title></head><body style="display:flex;align-items:center;justify-content:center;flex-direction:column;font-family:sans-serif;gap:12px;">
+          <h3 style="margin:0;">${title}</h3>
+          <img src="${url}" style="width:320px;height:320px;image-rendering:pixelated;" />
+          <script>window.onload = () => { window.print(); };</script>
+        </body></html>`);
+        w.document.close();
     };
 
     const handleCreateCustomer = async () => {
@@ -438,32 +501,51 @@ export default function SimpleOrderCreation() {
     };
 
     const handleNumpadPress = (val) => {
-        if (numpadMode === "colorSearch") {
-            let search = colorSearchCode;
-            if (val === "clear") search = "";
-            else if (val === "back") search = search.slice(0, -1);
-            else search = search + val;
+        if (numpadMode === "text") {
+            const apply = (prev) => {
+                let next = String(prev || "");
+                if (val === "clear") next = "";
+                else if (val === "back") next = next.slice(0, -1);
+                else next = next + val;
+                return next;
+            };
 
-            setColorSearchCode(search);
+            if (activeTextTarget === "color_search") {
+                const next = apply(colorSearchCode);
+                setColorSearchCode(next);
+                const matched = availablePricedColors.find(c => String(c.color_code) === String(next));
+                if (matched) {
+                    handleFieldChange("color_id", String(matched.color_id));
+                    setNumpadMode("quantity");
+                    setActiveTextTarget(null);
+                    setColorSearchCode("");
+                    toast.success(`تم العثور على اللون: ${matched.color_name}`);
+                }
+                return;
+            }
 
-            const matched = availablePricedColors.find(c => c.color_code === search);
-            if (matched) {
-                handleFieldChange("color_id", String(matched.color_id));
-                setNumpadMode("quantity");
-                setColorSearchCode("");
-                toast.success(`تم العثور على اللون: ${matched.color_name}`);
+            if (activeTextTarget === "batch_search") {
+                setBatchSearchTerm((prev) => apply(prev));
+                return;
             }
-        } else {
-            let current = String(formData[activeField] || "");
-            if (val === "clear") current = "";
-            else if (val === "back") current = current.slice(0, -1);
-            else if (val === ".") {
-                if (!current.includes(".")) current = current ? current + "." : "0.";
-            } else {
-                current = current + val;
+
+            if (activeTextTarget === "customer_search") {
+                setCustomerSearchTerm((prev) => apply(prev));
+                return;
             }
-            handleFieldChange(activeField, current);
+
+            return;
         }
+
+        let current = String(formData[activeField] || "");
+        if (val === "clear") current = "";
+        else if (val === "back") current = current.slice(0, -1);
+        else if (val === ".") {
+            if (!current.includes(".")) current = current ? current + "." : "0.";
+        } else {
+            current = current + val;
+        }
+        handleFieldChange(activeField, current);
     };
 
     const addOrUpdateItem = () => {
@@ -487,7 +569,7 @@ export default function SimpleOrderCreation() {
         const color = colors.find(c => String(c.color_id) === String(formData.color_id));
         const batch = batches.find(b => String(b.batch_id) === String(formData.batch_id));
 
-        const newItem = {
+        const newItemBase = {
             id: editingItemId || Date.now(),
             material_id: formData.material_id,
             type_item: formData.type_item,
@@ -499,9 +581,17 @@ export default function SimpleOrderCreation() {
             quantity: formData.quantity,
             notes: formData.notes,
             material_name: material?.material_name,
-            ruler_name: ruler?.ruler_name,
+            ruler_name: ruler?.ruler_name ?? ruler?.ruler_type,
             color_name: color?.color_name,
+            color_code: color?.color_code,
             batch_number: batch?.batch_number,
+        };
+
+        const qrData = buildItemQrData(newItemBase);
+        const newItem = {
+            ...newItemBase,
+            qrData,
+            qrUrl: getQrUrl(qrData),
         };
 
         if (editingItemId) {
@@ -527,6 +617,7 @@ export default function SimpleOrderCreation() {
             notes: ""
         }));
         setColorSearchCode("");
+        setBatchSearchTerm("");
     };
 
     const handleEditItem = (item) => {
@@ -543,6 +634,132 @@ export default function SimpleOrderCreation() {
         });
         setEditingItemId(item.id);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleEditOrderFromHistory = async (order) => {
+        try {
+            setLoadingDetails(true);
+
+            if (materials.length === 0 || rulers.length === 0 || colors.length === 0 || batches.length === 0) {
+                await loadInitialData();
+            }
+            if (customers.length === 0) {
+                await loadCustomers();
+            }
+
+            const response = await orderApi.getOrderById(order.order_id);
+            if (!response?.success || !response?.data) {
+                toast.error("فشل في جلب تفاصيل الطلب");
+                return;
+            }
+
+            const details = response.data;
+            setEditingOrderId(details.order_id);
+            setViewMode("create");
+
+            const customerId = details.customer?.customer_id ?? details.customer_id ?? details.customerId ?? null;
+            const resolvedCustomer = customerId
+                ? (customers.find((c) => String(c.customer_id) === String(customerId)) || details.customer || null)
+                : (details.customer || null);
+
+            if (resolvedCustomer && (resolvedCustomer.customer_id || resolvedCustomer.name || resolvedCustomer.phone)) {
+                setSelectedCustomer(resolvedCustomer);
+                setCustomerOption("existing");
+            } else {
+                setSelectedCustomer(null);
+                setCustomerOption("none");
+            }
+
+            const mappedItems = (details.items || []).map((it, idx) => {
+                const rawColorCode = it.color_code ?? it.color?.color_code ?? it.colorCode ?? null;
+                const rawColorName = it.color_name ?? it.color?.color_name ?? it.colorName ?? null;
+                const rawColorId = it.color_id ?? it.color?.color_id ?? it.colorId ?? null;
+
+                const colorByCode = rawColorCode
+                    ? colors.find((c) => String(c.color_code).trim() === String(rawColorCode).trim())
+                    : null;
+                const colorByName = rawColorName
+                    ? colors.find((c) => String(c.color_name).trim() === String(rawColorName).trim())
+                    : null;
+
+                const resolvedColor = rawColorId
+                    ? colors.find((c) => String(c.color_id) === String(rawColorId))
+                    : (colorByCode || colorByName);
+
+                const resolvedColorId = rawColorId ?? resolvedColor?.color_id ?? null;
+
+                const rulerTypeName = it.ruler_type ?? it.rulerType ?? it.ruler_name ?? it.ruler?.ruler_name ?? null;
+                const rulerByName = rulerTypeName
+                    ? rulers.find((r) => {
+                        const rName = r?.ruler_name ?? r?.ruler_type ?? "";
+                        return String(rName).trim() === String(rulerTypeName).trim();
+                    })
+                    : null;
+
+                const rawRulerId = it.ruler_id ?? it.ruler?.ruler_id ?? it.rulerId ?? resolvedColor?.ruler_id ?? rulerByName?.ruler_id ?? null;
+                const resolvedRuler = rawRulerId
+                    ? rulers.find((r) => String(r.ruler_id) === String(rawRulerId))
+                    : null;
+
+                const materialName = it.material_name ?? it.material?.material_name ?? null;
+                const materialByName = materialName
+                    ? materials.find((m) => String(m.material_name).trim() === String(materialName).trim())
+                    : null;
+
+                const rawMaterialId = it.material_id ?? it.material?.material_id ?? it.materialId ?? resolvedRuler?.material_id ?? materialByName?.material_id ?? null;
+                const resolvedMaterial = rawMaterialId
+                    ? materials.find((m) => String(m.material_id) === String(rawMaterialId))
+                    : null;
+
+                const rawBatchId = it.batch_id ?? it.batch?.batch_id ?? it.batchId ?? null;
+                const resolvedBatch = rawBatchId
+                    ? batches.find((b) => String(b.batch_id) === String(rawBatchId))
+                    : null;
+
+                const local = {
+                    id: Date.now() + idx,
+                    material_id: rawMaterialId ? String(rawMaterialId) : "",
+                    type_item: it.type_item ?? it.typeItem ?? TypeItem.Machine,
+                    ruler_id: rawRulerId ? String(rawRulerId) : "",
+                    color_id: resolvedColorId ? String(resolvedColorId) : "",
+                    batch_id: rawBatchId ? String(rawBatchId) : "",
+                    width: it.width !== undefined && it.width !== null ? String(it.width) : "",
+                    thickness: String(it.thickness ?? "0.6"),
+                    quantity: String(it.quantity ?? ""),
+                    notes: it.notes || "",
+                    material_name: it.material_name ?? it.material?.material_name ?? resolvedMaterial?.material_name ?? "",
+                    ruler_name: it.ruler_name ?? it.ruler?.ruler_name ?? resolvedRuler?.ruler_name ?? resolvedRuler?.ruler_type ?? rulerTypeName ?? "",
+                    color_name: it.color_name ?? it.color?.color_name ?? resolvedColor?.color_name ?? "",
+                    color_code: it.color_code ?? it.color?.color_code ?? resolvedColor?.color_code ?? "",
+                    batch_number: it.batch_number ?? it.batch?.batch_number ?? resolvedBatch?.batch_number ?? "",
+                };
+                const qrData = buildItemQrData(local);
+                return { ...local, qrData, qrUrl: getQrUrl(qrData) };
+            });
+
+            setOrderItems(mappedItems);
+
+            // تجهيز الفورم ليكون جاهز لإضافة عناصر جديدة
+            setFormData((prev) => ({
+                ...prev,
+                material_id: mappedItems[0]?.material_id || "",
+                ruler_id: "",
+                color_id: "",
+                width: "",
+                quantity: "",
+                notes: "",
+                thickness: mappedItems[0]?.thickness || prev.thickness,
+                type_item: TypeItem.Machine,
+                batch_id: "",
+            }));
+
+            toast.success(`تم تحميل الطلب #${details.order_id} للتعديل`);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (error) {
+            toast.error("حدث خطأ أثناء تحميل الطلب للتعديل");
+        } finally {
+            setLoadingDetails(false);
+        }
     };
 
     const removeItem = (id) => {
@@ -577,7 +794,7 @@ export default function SimpleOrderCreation() {
                 type_item: item.type_item,
                 color_id: Number(item.color_id),
                 width: Number(item.width) || 0,
-                thickness: 0.6,
+                thickness: Number(item.thickness ?? formData.thickness ?? 0.6),
                 batch_id: item.batch_id ? Number(item.batch_id) : null,
                 quantity: Number(item.quantity),
                 notes: item.notes || ""
@@ -593,16 +810,24 @@ export default function SimpleOrderCreation() {
                 orderData.customer_id = Number(selectedCustomer.customer_id);
             }
 
-            // console.log("Saving order:", orderData);
-            await orderApi.createOrder(orderData);
+            if (editingOrderId) {
+                await orderApi.updateOrder(editingOrderId, orderData);
+            } else {
+                await orderApi.createOrder(orderData);
+            }
             
-            toast.success("تم حفظ الطلب بنجاح");
+            toast.success(editingOrderId ? "تم تحديث الطلب بنجاح" : "تم حفظ الطلب بنجاح");
             
             setOrderItems([]);
             setSelectedCustomer(null);
             setCustomerOption("none");
             setShowPreview(false);
             setEditingItemId(null);
+            setEditingOrderId(null);
+
+            if (viewMode === "history") {
+                loadOrders();
+            }
             
         } catch (error) {
             // console.error("Error saving order:", error);
@@ -688,6 +913,16 @@ export default function SimpleOrderCreation() {
             label: customerApi.formatCustomerDisplay(c)
         }));
     }, [filteredCustomers]);
+
+    const filteredBatchOptions = useMemo(() => {
+        const term = String(batchSearchTerm || "").trim().toLowerCase();
+        const base = batches.map(b => ({
+            value: String(b.batch_id),
+            label: b.batch_number || `دفعة ${b.batch_id}`
+        }));
+        if (!term) return base;
+        return base.filter(opt => String(opt.label || "").toLowerCase().includes(term) || String(opt.value || "").toLowerCase().includes(term));
+    }, [batches, batchSearchTerm]);
 
     // Color options for select
     const colorOptions = useMemo(() => {
@@ -1073,6 +1308,12 @@ export default function SimpleOrderCreation() {
                                             value={formData.color_id ? String(formData.color_id) : ""}
                                             onChange={(e) => handleFieldChange("color_id", e.target.value)}
                                             disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
+                                            searchValue={colorSearchCode}
+                                            onSearchValueChange={(v) => setColorSearchCode(v)}
+                                            onInputFocus={() => {
+                                                setNumpadMode("text");
+                                                setActiveTextTarget("color_search");
+                                            }}
                                             options={colorOptions}
                                             placeholder={
                                                 !formData.ruler_id
@@ -1131,6 +1372,7 @@ export default function SimpleOrderCreation() {
                                                 placeholder="0.6"
                                                 step="0.1"
                                                 readOnly
+                                                disabled
                                             />
                                             <span className="text-base font-bold text-gray-600 whitespace-nowrap">مم</span>
                                         </div>
@@ -1142,11 +1384,17 @@ export default function SimpleOrderCreation() {
                                             value={formData.batch_id ? String(formData.batch_id) : ""}
                                             onChange={(e) => handleFieldChange("batch_id", e.target.value)}
                                             disabled={!isSelectedMaterialBoard && !formData.width}
-                                            options={batchOptions}
+                                            searchValue={batchSearchTerm}
+                                            onSearchValueChange={(v) => setBatchSearchTerm(v)}
+                                            onInputFocus={() => {
+                                                setNumpadMode("text");
+                                                setActiveTextTarget("batch_search");
+                                            }}
+                                            options={filteredBatchOptions}
                                             placeholder={
                                                 (!isSelectedMaterialBoard && !formData.width)
                                                     ? "اختر العرض أولاً"
-                                                    : batchOptions.length === 0
+                                                    : filteredBatchOptions.length === 0
                                                         ? "لا توجد طبخات"
                                                         : "اختر الطبخة"
                                             }
@@ -1236,6 +1484,12 @@ export default function SimpleOrderCreation() {
                                                         setSelectedCustomer(customer || null);
                                                     }}
                                                     options={customerOptions}
+                                                    searchValue={customerSearchTerm}
+                                                    onSearchValueChange={(v) => setCustomerSearchTerm(v)}
+                                                    onInputFocus={() => {
+                                                        setNumpadMode("text");
+                                                        setActiveTextTarget("customer_search");
+                                                    }}
                                                     placeholder="اختر الزبون..."
                                                     className="w-full text-sm" 
                                                 />
@@ -1471,6 +1725,7 @@ export default function SimpleOrderCreation() {
                                                 <th className="p-2 text-center border-b w-[60px]">الكمية</th>
                                                 <th className="p-2 text-center border-b w-[90px]">السماكة</th>
                                                 <th className="p-2 text-center border-b w-[120px]">رقم الطبخة</th>
+                                                <th className="p-2 text-center border-b w-[90px]">QR</th>
                                                 <th className="p-2 text-center border-b w-[100px]">الإجراءات</th>
                                             </tr>
                                         </thead>
@@ -1505,6 +1760,24 @@ export default function SimpleOrderCreation() {
                                                         {item.batch_number || "-"}
                                                     </td>
                                                     <td className="p-2 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const url = item.qrUrl || getQrUrl(buildItemQrData(item));
+                                                                openQrPreview(url, `QR - عنصر ${item.color_name || ""}`);
+                                                            }}
+                                                            className="inline-flex items-center justify-center"
+                                                            title="عرض QR"
+                                                        >
+                                                            <img
+                                                                src={item.qrUrl || getQrUrl(buildItemQrData(item))}
+                                                                alt="qr"
+                                                                className="h-9 w-9 border rounded"
+                                                            />
+                                                        </button>
+                                                    </td>
+                                                    <td className="p-2 text-center">
                                                         <div className="flex items-center justify-center gap-1">
                                                             {editingItemId === item.id && (
                                                                 <span className="text-blue-600 text-xs ml-1">
@@ -1527,7 +1800,7 @@ export default function SimpleOrderCreation() {
                                             ))}
                                             {orderItems.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="8" className="p-8 text-center text-primary-f">
+                                                    <td colSpan="9" className="p-8 text-center text-primary-f">
                                                         <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                         <span className="text-sm">لا توجد عناصر مضافة</span>
                                                         <p className="text-xs mt-1">اضغط على العناصر في اليمين لإضافتها</p>
@@ -1614,20 +1887,32 @@ export default function SimpleOrderCreation() {
                                                         </span>
                                                     </td>
                                                     <td className="p-2 text-center">
-                                                        <Button
-    size="sm"
-    variant="outline"
-    className="h-8 px-2 text-xs touch-manipulation active:scale-95 transition-transform hover:bg-primary-f hover:text-white"
-    onClick={() => handleViewOrderDetails(order)}
-    disabled={loadingDetails}
->
-    {loadingDetails ? (
-        <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin ml-1" />
-    ) : (
-        <Eye className="w-3 h-3 ml-1" />
-    )}
-    عرض
-</Button>
+                                                                                <div className="flex items-center justify-center gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-8 px-2 text-xs touch-manipulation active:scale-95 transition-transform hover:bg-primary-f hover:text-white"
+                                                                onClick={() => handleViewOrderDetails(order)}
+                                                                disabled={loadingDetails}
+                                                            >
+                                                                {loadingDetails ? (
+                                                                    <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin ml-1" />
+                                                                ) : (
+                                                                    <Eye className="w-3 h-3 ml-1" />
+                                                                )}
+                                                                عرض
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-8 px-2 text-xs touch-manipulation active:scale-95 transition-transform hover:bg-secondary-s hover:text-white"
+                                                                onClick={() => handleEditOrderFromHistory(order)}
+                                                                disabled={loadingDetails}
+                                                            >
+                                                                <Edit className="w-3 h-3 ml-1" />
+                                                                تعديل
+                                                            </Button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -1676,6 +1961,20 @@ export default function SimpleOrderCreation() {
                         <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusBadge(orderDetails.status).className}`}>
                             {getStatusBadge(orderDetails.status).label}
                         </span>
+                    </div>
+                </div>
+
+                <div className="bg-gray-50 p-3 rounded-lg border">
+                    <div className="text-xs text-gray-500">تعديل الحالة</div>
+                    <div className="mt-1">
+                        <FilterSelect
+                            value={orderDetails.status}
+                            onChange={(e) => handleUpdateOrderStatus(e.target.value)}
+                            disabled={updatingOrderStatus}
+                            options={Object.values(OrderStatus).map((s) => ({ value: s, label: getStatusLabel(s) }))}
+                            placeholder="اختر الحالة..."
+                            className="w-full"
+                        />
                     </div>
                 </div>
                 
@@ -1765,15 +2064,41 @@ export default function SimpleOrderCreation() {
                                         <th className="p-3 text-right">المادة</th>
                                         <th className="p-3 text-center">النوع</th>
                                         <th className="p-3 text-center">اللون</th>
+                                        <th className="p-3 text-center">المسطرة</th>
                                         <th className="p-3 text-center">الأبعاد (عرض × سماكة)</th>
                                         <th className="p-3 text-center">الكمية</th>
-                                        <th className="p-3 text-center">نوع المسطرة</th>
                                         <th className="p-3 text-center">رقم الدفعة</th>
+                                        <th className="p-3 text-center">QR</th>
                                         <th className="p-3 text-center">ملاحظات</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {orderDetails.items.map((item, index) => (
+                                        (() => {
+                                            const rawColorId = item.color_id ?? item.color?.color_id ?? item.colorId ?? null;
+                                            const resolvedColor = rawColorId
+                                                ? colors.find((c) => String(c.color_id) === String(rawColorId))
+                                                : null;
+                                            const rawRulerId = item.ruler_id ?? item.ruler?.ruler_id ?? item.rulerId ?? resolvedColor?.ruler_id ?? null;
+                                            const resolvedRuler = rawRulerId
+                                                ? rulers.find((r) => String(r.ruler_id) === String(rawRulerId))
+                                                : null;
+                                            const resolvedRulerName = item.ruler_name ?? item.ruler?.ruler_name ?? item.ruler_type ?? resolvedRuler?.ruler_name ?? "-";
+
+                                            const local = {
+                                                id: `${orderDetails.order_id}-${index + 1}`,
+                                                material_name: item.material_name,
+                                                ruler_name: resolvedRulerName,
+                                                color_name: item.color_name,
+                                                color_code: item.color_code,
+                                                width: item.width,
+                                                thickness: item.thickness,
+                                                quantity: item.quantity,
+                                                batch_number: item.batch_number,
+                                            };
+                                            const qrData = buildItemQrData(local);
+                                            const url = getQrUrl(qrData);
+                                            return (
                                         <tr key={index} className="border-t hover:bg-gray-50">
                                             <td className="p-3 text-center font-medium">{index + 1}</td>
                                             <td className="p-3 font-medium">{item.material_name || 'غير محدد'}</td>
@@ -1790,16 +2115,28 @@ export default function SimpleOrderCreation() {
                                                <span className="flex flex-col"> {item.color_name || '-'}</span>
                                                 <span className="px-2 py-1 rounded-full text-xs  text-purple-700">{item.color_code || '-'}</span>
                                             </td>
+                                            <td className="p-3 text-center">{resolvedRulerName}</td>
                                             <td className="p-3 text-center">
                                                 {item.width || '-'} × {item.thickness || '0.6'}
                                             </td>
                                             <td className="p-3 text-center font-bold">{item.quantity} م</td>
-                                            <td className="p-3 text-center">{item.ruler_type || '-'}</td>
                                             <td className="p-3 text-center font-mono text-xs">{item.batch_number || '-'}</td>
+                                            <td className="p-3 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openQrPreview(url, `QR - طلب #${orderDetails.order_id} - عنصر ${index + 1}`)}
+                                                    className="inline-flex items-center justify-center"
+                                                    title="عرض QR"
+                                                >
+                                                    <img src={url} alt="qr" className="h-10 w-10 border rounded" />
+                                                </button>
+                                            </td>
                                             <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
                                                 {item.notes || '-'}
                                             </td>
                                         </tr>
+                                            );
+                                        })()
                                     ))}
                                 </tbody>
                             </table>
@@ -1828,8 +2165,37 @@ export default function SimpleOrderCreation() {
         </div>
     </StyledDialog>
 )}
+
                     </Card>
-                )}
+
+            )} 
+
+            <StyledDialog
+                isOpen={qrPreview.open}
+                onOpenChange={(open) => setQrPreview((prev) => ({ ...prev, open }))}
+                title={qrPreview.title || "QR"}
+                onCancel={() => setQrPreview((prev) => ({ ...prev, open: false }))}
+                cancelLabel="إغلاق"
+                showFooter={false}
+            >
+                <div className="space-y-3">
+                    <div className="flex items-center justify-center">
+                        {qrPreview.url ? (
+                            <img src={qrPreview.url} alt="qr" className="h-80 w-80 border rounded" />
+                        ) : null}
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                        <Button
+                            size="sm"
+                            className="bg-secondary-s hover:brightness-110 text-white"
+                            onClick={() => printQr(qrPreview.url, qrPreview.title)}
+                            disabled={!qrPreview.url}
+                        >
+                            طباعة
+                        </Button>
+                    </div>
+                </div>
+            </StyledDialog>
             </div>
         </div>
     );
