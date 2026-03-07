@@ -73,7 +73,18 @@ export const invoiceApi = {
       const response = await axiosInstance.post('/invoice', payload);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في إنشاء الفاتورة' };
+      // Extract error message from various formats and create a proper error with message property
+      const errorData = error.response?.data || {};
+      const errorMessage = 
+        (errorData.details && typeof errorData.details === 'string' ? errorData.details : null) ||
+        (errorData.message) ||
+        (errorData.error) ||
+        'حدث خطأ في إنشاء الفاتورة';
+      
+      const errorObj = new Error(errorMessage);
+      errorObj.details = errorData.details;
+      errorObj.error = errorData.error;
+      throw errorObj;
     }
   },
 
@@ -108,7 +119,18 @@ export const invoiceApi = {
       const response = await axiosInstance.put(`/invoice/${id}`, payload);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في تحديث الفاتورة' };
+      // Extract error message from various formats and create a proper error with message property
+      const errorData = error.response?.data || {};
+      const errorMessage = 
+        (errorData.details && typeof errorData.details === 'string' ? errorData.details : null) ||
+        (errorData.message) ||
+        (errorData.error) ||
+        'حدث خطأ في تحديث الفاتورة';
+      
+      const errorObj = new Error(errorMessage);
+      errorObj.details = errorData.details;
+      errorObj.error = errorData.error;
+      throw errorObj;
     }
   },
 
@@ -118,7 +140,18 @@ export const invoiceApi = {
       const response = await axiosInstance.delete(`/invoice/${id}`, { data: deleteData });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في حذف الفاتورة' };
+      // Extract error message from various formats and create a proper error with message property
+      const errorData = error.response?.data || {};
+      const errorMessage = 
+        (errorData.details && typeof errorData.details === 'string' ? errorData.details : null) ||
+        (errorData.message) ||
+        (errorData.error) ||
+        'حدث خطأ في حذف الفاتورة';
+      
+      const errorObj = new Error(errorMessage);
+      errorObj.details = errorData.details;
+      errorObj.error = errorData.error;
+      throw errorObj;
     }
   },
 
@@ -128,7 +161,18 @@ export const invoiceApi = {
       const response = await axiosInstance.post(`/invoice/${id}/payment`, paymentData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في إضافة الدفعة' };
+      // Extract error message from various formats and create a proper error with message property
+      const errorData = error.response?.data || {};
+      const errorMessage = 
+        (errorData.details && typeof errorData.details === 'string' ? errorData.details : null) ||
+        (errorData.message) ||
+        (errorData.error) ||
+        'حدث خطأ في إضافة الدفعة';
+      
+      const errorObj = new Error(errorMessage);
+      errorObj.details = errorData.details;
+      errorObj.error = errorData.error;
+      throw errorObj;
     }
   },
 

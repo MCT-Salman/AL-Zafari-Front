@@ -265,8 +265,10 @@ export default function InvoiceManager() {
 
     const [orderItems, setOrderItems] = useLocalStorage("invoice_order_items", []);
     const [orders, setOrders] = useState([]);
-    const [ordersLoading, setOrdersLoading] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [invoiceToDelete, setInvoiceToDelete] = useState(null);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [deletingInvoice, setDeletingInvoice] = useState(false);
 
     const [inputMode, setInputMode] = useLocalStorage("invoice_input_mode", "manual");
     const [searchTerm, setSearchTerm] = useState("");
@@ -361,13 +363,10 @@ export default function InvoiceManager() {
 
     const loadOrders = useCallback(async () => {
         try {
-            setOrdersLoading(true);
             const response = await orderApi.getOrders({ status: OrderStatus.completed });
             setOrders(getApiData(response, []) || []);
         } catch (error) {
             toast.error("فشل في تحميل الطلبات");
-        } finally {
-            setOrdersLoading(false);
         }
     }, []);
 
@@ -540,13 +539,6 @@ export default function InvoiceManager() {
         }));
     }, [filteredCustomers]);
 
-    const orderOptions = useMemo(() => {
-        return orders.map(o => ({
-            value: o.order_id,
-            label: `طلب #${o.order_id} - ${o.customer?.name || 'بدون زبون'} - ${invoiceApi.formatCurrency(o.total_amount)}`
-        }));
-    }, [orders]);
-
     const colorOptions = useMemo(() => {
         return filteredColorsBySearch.map(c => ({
             value: String(c.color_id),
@@ -626,6 +618,24 @@ export default function InvoiceManager() {
                 setManualCode(prev => apply(prev));
                 return;
             }
+
+            // General text editing for activeField when no specific text target
+            if (!activeTextTarget && activeField) {
+                const next = apply(formData[activeField] || "");
+                // If editing payment popup fields
+                if (showPaymentPopup && (activeField === 'paid_amount' || activeField === 'discount')) {
+                    setPaymentFormData(prev => ({ ...prev, [activeField]: next }));
+                    return;
+                }
+                // If editing history payment amount
+                if (showPaymentDialog && activeField === 'paymentAmount') {
+                    setPaymentAmount(next);
+                    return;
+                }
+
+                handleFieldChange(activeField, next);
+                return;
+            }
         }
 
         if (numpadMode === "colorSearch") {
@@ -660,6 +670,20 @@ export default function InvoiceManager() {
             return;
         }
 
+        // If history payment dialog is open and activeField is paymentAmount, edit that
+        if (showPaymentDialog && activeField === 'paymentAmount') {
+            let current = String(paymentAmount || "");
+            if (val === "clear") current = "";
+            else if (val === "back") current = current.slice(0, -1);
+            else if (val === ".") {
+                if (!current.includes(".")) current = current ? current + "." : "0.";
+            } else {
+                current = current + val;
+            }
+            setPaymentAmount(current);
+            return;
+        }
+
         // Default: edit formData field
         let current = String(formData[activeField] || "");
         if (val === "clear") current = "";
@@ -670,7 +694,7 @@ export default function InvoiceManager() {
             current = current + val;
         }
         handleFieldChange(activeField, current);
-    }, [numpadMode, colorSearchCode, availablePricedColors, formData, activeField, handleFieldChange, showPaymentPopup, paymentFormData]);
+    }, [numpadMode, colorSearchCode, availablePricedColors, formData, activeField, handleFieldChange, showPaymentPopup, paymentFormData, showPaymentDialog, paymentAmount, setPaymentAmount]);
 
     const addOrUpdateItem = useCallback(() => {
         if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity) {
@@ -817,7 +841,7 @@ export default function InvoiceManager() {
         if (foundOrder) {
             setSelectedOrder(foundOrder);
             setFormData(prev => ({ ...prev, order_id: String(foundOrder.order_id) }));
-            toast.success(`تم العثور على الطلب #${foundOrder.order_id}`);
+            toast.success("تم العثور على الطلب");
         } else {
             toast.error("لم يتم العثور على طلب بهذا الرمز");
         }
@@ -832,7 +856,7 @@ export default function InvoiceManager() {
         if (foundOrder) {
             setSelectedOrder(foundOrder);
             setFormData(prev => ({ ...prev, order_id: String(foundOrder.order_id) }));
-            toast.success(`تم العثور على الطلب #${foundOrder.order_id}`);
+            toast.success("تم العثور على الطلب");
         } else {
             toast.error("لم يتم العثور على طلب بهذا الكود");
         }
@@ -918,7 +942,18 @@ export default function InvoiceManager() {
                 }
             }
         } catch (error) {
-            toast.error(error.message || "فشل في حفظ الفاتورة");
+            // Extract error message from various possible error formats
+            let errorMessage = "فشل في حفظ الفاتورة";
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.details && typeof error.details === 'string') {
+                errorMessage = error.details;
+            } else if (error.error) {
+                errorMessage = error.error;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            toast.error(errorMessage);
         }
     }, [selectedOrder, formData, editingInvoiceId, viewMode, loadInvoices, orderItems, setOrderItems, selectedCustomer]);
 
@@ -951,23 +986,50 @@ export default function InvoiceManager() {
                 loadInvoices();
             }
         } catch (error) {
-            toast.error(error.message || "فشل في إضافة الدفعة");
+            // Extract error message from various possible error formats
+            let errorMessage = "فشل في إضافة الدفعة";
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.details && typeof error.details === 'string') {
+                errorMessage = error.details;
+            } else if (error.error) {
+                errorMessage = error.error;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            toast.error(errorMessage);
         }
     }, [selectedInvoiceForPayment, paymentAmount, loadInvoices]);
 
-    const handleDeleteInvoice = useCallback(async (invoiceId) => {
-        if (!window.confirm("هل أنت متأكد من حذف هذه الفاتورة؟")) return;
+    const handleDeleteInvoice = useCallback(async () => {
+        if (!invoiceToDelete) return;
 
         try {
-            const response = await invoiceApi.deleteInvoice(invoiceId);
+            setDeletingInvoice(true);
+            const response = await invoiceApi.deleteInvoice(invoiceToDelete.invoice_id);
             if (response.success) {
                 toast.success("تم حذف الفاتورة بنجاح");
                 loadInvoices();
             }
+            setShowDeleteDialog(false);
+            setInvoiceToDelete(null);
         } catch (error) {
-            toast.error(error.message || "فشل في حذف الفاتورة");
+            // Extract error message from various possible error formats
+            let errorMessage = "فشل في حذف الفاتورة";
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.details && typeof error.details === 'string') {
+                errorMessage = error.details;
+            } else if (error.error) {
+                errorMessage = error.error;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            toast.error(errorMessage);
+        } finally {
+            setDeletingInvoice(false);
         }
-    }, [loadInvoices]);
+    }, [invoiceToDelete, loadInvoices]);
 
     const handleEditInvoice = useCallback((invoice) => {
         // populate selected order if invoice has order linkage
@@ -1384,117 +1446,99 @@ export default function InvoiceManager() {
                                         </div>
                                     </Card>
 
-                                    {/* الأرقام - مثل صفحة المبيعات */}
-                                    <Card className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
-                                        <div className="flex-shrink-0 mb-2">
-                                            {/* <div className="flex gap-2 mb-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setNumpadMode("quantity");
-                                                        setActiveField("quantity");
-                                                    }}
-                                                    className={`
-                                                        flex-1 py-2 px-2 rounded-lg text-sm font-bold border-2 
-                                                        touch-manipulation transition-all active:scale-95
-                                                        ${numpadMode === "quantity"
-                                                            ? "bg-primary-f text-white border-primary-f"
-                                                            : "bg-white border-gray-300 hover:bg-gray-100"
-                                                        }
-                                                    `}
-                                                >
-                                                    كتابة الكمية
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setNumpadMode("paid");
-                                                        setActiveField("paid_amount");
-                                                    }}
-                                                    className={`
-                                                        flex-1 py-2 px-2 rounded-lg text-sm font-bold border-2 
-                                                        touch-manipulation transition-all active:scale-95
-                                                        ${numpadMode === "paid"
-                                                            ? "bg-green-600 text-white border-green-600"
-                                                            : "bg-white border-gray-300 hover:bg-gray-100"
-                                                        }
-                                                    `}
-                                                >
-                                                    المبلغ
-                                                </button>
-                                            </div> */}
-
-                                            <div className="bg-gray-100 rounded-lg py-2 px-3">
-                                                <div className="text-xs text-gray-500 mb-0.5">
-                                                    {activeField === "quantity" ? "الكمية" :
-                                                        activeField === "paid_amount" ? "المبلغ" :
-                                                            activeField === "width" ? "العرض" : "القيمة"}
-                                                </div>
-                                                <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
-                                                    {showPaymentPopup && (activeField === 'paid_amount' || activeField === 'discount')
-                                                        ? (paymentFormData[activeField] || "0")
-                                                        : (formData[activeField] || "0")
-                                                    }
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* أزرار الأرقام */}
-                                        <div className="flex-1 grid grid-rows-4 gap-1 min-h-0">
-                                            <div className="grid grid-cols-3 gap-1">
-                                                {["7", "8", "9"].map(key => (
-                                                    <button
-                                                        key={key}
-                                                        onClick={() => handleNumpadPress(key)}
-                                                        className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
-                                                    >
-                                                        {key}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-1">
-                                                {["4", "5", "6"].map(key => (
-                                                    <button
-                                                        key={key}
-                                                        onClick={() => handleNumpadPress(key)}
-                                                        className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
-                                                    >
-                                                        {key}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-1">
-                                                {["1", "2", "3"].map(key => (
-                                                    <button
-                                                        key={key}
-                                                        onClick={() => handleNumpadPress(key)}
-                                                        className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
-                                                    >
-                                                        {key}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-1">
-                                                <button
-                                                    onClick={() => handleNumpadPress(".")}
-                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
-                                                >
-                                                    .
-                                                </button>
-                                                <button
-                                                    onClick={() => handleNumpadPress("0")}
-                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
-                                                >
-                                                    0
-                                                </button>
-                                                <button
-                                                    onClick={() => handleNumpadPress("clear")}
-                                                    className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-lg font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
-                                                >
-                                                    مسح
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </Card>
+                                   
+                                   
                                 </>
+                            )}
+
+                            {/* لوحة الأرقام - متاحة دائماً عندما لا يكون في وضع QR */}
+                            {inputMode !== "qr" && (
+                                <Card className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
+                                    <div className="flex-shrink-0 mb-2">
+                                        <div className="bg-gray-100 rounded-lg py-2 px-3">
+                                            <div className="text-xs text-gray-500 mb-0.5">
+                                                {activeField === "quantity" ? "الكمية" :
+                                                    activeField === "paid_amount" ? "المبلغ المدفوع" :
+                                                        activeField === "discount" ? "قيمة الخصم" :
+                                                            activeField === "paymentAmount" ? "مبلغ الدفعة" :
+                                                                activeField === "notes" ? "الملاحظات" :
+                                                                    activeField === "width" ? "العرض" : "القيمة"}
+                                            </div>
+                                            <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
+                                                {showPaymentPopup && (activeField === 'paid_amount' || activeField === 'discount')
+                                                    ? (paymentFormData[activeField] || "0")
+                                                    : showPaymentDialog && activeField === 'paymentAmount'
+                                                        ? (paymentAmount || "0")
+                                                        : (formData[activeField] || "0")
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* أزرار لوحة الأرقام */}
+                                    <div className="flex-1 grid grid-rows-4 gap-1 min-h-0">
+                                        <div className="grid grid-cols-3 gap-1">
+                                            {["7", "8", "9"].map(key => (
+                                                <button
+                                                    key={key}
+                                                    onClick={() => handleNumpadPress(key)}
+                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
+                                                >
+                                                    {key}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1">
+                                            {["4", "5", "6"].map(key => (
+                                                <button
+                                                    key={key}
+                                                    onClick={() => handleNumpadPress(key)}
+                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
+                                                >
+                                                    {key}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1">
+                                            {["1", "2", "3"].map(key => (
+                                                <button
+                                                    key={key}
+                                                    onClick={() => handleNumpadPress(key)}
+                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
+                                                >
+                                                    {key}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-1">
+                                            <button
+                                                onClick={() => handleNumpadPress(".")}
+                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
+                                            >
+                                                .
+                                            </button>
+                                            <button
+                                                onClick={() => handleNumpadPress("0")}
+                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
+                                            >
+                                                0
+                                            </button>
+                                            <button
+                                                onClick={() => handleNumpadPress("back")}
+                                                className="bg-orange-100 text-orange-700 border-2 border-orange-200 rounded-lg text-lg font-bold hover:bg-orange-200 active:bg-orange-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-12"
+                                            >
+                                                ← حذف
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => handleNumpadPress("clear")}
+                                        className="mt-2 w-full bg-red-100 text-red-700 border-2 border-red-200 rounded-lg py-2 font-bold hover:bg-red-200 active:bg-red-300 transition-all touch-manipulation active:scale-95"
+                                    >
+                                        مسح الكل
+                                    </button>
+                                </Card>
                             )}
                         </div>
 
@@ -1517,43 +1561,12 @@ export default function InvoiceManager() {
                             )}
 
                             {/* في الوضع اليدوي - نعرض كل الخيارات مثل صفحة المبيعات */}
-                            {inputMode === "manual" && (
-                                <>
-                                    {/* اختيار رقم الطلب */}
-                                    <Card className="p-4">
-                                        <Label className="font-bold text-base mb-3 block">رقم الطلب</Label>
-                                        <FilterSelect
-                                            value={selectedOrder ? selectedOrder.order_id : ""}
-                                            onChange={(e) => {
-                                                const order = orders.find(o => o.order_id === parseInt(e.target.value));
-                                                setSelectedOrder(order || null);
-                                                setFormData(prev => ({ ...prev, order_id: order ? String(order.order_id) : "" }));
-                                                if (order && order.customer) {
-                                                    setSelectedCustomer(order.customer);
-                                                    setCustomerOption('existing');
-                                                }
-                                            }}
-                                            options={orderOptions}
-                                            placeholder="اختر رقم الطلب..."
-                                            className="w-full text-base"
-                                            disabled={ordersLoading}
-                                        />
-                                        {ordersLoading && (
-                                            <div className="text-center mt-2">
-                                                <RefreshCw className="w-4 h-4 animate-spin inline text-gray-400" />
-                                            </div>
-                                        )}
-                                    </Card>
-                                </>
-                            )}
-
                             {/* معلومات الطلب المحدد */}
                             {selectedOrder && (
                                 <Card className="p-4">
                                     <Label className="font-bold text-base mb-3 block">معلومات الطلب</Label>
                                     <div className="bg-blue-50 p-3 rounded-lg space-y-2">
                                         <div className="grid grid-cols-2 gap-2 text-sm">
-                                            <div>رقم الطلب: #{selectedOrder.order_id}</div>
                                             <div>الزبون: {selectedOrder.customer?.name || 'غير محدد'}</div>
                                             <div>رقم الهاتف: {selectedOrder.customer?.phone || 'غير محدد'}</div>
                                             <div>الإجمالي: {invoiceApi.formatCurrency(selectedOrder.total_amount)}</div>
@@ -1703,10 +1716,8 @@ export default function InvoiceManager() {
                                                 type="number"
                                                 value={formData.quantity}
                                                 onChange={(e) => handleFieldChange("quantity", e.target.value)}
-                                                onClick={() => {
-                                                    setActiveField("quantity");
-                                                    setNumpadMode("quantity");
-                                                }}
+                                                onFocus={() => { setActiveField('quantity'); setNumpadMode('quantity'); }}
+                                                onClick={() => { setActiveField('quantity'); setNumpadMode('quantity'); }}
                                                 className={`h-12 text-lg text-center font-bold flex-1 ${activeField === "quantity" ? "ring-2 ring-blue-400" : ""
                                                     }`}
                                                 placeholder="0"
@@ -1791,6 +1802,8 @@ export default function InvoiceManager() {
                                     type="text"
                                     value={formData.notes}
                                     onChange={(e) => handleFieldChange("notes", e.target.value)}
+                                    onFocus={() => { setActiveField('notes'); setNumpadMode('text'); }}
+                                    onClick={() => { setActiveField('notes'); setNumpadMode('text'); }}
                                     placeholder="ملاحظات إضافية..."
                                     className="h-12 text-base"
                                 />
@@ -2001,7 +2014,7 @@ export default function InvoiceManager() {
                                             <div className="text-xs text-purple-600 font-bold">معلومات الفاتورة:</div>
                                             <div className="text-sm">
                                                 {selectedOrder ? (
-                                                    <>طلب #{selectedOrder.order_id} - {invoiceApi.formatCurrency(selectedOrder.total_amount)}</>
+                                                    <>طلب مرتبط - {invoiceApi.formatCurrency(selectedOrder.total_amount)}</>
                                                 ) : (
                                                     <>فاتورة يدوية - {invoiceApi.formatCurrency(orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0))}</>
                                                 )}
@@ -2068,7 +2081,6 @@ export default function InvoiceManager() {
                                             <div className="grid grid-cols-2 gap-2 text-xs">
                                                 {selectedOrder ? (
                                                     <>
-                                                        <div>رقم الطلب: #{selectedOrder.order_id}</div>
                                                         <div>الزبون: {selectedOrder.customer?.name || 'غير محدد'}</div>
                                                     </>
                                                 ) : (
@@ -2095,6 +2107,8 @@ export default function InvoiceManager() {
                                                         type="number"
                                                         value={paymentFormData.paid_amount}
                                                         onChange={(e) => setPaymentFormData(prev => ({ ...prev, paid_amount: e.target.value }))}
+                                                        onFocus={() => { setActiveField('paid_amount'); setNumpadMode('paid'); }}
+                                                        onClick={() => { setActiveField('paid_amount'); setNumpadMode('paid'); }}
                                                         placeholder="0.00"
                                                         className="h-12 text-lg text-center font-bold flex-1"
                                                         step="0.01"
@@ -2113,12 +2127,104 @@ export default function InvoiceManager() {
                                                     type="number"
                                                     value={paymentFormData.discount}
                                                     onChange={(e) => setPaymentFormData(prev => ({ ...prev, discount: e.target.value }))}
+                                                    onFocus={() => { setActiveField('discount'); setNumpadMode('paid'); }}
+                                                    onClick={() => { setActiveField('discount'); setNumpadMode('paid'); }}
                                                     placeholder="0"
                                                     className="h-12 text-lg text-center font-bold"
                                                     min="0"
                                                     step="0.01"
                                                 />
                                             </div>
+                                        </div>
+
+                                        {/* لوحة الأرقام في نافذة الدفع */}
+                                        <div className="bg-gray-100 rounded-lg p-2 space-y-2">
+                                            <div className="bg-white rounded-lg py-2 px-3">
+                                                <div className="text-xs text-gray-500 mb-0.5">
+                                                    {activeField === 'paid_amount' ? "المبلغ المدفوع" : activeField === 'discount' ? "قيمة الخصم" : "القيمة"}
+                                                </div>
+                                                <div className="text-2xl font-mono font-bold text-gray-800 text-center">
+                                                    {paymentFormData[activeField] || "0"}
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-rows-4 gap-1">
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    {["7", "8", "9"].map(key => (
+                                                        <button
+                                                            key={key}
+                                                            onClick={() => handleNumpadPress(key)}
+                                                            className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                        >
+                                                            {key}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    {["4", "5", "6"].map(key => (
+                                                        <button
+                                                            key={key}
+                                                            onClick={() => handleNumpadPress(key)}
+                                                            className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                        >
+                                                            {key}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    {["1", "2", "3"].map(key => (
+                                                        <button
+                                                            key={key}
+                                                            onClick={() => handleNumpadPress(key)}
+                                                            className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                        >
+                                                            {key}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    <button
+                                                        onClick={() => handleNumpadPress(".")}
+                                                        className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                    >
+                                                        .
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleNumpadPress("0")}
+                                                        className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                    >
+                                                        0
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleNumpadPress("back")}
+                                                        className="bg-orange-100 text-orange-700 border border-orange-200 rounded text-xs font-bold hover:bg-orange-200 active:bg-orange-300 transition-all active:scale-95 h-8"
+                                                    >
+                                                        ← حذف
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-1">
+                                                <button
+                                                    onClick={() => { setActiveField('paid_amount'); setNumpadMode('paid'); }}
+                                                    className={`py-1 rounded text-xs font-bold transition-all ${activeField === 'paid_amount' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                                                >
+                                                    المبلغ
+                                                </button>
+                                                <button
+                                                    onClick={() => { setActiveField('discount'); setNumpadMode('paid'); }}
+                                                    className={`py-1 rounded text-xs font-bold transition-all ${activeField === 'discount' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                                                >
+                                                    الخصم
+                                                </button>
+                                            </div>
+
+                                            <button
+                                                onClick={() => handleNumpadPress("clear")}
+                                                className="w-full bg-red-100 text-red-700 border border-red-200 rounded py-1 font-bold hover:bg-red-200 transition-all text-xs"
+                                            >
+                                                مسح الكل
+                                            </button>
                                         </div>
 
                                         {/* حساب الذمة (المتبقي) */}
@@ -2386,7 +2492,6 @@ export default function InvoiceManager() {
                                         <th className="p-2 text-right border-b w-32">التاريخ</th>
                                         <th className="p-2 text-right border-b w-32">المنشئ</th>
                                         <th className="p-2 text-right border-b w-40">الزبون</th>
-                                        <th className="p-2 text-center border-b w-24">رقم الطلب</th>
                                         <th className="p-2 text-center border-b w-28">الإجمالي</th>
                                         <th className="p-2 text-center border-b w-28">المدفوع</th>
                                         <th className="p-2 text-center border-b w-28">المتبقي</th>
@@ -2398,13 +2503,13 @@ export default function InvoiceManager() {
                                 <tbody>
                                     {invoicesLoading ? (
                                         <tr>
-                                            <td colSpan="11" className="p-8">
+                                            <td colSpan="10" className="p-8">
                                                 <LoadingState />
                                             </td>
                                         </tr>
                                     ) : filteredInvoices.length === 0 ? (
                                         <tr>
-                                            <td colSpan="11" className="p-8 text-center text-gray-400">
+                                            <td colSpan="10" className="p-8 text-center text-gray-400">
                                                 <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                 لا توجد فواتير
                                             </td>
@@ -2424,7 +2529,6 @@ export default function InvoiceManager() {
                                                     <td className="p-2 text-sm">
                                                         <CustomerInfo customer={invoice.customer} compact />
                                                     </td>
-                                                    <td className="p-2 text-center text-sm">#{invoice.order_id || '-'}</td>
                                                     <td className="p-2 text-center font-bold text-primary-f text-sm">
                                                         {invoiceApi.formatCurrency(total)}
                                                     </td>
@@ -2465,7 +2569,10 @@ export default function InvoiceManager() {
                                                                 <Plus className="w-4 h-4" />
                                                             </button>
                                                             <button
-                                                                onClick={() => handleDeleteInvoice(invoice.invoice_id)}
+                                                                onClick={() => {
+                                                                    setInvoiceToDelete(invoice);
+                                                                    setShowDeleteDialog(true);
+                                                                }}
                                                                 className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
                                                                 title="حذف"
                                                             >
@@ -2514,7 +2621,6 @@ export default function InvoiceManager() {
                                         <div className="text-sm font-bold mb-2">معلومات الفاتورة</div>
                                         <div className="grid grid-cols-2 gap-2 text-xs">
                                             <div>رقم الفاتورة: #{selectedInvoiceForPayment.invoice_id}</div>
-                                            <div>رقم الطلب: #{selectedInvoiceForPayment.order_id || '-'}</div>
                                             <div>الزبون: {selectedInvoiceForPayment.customer?.name}</div>
                                             <div>الإجمالي: {invoiceApi.formatCurrency(selectedInvoiceForPayment.total_amount)}</div>
                                             <div>المدفوع: {invoiceApi.formatCurrency(selectedInvoiceForPayment.paid_amount)}</div>
@@ -2529,6 +2635,8 @@ export default function InvoiceManager() {
                                                 type="number"
                                                 value={paymentAmount}
                                                 onChange={(e) => setPaymentAmount(e.target.value)}
+                                                onFocus={() => { setActiveField('paymentAmount'); setNumpadMode('paid'); }}
+                                                onClick={() => { setActiveField('paymentAmount'); setNumpadMode('paid'); }}
                                                 placeholder="أدخل المبلغ..."
                                                 className="h-10 text-sm flex-1"
                                                 step="0.01"
@@ -2537,6 +2645,79 @@ export default function InvoiceManager() {
                                             />
                                             <span className="text-sm font-bold text-gray-600">ل.س</span>
                                         </div>
+                                    </div>
+
+                                    {/* لوحة الأرقام لنافذة الدفعة */}
+                                    <div className="bg-gray-100 rounded-lg p-2 space-y-2">
+                                        <div className="bg-white rounded-lg py-2 px-3">
+                                            <div className="text-xs text-gray-500 mb-0.5">مبلغ الدفعة</div>
+                                            <div className="text-2xl font-mono font-bold text-gray-800 text-center">
+                                                {paymentAmount || "0"}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-rows-4 gap-1">
+                                            <div className="grid grid-cols-3 gap-1">
+                                                {["7", "8", "9"].map(key => (
+                                                    <button
+                                                        key={key}
+                                                        onClick={() => handleNumpadPress(key)}
+                                                        className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                    >
+                                                        {key}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1">
+                                                {["4", "5", "6"].map(key => (
+                                                    <button
+                                                        key={key}
+                                                        onClick={() => handleNumpadPress(key)}
+                                                        className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                    >
+                                                        {key}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1">
+                                                {["1", "2", "3"].map(key => (
+                                                    <button
+                                                        key={key}
+                                                        onClick={() => handleNumpadPress(key)}
+                                                        className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                    >
+                                                        {key}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1">
+                                                <button
+                                                    onClick={() => handleNumpadPress(".")}
+                                                    className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                >
+                                                    .
+                                                </button>
+                                                <button
+                                                    onClick={() => handleNumpadPress("0")}
+                                                    className="bg-white border border-gray-300 rounded text-lg font-bold hover:bg-gray-50 active:bg-gray-200 transition-all active:scale-95 h-8 text-sm"
+                                                >
+                                                    0
+                                                </button>
+                                                <button
+                                                    onClick={() => handleNumpadPress("back")}
+                                                    className="bg-orange-100 text-orange-700 border border-orange-200 rounded text-xs font-bold hover:bg-orange-200 active:bg-orange-300 transition-all active:scale-95 h-8"
+                                                >
+                                                    ← حذف
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => handleNumpadPress("clear")}
+                                            className="w-full bg-red-100 text-red-700 border border-red-200 rounded py-1 font-bold hover:bg-red-200 transition-all text-xs"
+                                        >
+                                            مسح الكل
+                                        </button>
                                     </div>
 
                                     {paymentAmount && (
@@ -2570,10 +2751,6 @@ export default function InvoiceManager() {
                                         <div className="bg-gray-50 p-2 rounded-lg">
                                             <div className="text-xs text-gray-500">المنشئ</div>
                                             <div className="font-bold text-sm">{selectedInvoice.user?.full_name || '-'}</div>
-                                        </div>
-                                        <div className="bg-gray-50 p-2 rounded-lg">
-                                            <div className="text-xs text-gray-500">رقم الطلب</div>
-                                            <div className="font-bold text-sm">#{selectedInvoice.order_id || '-'}</div>
                                         </div>
                                         <div className="bg-gray-50 p-2 rounded-lg">
                                             <div className="text-xs text-gray-500">الزبون</div>
@@ -2656,6 +2833,37 @@ export default function InvoiceManager() {
                                             <div className="text-sm">{selectedInvoice.notes}</div>
                                         </div>
                                     )}
+                                </div>
+                            </StyledDialog>
+                        )}
+
+                        {showDeleteDialog && invoiceToDelete && (
+                            <StyledDialog
+                                isOpen={showDeleteDialog}
+                                onOpenChange={(open) => {
+                                    if (!open) {
+                                        setShowDeleteDialog(false);
+                                        setInvoiceToDelete(null);
+                                    }
+                                }}
+                                title="حذف الفاتورة"
+                                onCancel={() => {
+                                    setShowDeleteDialog(false);
+                                    setInvoiceToDelete(null);
+                                }}
+                                onConfirm={handleDeleteInvoice}
+                                confirmLabel="حذف"
+                                cancelLabel="إلغاء"
+                                confirmVariant="destructive"
+                                isLoading={deletingInvoice}
+                            >
+                                <div className="space-y-3">
+                                    <p className="text-sm text-gray-600">
+                                        هل أنت متأكد من حذف الفاتورة؟ لا يمكن التراجع عن هذا الإجراء.
+                                    </p>
+                                    <div className="text-xs text-gray-500">
+                                        رقم الفاتورة: #{invoiceToDelete.invoice_id}
+                                    </div>
                                 </div>
                             </StyledDialog>
                         )}

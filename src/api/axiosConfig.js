@@ -57,8 +57,8 @@ axiosInstance.interceptors.response.use(
     const respData = error.response?.data;
     let serverMessage = null;
     if (respData) {
-      if (respData.message) serverMessage = respData.message;
-      else if (respData.details) serverMessage = typeof respData.details === 'string' ? respData.details : JSON.stringify(respData.details);
+      if (respData.details) serverMessage = typeof respData.details === 'string' ? respData.details : JSON.stringify(respData.details);
+      else if (respData.message) serverMessage = respData.message;
       else if (respData.error) serverMessage = respData.error;
       else if (typeof respData === "string") serverMessage = respData;
       else if (respData.errors) serverMessage = JSON.stringify(respData.errors);
