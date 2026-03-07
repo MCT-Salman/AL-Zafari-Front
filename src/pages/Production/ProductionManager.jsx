@@ -7,7 +7,6 @@ import { batchApi } from "../../api/batchApi";
 import { materialApi } from "../../api/materialApi";
 import { rulerApi } from "../../api/rulerApi";
 import { constantApi } from "../../api/constantApi";
-import { priceColorApi } from "../../api/priceColorApi";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import FilterSelect from "../../components/common/FilterSelect";
@@ -44,7 +43,7 @@ import {
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
 import toast from "react-hot-toast";
-import { TypeItem, ProductionType, ProductionStatus, MovementDestination, ProcessSource, PriceColorBy } from "../../types/enums";
+import { TypeItem, ProductionType, ProductionStatus, MovementDestination, ProcessSource } from "../../types/enums";
 
 export default function ProductionManager() {
     const navigate = useNavigate();
@@ -68,7 +67,6 @@ export default function ProductionManager() {
     const [batches, setBatches] = useState([]);
     const [materials, setMaterials] = useState([]);
     const [rulers, setRulers] = useState([]);
-    const [priceColors, setPriceColors] = useState([]);
     const [widthValues, setWidthValues] = useState([]);
     const [loadingWidths, setLoadingWidths] = useState(false);
     const [productionOrders, setProductionOrders] = useState([]);
@@ -77,10 +75,10 @@ export default function ProductionManager() {
     // Production Types
     const PRODUCTION_TYPES = [
         { value: ProductionType.warehouse, label: "مستودع", icon: Package },
-        { value: ProductionType.slitting, label: "تقطيع", icon: Scissors },
-        { value: ProductionType.cutting, label: "قص", icon: Scissors },
+        { value: ProductionType.slitting, label: "تشريح", icon: Scissors },
+        { value: ProductionType.cutting, label: "قص/تمتير", icon: Scissors },
         { value: ProductionType.gluing, label: "تغرية", icon: Droplet },
-        { value: ProductionType.orderproduction, label: "إنتاج", icon: Settings }
+        // { value: ProductionType.orderproduction, label: "إنتاج", icon: Settings }
     ];
 
     const TYPE_ITEM_OPTIONS = [
@@ -127,19 +125,22 @@ export default function ProductionManager() {
     const loadInitialData = async () => {
         try {
             setLoading(true);
-            const [colorRes, batchRes, materialRes, rulerRes, priceRes] = await Promise.all([
+            const [colorRes, batchRes, materialRes, rulerRes] = await Promise.all([
                 colorApi.getColors(),
                 batchApi.getBatches(),
                 materialApi.getMaterials(),
-                rulerApi.getRulers(),
-                priceColorApi.getPriceColors()
+                rulerApi.getRulers()
             ]);
 
             setColors(getApiData(colorRes, []) || []);
             setBatches(getApiData(batchRes, []) || []);
-            setMaterials(getApiData(materialRes, []) || []);
+            const allMaterials = getApiData(materialRes, []) || [];
+            setMaterials(
+                allMaterials.filter(m =>
+                    String(m?.material_name || "").toLowerCase().includes("pvc")
+                )
+            );
             setRulers(getApiData(rulerRes, []) || []);
-            setPriceColors(getApiData(priceRes, []) || []);
 
         } catch (error) {
             // console.error("Error loading data:", error);
@@ -288,6 +289,7 @@ export default function ProductionManager() {
             setProductionItems(prev => [...prev, newItem]);
             toast.success("تم إضافة العنصر بنجاح");
         }
+        setShowPreview(true);
 
         // Reset current item
         setCurrentItem({
@@ -347,8 +349,8 @@ export default function ProductionManager() {
             return;
         }
 
-        if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.batch_id) {
-            toast.error("يرجى اختيار المادة والمسطرة واللون ورقم الطبخة");
+        if (!formData.material_id || !formData.ruler_id || !formData.color_id) {
+            toast.error("يرجى اختيار المادة والمسطرة واللون ");
             return;
         }
 
@@ -451,42 +453,17 @@ export default function ProductionManager() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const availableRulers = useMemo(() => {
-        if (!formData.material_id) return [];
-        return rulers.filter(r => String(r.material_id) === String(formData.material_id));
-    }, [formData.material_id, rulers]);
+    const availableRulers = useMemo(() => rulers, [rulers]);
 
-    const availableColors = useMemo(() => {
-        if (!formData.ruler_id) return [];
-        return colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
-    }, [formData.ruler_id, colors]);
-
-    const availablePricedColors = useMemo(() => {
-        if (!formData.ruler_id) return [];
-        if (!priceColors || priceColors.length === 0) return availableColors;
-
-        if (!currentItem.width) return [];
-        const targetWidth = Number(currentItem.width);
-
-        return availableColors.filter(color =>
-            priceColors.some(pc =>
-                String(pc.color_id) === String(color.color_id) &&
-                pc.type_item === formData.type_item &&
-                (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
-                    pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
-                    pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
-                    pc.price_color_By === PriceColorBy.isByBlanck)
-            )
-        );
-    }, [formData.ruler_id, formData.type_item, currentItem.width, availableColors, priceColors]);
+    const availableColors = useMemo(() => colors, [colors]);
 
     // Color options for select
     const colorOptions = useMemo(() => {
-        return availablePricedColors.map(c => ({
+        return availableColors.map(c => ({
             value: String(c.color_id),
             label: `${c.color_name} (${c.color_code})`
         }));
-    }, [availablePricedColors]);
+    }, [availableColors]);
 
     // Batch options for select
     const batchOptions = useMemo(() => {
@@ -933,7 +910,7 @@ export default function ProductionManager() {
 
                                     <Button
                                         onClick={() => setShowPreview(true)}
-                                        disabled={loading || productionItems.length === 0 || !formData.color_id || !formData.batch_id}
+                                        disabled={loading || productionItems.length === 0 || !formData.color_id}
                                         className="w-full h-12 bg-secondary-s hover:brightness-110 text-white font-bold"
                                     >
                                         {loading ? (
