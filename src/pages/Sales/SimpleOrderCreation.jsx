@@ -107,7 +107,14 @@ export default function SimpleOrderCreation() {
     const [batchSearchTerm, setBatchSearchTerm] = useState("");
     const [activeField, setActiveField] = useState("quantity");
 
-    const [qrPreview, setQrPreview] = useState({ open: false, url: "", title: "" });
+    const [qrPreview, setQrPreview] = useState({
+        open: false,
+        url: "",
+        title: "",
+        colorCode: "",
+        quantity: "",
+        batchNumber: ""
+    });
     const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
 
     // QR Generation Dialog State with quantity editing
@@ -118,6 +125,13 @@ export default function SimpleOrderCreation() {
         qrUrl: "",
         qrData: ""
     });
+    const [savingQrQuantity, setSavingQrQuantity] = useState(false);
+
+    const isQrQuantityChanged = useMemo(() => {
+        const current = String(qrGenDialog.quantity ?? "");
+        const original = String(qrGenDialog.item?.quantity ?? "");
+        return current !== original;
+    }, [qrGenDialog.quantity, qrGenDialog.item?.quantity]);
 
     // Helper functions from orderApi
     const getOrderStatus = (order) => orderApi.getOrderStatus(order);
@@ -309,8 +323,15 @@ export default function SimpleOrderCreation() {
         return JSON.stringify(payload);
     };
 
-    const openQrPreview = (url, title = "") => {
-        setQrPreview({ open: true, url, title });
+    const openQrPreview = (url, title = "", meta = {}) => {
+        setQrPreview({
+            open: true,
+            url,
+            title,
+            colorCode: meta.colorCode || "",
+            quantity: meta.quantity || "",
+            batchNumber: meta.batchNumber || ""
+        });
     };
 
     const openQrGenDialog = (item) => {
@@ -340,6 +361,49 @@ export default function SimpleOrderCreation() {
                 qrData: newQrData
             };
         });
+    };
+
+    const applyQrGenQuantity = async () => {
+        const targetId = qrGenDialog.item?.id;
+        const orderId = qrGenDialog.item?.order_id;
+        const orderItemId = qrGenDialog.item?.order_item_id;
+        if (targetId == null || !orderId || !orderItemId) {
+            toast.error("لا يمكن حفظ الكمية");
+            return;
+        }
+
+        try {
+            setSavingQrQuantity(true);
+            const quantityValue = Number(qrGenDialog.quantity);
+            if (!Number.isFinite(quantityValue)) {
+                toast.error("الكمية غير صالحة");
+                return;
+            }
+            await orderApi.updateOrderItem(orderId, orderItemId, {
+                quantity: quantityValue
+            });
+
+            setOrderDetails(prev => {
+                if (!prev?.items) return prev;
+                const updatedItems = prev.items.map(item =>
+                    (item.order_item_id === orderItemId)
+                        ? { ...item, quantity: quantityValue }
+                        : item
+                );
+                return { ...prev, items: updatedItems };
+            });
+
+            setQrGenDialog(prev => ({
+                ...prev,
+                item: { ...prev.item, quantity: quantityValue }
+            }));
+
+            toast.success("تم حفظ الكمية");
+        } catch (error) {
+            toast.error(error?.message || "فشل في حفظ الكمية");
+        } finally {
+            setSavingQrQuantity(false);
+        }
     };
 
     const closeQrGenDialog = () => {
@@ -2115,6 +2179,8 @@ export default function SimpleOrderCreation() {
 
                                             const localItem = {
                                                 id: `${orderDetails.order_id}-${index + 1}`,
+                                                order_id: orderDetails.order_id,
+                                                order_item_id: item.order_item_id ?? item.orderItemId ?? item.id ?? null,
                                                 material_name: item.material_name,
                                                 ruler_name: resolvedRulerName,
                                                 color_name: item.color_name,
@@ -2209,6 +2275,20 @@ export default function SimpleOrderCreation() {
                             <img src={qrPreview.url} alt="qr" className="h-80 w-80 border rounded" />
                         ) : null}
                     </div>
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                        <div>
+                            <span className="font-semibold">كود اللون:</span>{" "}
+                            <span>{qrPreview.colorCode || "-"}</span>
+                        </div>
+                        <div>
+                            <span className="font-semibold">الكمية:</span>{" "}
+                            <span>{qrPreview.quantity || "-"}</span>
+                        </div>
+                        <div>
+                            <span className="font-semibold">الطبخة:</span>{" "}
+                            <span>{qrPreview.batchNumber || "-"}</span>
+                        </div>
+                    </div>
                     <div className="flex items-center justify-center gap-2">
                         <Button
                             size="sm"
@@ -2269,6 +2349,14 @@ export default function SimpleOrderCreation() {
                             />
                             <span className="text-gray-500 font-medium">م</span>
                         </div>
+                        <Button
+                            size="sm"
+                            className="bg-primary-f hover:bg-secondary-f text-white"
+                            onClick={applyQrGenQuantity}
+                            disabled={!isQrQuantityChanged || savingQrQuantity}
+                        >
+                            {savingQrQuantity ? "جاري الحفظ..." : "حفظ الكمية"}
+                        </Button>
                         <div className="text-xs text-gray-400">
                             الكمية الأصلية: {qrGenDialog.item?.quantity} م
                         </div>
@@ -2284,6 +2372,20 @@ export default function SimpleOrderCreation() {
                                     className="h-64 w-64 border rounded shadow-sm" 
                                 />
                             </div>
+                            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1 border">
+                                <div>
+                                    <span className="font-semibold">كود اللون:</span>{" "}
+                                    <span>{qrGenDialog.item?.color_code || "-"}</span>
+                                </div>
+                                <div>
+                                    <span className="font-semibold">الكمية:</span>{" "}
+                                    <span>{qrGenDialog.quantity || qrGenDialog.item?.quantity || "-"}</span>
+                                </div>
+                                <div>
+                                    <span className="font-semibold">الطبخة:</span>{" "}
+                                    <span>{qrGenDialog.item?.batch_number || "-"}</span>
+                                </div>
+                            </div>
                             <div className="flex items-center justify-center gap-2">
                                 <Button
                                     size="sm"
@@ -2298,7 +2400,11 @@ export default function SimpleOrderCreation() {
                                     onClick={() => {
                                         const url = qrGenDialog.qrUrl;
                                         const title = `QR - ${qrGenDialog.item?.color_name || ''}`;
-                                        openQrPreview(url, title);
+                                        openQrPreview(url, title, {
+                                            colorCode: qrGenDialog.item?.color_code || "",
+                                            quantity: qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
+                                            batchNumber: qrGenDialog.item?.batch_number || ""
+                                        });
                                         closeQrGenDialog();
                                     }}
                                 >

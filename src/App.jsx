@@ -95,7 +95,7 @@ const App = () => {
                 </RoleProtectedRoute>
               } />
               <Route path="/production" element={
-                <RoleProtectedRoute allowedRoles="sales">
+                <RoleProtectedRoute allowedRoles="production_manager">
                   <ProductionManager />
                 </RoleProtectedRoute>
               } />

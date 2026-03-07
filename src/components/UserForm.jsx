@@ -1,4 +1,6 @@
 // src\components\UserForm.jsx
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { Input } from "../components/ui/input";
 import FilterSelect from "../components/common/FilterSelect";
 
@@ -18,6 +20,7 @@ const roleLabels = {
 export default function UserForm({ user, formData, setFormData, loading, error }) {
   // State synchronization is now handled exclusively by the parent components (Users.jsx, Profile.jsx, etc.)
   // to prevent overwriting custom pre-fills like stripped phone numbers.
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -93,14 +96,26 @@ export default function UserForm({ user, formData, setFormData, loading, error }
 
       <div>
         <label className="block text-sm font-medium mb-1">كلمة المرور</label>
-        <Input
-          type="password"
-          name="password"
-          value={formData.password || ""}
-          onChange={handleInputChange}
-          placeholder={user ? "اتركه فارغاً لعدم التغيير" : "••••••••"}
-          disabled={loading}
-        />
+        <div className="relative">
+          <Input
+            type={showPassword ? "text" : "password"}
+            name="password"
+            value={formData.password || ""}
+            onChange={handleInputChange}
+            placeholder={user ? "اتركه فارغاً لعدم التغيير" : "••••••••"}
+            disabled={loading}
+            className="pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((prev) => !prev)}
+            className="absolute inset-y-0 right-2 flex items-center text-gray-500 hover:text-gray-700"
+            aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+            disabled={loading}
+          >
+            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
         {user && (
           <p className="text-xs text-gray-500 mt-1">
             اتركه فارغاً لعدم تغيير كلمة المرور
