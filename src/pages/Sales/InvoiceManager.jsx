@@ -288,7 +288,9 @@ export default function InvoiceManager() {
     // Numpad
     const [numpadMode, setNumpadMode] = useState("quantity");
     const [colorSearchCode, setColorSearchCode] = useState("");
+    const [batchSearchTerm, setBatchSearchTerm] = useState("");
     const [activeField, setActiveField] = useState("quantity");
+    const [activeTextTarget, setActiveTextTarget] = useState(null); // color_search | batch_search | customer_search
 
     // Price calculation
     const [priceCalculation, setPriceCalculation] = useState(null);
@@ -592,6 +594,40 @@ export default function InvoiceManager() {
     }, []);
 
     const handleNumpadPress = useCallback((val) => {
+        if (numpadMode === "text") {
+            const apply = (prev) => {
+                let next = String(prev || "");
+                if (val === "clear") next = "";
+                else if (val === "back") next = next.slice(0, -1);
+                else next = next + val;
+                return next;
+            };
+
+            if (activeTextTarget === "color_search") {
+                const next = apply(colorSearchCode);
+                setColorSearchCode(next);
+                const matched = availablePricedColors.find(c => String(c.color_code) === String(next));
+                if (matched) {
+                    handleFieldChange("color_id", String(matched.color_id));
+                    setNumpadMode("quantity");
+                    setActiveTextTarget(null);
+                    setColorSearchCode("");
+                    toast.success(`تم العثور على اللون: ${matched.color_name}`);
+                }
+                return;
+            }
+
+            if (activeTextTarget === "batch_search") {
+                setBatchSearchTerm(prev => apply(prev));
+                return;
+            }
+
+            if (activeTextTarget === "customer_search") {
+                setManualCode(prev => apply(prev));
+                return;
+            }
+        }
+
         if (numpadMode === "colorSearch") {
             let search = colorSearchCode;
             if (val === "clear") search = "";
@@ -607,8 +643,12 @@ export default function InvoiceManager() {
                 setColorSearchCode("");
                 toast.success(`تم العثور على اللون: ${matched.color_name}`);
             }
-        } else {
-            let current = String(formData[activeField] || "");
+            return;
+        }
+
+        // If payment popup is open and active field is paid/discount, edit paymentFormData
+        if (showPaymentPopup && (activeField === 'paid_amount' || activeField === 'discount')) {
+            let current = String(paymentFormData[activeField] || "");
             if (val === "clear") current = "";
             else if (val === "back") current = current.slice(0, -1);
             else if (val === ".") {
@@ -616,9 +656,21 @@ export default function InvoiceManager() {
             } else {
                 current = current + val;
             }
-            handleFieldChange(activeField, current);
+            setPaymentFormData(prev => ({ ...prev, [activeField]: current }));
+            return;
         }
-    }, [numpadMode, colorSearchCode, availablePricedColors, formData, activeField, handleFieldChange]);
+
+        // Default: edit formData field
+        let current = String(formData[activeField] || "");
+        if (val === "clear") current = "";
+        else if (val === "back") current = current.slice(0, -1);
+        else if (val === ".") {
+            if (!current.includes(".")) current = current ? current + "." : "0.";
+        } else {
+            current = current + val;
+        }
+        handleFieldChange(activeField, current);
+    }, [numpadMode, colorSearchCode, availablePricedColors, formData, activeField, handleFieldChange, showPaymentPopup, paymentFormData]);
 
     const addOrUpdateItem = useCallback(() => {
         if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity) {
@@ -804,8 +856,8 @@ export default function InvoiceManager() {
             }
 
             const invoiceData = {
-                order_id: selectedOrder?.order_id || null,
-                customer_id: selectedOrder?.customer_id || selectedCustomer?.customer_id || null,
+                order_id: selectedOrder?.order_id ? Number(selectedOrder.order_id) : null,
+                customer_id: selectedOrder?.customer_id ? Number(selectedOrder.customer_id) : (selectedCustomer?.customer_id ? Number(selectedCustomer.customer_id) : null),
                 total_amount: parseFloat(totalAmount),
                 discount: discount,
                 paid_amount: paidAmount,
@@ -918,25 +970,169 @@ export default function InvoiceManager() {
     }, [loadInvoices]);
 
     const handleEditInvoice = useCallback((invoice) => {
-        setSelectedOrder({
-            order_id: invoice.order_id,
-            customer_id: invoice.customer_id,
-            total_amount: invoice.total_amount,
-            items: invoice.invoiceItems?.map(item => ({
-                ...item,
-                unit_price: item.unit_price,
-                subtotal: item.subtotal
-            })) || []
+        // populate selected order if invoice has order linkage
+        if (invoice.order_id) {
+            setSelectedOrder({
+                order_id: Number(invoice.order_id),
+                customer_id: invoice.customer_id,
+                total_amount: invoice.total_amount,
+                items: invoice.invoiceItems || []
+            });
+            setFormData(prev => ({ ...prev, order_id: String(invoice.order_id) }));
+        } else {
+            setSelectedOrder(null);
+            setFormData(prev => ({ ...prev, order_id: "" }));
+        }
+
+        // populate items into orderItems state so they appear in the editor
+        const mappedItems = (invoice.invoiceItems || []).map(it => {
+            // Helper to safely read multiple possible fields
+            const getFirst = (obj, keys = []) => {
+                for (const k of keys) {
+                    const v = obj?.[k];
+                    if (v !== undefined && v !== null && v !== "") return v;
+                }
+                return null;
+            };
+
+            // Try many possible locations for ids/names
+            let materialId = getFirst(it, ["material_id", "materialId", "material?.material_id"]) || getFirst(it.material, ["material_id", "id"]) || (it.color && it.color.ruler && it.color.ruler.material && getFirst(it.color.ruler.material, ["material_id", "id"]));
+            let materialName = getFirst(it, ["material_name", "materialName", "material?.material_name"]) || getFirst(it.material, ["material_name", "name"]) || (it.color && it.color.ruler && it.color.ruler.material && getFirst(it.color.ruler.material, ["material_name", "name"]));
+
+            let rulerId = getFirst(it, ["ruler_id", "rulerId"]) || getFirst(it.ruler, ["ruler_id", "id"])
+                || (it.color && it.color.ruler && getFirst(it.color.ruler, ["ruler_id", "id"]));
+            let rulerName = getFirst(it, ["ruler_name", "rulerName"]) || getFirst(it.ruler, ["ruler_name", "name"])
+                || (it.color && it.color.ruler && getFirst(it.color.ruler, ["ruler_name", "name"]));
+
+            // batch number may be named differently
+            const batchNumber = getFirst(it, ["batch_number", "batchNo", "batch_no", "batch", "cooking_number", "cooking_no"]) || (it.batch && getFirst(it.batch, ["batch_number", "batchNo", "batch_no", "batch"])) || "";
+            const batchId = getFirst(it, ["batch_id", "batchId"]) || (it.batch && getFirst(it.batch, ["batch_id", "id"])) || null;
+
+            // color id/name
+            const colorId = getFirst(it, ["color_id", "colorId"]) || (it.color && getFirst(it.color, ["color_id", "id"])) || null;
+            const colorName = getFirst(it, ["color_name", "colorName"]) || (it.color && getFirst(it.color, ["color_name", "name"])) || null;
+
+            // If ids missing try to resolve by name using loaded lists
+            if (!materialId && materialName) {
+                const found = materials.find(m => String(m.material_name || m.name || "").trim().toLowerCase() === String(materialName).trim().toLowerCase());
+                if (found) {
+                    materialId = found.material_id;
+                    materialName = found.material_name || found.name;
+                }
+            }
+
+            if (!rulerId && rulerName) {
+                const foundR = rulers.find(r => {
+                    const rName = (r.ruler_name || r.ruler_type || r.name || '').trim().toLowerCase();
+                    return rName === String(rulerName).trim().toLowerCase();
+                });
+                if (foundR) {
+                    rulerId = foundR.ruler_id;
+                    rulerName = foundR.ruler_name || foundR.name || foundR.ruler_type;
+                }
+            }
+
+            // If we have ids but not names, look up names from loaded lists
+            if (materialId && !materialName) {
+                const found = materials.find(m => String(m.material_id) === String(materialId));
+                if (found) materialName = found.material_name || found.name || "";
+            }
+
+            if (rulerId && !rulerName) {
+                const foundR = rulers.find(r => String(r.ruler_id) === String(rulerId));
+                if (foundR) rulerName = foundR.ruler_name || foundR.name || foundR.ruler_type || "";
+            }
+
+            return {
+                id: it.invoice_item_id || Date.now(),
+                material_id: materialId ? String(materialId) : "",
+                type_item: it.type_item,
+                ruler_id: rulerId ? String(rulerId) : "",
+                color_id: colorId ? String(colorId) : (it.color?.color_id ? String(it.color.color_id) : ""),
+                width: it.width !== undefined && it.width !== null ? String(it.width) : "",
+                length: it.length !== undefined && it.length !== null ? String(it.length) : "",
+                thickness: it.thickness !== undefined && it.thickness !== null ? String(it.thickness) : "0.6",
+                batch_id: batchId ? String(batchId) : (it.batch_id ? String(it.batch_id) : ""),
+                quantity: String(it.quantity || it.qty || it.quantity_m || 0),
+                unit_price: String(it.unit_price || it.price || 0),
+                subtotal: String(it.subtotal || it.total || 0),
+                notes: it.notes || it.description || "",
+                material_name: materialName || it.material?.material_name || it.material?.name || "",
+                ruler_name: rulerName || it.ruler?.ruler_name || it.ruler?.name || "",
+                color_name: colorName || it.color?.color_name || it.color_name || "",
+                batch_number: batchNumber || it.batch_number || it.batch?.batch_number || "",
+            };
         });
+        setOrderItems(mappedItems);
+
+        // populate customer selection
+        if (invoice.customer) {
+            setSelectedCustomer(invoice.customer);
+            setCustomerOption('existing');
+        } else {
+            setSelectedCustomer(null);
+            setCustomerOption('none');
+        }
+
         setFormData(prev => ({
             ...prev,
-            paid_amount: invoice.paid_amount,
-            notes: invoice.notes || ""
+            paid_amount: invoice.paid_amount || prev.paid_amount,
+            notes: invoice.notes || prev.notes
         }));
         setEditingInvoiceId(invoice.invoice_id);
         setViewMode("create");
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, [setViewMode]);
+
+    // If user opened edit before materials/batches loaded, re-resolve missing names/ids
+    useEffect(() => {
+        if (!editingInvoiceId) return;
+        if (!materials || materials.length === 0) return;
+        let changed = false;
+        const resolved = (orderItems || []).map(it => {
+            const next = { ...it };
+
+            // material: try fill id from name or name from id
+            if ((!next.material_id || next.material_id === "") && next.material_name) {
+                const found = materials.find(m => String(m.material_name || m.name || "").trim().toLowerCase() === String(next.material_name).trim().toLowerCase());
+                if (found) {
+                    next.material_id = String(found.material_id);
+                    next.material_name = found.material_name || found.name || next.material_name;
+                    changed = true;
+                }
+            } else if (next.material_id && (!next.material_name || next.material_name === "")) {
+                const found = materials.find(m => String(m.material_id) === String(next.material_id));
+                if (found) {
+                    next.material_name = found.material_name || found.name || "";
+                    changed = true;
+                }
+            }
+
+            // batch: try fill number from id or id from number (only if batches available)
+            if (batches && batches.length > 0) {
+                if ((!next.batch_number || next.batch_number === "") && next.batch_id) {
+                    const foundB = batches.find(b => String(b.batch_id) === String(next.batch_id));
+                    if (foundB) {
+                        next.batch_number = foundB.batch_number || String(foundB.batch_id);
+                        changed = true;
+                    }
+                }
+                if ((!next.batch_id || next.batch_id === "") && next.batch_number) {
+                    const foundB2 = batches.find(b => (b.batch_number || "").toString().trim().toLowerCase() === String(next.batch_number).trim().toLowerCase());
+                    if (foundB2) {
+                        next.batch_id = String(foundB2.batch_id);
+                        changed = true;
+                    }
+                }
+            }
+
+            return next;
+        });
+
+        if (changed) {
+            setOrderItems(resolved);
+        }
+    }, [materials, orderItems, editingInvoiceId, batches]);
 
     const clearForm = useCallback(() => {
         setFormData({
@@ -1191,7 +1387,7 @@ export default function InvoiceManager() {
                                     {/* الأرقام - مثل صفحة المبيعات */}
                                     <Card className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
                                         <div className="flex-shrink-0 mb-2">
-                                            <div className="flex gap-2 mb-2">
+                                            {/* <div className="flex gap-2 mb-2">
                                                 <button
                                                     onClick={() => {
                                                         setNumpadMode("quantity");
@@ -1224,7 +1420,7 @@ export default function InvoiceManager() {
                                                 >
                                                     المبلغ
                                                 </button>
-                                            </div>
+                                            </div> */}
 
                                             <div className="bg-gray-100 rounded-lg py-2 px-3">
                                                 <div className="text-xs text-gray-500 mb-0.5">
@@ -1233,7 +1429,10 @@ export default function InvoiceManager() {
                                                             activeField === "width" ? "العرض" : "القيمة"}
                                                 </div>
                                                 <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
-                                                    {formData[activeField] || "0"}
+                                                    {showPaymentPopup && (activeField === 'paid_amount' || activeField === 'discount')
+                                                        ? (paymentFormData[activeField] || "0")
+                                                        : (formData[activeField] || "0")
+                                                    }
                                                 </div>
                                             </div>
                                         </div>
@@ -1328,6 +1527,11 @@ export default function InvoiceManager() {
                                             onChange={(e) => {
                                                 const order = orders.find(o => o.order_id === parseInt(e.target.value));
                                                 setSelectedOrder(order || null);
+                                                setFormData(prev => ({ ...prev, order_id: order ? String(order.order_id) : "" }));
+                                                if (order && order.customer) {
+                                                    setSelectedCustomer(order.customer);
+                                                    setCustomerOption('existing');
+                                                }
                                             }}
                                             options={orderOptions}
                                             placeholder="اختر رقم الطلب..."
@@ -1459,6 +1663,10 @@ export default function InvoiceManager() {
                                         <FilterSelect
                                             value={formData.color_id ? String(formData.color_id) : ""}
                                             onChange={(e) => handleFieldChange("color_id", e.target.value)}
+                                            onInputFocus={() => {
+                                                setNumpadMode("text");
+                                                setActiveTextTarget("color_search");
+                                            }}
                                             disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
                                             options={colorOptions}
                                             placeholder={
@@ -1527,6 +1735,12 @@ export default function InvoiceManager() {
                                         <FilterSelect
                                             value={formData.batch_id ? String(formData.batch_id) : ""}
                                             onChange={(e) => handleFieldChange("batch_id", e.target.value)}
+                                            onInputFocus={() => {
+                                                setNumpadMode("text");
+                                                setActiveTextTarget("batch_search");
+                                            }}
+                                            searchValue={batchSearchTerm}
+                                            onSearchValueChange={(v) => setBatchSearchTerm(v)}
                                             disabled={!isSelectedMaterialBoard && !formData.width}
                                             options={batchOptions}
                                             placeholder={
@@ -1664,6 +1878,10 @@ export default function InvoiceManager() {
                                                     options={customerOptions}
                                                     placeholder="اختر الزبون..."
                                                     className="w-full text-sm"
+                                                    onInputFocus={() => {
+                                                        setNumpadMode("text");
+                                                        setActiveTextTarget("customer_search");
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -2245,13 +2463,6 @@ export default function InvoiceManager() {
                                                                 disabled={remaining <= 0}
                                                             >
                                                                 <Plus className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleEditInvoice(invoice)}
-                                                                className="text-yellow-600 hover:bg-yellow-50 p-1.5 rounded-lg"
-                                                                title="تعديل"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDeleteInvoice(invoice.invoice_id)}

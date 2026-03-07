@@ -53,11 +53,16 @@ axiosInstance.interceptors.response.use(
     //   data: error.response?.data,
     // });
 
-    // Normalize error message to server message if present
-    const serverMessage =
-      error.response?.data?.message ||
-      error.response?.data?.error ||
-      (typeof error.response?.data === "string" ? error.response.data : "");
+    // Normalize error message to server message or details if present
+    const respData = error.response?.data;
+    let serverMessage = null;
+    if (respData) {
+      if (respData.message) serverMessage = respData.message;
+      else if (respData.details) serverMessage = typeof respData.details === 'string' ? respData.details : JSON.stringify(respData.details);
+      else if (respData.error) serverMessage = respData.error;
+      else if (typeof respData === "string") serverMessage = respData;
+      else if (respData.errors) serverMessage = JSON.stringify(respData.errors);
+    }
     if (serverMessage) {
       error.message = serverMessage;
     }

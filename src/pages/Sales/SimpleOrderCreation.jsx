@@ -801,7 +801,7 @@ export default function SimpleOrderCreation() {
                 batch_id: "",
             }));
 
-            toast.success(`تم تحميل الطلب #${details.order_id} للتعديل`);
+            toast.success(details.order_id ? `تم تحميل الطلب #${details.order_id} للتعديل` : "تم تحميل الطلب للتعديل");
             window.scrollTo({ top: 0, behavior: "smooth" });
         } catch (error) {
             toast.error("حدث خطأ أثناء تحميل الطلب للتعديل");
@@ -1888,8 +1888,8 @@ export default function SimpleOrderCreation() {
                                         orders.map(order => {
                                             const statusBadge = getStatusBadge(order.status);
                                             return (
-                                                <tr key={order.order_id} className="border-b hover:bg-gray-50">
-                                                    <td className="p-2 font-medium text-sm">#{order.order_id}</td>
+                                                    <tr key={order.order_id} className="border-b hover:bg-gray-50">
+                                                        <td className="p-2 font-medium text-sm">{order.order_id ? `#${order.order_id}` : 'بدون طلب'}</td>
                                                     <td className="p-2 text-sm">{getFormattedDate(order)}</td>
                                                     <td className="p-2 text-center">
                                                         <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
@@ -1957,7 +1957,7 @@ export default function SimpleOrderCreation() {
     <StyledDialog
         isOpen={Boolean(orderDetails)}
         onOpenChange={(open) => { if (!open) setOrderDetails(null); }}
-        title={`تفاصيل الطلب #${orderDetails.order_id}`}
+        title={`تفاصيل الطلب ${orderDetails.order_id ? `#${orderDetails.order_id}` : 'بدون طلب'}`}
         onCancel={() => setOrderDetails(null)}
         cancelLabel="إغلاق"
         showFooter={false}
@@ -1968,7 +1968,7 @@ export default function SimpleOrderCreation() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div className="bg-gray-50 p-3 rounded-lg border">
                     <div className="text-xs text-gray-500">رقم الطلب</div>
-                    <div className="font-bold text-base">#{orderDetails.order_id}</div>
+                    <div className="font-bold text-base">{orderDetails.order_id ? `#${orderDetails.order_id}` : 'بدون طلب'}</div>
                 </div>
                 
                 <div className="bg-gray-50 p-3 rounded-lg border">

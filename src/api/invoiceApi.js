@@ -45,7 +45,32 @@ export const invoiceApi = {
   // Create new invoice
   createInvoice: async (invoiceData) => {
     try {
-      const response = await axiosInstance.post('/invoice', invoiceData);
+      // Coerce numeric fields to proper types to avoid backend validation errors
+      const payload = {
+        ...invoiceData,
+        order_id: invoiceData.order_id ? Number(invoiceData.order_id) : null,
+        customer_id: invoiceData.customer_id ? Number(invoiceData.customer_id) : null,
+        total_amount: invoiceData.total_amount !== undefined ? Number(invoiceData.total_amount) : undefined,
+        discount: invoiceData.discount !== undefined ? Number(invoiceData.discount) : undefined,
+        paid_amount: invoiceData.paid_amount !== undefined ? Number(invoiceData.paid_amount) : undefined,
+        items: (invoiceData.items || []).map((it) => ({
+          ...it,
+          color_id: it.color_id ? Number(it.color_id) : null,
+          batch_id: it.batch_id ? Number(it.batch_id) : null,
+          width: it.width !== undefined ? Number(it.width) : 0,
+          length: it.length !== undefined ? Number(it.length) : 0,
+          thickness: it.thickness !== undefined ? Number(it.thickness) : 0,
+          quantity: it.quantity !== undefined ? Number(it.quantity) : 0,
+          unit_price: it.unit_price !== undefined ? Number(it.unit_price) : 0,
+          subtotal: it.subtotal !== undefined ? Number(it.subtotal) : 0,
+        }))
+      };
+
+      // Remove nullable fields that are explicitly null to avoid strict backend validation
+      if (payload.order_id === null) delete payload.order_id;
+      if (payload.customer_id === null) delete payload.customer_id;
+
+      const response = await axiosInstance.post('/invoice', payload);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'حدث خطأ في إنشاء الفاتورة' };
@@ -55,7 +80,32 @@ export const invoiceApi = {
   // Update invoice
   updateInvoice: async (id, invoiceData) => {
     try {
-      const response = await axiosInstance.put(`/invoice/${id}`, invoiceData);
+      // Coerce numeric fields and strip nulls
+      const payload = {
+        ...invoiceData,
+        order_id: invoiceData.order_id ? Number(invoiceData.order_id) : null,
+        customer_id: invoiceData.customer_id ? Number(invoiceData.customer_id) : null,
+        total_amount: invoiceData.total_amount !== undefined ? Number(invoiceData.total_amount) : undefined,
+        discount: invoiceData.discount !== undefined ? Number(invoiceData.discount) : undefined,
+        paid_amount: invoiceData.paid_amount !== undefined ? Number(invoiceData.paid_amount) : undefined,
+        items: (invoiceData.items || []).map((it) => ({
+          ...it,
+          color_id: it.color_id ? Number(it.color_id) : null,
+          batch_id: it.batch_id ? Number(it.batch_id) : null,
+          width: it.width !== undefined ? Number(it.width) : 0,
+          length: it.length !== undefined ? Number(it.length) : 0,
+          thickness: it.thickness !== undefined ? Number(it.thickness) : 0,
+          quantity: it.quantity !== undefined ? Number(it.quantity) : 0,
+          unit_price: it.unit_price !== undefined ? Number(it.unit_price) : 0,
+          subtotal: it.subtotal !== undefined ? Number(it.subtotal) : 0,
+        }))
+      };
+
+      // Remove nullable fields that are explicitly null to avoid strict backend validation
+      if (payload.order_id === null) delete payload.order_id;
+      if (payload.customer_id === null) delete payload.customer_id;
+
+      const response = await axiosInstance.put(`/invoice/${id}`, payload);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'حدث خطأ في تحديث الفاتورة' };
