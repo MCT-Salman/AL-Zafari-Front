@@ -473,13 +473,17 @@ export default function ProductionManager() {
 
             const orderData = {
                 color_id: Number(formData.color_id),
-                batch_id: formData.batch_id ? Number(formData.batch_id) : "",
-                type_item: formData.type_item || "",
                 thickness: Number(formData.thickness),
                 notes: formData.notes || "",
                 status: formData.status || ProductionStatus.pending,
                 items: items
             };
+            if (formData.type_item) {
+                orderData.type_item = formData.type_item;
+            }
+            if (formData.batch_id) {
+                orderData.batch_id = Number(formData.batch_id);
+            }
 
             // console.log("Saving production order:", orderData);
 

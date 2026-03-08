@@ -960,15 +960,18 @@ export default function SimpleOrderCreation() {
         try {
             setLoading(true);
             
-            const items = orderItems.map(item => ({
-                type_item: item.type_item || "",
-                color_id: Number(item.color_id),
-                width: Number(item.width) || 0,
-                thickness: Number(item.thickness ?? formData.thickness ?? 0.6),
-                batch_id: item.batch_id ? Number(item.batch_id) : "",
-                quantity: Number(item.quantity),
-                notes: item.notes || ""
-            }));
+            const items = orderItems.map(item => {
+                const payload = {
+                    color_id: Number(item.color_id),
+                    width: Number(item.width) || 0,
+                    thickness: Number(item.thickness ?? formData.thickness ?? 0.6),
+                    quantity: Number(item.quantity),
+                    notes: item.notes || ""
+                };
+                if (item.type_item) payload.type_item = item.type_item;
+                if (item.batch_id) payload.batch_id = Number(item.batch_id);
+                return payload;
+            });
 
             const orderData = {
                 status: OrderStatus.pending,

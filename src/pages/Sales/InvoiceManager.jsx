@@ -285,7 +285,7 @@ export default function InvoiceManager() {
         batch_id: "",
         width: "",
         thickness: "0.6",
-        length: "150",
+        length: "1",
         quantity: "",
         discount: "0",
         discount_type: "fixed",
@@ -456,7 +456,7 @@ export default function InvoiceManager() {
                     const payload = {
                         color_id: parseInt(formData.color_id),
                         width: parseFloat(formData.width) || 0,
-                        length: 150, // Default length
+                        length: parseFloat(formData.length) || 1,
                         quantity: parseFloat(formData.quantity)
                     };
                     if (requiresType) payload.type_item = formData.type_item;
@@ -796,6 +796,7 @@ export default function InvoiceManager() {
             batch_id: formData.batch_id,
             width: formData.width,
             thickness: formData.thickness,
+            length: formData.length,
             quantity: formData.quantity,
             notes: formData.notes,
             material_name: material?.material_name,
@@ -956,18 +957,21 @@ export default function InvoiceManager() {
                 discount: discount,
                 paid_amount: paidAmount,
                 notes: formData.notes || "",
-                items: orderItems.map(item => ({
-                    type_item: item.type_item,
-                    color_id: parseInt(item.color_id),
-                    width: parseFloat(item.width) || 0,
-                    length: parseFloat(item.length) || 150,
-                    thickness: parseFloat(item.thickness) || 0.6,
-                    batch_id: item.batch_id ? parseInt(item.batch_id) : "",
-                    quantity: parseFloat(item.quantity),
-                    unit_price: parseFloat(item.unit_price) || 0,
-                    subtotal: parseFloat(item.subtotal) || 0,
-                    notes: item.notes || ""
-                }))
+                items: orderItems.map(item => {
+                    const payload = {
+                        color_id: parseInt(item.color_id),
+                        width: parseFloat(item.width) || 0,
+                        length: parseFloat(item.length) || 1,
+                        thickness: parseFloat(item.thickness) || 0.6,
+                        quantity: parseFloat(item.quantity),
+                        unit_price: parseFloat(item.unit_price) || 0,
+                        subtotal: parseFloat(item.subtotal) || 0,
+                        notes: item.notes || ""
+                    };
+                    if (item.type_item) payload.type_item = item.type_item;
+                    if (item.batch_id) payload.batch_id = parseInt(item.batch_id);
+                    return payload;
+                })
             };
 
             let response;
@@ -990,7 +994,7 @@ export default function InvoiceManager() {
                 setFormData(prev => ({
                     material_id: "",
                     thickness: "0.6",
-                    length: "150",
+                    length: "1",
                     type_item: "",
                     ruler_id: "",
                     color_id: "",
@@ -1275,6 +1279,7 @@ export default function InvoiceManager() {
             batch_id: "",
             width: "",
             thickness: "0.6",
+            length: "1",
             quantity: "",
             notes: ""
         });
