@@ -2407,6 +2407,7 @@ export default function InvoiceManager() {
                                                 <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
                                                 <th className="p-1 text-right border-b w-[90px]">اللون</th>
                                                 <th className="p-1 text-center border-b w-[45px]">النوع</th>
+                                                <th className="p-1 text-center border-b w-[55px]">العرض</th>
                                                 <th className="p-1 text-center border-b w-[55px]">الكمية</th>
                                                 <th className="p-1 text-center border-b w-[70px]">السماكة</th>
                                                 <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
@@ -2434,6 +2435,9 @@ export default function InvoiceManager() {
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
                                                         {formatTypeItem(item.type_item)}
+                                                    </td>
+                                                    <td className="p-1 text-center text-sm">
+                                                        {item.width || "-"}
                                                     </td>
                                                     <td className="p-1 text-center font-bold text-sm">
                                                         {item.quantity} م
@@ -2880,6 +2884,7 @@ export default function InvoiceManager() {
                                                         <tr>
                                                             <th className="p-2 text-right">اللون</th>
                                                             <th className="p-2 text-center">النوع</th>
+                                                            <th className="p-2 text-center">العرض</th>
                                                             <th className="p-2 text-center">الكمية</th>
                                                             <th className="p-2 text-center">سعر الوحدة</th>
                                                             <th className="p-2 text-center">الإجمالي</th>
@@ -2893,6 +2898,7 @@ export default function InvoiceManager() {
                                                                     <div className="text-xs text-gray-500">{item.color?.color_code}</div>
                                                                 </td>
                                                                 <td className="p-2 text-center">{formatTypeItem(item.type_item)}</td>
+                                                                <td className="p-2 text-center">{item.width || "-"}</td>
                                                                 <td className="p-2 text-center">{item.quantity} م</td>
                                                                 <td className="p-2 text-center">{invoiceApi.formatCurrency(item.unit_price)}</td>
                                                                 <td className="p-2 text-center font-bold">{invoiceApi.formatCurrency(item.subtotal)}</td>

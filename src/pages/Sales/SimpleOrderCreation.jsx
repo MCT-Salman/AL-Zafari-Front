@@ -1884,6 +1884,7 @@ export default function SimpleOrderCreation() {
                                                 <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
                                                 <th className="p-1 text-right border-b w-[90px]">اللون</th>
                                                 <th className="p-1 text-center border-b w-[45px]">النوع</th>
+                                                <th className="p-1 text-center border-b w-[55px]">العرض</th>
                                                 <th className="p-1 text-center border-b w-[55px]">الكمية</th>
                                                 <th className="p-1 text-center border-b w-[70px]">السماكة</th>
                                                 <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
@@ -1910,6 +1911,9 @@ export default function SimpleOrderCreation() {
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
                                                         {formatTypeItem(item.type_item)}
+                                                    </td>
+                                                    <td className="p-1 text-center text-sm">
+                                                        {item.width || "-"}
                                                     </td>
                                                     <td className="p-1 text-center font-bold text-sm">
                                                         {item.quantity} م
