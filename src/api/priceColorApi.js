@@ -80,11 +80,11 @@ export const priceColorApi = {
     const typeItem = priceColor.type_item || 'غير محدد';
     const pricingBy = priceColor.price_color_By || 'غير محدد';
     const price = priceColor.price_per_meter || '0';
-    return `${colorName} - ${typeItem} (${pricingBy}): ${price} ل.س`;
+    return `${colorName} - ${typeItem} (${pricingBy}): ${price} $`;
   },
 
   formatPriceDisplay: (priceColor) => {
     if (!priceColor) return '0';
-    return `${priceColor.price_per_meter || '0'} ل.س`;
+    return `${priceColor.price_per_meter || '0'} $`;
   }
 };

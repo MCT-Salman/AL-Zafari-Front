@@ -259,7 +259,7 @@ export default function Color() {
     const colorName = formData.color_name?.trim();
 
     if (!rulerId || !colorCode || !colorName) {
-      setFormError("يرجى ملء جميع الحقول المطلوبة");
+      toast.error("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
 
@@ -287,19 +287,24 @@ export default function Color() {
         await colorApi.createColor(formDataToSend);
         fetchItems();
         // Clear form after successful create, but keep modal open
-        setFormData({
-          material_id: "",
-          ruler_id: "",
+        setFormData((prev) => ({
+          material_id: prev.material_id,
+          ruler_id: prev.ruler_id,
           color_code: "",
           color_name: "",
           notes: "",
           imageFile: null,
           imagePreview: null,
-        });
+        }));
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     } catch (err) {
-      setFormError(err.message || "فشل في حفظ اللون");
+      const errorMessage =
+        err?.message ||
+        err?.details ||
+        err?.error?.message ||
+        "فشل في حفظ اللون";
+      toast.error(errorMessage);
     }
   };
 
@@ -383,11 +388,11 @@ export default function Color() {
         />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-5">
+        {/* <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-5">
           {mainStats.map((stat) => (
             <StatsCard key={stat.id} {...stat} />
           ))}
-        </div>
+        </div> */}
 
         {/* Colors Table Card */}
         <Card className="p-6">

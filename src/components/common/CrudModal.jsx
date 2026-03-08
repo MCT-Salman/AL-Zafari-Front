@@ -76,20 +76,6 @@ export const CrudModal = ({
     await onDelete();
   };
 
-  const getIcon = (key) => {
-    const icons = {
-      name: User,
-      full_name: User,
-      username: User,
-      email: Mail,
-      phone: Phone,
-      role: Shield,
-      created_at: Calendar,
-      updated_at: Calendar,
-    };
-    return icons[key] || User;
-  };
-
   const defaultFormatValue = (key, value) => {
     if (formatValue) {
       return formatValue(key, value);
@@ -200,55 +186,44 @@ export const CrudModal = ({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className="absolute inset-0 bg-white/60 backdrop-blur-sm"
+          className="absolute inset-0 bg-primary-f/30 backdrop-blur-sm"
           onClick={onClose}
         />
 
         <div className={cn(
-          'relative w-full bg-primary-s rounded-2xl shadow-2xl',
+          'relative w-full bg-primary-s rounded-2xl shadow-2xl ring-1 ring-primary-f/10',
           sizeClasses[size]
         )}>
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-primary-f/10 bg-secondary-s/30 rounded-t-2xl">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary-f/10 flex items-center justify-center">
-                <User className="w-6 h-6 text-primary-f" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-secondary-f">{title || 'التفاصيل'}</h2>
-                {data?.id && <p className="text-sm text-secondary-t">ID: #{data.id}</p>}
-              </div>
+          <div className="flex items-center justify-between p-6 border-b border-primary-f/10 bg-gradient-to-l from-primary-f/10 via-secondary-s/40 to-primary-s rounded-t-2xl">
+            <div>
+              <h2 className="text-xl font-bold text-secondary-f">{title || 'التفاصيل'}</h2>
+              {data?.id && <p className="text-sm text-secondary-t">ID: #{data.id}</p>}
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-secondary-t hover:text-secondary-f hover:bg-secondary-s transition-all"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-secondary-t hover:text-primary-s cursor-pointer hover:bg-secondary-s/60 transition-all"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto">
             {fields.length > 0 ? (
               fields.map((field) => {
-                const Icon = getIcon(field.key);
                 const value = data[field.key];
 
                 return (
                   <div
                     key={field.key}
-                    className="flex items-start gap-4 p-4 rounded-xl bg-white border border-primary-f/10 hover:border-primary-f/30 transition-colors"
+                    className="p-4 rounded-xl bg-white/90 border border-primary-f/10 hover:border-secondary-f/30 hover:bg-white transition-colors"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-secondary-s flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-5 h-5 text-primary-f" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-secondary-t uppercase tracking-wider mb-1">
-                        {field.label}
-                      </p>
-                      <div className="text-base font-semibold text-secondary-f">
-                        {field.formatValue ? field.formatValue(field.key, value) : defaultFormatValue(field.key, value)}
-                      </div>
+                    <p className="text-xs font-medium text-secondary-t uppercase tracking-wider mb-1">
+                      {field.label}
+                    </p>
+                    <div className="text-base font-semibold text-secondary-f">
+                      {field.formatValue ? field.formatValue(field.key, value) : defaultFormatValue(field.key, value)}
                     </div>
                   </div>
                 );

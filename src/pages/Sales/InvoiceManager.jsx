@@ -27,6 +27,7 @@ import {
     Users,
     EyeOff,
     Home,
+    LogOut,
     X,
     AlertCircle,
     Edit,
@@ -51,6 +52,10 @@ import toast from "react-hot-toast";
 import { TypeItem, OrderStatus, CustomerType, PriceColorBy } from "../../types/enums";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
+import { useExport } from "../../hooks/useExport";
+import { useAuth } from "../../context/AuthContext";
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
 
 // مكون فرعي لعرض شريط التقدم
 const ProgressBar = ({ value, max, className = "" }) => {
@@ -200,6 +205,7 @@ const useMaterialsData = () => {
 
 export default function InvoiceManager() {
     const navigate = useNavigate();
+    const { logout } = useAuth();
     const [viewMode, setViewMode] = useLocalStorage("invoice_view_mode", "create");
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [showPreview, setShowPreview] = useState(false);
@@ -227,6 +233,30 @@ export default function InvoiceManager() {
         loadInitialData,
         loadWidthValues
     } = useMaterialsData();
+
+    const { exportToExcel: exportInvoicesToExcel, loading: exportingInvoices } = useExport({
+        sheetName: "الفواتير",
+        columns: [
+            { key: "invoice_id", header: "#" },
+            { key: "date", header: "التاريخ" },
+            { key: "customer", header: "الزبون" },
+            { key: "total", header: "الإجمالي" },
+            { key: "paid", header: "المدفوع" },
+            { key: "remaining", header: "المتبقي" },
+            { key: "status", header: "الحالة" },
+            { key: "notes", header: "ملاحظات" },
+        ],
+        columnWidths: [
+            { wch: 8 },
+            { wch: 18 },
+            { wch: 22 },
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 28 },
+        ],
+    });
 
     // Customer State
     const [customers, setCustomers] = useState([]);
@@ -486,11 +516,6 @@ export default function InvoiceManager() {
         );
     }, [colorSearchCode, availablePricedColors, numpadMode]);
 
-    const selectedColorImage = useMemo(() => {
-        const color = colors.find(c => String(c.color_id) === String(formData.color_id));
-        return color?.imageUrl || color?.image_url || color?.color_image || null;
-    }, [formData.color_id, colors]);
-
     const isColorPriced = useMemo(() => {
         if (!formData.color_id || !formData.ruler_id) return false;
 
@@ -542,7 +567,11 @@ export default function InvoiceManager() {
     const colorOptions = useMemo(() => {
         return filteredColorsBySearch.map(c => ({
             value: String(c.color_id),
-            label: `${c.color_name} (${c.color_code})`
+            label: `${c.color_name} (${c.color_code})`,
+            imageUrl: (() => {
+                const raw = c.imageUrl || c.image_url || c.color_image || null;
+                return raw ? (raw.startsWith("http") ? raw : `${API_BASE_URL}${raw}`) : null;
+            })()
         }));
     }, [filteredColorsBySearch]);
 
@@ -563,6 +592,27 @@ export default function InvoiceManager() {
             (inv.order_id && String(inv.order_id).includes(term))
         );
     }, [invoices, searchTerm]);
+
+    const handleExportInvoices = () => {
+        if (!filteredInvoices || filteredInvoices.length === 0) {
+            toast.error("لا توجد فواتير للتصدير");
+            return;
+        }
+        const exportRows = filteredInvoices.map(inv => {
+            const status = invoiceApi.getPaymentStatus(inv.total_amount, inv.paid_amount);
+            return {
+                invoice_id: `#${inv.invoice_id}`,
+                date: invoiceApi.getFormattedDate(inv.issued_at),
+                customer: inv.customer?.name || "-",
+                total: invoiceApi.formatCurrency(inv.total_amount || 0),
+                paid: invoiceApi.formatCurrency(inv.paid_amount || 0),
+                remaining: invoiceApi.formatCurrency(inv.remaining_amount || 0),
+                status: status?.label || "-",
+                notes: inv.notes || "",
+            };
+        });
+        exportInvoicesToExcel(exportRows, "الفواتير");
+    };
 
     // Handlers
     const handleFieldChange = useCallback((field, value) => {
@@ -1306,6 +1356,15 @@ export default function InvoiceManager() {
                             <Button
                                 size="lg"
                                 variant="outline"
+                                onClick={logout}
+                                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            >
+                                <LogOut className="w-5 h-5 ml-2" />
+                                تسجيل الخروج
+                            </Button>
+                            <Button
+                                size="lg"
+                                variant="outline"
                                 onClick={() => setIsHeaderVisible(false)}
                                 className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110"
                             >
@@ -1585,9 +1644,9 @@ export default function InvoiceManager() {
                                                 key={t.value}
                                                 onClick={() => handleFieldChange("type_item", t.value)}
                                                 className={`
-                                                    rounded-xl border-3 text-base font-medium
+                                                    rounded-2xl border-3 text-lg font-bold
                                                     transition-all touch-manipulation hover:scale-105 active:scale-95
-                                                    flex items-center justify-center p-2
+                                                    flex items-center justify-center px-4 py-3 min-h-[56px]
                                                     ${formData.type_item === t.value
                                                         ? "border-primary-f bg-primary-f text-white shadow-lg"
                                                         : "border-gray-300 bg-white hover:border-secondary-s"
@@ -1680,6 +1739,9 @@ export default function InvoiceManager() {
                                                 setNumpadMode("text");
                                                 setActiveTextTarget("color_search");
                                             }}
+                                            searchValue={colorSearchCode}
+                                            onSearchValueChange={(v) => setColorSearchCode(v)}
+                                            keepOpen={activeTextTarget === "color_search"}
                                             disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
                                             options={colorOptions}
                                             placeholder={
@@ -1693,16 +1755,6 @@ export default function InvoiceManager() {
                                             }
                                             className="w-full text-sm"
                                         />
-                                    </div>
-                                    <div>
-                                        <Label className="font-bold text-sm mb-2 block">الصورة</Label>
-                                        <div className="h-16 border-2 border-gray-300 rounded-lg bg-gray-50 flex items-center justify-center overflow-hidden">
-                                            {selectedColorImage ? (
-                                                <img src={selectedColorImage} alt="" className="h-full w-full object-cover" />
-                                            ) : (
-                                                <span className="text-gray-400 text-xs">لا توجد</span>
-                                            )}
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1752,6 +1804,7 @@ export default function InvoiceManager() {
                                             }}
                                             searchValue={batchSearchTerm}
                                             onSearchValueChange={(v) => setBatchSearchTerm(v)}
+                                            keepOpen={activeTextTarget === "batch_search"}
                                             disabled={!isSelectedMaterialBoard && !formData.width}
                                             options={batchOptions}
                                             placeholder={
@@ -1809,38 +1862,38 @@ export default function InvoiceManager() {
                                 />
                             </Card>
 
-                            {/* زر إنشاء الفاتورة - يفتح بوب أب الدفع */}
-                            <Button
-                                onClick={() => setShowPaymentPopup(true)}
-                                size="lg"
-                                className={`h-12 flex-shrink-0 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingInvoiceId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
-                                    }`}
-                                disabled={orderItems.length === 0}
-                            >
-                                {editingInvoiceId ? (
-                                    <>
-                                        <Save className="w-5 h-5 ml-2" />
-                                        تحديث الفاتورة
-                                    </>
-                                ) : (
-                                    <>
-                                        <Plus className="w-5 h-5 ml-2" />
-                                        إنشاء فاتورة
-                                    </>
-                                )}
-                            </Button>
-
-                            {/* زر مسح الكل */}
-                            {(selectedOrder || formData.notes) && (
+                            <div className="mt-auto space-y-2">
                                 <Button
-                                    onClick={clearForm}
-                                    variant="outline"
-                                    className="h-12 border-red-300 text-red-600 hover:bg-red-50"
+                                    onClick={addOrUpdateItem}
+                                    size="lg"
+                                    className={`h-14 w-full text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform ${
+                                        editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
+                                    }`}
+                                    disabled={!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity}
                                 >
-                                    <X className="w-5 h-5 ml-2" />
-                                    مسح الكل
+                                    {editingItemId ? (
+                                        <>
+                                            <Save className="w-5 h-5 ml-2" />
+                                            تحديث العنصر
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus className="w-5 h-5 ml-2" />
+                                            إضافة للجدول
+                                        </>
+                                    )}
                                 </Button>
-                            )}
+                                {(selectedOrder || formData.notes) && (
+                                    <Button
+                                        onClick={clearForm}
+                                        variant="outline"
+                                        className="h-12 w-full border-red-300 text-red-600 hover:bg-red-50"
+                                    >
+                                        <X className="w-5 h-5 ml-2" />
+                                        مسح الكل
+                                    </Button>
+                                )}
+                            </div>
                         </div>
 
                         {/* العمود الأيسر - الجدول */}
@@ -1849,7 +1902,7 @@ export default function InvoiceManager() {
                             <Card className="flex-shrink-0 p-3">
                                 <div className="flex items-center justify-between mb-2">
                                     <Label className="font-bold text-sm">الزبون</Label>
-                                    <div className="flex gap-1">
+                                    <div className="flex gap-2">
                                         {CUSTOMER_OPTIONS.map(option => {
                                             const Icon = option.icon;
                                             return (
@@ -1857,7 +1910,7 @@ export default function InvoiceManager() {
                                                     key={option.value}
                                                     onClick={() => setCustomerOption(option.value)}
                                                     className={`
-                                                        px-2 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1
+                                                        px-3 py-2 rounded-xl text-sm font-bold flex items-center gap-2 min-h-[44px]
                                                         transition-all touch-manipulation active:scale-95
                                                         ${customerOption === option.value
                                                             ? option.value === "none"
@@ -1870,7 +1923,7 @@ export default function InvoiceManager() {
                                                     `}
                                                     title={option.label}
                                                 >
-                                                    <Icon className="w-3 h-3" />
+                                                    <Icon className="w-4 h-4" />
                                                     <span className="hidden sm:inline">{option.label}</span>
                                                 </button>
                                             );
@@ -2317,24 +2370,6 @@ export default function InvoiceManager() {
                                         <div className="bg-green-50 px-2 py-1 rounded-lg text-xs">
                                             إجمالي: <span className="font-bold text-primary-f">{totalPreviewQuantity} م</span>
                                         </div>
-                                        <Button
-                                            size="sm"
-                                            onClick={addOrUpdateItem}
-                                            disabled={!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity}
-                                            className="h-8 bg-secondary-s hover:brightness-110 text-xs px-3 text-white touch-manipulation active:scale-95 transition-transform"
-                                        >
-                                            {editingItemId ? (
-                                                <>
-                                                    <Save className="w-3 h-3 ml-1" />
-                                                    تحديث
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Plus className="w-3 h-3 ml-1" />
-                                                    إضافة
-                                                </>
-                                            )}
-                                        </Button>
                                     </div>
                                 </div>
 
@@ -2344,19 +2379,19 @@ export default function InvoiceManager() {
                                     className="flex-1 overflow-auto min-h-0"
                                     style={{ direction: 'rtl' }}
                                 >
-                                    <table className="min-w-[1400px] w-full table-fixed border-collapse">
+                                    <table className="min-w-[1200px] w-full table-fixed border-collapse">
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
-                                                <th className="p-2 text-right border-b w-[100px]">المادة</th>
-                                                <th className="p-2 text-right border-b w-[100px]">المسطرة</th>
-                                                <th className="p-2 text-right border-b w-[100px]">اللون</th>
-                                                <th className="p-2 text-center border-b w-[50px]">النوع</th>
-                                                <th className="p-2 text-center border-b w-[60px]">الكمية</th>
-                                                <th className="p-2 text-center border-b w-[90px]">السماكة</th>
-                                                <th className="p-2 text-center border-b w-[120px]">رقم الطبخة</th>
-                                                <th className="p-2 text-center border-b w-[100px]">سعر الوحدة</th>
-                                                <th className="p-2 text-center border-b w-[100px]">الإجمالي</th>
-                                                <th className="p-2 text-center border-b w-[100px]">الإجراءات</th>
+                                                <th className="p-1 text-right border-b w-[80px]">المادة</th>
+                                                <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
+                                                <th className="p-1 text-right border-b w-[90px]">اللون</th>
+                                                <th className="p-1 text-center border-b w-[45px]">النوع</th>
+                                                <th className="p-1 text-center border-b w-[55px]">الكمية</th>
+                                                <th className="p-1 text-center border-b w-[70px]">السماكة</th>
+                                                <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
+                                                <th className="p-1 text-center border-b w-[80px]">سعر الوحدة</th>
+                                                <th className="p-1 text-center border-b w-[80px]">الإجمالي</th>
+                                                <th className="p-1 text-center border-b w-[80px]">الإجراءات</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -2367,34 +2402,34 @@ export default function InvoiceManager() {
                                                         }`}
                                                     onClick={() => handleEditItem(item)}
                                                 >
-                                                    <td className="p-2 break-words text-sm" title={item.material_name}>
+                                                    <td className="p-1 break-words text-sm" title={item.material_name}>
                                                         {item.material_name}
                                                     </td>
-                                                    <td className="p-2 break-words text-sm" title={item.ruler_name}>
+                                                    <td className="p-1 break-words text-sm" title={item.ruler_name}>
                                                         {item.ruler_name}
                                                     </td>
-                                                    <td className="p-2 break-words text-sm" title={item.color_name}>
+                                                    <td className="p-1 break-words text-sm" title={item.color_name}>
                                                         {item.color_name}
                                                     </td>
-                                                    <td className="p-2 text-center text-sm">
+                                                    <td className="p-1 text-center text-sm">
                                                         {item.type_item === TypeItem.Machine ? "مكنة" : "كوي"}
                                                     </td>
-                                                    <td className="p-2 text-center font-bold text-sm">
+                                                    <td className="p-1 text-center font-bold text-sm">
                                                         {item.quantity} م
                                                     </td>
-                                                    <td className="p-2 text-center text-sm">
+                                                    <td className="p-1 text-center text-sm">
                                                         {item.thickness || "0.6"} مم
                                                     </td>
-                                                    <td className="p-2 text-center text-sm" title={item.batch_number}>
+                                                    <td className="p-1 text-center text-sm" title={item.batch_number}>
                                                         {item.batch_number || "-"}
                                                     </td>
-                                                    <td className="p-2 text-center text-sm">
+                                                    <td className="p-1 text-center text-sm">
                                                         {invoiceApi.formatCurrency(item.unit_price || 0)}
                                                     </td>
-                                                    <td className="p-2 text-center text-sm font-bold text-primary-f">
+                                                    <td className="p-1 text-center text-sm font-bold text-primary-f">
                                                         {invoiceApi.formatCurrency(item.subtotal || 0)}
                                                     </td>
-                                                    <td className="p-2 text-center">
+                                                    <td className="p-1 text-center">
                                                         <div className="flex items-center justify-center gap-1">
                                                             {editingItemId === item.id && (
                                                                 <span className="text-blue-600 text-xs ml-1">
@@ -2426,6 +2461,28 @@ export default function InvoiceManager() {
                                             )}
                                         </tbody>
                                     </table>
+                                </div>
+                                <div className="flex justify-end pt-2">
+                                    <Button
+                                        onClick={() => setShowPaymentPopup(true)}
+                                        size="lg"
+                                        className={`h-12 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform ${
+                                            editingInvoiceId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
+                                        }`}
+                                        disabled={orderItems.length === 0}
+                                    >
+                                        {editingInvoiceId ? (
+                                            <>
+                                                <Save className="w-4 h-4 ml-2" />
+                                                تحديث الفاتورة
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Plus className="w-4 h-4 ml-2" />
+                                                إنشاء فاتورة
+                                            </>
+                                        )}
+                                    </Button>
                                 </div>
                             </Card>
                         </div>
@@ -2461,12 +2518,12 @@ export default function InvoiceManager() {
                                     variant="outline"
                                     className="px-4 py-2 text-sm"
                                     onClick={() => {
-                                        // تصدير PDF
-                                        toast.success("جاري تحضير ملف PDF...");
+                                        handleExportInvoices();
                                     }}
+                                    disabled={exportingInvoices || filteredInvoices.length === 0}
                                 >
                                     <Download className="w-4 h-4 ml-1" />
-                                    تصدير
+                                    {exportingInvoices ? "جارٍ التصدير..." : "تصدير Excel"}
                                 </Button>
                                 <Button
                                     size="sm"

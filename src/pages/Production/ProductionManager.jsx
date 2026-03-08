@@ -7,6 +7,8 @@ import { batchApi } from "../../api/batchApi";
 import { materialApi } from "../../api/materialApi";
 import { rulerApi } from "../../api/rulerApi";
 import { constantApi } from "../../api/constantApi";
+import { useExport } from "../../hooks/useExport";
+import { useAuth } from "../../context/AuthContext";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import FilterSelect from "../../components/common/FilterSelect";
@@ -23,6 +25,7 @@ import {
     Check,
     EyeOff,
     Home,
+    LogOut,
     Users,
     X,
     AlertCircle,
@@ -45,8 +48,11 @@ import { getApiData } from "../../utils/api";
 import toast from "react-hot-toast";
 import { TypeItem, ProductionType, ProductionStatus, MovementDestination, ProcessSource } from "../../types/enums";
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+
 export default function ProductionManager() {
     const navigate = useNavigate();
+    const { logout } = useAuth();
     const [viewMode, setViewMode] = useState("create");
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -61,6 +67,9 @@ export default function ProductionManager() {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [selectedOrderItems, setSelectedOrderItems] = useState([]);
     const tableContainerRef = useRef(null);
+    const [activeTextTarget, setActiveTextTarget] = useState(null); // color_search | batch_search
+    const [colorSearchCode, setColorSearchCode] = useState("");
+    const [batchSearchTerm, setBatchSearchTerm] = useState("");
 
     // Data
     const [colors, setColors] = useState([]);
@@ -71,6 +80,32 @@ export default function ProductionManager() {
     const [loadingWidths, setLoadingWidths] = useState(false);
     const [productionOrders, setProductionOrders] = useState([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
+
+    const { exportToExcel: exportProductionToExcel, loading: exportingProduction } = useExport({
+        sheetName: "طلبات_الإنتاج",
+        columns: [
+            { key: "production_order_id", header: "#" },
+            { key: "date", header: "التاريخ" },
+            { key: "issued_by", header: "المنشئ" },
+            { key: "color", header: "اللون" },
+            { key: "type_item", header: "النوع" },
+            { key: "thickness", header: "السماكة" },
+            { key: "batch", header: "رقم الطبخة" },
+            { key: "status", header: "الحالة" },
+            { key: "notes", header: "ملاحظات" },
+        ],
+        columnWidths: [
+            { wch: 8 },
+            { wch: 20 },
+            { wch: 22 },
+            { wch: 24 },
+            { wch: 14 },
+            { wch: 12 },
+            { wch: 18 },
+            { wch: 14 },
+            { wch: 28 },
+        ],
+    });
 
     // Production Types
     const PRODUCTION_TYPES = [
@@ -223,6 +258,26 @@ export default function ProductionManager() {
     };
 
     const handleNumpadPress = (val) => {
+        if (activeTextTarget) {
+            const apply = (prev) => {
+                let next = String(prev || "");
+                if (val === "clear") next = "";
+                else if (val === "back") next = next.slice(0, -1);
+                else next = next + val;
+                return next;
+            };
+
+            if (activeTextTarget === "color_search") {
+                setColorSearchCode((prev) => apply(prev));
+                return;
+            }
+
+            if (activeTextTarget === "batch_search") {
+                setBatchSearchTerm((prev) => apply(prev));
+                return;
+            }
+        }
+
         let current = String(currentItem[activeField] || "");
         if (val === "clear") current = "";
         else if (val === "back") current = current.slice(0, -1);
@@ -249,6 +304,41 @@ export default function ProductionManager() {
             order.ruler_type?.toLowerCase().includes(term)
         );
     }, [productionOrders, searchTerm]);
+
+    const filteredBatchOptions = useMemo(() => {
+        const term = String(batchSearchTerm || "").trim().toLowerCase();
+        const base = batches.map(b => ({
+            value: String(b.batch_id),
+            label: b.batch_number || `دفعة ${b.batch_id}`
+        }));
+        if (!term) return base;
+        return base.filter(opt =>
+            String(opt.label || "").toLowerCase().includes(term) ||
+            String(opt.value || "").toLowerCase().includes(term)
+        );
+    }, [batches, batchSearchTerm]);
+
+    const handleExportProduction = () => {
+        if (!filteredProductionOrders || filteredProductionOrders.length === 0) {
+            toast.error("لا توجد طلبات للتصدير");
+            return;
+        }
+        const exportRows = filteredProductionOrders.map(order => {
+            const statusBadge = productionApi.getStatusBadge(order.status);
+            return {
+                production_order_id: `#${order.production_order_id}`,
+                date: productionApi.getFormattedDate(order.created_at),
+                issued_by: productionApi.formatIssuedBy(order.issued_by),
+                color: `${order.color_name || "-"} (${order.color_code || "-"})`,
+                type_item: order.type_item === TypeItem.Machine ? "مكنة" : "كوي",
+                thickness: order.thickness ?? "-",
+                batch: order.batch_number || "-",
+                status: statusBadge?.label || "-",
+                notes: order.notes || "",
+            };
+        });
+        exportProductionToExcel(exportRows, "طلبات_الإنتاج");
+    };
 
     const handleProductionTypeToggle = (type) => {
         setCurrentItem(prev => {
@@ -280,7 +370,7 @@ export default function ProductionManager() {
         };
 
         if (editingItemId) {
-            setProductionItems(prev => prev.map(item => 
+            setProductionItems(prev => prev.map(item =>
                 item.id === editingItemId ? { ...newItem, id: item.id } : item
             ));
             toast.success("تم تحديث العنصر بنجاح");
@@ -400,7 +490,7 @@ export default function ProductionManager() {
             setProductionItems([]);
             setShowPreview(false);
             setEditingOrderId(null);
-            
+
             // تحديث قائمة الطلبات إذا كنا في وضع السجل
             if (viewMode === "history") {
                 loadProductionOrders();
@@ -457,21 +547,30 @@ export default function ProductionManager() {
 
     const availableColors = useMemo(() => colors, [colors]);
 
+    const filteredColorsBySearch = useMemo(() => {
+        if (!colorSearchCode) return availableColors;
+        const term = String(colorSearchCode).toLowerCase();
+        return availableColors.filter(c =>
+            String(c.color_code || "").toLowerCase().includes(term)
+        );
+    }, [colorSearchCode, availableColors]);
+
     // Color options for select
     const colorOptions = useMemo(() => {
-        return availableColors.map(c => ({
+        return filteredColorsBySearch.map(c => ({
             value: String(c.color_id),
-            label: `${c.color_name} (${c.color_code})`
+            label: `${c.color_name} (${c.color_code})`,
+            imageUrl: (() => {
+                const raw = c.imageUrl || c.image_url || c.color_image || null;
+                return raw ? (raw.startsWith("http") ? raw : `${API_BASE_URL}${raw}`) : null;
+            })()
         }));
-    }, [availableColors]);
+    }, [filteredColorsBySearch]);
 
     // Batch options for select
     const batchOptions = useMemo(() => {
-        return batches.map(b => ({
-            value: String(b.batch_id),
-            label: b.batch_number || `دفعة ${b.batch_id}`
-        }));
-    }, [batches]);
+        return filteredBatchOptions;
+    }, [filteredBatchOptions]);
 
     // Scroll table horizontally
     const scrollTable = (direction) => {
@@ -501,11 +600,10 @@ export default function ProductionManager() {
                                 size="lg"
                                 variant="outline"
                                 onClick={() => setViewMode("create")}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
-                                    viewMode === "create"
-                                        ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                        : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                }`}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                    }`}
                             >
                                 <ShoppingCart className="w-5 h-5 ml-2" />
                                 طلب إنتاج جديد
@@ -514,11 +612,10 @@ export default function ProductionManager() {
                                 size="lg"
                                 variant="outline"
                                 onClick={() => setViewMode("history")}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
-                                    viewMode === "history"
-                                        ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                        : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                }`}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                    }`}
                             >
                                 <History className="w-5 h-5 ml-2" />
                                 سجل طلبات الإنتاج
@@ -552,6 +649,24 @@ export default function ProductionManager() {
                                 <Home className="w-5 h-5 ml-2" />
                                 الرئيسية
                             </Button> */}
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={() => navigate("/dashboard")}
+                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            >
+                                <Home className="w-5 h-5 ml-2" />
+                                الرئيسية
+                            </Button>
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={logout}
+                                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            >
+                                <LogOut className="w-5 h-5 ml-2" />
+                                تسجيل الخروج
+                            </Button>
                             <Button
                                 size="lg"
                                 variant="outline"
@@ -594,6 +709,7 @@ export default function ProductionManager() {
                                                 handleFieldChange("material_id", String(m.material_id));
                                                 setCurrentItem(prev => ({ ...prev, width: "" }));
                                                 setActiveField("length");
+                                                setActiveTextTarget(null);
                                             }}
                                             className={`
                                                 aspect-square rounded-xl border-3 text-sm font-bold
@@ -680,20 +796,26 @@ export default function ProductionManager() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                {/* <div className="grid grid-cols-2 gap-2 mt-2">
                                     <button
-                                        onClick={() => setActiveField("width")}
+                                        onClick={() => {
+                                            setActiveField("width");
+                                            setActiveTextTarget(null);
+                                        }}
                                         className={`py-2 rounded-lg text-sm font-bold transition-all ${activeField === "width" ? "bg-primary-f text-white" : "bg-gray-200 text-gray-700"}`}
                                     >
                                         العرض
                                     </button>
                                     <button
-                                        onClick={() => setActiveField("length")}
+                                        onClick={() => {
+                                            setActiveField("length");
+                                            setActiveTextTarget(null);
+                                        }}
                                         className={`py-2 rounded-lg text-sm font-bold transition-all ${activeField === "length" ? "bg-primary-f text-white" : "bg-gray-200 text-gray-700"}`}
                                     >
                                         الكمية
                                     </button>
-                                </div>
+                                </div> */}
 
                                 <button
                                     onClick={() => handleNumpadPress("clear")}
@@ -756,6 +878,7 @@ export default function ProductionManager() {
                                                 onClick={() => {
                                                     handleItemFieldChange("width", w.value);
                                                     setActiveField("length");
+                                                    setActiveTextTarget(null);
                                                 }}
                                                 className={`
                                                     rounded-xl border-3 text-base font-medium
@@ -779,53 +902,66 @@ export default function ProductionManager() {
                                     )
                                 )}
                             </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
+                                <div className="p-3 border-b-2 border-dashed border-gray-300">
+                                    <Label className="font-bold text-sm mb-2 block">المسطرة</Label>
+                                    <FilterSelect
+                                        value={formData.ruler_id}
+                                        onChange={(e) => handleFieldChange("ruler_id", e.target.value)}
+                                        options={availableRulers.map(r => ({ value: String(r.ruler_id), label: r.ruler_name }))}
+                                        placeholder={!formData.material_id ? "اختر المادة أولاً" : "اختر المسطرة..."}
+                                        className="w-full text-sm"
+                                        disabled={!formData.material_id}
+                                    />
+                                </div>
 
-                            <div className="p-3 border-b-2 border-dashed border-gray-300">
-                                <Label className="font-bold text-sm mb-2 block">المسطرة</Label>
-                                <FilterSelect
-                                    value={formData.ruler_id}
-                                    onChange={(e) => handleFieldChange("ruler_id", e.target.value)}
-                                    options={availableRulers.map(r => ({ value: String(r.ruler_id), label: r.ruler_name }))}
-                                    placeholder={!formData.material_id ? "اختر المادة أولاً" : "اختر المسطرة..."}
-                                    className="w-full text-sm"
-                                    disabled={!formData.material_id}
-                                />
+                                <div className="p-3 border-b-2 border-dashed border-gray-300">
+                                    <Label className="font-bold text-sm mb-2 block">اللون</Label>
+                                    <FilterSelect
+                                        value={formData.color_id}
+                                        onChange={(e) => {
+                                            handleFieldChange("color_id", e.target.value);
+                                            setActiveTextTarget(null);
+                                        }}
+                                        searchValue={colorSearchCode}
+                                        onSearchValueChange={(v) => setColorSearchCode(v)}
+                                        onInputFocus={() => setActiveTextTarget("color_search")}
+                                        keepOpen={activeTextTarget === "color_search"}
+                                        options={colorOptions}
+                                        placeholder={
+                                            !formData.ruler_id
+                                                ? "اختر المسطرة أولاً"
+                                                : !currentItem.width
+                                                    ? "اختر العرض أولاً"
+                                                    : colorOptions.length === 0
+                                                        ? "لا توجد ألوان مسعرة"
+                                                        : "اختر اللون..."
+                                        }
+                                        className="w-full text-sm"
+                                        disabled={!formData.ruler_id || !currentItem.width}
+                                    />
+                                </div>
+
                             </div>
-
-                            <div className="p-3 border-b-2 border-dashed border-gray-300">
-                                <Label className="font-bold text-sm mb-2 block">اللون</Label>
-                                <FilterSelect
-                                    value={formData.color_id}
-                                    onChange={(e) => handleFieldChange("color_id", e.target.value)}
-                                    options={colorOptions}
-                                    placeholder={
-                                        !formData.ruler_id
-                                            ? "اختر المسطرة أولاً"
-                                            : !currentItem.width
-                                                ? "اختر العرض أولاً"
-                                                : colorOptions.length === 0
-                                                    ? "لا توجد ألوان مسعرة"
-                                                    : "اختر اللون..."
-                                    }
-                                    className="w-full text-sm"
-                                    disabled={!formData.ruler_id || !currentItem.width}
-                                />
-                            </div>
-
                             <Card className="flex-shrink-0 p-4">
                                 <Label className="font-bold text-base mb-3 block">معلومات الطلب</Label>
-                                <div className="space-y-3">
-                                    <div>
-                                        <Label className="font-bold text-sm mb-1 block">رقم الطبخة</Label>
-                                        <FilterSelect
-                                            value={formData.batch_id}
-                                            onChange={(e) => handleFieldChange("batch_id", e.target.value)}
-                                            options={batchOptions}
-                                            placeholder="اختر الطبخة..."
-                                            className="w-full text-sm"
-                                        />
-                                    </div>
 
+                                <div className="grid grid-cols-1 sm:grid-cols-2 items-center gap-2">
+
+                                    <div>
+                                        <Label className="font-bold text-xs mb-1 block">الكمية</Label>
+                                            <Input
+                                                type="number"
+                                                value={currentItem.length}
+                                                onChange={(e) => handleItemFieldChange("length", e.target.value)}
+                                            onFocus={() => {
+                                                setActiveField("length");
+                                                setActiveTextTarget(null);
+                                            }}
+                                                placeholder="مثال: 100"
+                                                className="h-10 text-sm"
+                                            />
+                                    </div>
                                     <div>
                                         <Label className="font-bold text-sm mb-1 block">السماكة (مم)</Label>
                                         <Input
@@ -838,6 +974,26 @@ export default function ProductionManager() {
                                     </div>
 
                                     <div>
+                                        <Label className="font-bold text-sm mb-1 block">رقم الطبخة</Label>
+                                        <FilterSelect
+                                            value={formData.batch_id}
+                                            onChange={(e) => {
+                                                handleFieldChange("batch_id", e.target.value);
+                                                setActiveTextTarget(null);
+                                            }}
+                                            options={batchOptions}
+                                            searchValue={batchSearchTerm}
+                                            onSearchValueChange={(v) => setBatchSearchTerm(v)}
+                                            onInputFocus={() => setActiveTextTarget("batch_search")}
+                                            keepOpen={activeTextTarget === "batch_search"}
+                                            placeholder="اختر الطبخة..."
+                                            className="w-full text-sm"
+                                        />
+                                    </div>
+
+
+
+                                    <div>
                                         <Label className="font-bold text-sm mb-1 block">الحالة</Label>
                                         <FilterSelect
                                             value={formData.status}
@@ -847,54 +1003,46 @@ export default function ProductionManager() {
                                         />
                                     </div>
 
-                                    <div>
-                                        <Label className="font-bold text-sm mb-1 block">ملاحظات</Label>
-                                        <Input
-                                            value={formData.notes}
-                                            onChange={(e) => handleFieldChange("notes", e.target.value)}
-                                            placeholder="ملاحظات إضافية..."
-                                            className="h-10 text-sm"
-                                        />
-                                    </div>
+
+                                </div>
+                                <div>
+                                    <Label className="font-bold text-sm mb-1 block">ملاحظات</Label>
+                                    <Input
+                                        value={formData.notes}
+                                        onChange={(e) => handleFieldChange("notes", e.target.value)}
+                                        placeholder="ملاحظات إضافية..."
+                                        className="h-10 text-sm"
+                                    />
                                 </div>
                             </Card>
 
-                            <Card className="p-4">
+                            <div className="mt-auto">
+                                <Button
+                                    onClick={addProductionItem}
+                                    className={`w-full h-14 text-lg font-bold ${editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
+                                        } text-white`}
+                                >
+                                    {editingItemId ? (
+                                        <>
+                                            <Save className="w-4 h-4 ml-1" />
+                                            تحديث العنصر
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus className="w-4 h-4 ml-1" />
+                                            إضافة عنصر
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                            {/* <Card className="p-4">
                                 <Label className="font-bold text-base mb-3 block">إضافة عنصر إنتاج</Label>
                                 <div className="space-y-3">
-                                    <div>
-                                        <Label className="font-bold text-xs mb-1 block">الكمية</Label>
-                                        <Input
-                                            type="number"
-                                            value={currentItem.length}
-                                            onChange={(e) => handleItemFieldChange("length", e.target.value)}
-                                            onFocus={() => setActiveField("length")}
-                                            placeholder="مثال: 100"
-                                            className="h-10 text-sm"
-                                        />
-                                    </div>
+                                    
 
-                                    <Button
-                                        onClick={addProductionItem}
-                                        className={`w-full h-10 text-sm font-bold ${
-                                            editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
-                                        } text-white`}
-                                    >
-                                        {editingItemId ? (
-                                            <>
-                                                <Save className="w-4 h-4 ml-1" />
-                                                تحديث العنصر
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Plus className="w-4 h-4 ml-1" />
-                                                إضافة عنصر
-                                            </>
-                                        )}
-                                    </Button>
                                 </div>
-                            </Card>
-
+                            </Card> */}
+                            {/* 
                             <Card className="p-4">
                                 <div className="space-y-3">
                                     <div className="bg-blue-50 p-3 rounded-lg">
@@ -908,22 +1056,8 @@ export default function ProductionManager() {
                                         </div>
                                     </div>
 
-                                    <Button
-                                        onClick={() => setShowPreview(true)}
-                                        disabled={loading || productionItems.length === 0 || !formData.color_id}
-                                        className="w-full h-12 bg-secondary-s hover:brightness-110 text-white font-bold"
-                                    >
-                                        {loading ? (
-                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        ) : (
-                                            <>
-                                                <Eye className="w-5 h-5 ml-2" />
-                                                معاينة الطلب
-                                            </>
-                                        )}
-                                    </Button>
                                 </div>
-                            </Card>
+                            </Card> */}
                         </div>
 
                         {/* العمود الأيسر - أنواع الإنتاج وجدول العناصر */}
@@ -939,16 +1073,16 @@ export default function ProductionManager() {
                                                 key={type.value}
                                                 onClick={() => handleProductionTypeToggle(type.value)}
                                                 className={`
-                                                    py-2 px-2 rounded-lg text-xs font-medium border-2
-                                                    transition-all touch-manipulation active:scale-95
-                                                    flex items-center justify-center gap-1
+                                                    py-3 px-3 rounded-xl text-sm font-bold border-2
+                                                    transition-all touch-manipulation active:scale-95 min-h-[48px]
+                                                    flex items-center justify-center gap-2
                                                     ${isSelected
                                                         ? "border-green-600 bg-green-50 text-green-700"
                                                         : "border-gray-300 bg-white hover:border-gray-400"
                                                     }
                                                 `}
                                             >
-                                                <Icon className="w-3 h-3" />
+                                                <Icon className="w-4 h-4" />
                                                 {type.label}
                                             </button>
                                         );
@@ -971,13 +1105,13 @@ export default function ProductionManager() {
                                 </div>
 
                                 <div className="flex-1 overflow-auto min-h-0">
-                                    <table className="min-w-[600px] w-full table-fixed border-collapse">
+                                    <table className="min-w-[520px] w-full table-fixed border-collapse">
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
-                                                <th className="p-2 text-center border-b w-20">العرض</th>
-                                                <th className="p-2 text-center border-b w-24">الكمية</th>
-                                                <th className="p-2 text-center border-b">أنواع الإنتاج</th>
-                                                <th className="p-2 text-center border-b w-20">إجراء</th>
+                                                <th className="p-1 text-center border-b w-16">العرض</th>
+                                                <th className="p-1 text-center border-b w-20">الكمية</th>
+                                                <th className="p-1 text-center border-b">أنواع الإنتاج</th>
+                                                <th className="p-1 text-center border-b w-16">إجراء</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -986,9 +1120,9 @@ export default function ProductionManager() {
                                                     key={item.id}
                                                     className="border-b"
                                                 >
-                                                    <td className="p-2 text-center text-sm">{item.width}</td>
-                                                    <td className="p-2 text-center text-sm">{item.length}</td>
-                                                    <td className="p-2 text-center text-xs">
+                                                    <td className="p-1 text-center text-sm">{item.width}</td>
+                                                    <td className="p-1 text-center text-sm">{item.length}</td>
+                                                    <td className="p-1 text-center text-xs">
                                                         <div className="flex flex-wrap gap-1 justify-center">
                                                             {item.production_types.map(type => {
                                                                 const typeInfo = PRODUCTION_TYPES.find(t => t.value === type);
@@ -1000,7 +1134,7 @@ export default function ProductionManager() {
                                                             })}
                                                         </div>
                                                     </td>
-                                                    <td className="p-2 text-center">
+                                                    <td className="p-1 text-center">
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
@@ -1024,6 +1158,22 @@ export default function ProductionManager() {
                                             )}
                                         </tbody>
                                     </table>
+                                </div>
+                                <div className="p-2 pt-1 flex justify-end">
+                                    <Button
+                                        onClick={() => setShowPreview(true)}
+                                        disabled={loading || productionItems.length === 0 || !formData.color_id}
+                                        className="h-12 text-base px-6 bg-secondary-s hover:brightness-110 text-white font-bold"
+                                    >
+                                        {loading ? (
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Eye className="w-5 h-5 ml-2" />
+                                                معاينة الطلب
+                                            </>
+                                        )}
+                                    </Button>
                                 </div>
                             </Card>
                         </div>
@@ -1059,12 +1209,12 @@ export default function ProductionManager() {
                                     variant="outline"
                                     className="px-4 py-2 text-sm"
                                     onClick={() => {
-                                        // تصدير PDF
-                                        toast.success("جارٍ تحضير ملف PDF...");
+                                        handleExportProduction();
                                     }}
+                                    disabled={exportingProduction || filteredProductionOrders.length === 0}
                                 >
                                     <Download className="w-4 h-4 ml-1" />
-                                    تصدير
+                                    {exportingProduction ? "جارٍ التصدير..." : "تصدير Excel"}
                                 </Button>
                                 <Button
                                     size="sm"
@@ -1325,9 +1475,8 @@ export default function ProductionManager() {
                                                         {productionApi.getMovementDestinationLabel(item.destination)}
                                                     </td>
                                                     <td className="p-2 text-center">
-                                                        <span className={`px-2 py-0.5 rounded-full text-xs ${
-                                                            productionApi.getStatusBadge(item.status).className
-                                                        }`}>
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs ${productionApi.getStatusBadge(item.status).className
+                                                            }`}>
                                                             {productionApi.getStatusBadge(item.status).label}
                                                         </span>
                                                     </td>

@@ -22,6 +22,7 @@ const FilterSelect = ({
   options = [],
   className = "",
   disabled = false,
+  keepOpen = false,
   placeholder = "ابحث أو اختر...",
 }) => {
   const selectId = useId();
@@ -52,6 +53,7 @@ const FilterSelect = ({
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
+      if (keepOpen) return;
       if (!wrapperRef.current?.contains(event.target)) {
         setIsOpen(false);
         if (typeof onSearchValueChange === "function") onSearchValueChange("");
@@ -61,7 +63,15 @@ const FilterSelect = ({
 
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, []);
+  }, [keepOpen, onSearchValueChange]);
+
+  useEffect(() => {
+    if (!keepOpen || disabled) return;
+    setIsOpen(true);
+    if (inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [keepOpen, disabled, effectiveSearchTerm]);
 
   const handleSelect = (optionValue) => {
     const nextValue = toStringValue(optionValue);
@@ -152,6 +162,12 @@ const FilterSelect = ({
             filteredOptions.map((option, index) => {
               const optionValue = toStringValue(option?.value);
               const optionLabel = String(option?.label ?? optionValue);
+              const optionImage =
+                option?.imageUrl ||
+                option?.image_url ||
+                option?.image ||
+                option?.color_image ||
+                null;
               const optionDisabled = Boolean(option?.disabled);
               const isSelected = optionValue === normalizedValue;
 
@@ -166,7 +182,18 @@ const FilterSelect = ({
                     isSelected ? "bg-secondary-f/20 font-semibold" : ""
                   }`}
                 >
-                  {optionLabel}
+                  {optionImage ? (
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span className="flex-1 text-right">{optionLabel}</span>
+                      <img
+                        src={optionImage}
+                        alt=""
+                        className="h-6 w-6 rounded-full border border-gray-200 object-cover"
+                      />
+                    </span>
+                  ) : (
+                    optionLabel
+                  )}
                 </button>
               );
             })

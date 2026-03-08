@@ -903,9 +903,32 @@ export default function ConstantValue() {
 
 
 
-        {/* Material and Type Selector */}
 
-        <Card className="p-4 mb-4">
+
+
+
+        {/* Stats Cards */}
+
+        {/* <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+
+          {mainStats.map((stat) => (
+
+            <StatsCard key={stat.id} {...stat} />
+
+          ))}
+
+        </div> */}
+
+
+        {/* Values Table Card */}
+
+        <Card className="p-6">
+
+          <h2 className="text-xl font-bold">
+
+            {selectedMaterialId === "all" ? `قيم جميع المواد` : selectedMaterialName ? `قيم ${selectedMaterialName}` : "القيم الثابتة"}
+
+          </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
@@ -1001,35 +1024,9 @@ export default function ConstantValue() {
 
           </div>
 
-        </Card>
-
-
-
-        {/* Stats Cards */}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-
-          {mainStats.map((stat) => (
-
-            <StatsCard key={stat.id} {...stat} />
-
-          ))}
-
-        </div>
-
-
-
-        {/* Values Table Card */}
-
-        <Card className="p-6">
-
           <div className="">
 
-            <h2 className="text-xl font-bold">
 
-              {selectedMaterialId === "all" ? `قيم جميع المواد` : selectedMaterialName ? `قيم ${selectedMaterialName}` : "القيم الثابتة"}
-
-            </h2>
 
           </div>
 
@@ -1494,7 +1491,7 @@ export default function ConstantValue() {
                   value: material.material_id.toString(),
                   label: material.material_name,
                 }))}
-                placeholder="Search material"
+                placeholder="ابحث عن المادة"
               />
 
             </div>
@@ -1512,11 +1509,11 @@ export default function ConstantValue() {
                 value={formData.type || ""}
                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 options={[
-                  { value: "width", label: "Width" },
-                  { value: "height", label: "Height" },
-                  { value: "thickness", label: "Thickness" },
+                  { value: "width", label: "العرض" },
+                  { value: "height", label: "الطول" },
+                  { value: "thickness", label: "السماكة" },
                 ]}
-                placeholder="Search value type"
+                placeholder="ابحث عن نوع القيمة"
               />
             </div>
 
@@ -1536,7 +1533,7 @@ export default function ConstantValue() {
                   value: unit.value,
                   label: unit.label,
                 }))}
-                placeholder="Search unit"
+                placeholder="ابحث عن الوحدة"
               />
             </div>
 

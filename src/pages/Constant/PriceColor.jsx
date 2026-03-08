@@ -35,6 +35,8 @@ import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
 import { getApiData } from "../../utils/api";
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+
 export default function PriceColor() {
   // Create adapter to map generic CRUD method names to priceColorApi method names
   const priceColorApiAdapter = useMemo(() => ({
@@ -91,6 +93,16 @@ export default function PriceColor() {
   const [colors, setColors] = useState([]);
   const [rulers, setRulers] = useState([]);
   const [materials, setMaterials] = useState([]);
+  const selectedMaterial = useMemo(() => {
+    if (!formData.material_id) return null;
+    return materials.find(
+      (m) => m.material_id?.toString() === formData.material_id?.toString()
+    );
+  }, [materials, formData.material_id]);
+  const isSelectedMaterialPvc = useMemo(() => {
+    const name = selectedMaterial?.material_name || "";
+    return name.toLowerCase().includes("pvc");
+  }, [selectedMaterial]);
 
   // Load price colors, colors, rulers and materials on mount
   useEffect(() => {
@@ -202,7 +214,7 @@ export default function PriceColor() {
   const getLabel = (options, value) => {
     // Check both standard value and legacy 'blanck'
     const actualValue = value === "blanck" ? "isByBlanck" : value;
-    return options.find(opt => opt.value === actualValue)?.label || actualValue || "غير محدد";
+    return options.find(opt => opt.value === actualValue)?.label || actualValue || "-";
   };
 
   // Filter and pagination state
@@ -222,7 +234,7 @@ export default function PriceColor() {
       { key: "material_name", header: "المادة", format: (item) => priceColorApi.getMaterialName(item) },
       { key: "type_item", header: "النوع" },
       { key: "price_color_By", header: "طريقة التسعير" },
-      { key: "price_per_meter", header: "السعر" },
+      { key: "price_per_meter", header: "السعر ($)" },
       { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [
@@ -256,8 +268,17 @@ export default function PriceColor() {
     const typeItem = actualData.type_item?.trim();
     const priceColorBy = actualData.price_color_By?.trim();
     const pricePerMeter = actualData.price_per_meter;
+    const isPvcMaterial = (() => {
+      const materialId = actualData.material_id;
+      if (!materialId) return false;
+      const material = materials.find(
+        (m) => m.material_id?.toString() === materialId?.toString()
+      );
+      const materialName = material?.material_name || "";
+      return materialName.toLowerCase().includes("pvc");
+    })();
 
-    if (!colorId || !typeItem || !priceColorBy || !pricePerMeter) {
+    if (!colorId || !priceColorBy || !pricePerMeter || (isPvcMaterial && !typeItem)) {
       setFormError("يرجى ملء جميع الحقول المطلوبة");
       return;
     }
@@ -271,11 +292,13 @@ export default function PriceColor() {
     // Prepare data to send
     const dataToSend = {
       color_id: parseInt(colorId),
-      type_item: typeItem,
       price_color_By: priceColorBy === "blanck" ? "isByBlanck" : priceColorBy,
       price_per_meter: parseFloat(pricePerMeter),
       notes: actualData.notes || "",
     };
+    if (isPvcMaterial) {
+      dataToSend.type_item = typeItem;
+    }
 
     // Special handling for "blanck" (Board) if the backend expects different structure
     // (Assuming standard payload based on previous context, but ensuring clean values)
@@ -380,7 +403,7 @@ export default function PriceColor() {
       id: 2,
       title: "متوسط السعر",
       value: stats.avgPrice,
-      unit: "ل.س",
+      unit: "$",
       icon: DollarSign,
       iconColor: "text-primary-f",
       bgColor: "bg-primary-s",
@@ -409,11 +432,11 @@ export default function PriceColor() {
         />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        {/* <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {mainStats.map((stat) => (
             <StatsCard key={stat.id} {...stat} />
           ))}
-        </div>
+        </div> */}
 
         {/* Price Colors Table Card */}
         <Card className="p-6">
@@ -524,7 +547,7 @@ export default function PriceColor() {
                       <TableHead>المادة</TableHead>
                       <TableHead>النوع</TableHead>
                       <TableHead>طريقة التسعير</TableHead>
-                      <TableHead sortable sortKey="price_per_meter">السعر بالمتر/لوح</TableHead>
+                      <TableHead sortable sortKey="price_per_meter">السعر بالمتر/لوح ($)</TableHead>
                       <TableHead>الملاحظات</TableHead>
                       <TableHead>الإجراءات</TableHead>
                     </TableRow>
@@ -622,9 +645,11 @@ export default function PriceColor() {
               { key: "color_name", label: "اللون", formatValue: () => priceColorApi.getColorName(selectedItem) },
               { key: "ruler_name", label: "المسطرة", formatValue: () => priceColorApi.getRulerName(selectedItem) },
               { key: "material_name", label: "المادة", formatValue: () => priceColorApi.getMaterialName(selectedItem) },
-              { key: "type_item", label: "النوع", formatValue: (key, value) => getLabel(typeItemOptions, value) },
+              ...(priceColorApi.getMaterialName(selectedItem || {}).toLowerCase().includes("pvc")
+                ? [{ key: "type_item", label: "النوع", formatValue: (key, value) => getLabel(typeItemOptions, value) }]
+                : []),
               { key: "price_color_By", label: "طريقة التسعير", formatValue: (key, value) => getLabel(pricingOptions, value) },
-              { key: "price_per_meter", label: "السعر بالمتر/لوح", formatValue: (key, value) => `${value} ل.س` },
+              { key: "price_per_meter", label: "السعر بالمتر/لوح ($)", formatValue: (key, value) => `${value} $` },
               { key: "notes", label: "الملاحظات" },
             ]
             : []
@@ -685,24 +710,33 @@ export default function PriceColor() {
                 disabled={!formData.ruler_id}
                 options={colors
                   .filter((c) => c.ruler_id?.toString() === formData.ruler_id?.toString())
-                  .map((color) => ({
-                    value: color.color_id.toString(),
-                    label: `${color.color_name} (${color.color_code})`,
-                  }))}
+                  .map((color) => {
+                    const rawImage = color.imageUrl || color.image_url || color.color_image || null;
+                    const resolvedImage = rawImage
+                      ? (rawImage.startsWith("http") ? rawImage : `${API_BASE_URL}${rawImage}`)
+                      : null;
+                    return {
+                      value: color.color_id.toString(),
+                      label: `${color.color_name} (${color.color_code})`,
+                      imageUrl: resolvedImage,
+                    };
+                  })}
                 placeholder={!formData.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"}
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>النوع <span className="text-red-500">*</span></Label>
-                <FilterSelect
-                  value={formData.type_item || ""}
-                  onChange={(e) => setFormData({ ...formData, type_item: e.target.value })}
-                  options={typeItemOptions}
-                  placeholder="اختر النوع"
-                />
-              </div>
+              {isSelectedMaterialPvc && (
+                <div className="space-y-2">
+                  <Label>النوع <span className="text-red-500">*</span></Label>
+                  <FilterSelect
+                    value={formData.type_item || ""}
+                    onChange={(e) => setFormData({ ...formData, type_item: e.target.value })}
+                    options={typeItemOptions}
+                    placeholder="اختر النوع"
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>طريقة التسعير <span className="text-red-500">*</span></Label>
@@ -716,7 +750,7 @@ export default function PriceColor() {
             </div>
 
             <div className="space-y-2">
-              <Label>السعر بالمتر/لوح <span className="text-red-500">*</span></Label>
+              <Label>السعر بالمتر/لوح ($) <span className="text-red-500">*</span></Label>
               <Input
                 type="number"
                 value={formData.price_per_meter || ""}

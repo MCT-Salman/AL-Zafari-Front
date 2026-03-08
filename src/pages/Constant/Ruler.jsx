@@ -345,11 +345,11 @@ export default function Ruler() {
         />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        {/* <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {mainStats.map((stat) => (
             <StatsCard key={stat.id} {...stat} />
           ))}
-        </div>
+        </div> */}
 
         {/* Rulers Table Card */}
         <Card className="p-6">
