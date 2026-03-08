@@ -120,6 +120,11 @@ export default function ProductionManager() {
         { value: TypeItem.Machine, label: "مكنة" },
         { value: TypeItem.Presser, label: "كوي" }
     ];
+    const formatTypeItem = (value) => {
+        if (value === TypeItem.Machine) return "مكنة";
+        if (value === TypeItem.Presser) return "كوي";
+        return "-";
+    };
 
     const STATUS_OPTIONS = [
         { value: ProductionStatus.pending, label: "قيد الانتظار" },
@@ -134,7 +139,7 @@ export default function ProductionManager() {
         ruler_id: "",
         color_id: "",
         batch_id: "",
-        type_item: TypeItem.Machine,
+        type_item: "",
         thickness: "0.6",
         notes: "",
         status: ProductionStatus.pending
@@ -210,6 +215,13 @@ export default function ProductionManager() {
         }
     }, [formData.material_id]);
 
+    const isSelectedMaterialPvc = useMemo(() => {
+        if (!formData.material_id) return false;
+        const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
+        const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
+        return materialName.includes("pvc");
+    }, [formData.material_id, materials]);
+
     const loadProductionOrders = async () => {
         try {
             setLoadingOrders(true);
@@ -245,6 +257,7 @@ export default function ProductionManager() {
             if (field === "material_id") {
                 next.ruler_id = "";
                 next.color_id = "";
+                next.type_item = "";
             }
             if (field === "ruler_id") {
                 next.color_id = "";
@@ -330,7 +343,7 @@ export default function ProductionManager() {
                 date: productionApi.getFormattedDate(order.created_at),
                 issued_by: productionApi.formatIssuedBy(order.issued_by),
                 color: `${order.color_name || "-"} (${order.color_code || "-"})`,
-                type_item: order.type_item === TypeItem.Machine ? "مكنة" : "كوي",
+                type_item: formatTypeItem(order.type_item),
                 thickness: order.thickness ?? "-",
                 batch: order.batch_number || "-",
                 status: statusBadge?.label || "-",
@@ -443,6 +456,10 @@ export default function ProductionManager() {
             toast.error("يرجى اختيار المادة والمسطرة واللون ");
             return;
         }
+        if (isSelectedMaterialPvc && !formData.type_item) {
+            toast.error("يرجى اختيار النوع");
+            return;
+        }
 
         try {
             setLoading(true);
@@ -456,8 +473,8 @@ export default function ProductionManager() {
 
             const orderData = {
                 color_id: Number(formData.color_id),
-                batch_id: Number(formData.batch_id),
-                type_item: formData.type_item,
+                batch_id: formData.batch_id ? Number(formData.batch_id) : "",
+                type_item: formData.type_item || "",
                 thickness: Number(formData.thickness),
                 notes: formData.notes || "",
                 status: formData.status || ProductionStatus.pending,
@@ -482,7 +499,7 @@ export default function ProductionManager() {
                 ruler_id: "",
                 color_id: "",
                 batch_id: "",
-                type_item: TypeItem.Machine,
+                type_item: "",
                 thickness: "0.6",
                 notes: "",
                 status: ProductionStatus.pending
@@ -843,27 +860,29 @@ export default function ProductionManager() {
                                 </div>
                             )}
 
-                            <div className="flex-shrink-0 p-3 border-b-2 border-dashed border-gray-300">
-                                <div className="grid grid-cols-2 gap-3">
-                                    {TYPE_ITEM_OPTIONS.map(option => (
-                                        <button
-                                            key={option.value}
-                                            onClick={() => handleFieldChange("type_item", option.value)}
-                                            className={`
-                                                rounded-xl border-3 text-base font-medium
-                                                transition-all touch-manipulation hover:scale-105 active:scale-95
-                                                flex items-center justify-center p-2
-                                                ${formData.type_item === option.value
-                                                    ? "border-primary-f bg-primary-f text-white shadow-lg"
-                                                    : "border-gray-300 bg-white hover:border-secondary-s"
-                                                }
-                                            `}
-                                        >
-                                            {option.label}
-                                        </button>
-                                    ))}
+                            {isSelectedMaterialPvc && (
+                                <div className="flex-shrink-0 p-3 border-b-2 border-dashed border-gray-300">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {TYPE_ITEM_OPTIONS.map(option => (
+                                            <button
+                                                key={option.value}
+                                                onClick={() => handleFieldChange("type_item", option.value)}
+                                                className={`
+                                                    rounded-xl border-3 text-base font-medium
+                                                    transition-all touch-manipulation hover:scale-105 active:scale-95
+                                                    flex items-center justify-center p-2
+                                                    ${formData.type_item === option.value
+                                                        ? "border-primary-f bg-primary-f text-white shadow-lg"
+                                                        : "border-gray-300 bg-white hover:border-secondary-s"
+                                                    }
+                                                `}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div className="p-3 border-b-2 border-dashed border-gray-300">
                                 <Label className="font-bold text-sm mb-2 block">
@@ -1051,7 +1070,7 @@ export default function ProductionManager() {
                                         <div className="text-xs space-y-1">
                                             <div>اللون: {colors.find(c => String(c.color_id) === formData.color_id)?.color_name || '-'}</div>
                                             <div>الطبخة: {batches.find(b => String(b.batch_id) === formData.batch_id)?.batch_number || '-'}</div>
-                                            <div>النوع: {formData.type_item === TypeItem.Machine ? 'مكنة' : 'كوي'}</div>
+                                            <div>النوع: {formatTypeItem(formData.type_item)}</div>
                                             <div>السماكة: {formData.thickness} مم</div>
                                             <div>عدد العناصر: {productionItems.length}</div>
                                         </div>
@@ -1269,7 +1288,7 @@ export default function ProductionManager() {
                                                     <td className="p-2 text-sm">{productionApi.formatIssuedBy(order.issued_by)}</td>
                                                     <td className="p-2 text-sm">{order.color_name} ({order.color_code})</td>
                                                     <td className="p-2 text-center text-sm">
-                                                        {order.type_item === TypeItem.Machine ? 'مكنة' : 'كوي'}
+                                                        {formatTypeItem(order.type_item)}
                                                     </td>
                                                     <td className="p-2 text-center text-sm">{order.thickness} مم</td>
                                                     <td className="p-2 text-center text-sm">{order.batch_number || '-'}</td>
@@ -1339,7 +1358,7 @@ export default function ProductionManager() {
                         <div className="bg-gray-50 p-2 rounded-lg">
                             <div className="text-xs text-gray-500">النوع</div>
                             <div className="font-bold text-sm">
-                                {formData.type_item === TypeItem.Machine ? 'مكنة' : 'كوي'}
+                                {formatTypeItem(formData.type_item)}
                             </div>
                         </div>
                         <div className="bg-gray-50 p-2 rounded-lg">
@@ -1429,7 +1448,7 @@ export default function ProductionManager() {
                             <div className="bg-gray-50 p-2 rounded-lg">
                                 <div className="text-xs text-gray-500">النوع</div>
                                 <div className="font-bold text-sm">
-                                    {selectedOrder.type_item === TypeItem.Machine ? 'مكنة' : 'كوي'}
+                                    {formatTypeItem(selectedOrder.type_item)}
                                 </div>
                             </div>
                             <div className="bg-gray-50 p-2 rounded-lg">

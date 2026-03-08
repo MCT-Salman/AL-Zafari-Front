@@ -56,7 +56,7 @@ export const invoiceApi = {
         items: (invoiceData.items || []).map((it) => ({
           ...it,
           color_id: it.color_id ? Number(it.color_id) : null,
-          batch_id: it.batch_id ? Number(it.batch_id) : null,
+          batch_id: it.batch_id === "" ? "" : (it.batch_id ? Number(it.batch_id) : null),
           width: it.width !== undefined ? Number(it.width) : 0,
           length: it.length !== undefined ? Number(it.length) : 0,
           thickness: it.thickness !== undefined ? Number(it.thickness) : 0,
@@ -102,7 +102,7 @@ export const invoiceApi = {
         items: (invoiceData.items || []).map((it) => ({
           ...it,
           color_id: it.color_id ? Number(it.color_id) : null,
-          batch_id: it.batch_id ? Number(it.batch_id) : null,
+          batch_id: it.batch_id === "" ? "" : (it.batch_id ? Number(it.batch_id) : null),
           width: it.width !== undefined ? Number(it.width) : 0,
           length: it.length !== undefined ? Number(it.length) : 0,
           thickness: it.thickness !== undefined ? Number(it.thickness) : 0,

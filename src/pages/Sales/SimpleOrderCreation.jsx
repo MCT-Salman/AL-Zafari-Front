@@ -89,7 +89,7 @@ export default function SimpleOrderCreation() {
     // Form State
     const [formData, setFormData] = useState({
         material_id: "",
-        type_item: TypeItem.Machine,
+        type_item: "",
         ruler_id: "",
         color_id: "",
         batch_id: "",
@@ -179,6 +179,11 @@ export default function SimpleOrderCreation() {
         { value: TypeItem.Machine, label: "مكنة" },
         { value: TypeItem.Presser, label: "كوي" }
     ];
+    const formatTypeItem = (value) => {
+        if (value === TypeItem.Machine) return "مكنة";
+        if (value === TypeItem.Presser) return "كوي";
+        return "-";
+    };
 
     const CUSTOMER_OPTIONS = [
         { value: "none", label: "بدون زبون", icon: UserX },
@@ -529,6 +534,12 @@ export default function SimpleOrderCreation() {
         const boardKeywords = ["لوح", "ألواح", "board", "boards", "لوحة", "الواح"];
         return boardKeywords.some(keyword => materialName.includes(keyword));
     }, [formData.material_id, materials]);
+    const isSelectedMaterialPvc = useMemo(() => {
+        if (!formData.material_id) return false;
+        const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
+        const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
+        return materialName.includes("pvc");
+    }, [formData.material_id, materials]);
 
     // Filters
     const availableRulers = useMemo(() => {
@@ -554,7 +565,7 @@ export default function SimpleOrderCreation() {
             return filteredColors.filter(color =>
                 priceColors.some(pc =>
                     String(pc.color_id) === String(color.color_id) &&
-                    pc.type_item === formData.type_item
+                    (!isSelectedMaterialPvc || pc.type_item === formData.type_item)
                 )
             );
         }
@@ -565,14 +576,14 @@ export default function SimpleOrderCreation() {
         return filteredColors.filter(color => {
             return priceColors.some(pc =>
                 String(pc.color_id) === String(color.color_id) &&
-                pc.type_item === formData.type_item &&
+                (!isSelectedMaterialPvc || pc.type_item === formData.type_item) &&
                 (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
                  pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
                  pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
                  pc.price_color_By === PriceColorBy.isByBlanck)
             );
         });
-    }, [formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, colors, priceColors]);
+    }, [formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, isSelectedMaterialPvc, colors, priceColors]);
 
     const filteredColorsBySearch = useMemo(() => {
         if (!colorSearchCode || numpadMode !== "colorSearch") return availablePricedColors;
@@ -591,7 +602,7 @@ export default function SimpleOrderCreation() {
         if (isSelectedMaterialBoard) {
             return priceColors.some(pc =>
                 String(pc.color_id) === String(formData.color_id) &&
-                pc.type_item === formData.type_item
+                (!isSelectedMaterialPvc || pc.type_item === formData.type_item)
             );
         }
 
@@ -600,13 +611,13 @@ export default function SimpleOrderCreation() {
 
         return priceColors.some(pc =>
             String(pc.color_id) === String(formData.color_id) &&
-            pc.type_item === formData.type_item &&
+            (!isSelectedMaterialPvc || pc.type_item === formData.type_item) &&
             (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
              pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
              pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
              pc.price_color_By === PriceColorBy.isByBlanck)
         );
-    }, [formData.color_id, formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, priceColors]);
+    }, [formData.color_id, formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, isSelectedMaterialPvc, priceColors]);
 
     const getColorPricingStatus = (colorId) => {
         if (!priceColors || priceColors.length === 0) return { priced: true, label: "" };
@@ -614,7 +625,7 @@ export default function SimpleOrderCreation() {
         if (isSelectedMaterialBoard) {
             const isPriced = priceColors.some(pc =>
                 String(pc.color_id) === String(colorId) &&
-                pc.type_item === formData.type_item
+                (!isSelectedMaterialPvc || pc.type_item === formData.type_item)
             );
             return { priced: isPriced, label: isPriced ? "" : " (غير مسعر)" };
         }
@@ -624,7 +635,7 @@ export default function SimpleOrderCreation() {
         const targetWidth = Number(formData.width);
         const isPriced = priceColors.some(pc =>
             String(pc.color_id) === String(colorId) &&
-            pc.type_item === formData.type_item &&
+            (!isSelectedMaterialPvc || pc.type_item === formData.type_item) &&
             (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
              pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
              pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
@@ -641,6 +652,7 @@ export default function SimpleOrderCreation() {
                 newData.ruler_id = "";
                 newData.color_id = "";
                 newData.width = "";
+                newData.type_item = "";
             } else if (field === "ruler_id") {
                 newData.color_id = "";
             } else if (field === "width") {
@@ -707,6 +719,11 @@ export default function SimpleOrderCreation() {
             return;
         }
 
+        if (isSelectedMaterialPvc && !formData.type_item) {
+            toast.error("يرجى اختيار النوع");
+            return;
+        }
+
         if (!isSelectedMaterialBoard && !formData.width) {
             toast.error("يرجى اختيار العرض");
             return;
@@ -725,7 +742,7 @@ export default function SimpleOrderCreation() {
         const newItemBase = {
             id: editingItemId || Date.now(),
             material_id: formData.material_id,
-            type_item: formData.type_item,
+            type_item: formData.type_item || "",
             ruler_id: formData.ruler_id,
             color_id: formData.color_id,
             batch_id: formData.batch_id,
@@ -761,7 +778,7 @@ export default function SimpleOrderCreation() {
         setFormData(prev => ({
             material_id: prev.material_id,
             thickness: "0.6",
-            type_item: TypeItem.Machine,
+            type_item: "",
             ruler_id: "",
             color_id: "",
             batch_id: "",
@@ -776,7 +793,7 @@ export default function SimpleOrderCreation() {
     const handleEditItem = (item) => {
         setFormData({
             material_id: String(item.material_id),
-            type_item: item.type_item,
+            type_item: item.type_item || "",
             ruler_id: String(item.ruler_id),
             color_id: String(item.color_id),
             batch_id: item.batch_id ? String(item.batch_id) : "",
@@ -872,7 +889,7 @@ export default function SimpleOrderCreation() {
                 const local = {
                     id: Date.now() + idx,
                     material_id: rawMaterialId ? String(rawMaterialId) : "",
-                    type_item: it.type_item ?? it.typeItem ?? TypeItem.Machine,
+                    type_item: it.type_item ?? it.typeItem ?? "",
                     ruler_id: rawRulerId ? String(rawRulerId) : "",
                     color_id: resolvedColorId ? String(resolvedColorId) : "",
                     batch_id: rawBatchId ? String(rawBatchId) : "",
@@ -902,7 +919,7 @@ export default function SimpleOrderCreation() {
                 quantity: "",
                 notes: "",
                 thickness: mappedItems[0]?.thickness || prev.thickness,
-                type_item: TypeItem.Machine,
+                type_item: "",
                 batch_id: "",
             }));
 
@@ -921,7 +938,7 @@ export default function SimpleOrderCreation() {
             setFormData(prev => ({
                 material_id: prev.material_id,
                 thickness: "0.6",
-                type_item: TypeItem.Machine,
+                type_item: "",
                 ruler_id: "",
                 color_id: "",
                 batch_id: "",
@@ -944,11 +961,11 @@ export default function SimpleOrderCreation() {
             setLoading(true);
             
             const items = orderItems.map(item => ({
-                type_item: item.type_item,
+                type_item: item.type_item || "",
                 color_id: Number(item.color_id),
                 width: Number(item.width) || 0,
                 thickness: Number(item.thickness ?? formData.thickness ?? 0.6),
-                batch_id: item.batch_id ? Number(item.batch_id) : null,
+                batch_id: item.batch_id ? Number(item.batch_id) : "",
                 quantity: Number(item.quantity),
                 notes: item.notes || ""
             }));
@@ -1021,7 +1038,7 @@ export default function SimpleOrderCreation() {
             setFormData(prev => ({
                 material_id: prev.material_id,
                 thickness: "0.6",
-                type_item: TypeItem.Machine,
+                type_item: "",
                 ruler_id: "",
                 color_id: "",
                 batch_id: "",
@@ -1038,7 +1055,7 @@ export default function SimpleOrderCreation() {
         setFormData(prev => ({
             material_id: prev.material_id,
             thickness: "0.6",
-            type_item: TypeItem.Machine,
+            type_item: "",
             ruler_id: "",
             color_id: "",
             batch_id: "",
@@ -1374,7 +1391,7 @@ export default function SimpleOrderCreation() {
                                 </div>
                             )}
 
-                            {!isSelectedMaterialBoard && (
+                            {isSelectedMaterialPvc && (
                                 <div className="flex-shrink-0 p-3 border-b-2 border-dashed border-gray-300">
                                     {/* <Label className="font-bold text-sm mb-2 block">نوع الطلب</Label> */}
                                     <div className="grid grid-cols-2 gap-3">
@@ -1800,7 +1817,7 @@ export default function SimpleOrderCreation() {
                                                             <td className="p-2">{item.ruler_name}</td>
                                                             <td className="p-2">{item.color_name}</td>
                                                             <td className="p-2 text-center">
-                                                                {item.type_item === TypeItem.Machine ? "مكنة" : "كوي"}
+                                                                {formatTypeItem(item.type_item)}
                                                             </td>
                                                             <td className="p-2 text-center font-bold">{item.quantity} م</td>
                                                             <td className="p-2 text-center">{item.thickness || "0.6"}</td>
@@ -1892,7 +1909,7 @@ export default function SimpleOrderCreation() {
                                                         {item.color_name}
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
-                                                        {item.type_item === TypeItem.Machine ? "مكنة" : "كوي"}
+                                                        {formatTypeItem(item.type_item)}
                                                     </td>
                                                     <td className="p-1 text-center font-bold text-sm">
                                                         {item.quantity} م
@@ -2258,11 +2275,11 @@ export default function SimpleOrderCreation() {
                                             <td className="p-3 font-medium">{item.material_name || 'غير محدد'}</td>
                                             <td className="p-3 text-center">
                                                 <span className={`px-2 py-1 rounded-full text-xs ${
-                                                    item.type_item === 'Machine' 
-                                                        ? 'bg-purple-100 text-purple-700' 
-                                                        : 'bg-green-100 text-green-700'
+                                                    item.type_item
+                                                        ? 'bg-purple-100 text-purple-700'
+                                                        : 'bg-gray-100 text-gray-600'
                                                 }`}>
-                                                    {item.type_item === 'Machine' ? 'مكنة' : 'كوي'}
+                                                    {formatTypeItem(item.type_item)}
                                                 </span>
                                             </td>
                                             <td className="p-3 text-center">
