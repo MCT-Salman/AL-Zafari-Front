@@ -1743,6 +1743,7 @@ export default function InvoiceManager() {
                                             onSearchValueChange={(v) => setColorSearchCode(v)}
                                             keepOpen={activeTextTarget === "color_search"}
                                             disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
+                                            showSelectedImage={true}
                                             options={colorOptions}
                                             placeholder={
                                                 !formData.ruler_id

@@ -23,6 +23,7 @@ const FilterSelect = ({
   className = "",
   disabled = false,
   keepOpen = false,
+  showSelectedImage = false,
   placeholder = "ابحث أو اختر...",
 }) => {
   const selectId = useId();
@@ -115,6 +116,14 @@ const FilterSelect = ({
   const inputText = isOpen
     ? effectiveSearchTerm
     : String(selectedOption?.label ?? (normalizedValue ? normalizedValue : ""));
+  const selectedOptionImage =
+    showSelectedImage && selectedOption
+      ? selectedOption.imageUrl ||
+        selectedOption.image_url ||
+        selectedOption.image ||
+        selectedOption.color_image ||
+        null
+      : null;
 
   return (
     <div ref={wrapperRef} className={`group relative w-full ${className}`}>
@@ -139,8 +148,17 @@ const FilterSelect = ({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="h-[52px] w-full rounded-md border border-primary-f bg-primary-s py-2 pl-10 pr-10 text-right text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+          className={`h-[52px] w-full rounded-md border border-primary-f bg-primary-s py-2 text-right text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 ${
+            selectedOptionImage ? "pl-16 pr-10" : "pl-10 pr-10"
+          }`}
         />
+        {selectedOptionImage && (
+          <img
+            src={selectedOptionImage}
+            alt=""
+            className="pointer-events-none absolute left-9 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full border border-gray-200 object-cover"
+          />
+        )}
         <button
           type="button"
           onClick={() => {

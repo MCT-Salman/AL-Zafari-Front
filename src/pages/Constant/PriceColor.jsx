@@ -36,6 +36,12 @@ import PaginationControls from "../../components/common/PaginationControls";
 import { getApiData } from "../../utils/api";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+const resolveColorImage = (color) => {
+  if (!color) return null;
+  const raw = color.imageUrl || color.image_url || color.color_image || null;
+  if (!raw) return null;
+  return raw.startsWith("http") ? raw : `${API_BASE_URL}${raw}`;
+};
 
 export default function PriceColor() {
   // Create adapter to map generic CRUD method names to priceColorApi method names
@@ -469,9 +475,14 @@ export default function PriceColor() {
               label="اللون"
               value={selectedColorId}
               onChange={(e) => setSelectedColorId(e.target.value)}
+              showSelectedImage={true}
               options={[
                 { value: "", label: "جميع الألوان" },
-                ...sortedColors.map(c => ({ value: c.color_id.toString(), label: c.color_name }))
+                ...sortedColors.map(c => ({
+                  value: c.color_id.toString(),
+                  label: c.color_name,
+                  imageUrl: resolveColorImage(c),
+                }))
               ]}
             />
 
@@ -556,9 +567,18 @@ export default function PriceColor() {
                     {paginatedPriceColors.map((priceColor) => (
                       <TableRow key={priceColor.price_color_id}>
                         <TableCell className="font-medium">
-                          <div>
-                            <div>{priceColorApi.getColorName(priceColor)}</div>
-                            <div className="text-xs text-gray-500">{priceColorApi.getColorCode(priceColor)}</div>
+                          <div className="flex items-center gap-2">
+                            {resolveColorImage(priceColor?.color) && (
+                              <img
+                                src={resolveColorImage(priceColor?.color)}
+                                alt=""
+                                className="h-7 w-7 rounded-full border border-gray-200 object-cover"
+                              />
+                            )}
+                            <div>
+                              <div>{priceColorApi.getColorName(priceColor)}</div>
+                              <div className="text-xs text-gray-500">{priceColorApi.getColorCode(priceColor)}</div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -642,7 +662,28 @@ export default function PriceColor() {
         fields={
           modalState.mode === "view"
             ? [
-              { key: "color_name", label: "اللون", formatValue: () => priceColorApi.getColorName(selectedItem) },
+              {
+                key: "color_name",
+                label: "اللون",
+                formatValue: () => {
+                  const color = selectedItem?.color;
+                  const imageUrl = resolveColorImage(color);
+                  const name = priceColorApi.getColorName(selectedItem);
+                  const code = priceColorApi.getColorCode(selectedItem);
+                  return (
+                    <div className="flex items-center gap-2">
+                      {imageUrl && (
+                        <img
+                          src={imageUrl}
+                          alt=""
+                          className="h-7 w-7 rounded-full border border-gray-200 object-cover"
+                        />
+                      )}
+                      <span>{`${name} (${code})`}</span>
+                    </div>
+                  );
+                }
+              },
               { key: "ruler_name", label: "المسطرة", formatValue: () => priceColorApi.getRulerName(selectedItem) },
               { key: "material_name", label: "المادة", formatValue: () => priceColorApi.getMaterialName(selectedItem) },
               ...(priceColorApi.getMaterialName(selectedItem || {}).toLowerCase().includes("pvc")
@@ -708,19 +749,14 @@ export default function PriceColor() {
                 value={formData.color_id?.toString() || ""}
                 onChange={(e) => setFormData({ ...formData, color_id: e.target.value })}
                 disabled={!formData.ruler_id}
+                showSelectedImage={true}
                 options={colors
                   .filter((c) => c.ruler_id?.toString() === formData.ruler_id?.toString())
-                  .map((color) => {
-                    const rawImage = color.imageUrl || color.image_url || color.color_image || null;
-                    const resolvedImage = rawImage
-                      ? (rawImage.startsWith("http") ? rawImage : `${API_BASE_URL}${rawImage}`)
-                      : null;
-                    return {
-                      value: color.color_id.toString(),
-                      label: `${color.color_name} (${color.color_code})`,
-                      imageUrl: resolvedImage,
-                    };
-                  })}
+                  .map((color) => ({
+                    value: color.color_id.toString(),
+                    label: `${color.color_name} (${color.color_code})`,
+                    imageUrl: resolveColorImage(color),
+                  }))}
                 placeholder={!formData.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"}
               />
             </div>

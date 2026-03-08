@@ -927,6 +927,7 @@ export default function ProductionManager() {
                                         onSearchValueChange={(v) => setColorSearchCode(v)}
                                         onInputFocus={() => setActiveTextTarget("color_search")}
                                         keepOpen={activeTextTarget === "color_search"}
+                                        showSelectedImage={true}
                                         options={colorOptions}
                                         placeholder={
                                             !formData.ruler_id

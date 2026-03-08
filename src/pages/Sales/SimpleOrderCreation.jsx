@@ -1482,6 +1482,7 @@ export default function SimpleOrderCreation() {
                                                 setActiveTextTarget("color_search");
                                             }}
                                             keepOpen={activeTextTarget === "color_search"}
+                                            showSelectedImage={true}
                                             options={colorOptions}
                                             placeholder={
                                                 !formData.ruler_id
