@@ -1,12 +1,15 @@
 // src/pages/Sales/SalesHome.jsx
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { orderApi } from "../../api/orderApi";
 import { customerApi } from "../../api/customerApi";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
+import DashboardHeader from "../../components/common/DashboardHeader";
 import PageHeader from "../../components/common/PageHeader";
 import MessageAlert from "../../components/common/MessageAlert";
 import LoadingState from "../../components/common/LoadingState";
+import { useAuth } from "../../context/AuthContext";
 import { getApiData } from "../../utils/api";
 import { ClipboardList, User, ShoppingCart, Plus } from "lucide-react";
 
@@ -15,6 +18,10 @@ export default function SalesHome() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   useEffect(() => {
     const loadData = async () => {
@@ -71,7 +78,7 @@ export default function SalesHome() {
           </div>
           <Button
             className="h-12 text-lg"
-            onClick={() => window.location.href = "/orders"}
+            onClick={() => navigate("/orders")}
           >
             فتح شاشة الطلبات
           </Button>
@@ -88,7 +95,7 @@ export default function SalesHome() {
           <Button
             variant="outline"
             className="h-12 text-lg"
-            onClick={() => window.location.href = "/customers"}
+            onClick={() => navigate("/customers")}
           >
             إدارة العملاء
           </Button>
@@ -104,7 +111,7 @@ export default function SalesHome() {
           </div>
           <Button
             className="h-12 text-lg bg-green-600 hover:bg-green-700"
-            onClick={() => window.location.href = "/orders"}
+            onClick={() => navigate("/orders")}
           >
             <Plus className="w-5 h-5 ml-2" />
             إنشاء طلب

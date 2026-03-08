@@ -1,5 +1,5 @@
 // src/pages/Production/ProductionManager.jsx
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { productionApi } from "../../api/productionApi";
 import { colorApi } from "../../api/colorApi";
@@ -175,12 +175,20 @@ export default function ProductionManager() {
             setColors(getApiData(colorRes, []) || []);
             setBatches(getApiData(batchRes, []) || []);
             const allMaterials = getApiData(materialRes, []) || [];
-            setMaterials(
-                allMaterials.filter(m =>
-                    String(m?.material_name || "").toLowerCase().includes("pvc")
-                )
+            const filteredMaterials = allMaterials.filter(m =>
+                String(m?.material_name || "").toLowerCase().includes("pvc")
             );
+            setMaterials(filteredMaterials);
             setRulers(getApiData(rulerRes, []) || []);
+
+            // تحديد أول مادة مفلترة تلقائياً
+            if (filteredMaterials.length > 0) {
+                const firstMaterial = filteredMaterials[0];
+                setFormData(prev => ({
+                    ...prev,
+                    material_id: String(firstMaterial.material_id)
+                }));
+            }
 
         } catch (error) {
             // console.error("Error loading data:", error);
@@ -215,12 +223,22 @@ export default function ProductionManager() {
         }
     }, [formData.material_id]);
 
+    const selectedMaterial = useMemo(() => {
+        if (!formData.material_id) return null;
+        return materials.find(m => String(m.material_id) === String(formData.material_id)) || null;
+    }, [formData.material_id, materials]);
     const isSelectedMaterialPvc = useMemo(() => {
         if (!formData.material_id) return false;
-        const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
         return materialName.includes("pvc");
-    }, [formData.material_id, materials]);
+    }, [formData.material_id, materials, selectedMaterial]);
+    const getMaterialConstantLabel = useCallback((material, type) => {
+        const values = material?.constant_values || [];
+        const candidates = values.filter(v => v.type === type);
+        const pick = candidates.find(v => v.isDefault) || candidates[0];
+        if (!pick) return "-";
+        return pick.label || `${pick.value ?? ""} ${pick.unit || ""}`.trim();
+    }, []);
 
     const loadProductionOrders = async () => {
         try {
@@ -253,16 +271,20 @@ export default function ProductionManager() {
 
     const handleFieldChange = (field, value) => {
         setFormData(prev => {
-            const next = { ...prev, [field]: value };
+            const newData = { ...prev, [field]: value };
+
             if (field === "material_id") {
-                next.ruler_id = "";
-                next.color_id = "";
-                next.type_item = "";
+                newData.ruler_id = "";
+                newData.color_id = "";
+                newData.batch_id = "";
+            } else if (field === "ruler_id") {
+                newData.color_id = "";
+                newData.batch_id = "";
+            } else if (field === "color_id") {
+                newData.batch_id = "";
             }
-            if (field === "ruler_id") {
-                next.color_id = "";
-            }
-            return next;
+
+            return newData;
         });
     };
 
@@ -270,7 +292,7 @@ export default function ProductionManager() {
         setCurrentItem(prev => ({ ...prev, [field]: value }));
     };
 
-    const handleNumpadPress = (val) => {
+    const handleNumpadPress = useCallback((val) => {
         if (activeTextTarget) {
             const apply = (prev) => {
                 let next = String(prev || "");
@@ -282,35 +304,21 @@ export default function ProductionManager() {
 
             if (activeTextTarget === "color_search") {
                 setColorSearchCode((prev) => apply(prev));
-                return;
-            }
-
-            if (activeTextTarget === "batch_search") {
+            } else if (activeTextTarget === "batch_search") {
                 setBatchSearchTerm((prev) => apply(prev));
-                return;
             }
         }
-
-        let current = String(currentItem[activeField] || "");
-        if (val === "clear") current = "";
-        else if (val === "back") current = current.slice(0, -1);
-        else if (val === ".") {
-            if (!current.includes(".")) current = current ? current + "." : "0.";
-        } else {
-            current = current + val;
-        }
-        setCurrentItem(prev => ({ ...prev, [activeField]: current }));
-    };
+    }, [activeTextTarget]);
 
     const filteredProductionOrders = useMemo(() => {
         if (!searchTerm) return productionOrders;
         const term = searchTerm.toLowerCase();
         return productionOrders.filter(order =>
             String(order.production_order_id).includes(term) ||
-            order.issued_by?.full_name?.toLowerCase().includes(term) ||
             order.issued_by?.username?.toLowerCase().includes(term) ||
             order.color_name?.toLowerCase().includes(term) ||
             order.color_code?.toLowerCase().includes(term) ||
+            order.batch?.batch_number?.toLowerCase().includes(term) ||
             order.batch_number?.toLowerCase().includes(term) ||
             order.status?.toLowerCase().includes(term) ||
             order.material_name?.toLowerCase().includes(term) ||
@@ -345,7 +353,7 @@ export default function ProductionManager() {
                 color: `${order.color_name || "-"} (${order.color_code || "-"})`,
                 type_item: formatTypeItem(order.type_item),
                 thickness: order.thickness ?? "-",
-                batch: order.batch_number || "-",
+                batch: order.batch?.batch_number || order.batch_number || "-",
                 status: statusBadge?.label || "-",
                 notes: order.notes || "",
             };
@@ -564,9 +572,15 @@ export default function ProductionManager() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const availableRulers = useMemo(() => rulers, [rulers]);
+    const availableRulers = useMemo(() => {
+        if (!formData.material_id) return rulers;
+        return rulers.filter(r => String(r.material_id) === String(formData.material_id));
+    }, [rulers, formData.material_id]);
 
-    const availableColors = useMemo(() => colors, [colors]);
+    const availableColors = useMemo(() => {
+        if (!formData.ruler_id) return colors;
+        return colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
+    }, [colors, formData.ruler_id]);
 
     const filteredColorsBySearch = useMemo(() => {
         if (!colorSearchCode) return availableColors;
@@ -613,8 +627,8 @@ export default function ProductionManager() {
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <div className="relative flex-shrink-0">
-                {isHeaderVisible && (
+            {isHeaderVisible && (
+                <div className="relative flex-shrink-0">
                     <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
                         <div className="flex flex-wrap gap-3">
                             <Button
@@ -643,33 +657,6 @@ export default function ProductionManager() {
                             </Button>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {/* <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/orders")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <ShoppingCart className="w-5 h-5 ml-2" />
-                                الطلبات
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/customers")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <Users className="w-5 h-5 ml-2" />
-                                الزبائن
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/dashboard")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <Home className="w-5 h-5 ml-2" />
-                                الرئيسية
-                            </Button> */}
                             <Button
                                 size="lg"
                                 variant="outline"
@@ -698,21 +685,21 @@ export default function ProductionManager() {
                             </Button>
                         </div>
                     </div>
-                )}
-                {!isHeaderVisible && (
-                    <div className="absolute top-2 right-2 z-20">
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => setIsHeaderVisible(true)}
-                            className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f hover:bg-secondary-f shadow-lg touch-manipulation"
-                        >
-                            <Eye className="w-5 h-5 ml-2" />
-                            إظهار الهيدر
-                        </Button>
-                    </div>
-                )}
-            </div>
+                </div>
+            )}
+            {!isHeaderVisible && (
+                <div className="absolute top-2 right-2 z-20">
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={() => setIsHeaderVisible(true)}
+                        className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f hover:bg-secondary-f shadow-lg touch-manipulation"
+                    >
+                        <Eye className="w-5 h-5 ml-2" />
+                        إظهار الهيدر
+                    </Button>
+                </div>
+            )}
 
             {/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
@@ -864,6 +851,7 @@ export default function ProductionManager() {
                                 </div>
                             )}
 
+                            
                             {isSelectedMaterialPvc && (
                                 <div className="flex-shrink-0 p-3 border-b-2 border-dashed border-gray-300">
                                     <div className="grid grid-cols-2 gap-3">
@@ -1295,7 +1283,7 @@ export default function ProductionManager() {
                                                         {formatTypeItem(order.type_item)}
                                                     </td>
                                                     <td className="p-2 text-center text-sm">{order.thickness} مم</td>
-                                                    <td className="p-2 text-center text-sm">{order.batch_number || '-'}</td>
+                                                    <td className="p-2 text-center text-sm">{order.batch?.batch_number || order.batch_number || '-'}</td>
                                                     <td className="p-2 text-center">
                                                         <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
                                                             {statusBadge.label}
@@ -1447,7 +1435,7 @@ export default function ProductionManager() {
                             </div>
                             <div className="bg-gray-50 p-2 rounded-lg">
                                 <div className="text-xs text-gray-500">رقم الطبخة</div>
-                                <div className="font-bold text-sm">{selectedOrder.batch_number || '-'}</div>
+                                <div className="font-bold text-sm">{selectedOrder.batch?.batch_number || selectedOrder.batch_number || '-'}</div>
                             </div>
                             <div className="bg-gray-50 p-2 rounded-lg">
                                 <div className="text-xs text-gray-500">النوع</div>

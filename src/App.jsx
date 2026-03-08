@@ -28,10 +28,17 @@ const RouteFallback = () => (
   </div>
 );
 
+const DefaultRoute = () => {
+  const { user } = useAuth();
+  const target = user?.role === 'production_manager' ? "/production" : "/dashboard";
+  return <Navigate to={target} replace />;
+};
+
 // Dashboard switcher based on role
 const DashboardSwitcher = () => {
   const { user } = useAuth();
   if (user?.role === 'sales') return <SalesHome />;
+  if (user?.role === 'production_manager') return <Navigate to="/production" replace />;
   return <Dashboard />;
 };
 
@@ -49,7 +56,7 @@ const App = () => {
 
             {/* Protected/App routes wrapped with MainLayout */}
             <Route element={<MainLayout />}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<DefaultRoute />} />
               <Route path="/dashboard" element={<DashboardSwitcher />} />
               <Route path="/profile" element={
                 <RoleProtectedRoute allowedRoles="admin">
@@ -82,8 +89,6 @@ const App = () => {
                   <CustomerManagement />
                 </RoleProtectedRoute>
               } />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Route>
               <Route path="/orders" element={
                 <RoleProtectedRoute allowedRoles="sales">
                   <OrderManagement />
@@ -99,6 +104,8 @@ const App = () => {
                   <ProductionManager />
                 </RoleProtectedRoute>
               } />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
           </Routes>
         </Suspense>
       </AuthProvider>

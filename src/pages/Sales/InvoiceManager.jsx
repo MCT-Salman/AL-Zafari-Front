@@ -46,6 +46,7 @@ import {
     Download,
     RefreshCw
 } from "lucide-react";
+import DashboardHeader from "../../components/common/DashboardHeader";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
 import toast from "react-hot-toast";
@@ -432,19 +433,28 @@ export default function InvoiceManager() {
     };
 
     // Memoized values for performance
+    const selectedMaterial = useMemo(() => {
+        if (!formData.material_id) return null;
+        return materials.find(m => String(m.material_id) === String(formData.material_id)) || null;
+    }, [formData.material_id, materials]);
     const isSelectedMaterialBoard = useMemo(() => {
         if (!formData.material_id) return false;
-        const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
         const boardKeywords = ["لوح", "ألواح", "board", "boards", "لوحة", "الواح"];
         return boardKeywords.some(keyword => materialName.includes(keyword));
-    }, [formData.material_id, materials]);
+    }, [formData.material_id, materials, selectedMaterial]);
     const isSelectedMaterialPvc = useMemo(() => {
         if (!formData.material_id) return false;
-        const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
         return materialName.includes("pvc");
-    }, [formData.material_id, materials]);
+    }, [formData.material_id, materials, selectedMaterial]);
+    const getMaterialConstantLabel = useCallback((material, type) => {
+        const values = material?.constant_values || [];
+        const candidates = values.filter(v => v.type === type);
+        const pick = candidates.find(v => v.isDefault) || candidates[0];
+        if (!pick) return "-";
+        return pick.label || `${pick.value ?? ""} ${pick.unit || ""}`.trim();
+    }, []);
 
     // Calculate price when color and quantity change
     useEffect(() => {
@@ -1317,106 +1327,47 @@ export default function InvoiceManager() {
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <div className="relative flex-shrink-0">
-                {isHeaderVisible && (
-                    <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
-                        <div className="flex flex-wrap gap-3">
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setViewMode("create")}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
-                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                    }`}
-                            >
-                                <Receipt className="w-5 h-5 ml-2" />
-                                فاتورة جديدة
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => {
-                                    setViewMode("history");
-                                    loadInvoices();
-                                    loadOrders();
-                                }}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
-                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                    }`}
-                            >
-                                <History className="w-5 h-5 ml-2" />
-                                سجل الفواتير
-                            </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/orders")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <ShoppingCart className="w-5 h-5 ml-2" />
-                                الطلبات
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/customers")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <Users className="w-5 h-5 ml-2" />
-                                الزبائن
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/dashboard")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <Home className="w-5 h-5 ml-2" />
-                                الرئيسية
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={logout}
-                                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <LogOut className="w-5 h-5 ml-2" />
-                                تسجيل الخروج
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setIsHeaderVisible(false)}
-                                className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110"
-                            >
-                                <EyeOff className="w-5 h-5" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
-                {!isHeaderVisible && (
-                    <div className="absolute top-2 right-2 z-20">
+            <DashboardHeader
+                isHeaderVisible={isHeaderVisible}
+                setIsHeaderVisible={setIsHeaderVisible}
+                leftContent={
+                    <>
                         <Button
                             size="lg"
                             variant="outline"
-                            onClick={() => setIsHeaderVisible(true)}
-                            className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f hover:bg-secondary-f shadow-lg touch-manipulation"
+                            onClick={() => setViewMode("create")}
+                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
+                                ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                }`}
                         >
-                            <Eye className="w-5 h-5 ml-2" />
-                            إظهار الهيدر
+                            <Receipt className="w-5 h-5 ml-2" />
+                            فاتورة جديدة
                         </Button>
-                    </div>
-                )}
-            </div>
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => {
+                                setViewMode("history");
+                                loadInvoices();
+                                loadOrders();
+                            }}
+                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
+                                ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                }`}
+                        >
+                            <History className="w-5 h-5 ml-2" />
+                            سجل الفواتير
+                        </Button>
+                    </>
+                }
+            />
 
             {/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
                 {viewMode === "create" ? (
-                    <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_2.2fr_1.6fr] gap-3 h-full min-h-0">
+                    <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-3 h-full min-h-0">
 
                         {/* العمود الأيمن - يتغير حسب وضع الإدخال */}
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
@@ -1641,6 +1592,26 @@ export default function InvoiceManager() {
                                     >
                                         إلغاء
                                     </button>
+                                </div>
+                            )}
+
+                            {formData.material_id && !isSelectedMaterialPvc && (
+                                <div className="bg-primary-s border border-primary-f/20 text-secondary-f text-sm p-3 rounded-lg">
+                                    <div className="font-bold mb-2">معلومات الأبعاد</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
+                                            <div className="text-xs text-secondary-t">الطول</div>
+                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "height")}</div>
+                                        </div>
+                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
+                                            <div className="text-xs text-secondary-t">العرض</div>
+                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "width")}</div>
+                                        </div>
+                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
+                                            <div className="text-xs text-secondary-t">السماكة</div>
+                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "thickness")}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -2405,15 +2376,15 @@ export default function InvoiceManager() {
                                     className="flex-1 overflow-auto min-h-0"
                                     style={{ direction: 'rtl' }}
                                 >
-                                    <table className="min-w-[1200px] w-full table-fixed border-collapse">
+                                    <table className="min-w-[750px] w-full table-fixed border-collapse">
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
                                                 <th className="p-1 text-right border-b w-[80px]">المادة</th>
-                                                <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
+                                                <th className="p-1 text-center border-b w-[55px]">العرض</th>
                                                 <th className="p-1 text-right border-b w-[90px]">اللون</th>
                                                 <th className="p-1 text-center border-b w-[45px]">النوع</th>
-                                                <th className="p-1 text-center border-b w-[55px]">العرض</th>
                                                 <th className="p-1 text-center border-b w-[55px]">الكمية</th>
+                                                <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
                                                 <th className="p-1 text-center border-b w-[70px]">السماكة</th>
                                                 <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
                                                 <th className="p-1 text-center border-b w-[80px]">سعر الوحدة</th>
@@ -2432,8 +2403,8 @@ export default function InvoiceManager() {
                                                     <td className="p-1 break-words text-sm" title={item.material_name}>
                                                         {item.material_name}
                                                     </td>
-                                                    <td className="p-1 break-words text-sm" title={item.ruler_name}>
-                                                        {item.ruler_name}
+                                                    <td className="p-1 text-center text-sm">
+                                                        {item.width || "-"}
                                                     </td>
                                                     <td className="p-1 break-words text-sm" title={item.color_name}>
                                                         {item.color_name}
@@ -2441,11 +2412,11 @@ export default function InvoiceManager() {
                                                     <td className="p-1 text-center text-sm">
                                                         {formatTypeItem(item.type_item)}
                                                     </td>
-                                                    <td className="p-1 text-center text-sm">
-                                                        {item.width || "-"}
-                                                    </td>
                                                     <td className="p-1 text-center font-bold text-sm">
                                                         {item.quantity} م
+                                                    </td>
+                                                    <td className="p-1 break-words text-sm" title={item.ruler_name}>
+                                                        {item.ruler_name}
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
                                                         {item.thickness || "0.6"} مم

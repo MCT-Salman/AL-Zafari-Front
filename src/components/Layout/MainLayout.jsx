@@ -63,108 +63,31 @@
 
 
 // src/components/Layout/MainLayout.jsx
-import { Outlet, Navigate, useLocation } from "react-router-dom";
+import { Outlet, Navigate } from "react-router-dom";
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { LayoutProvider, useLayout } from "./LayoutContext";
-import Header from "./Header";
-import Sidebar from "./Sidebar";
-import { sideData } from "@/data/sidebarData"; // بياناتك القديمة
-import IconCommon from "../IconCommon/IconCommon"; // أيقوناتك القديمة
-import { LogOut, Bell } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import DashboardHeader from "../common/DashboardHeader";
 
-import { UserRoleLabels } from "@/enums";
-
-// 1. مكون داخلي للمحتوى (لأننا نحتاج لاستخدام useLayout داخله)
-const LayoutContent = () => {
-  const { collapsed } = useLayout();
-  const { logout, user } = useAuth();
-  const location = useLocation();
-  const isOrdersPage = location.pathname === "/orders";
-
-  // تحويل بيانات الـ Sidebar الخاصة بك لتناسب المكون الجديد
-  // إذا كان للعنصر role معيّن، لن يظهر إلا للمستخدم الذي يملك نفس الدور
-  const filteredSideData = sideData.filter(item => !item.role || item.role === user?.role);
-  const navItems = filteredSideData.map(item => ({
-    title: item.title,
-    href: item.link,
-    // خدعة: نمرر الأيقونة كمكون (Function Component)
-    icon: (props) => <IconCommon icon={item.logo} size={20} {...props} />
-  }));
-
-  // زر الخروج
-  const LogoutBtn = (
-    <button
-      onClick={logout}
-      className={cn(
-        "group flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 cursor-pointer w-full",
-        "bg-secondary-s text-primary-s hover:bg-secondary-s/95 hover:text-white"
-      )}
-    >
-      <LogOut size={20} className={cn("flex-shrink-0", collapsed ? "mx-auto" : "")} />
-      {!collapsed && <span className="font-medium">تسجيل الخروج</span>}
-    </button>
-  );
-
-  return (
-    <div className="h-screen overflow-hidden bg-surface text-text-strong" dir="rtl">
-      {/* تمرير البيانات للمكونات النظيفة */}
-      <Sidebar
-        title="AL-Zafari"
-        items={navItems}
-        footerItem={LogoutBtn}
-      />
-
-      <div
-        className={cn(
-          "flex-1 flex flex-col h-screen transition-all duration-300",
-          "md:mr-64", // الهامش الافتراضي
-          collapsed && "md:mr-20" // الهامش عند التصغير
-        )}
-      >
-        <Header>
-          {/* محتوى الهيدر الخاص بك */}
-          <div className="flex items-center gap-4">
-            <Button className="relative cursor-pointer p-2 bg-primary-f border-none shadow-none hover:bg-secondary-f">
-              <Bell size={20} className="text-text-muted" />
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-primary-s"></span>
-            </Button>
-
-            <div className="flex items-center gap-3 mr-4 border-r pr-4 border-secondary-f/30">
-              <div className="hidden sm:block text-right">
-                <div className="text-sm font-bold text-text-strong">{user?.username || user?.name || "مستخدم"}</div>
-                <div className="text-[10px] text-secondary-f font-bold">
-                  {UserRoleLabels[user?.role] || user?.role || "موظف"}
-                </div>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-f to-primary-f/80 flex items-center justify-center text-white font-bold shadow-md border border-secondary-f/20">
-                {(user?.username?.[0] || user?.name?.[0] || "U").toUpperCase()}
-              </div>
-            </div>
-          </div>
-        </Header>
-
-        {/* منطقة المحتوى المتغير */}
-        <main className={cn("flex-1 min-h-0 p-4 md:p-6 mt-20", isOrdersPage ? "overflow-hidden" : "overflow-y-auto overflow-x-hidden")}>
-          <Outlet />
-        </main>
-      </div>
-    </div>
-  );
-};
-
-// 2. المكون الرئيسي الذي يغلف كل شيء بالـ Context
+// Simplified layout that only renders the shared dashboard header
+// and the routed content. The old sidebar/header system has been
+// removed per request.
 function MainLayout() {
   const { user, loading } = useAuth();
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
   if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
 
   return (
-    <LayoutProvider>
-      <LayoutContent />
-    </LayoutProvider>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <DashboardHeader
+        isHeaderVisible={isHeaderVisible}
+        setIsHeaderVisible={setIsHeaderVisible}
+      />
+      <div className="flex-1 overflow-auto">
+        <Outlet />
+      </div>
+    </div>
   );
 }
 

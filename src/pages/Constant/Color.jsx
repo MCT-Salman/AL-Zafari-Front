@@ -168,7 +168,17 @@ export default function Color() {
     }
   };
 
-  // Helper to get material name from rulers list if missing in color object
+  const getRulerNameResolved = (color) => {
+    if (color?.ruler?.ruler_name) return color.ruler.ruler_name;
+    if (color?.ruler_name) return color.ruler_name;
+    const rulerId = color?.ruler_id || color?.ruler?.ruler_id;
+    if (rulerId && rulers.length > 0) {
+      const ruler = rulers.find(r => String(r.ruler_id) === String(rulerId));
+      if (ruler?.ruler_name) return ruler.ruler_name;
+    }
+    return "غير محدد";
+  };
+  // Helper to get material name from rulers/materials list if missing in color object
   const getMaterialName = (color) => {
     // 1. Try nested structure color.ruler.material
     if (color?.ruler?.material?.material_name) return color.ruler.material.material_name;
@@ -176,9 +186,23 @@ export default function Color() {
     // 2. Try to find in rulers list
     const rulerId = color?.ruler_id || color?.ruler?.ruler_id;
     if (rulerId && rulers.length > 0) {
-      const ruler = rulers.find(r => r.ruler_id === rulerId);
+      const ruler = rulers.find(r => String(r.ruler_id) === String(rulerId));
       if (ruler?.material?.material_name) return ruler.material.material_name;
+      const materialId = ruler?.material_id;
+      if (materialId && materials.length > 0) {
+        const material = materials.find(m => String(m.material_id) === String(materialId));
+        if (material?.material_name) return material.material_name;
+      }
     }
+
+    // 3. Try to match by material_id on color (if provided)
+    const materialId = color?.material_id || color?.material?.material_id;
+    if (materialId && materials.length > 0) {
+      const material = materials.find(m => String(m.material_id) === String(materialId));
+      if (material?.material_name) return material.material_name;
+    }
+
+    if (color?.material_name) return color.material_name;
 
     return "غير محدد";
   };
@@ -196,7 +220,7 @@ export default function Color() {
     columns: [
       { key: "color_name", header: "اسم اللون" },
       { key: "color_code", header: "كود اللون" },
-      { key: "ruler_name", header: "المسطرة", format: (item) => colorApi.getRulerName(item) },
+      { key: "ruler_name", header: "المسطرة", format: (item) => getRulerNameResolved(item) },
       { key: "material_name", header: "المادة", format: (item) => getMaterialName(item) },
       { key: "notes", header: "الملاحظات" },
     ],

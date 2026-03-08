@@ -1,6 +1,7 @@
 // src/pages/Sales/SimpleOrderCreation.jsx
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import DashboardHeader from "../../components/common/DashboardHeader";
 import { orderApi } from "../../api/orderApi";
 import { customerApi } from "../../api/customerApi";
 import { materialApi } from "../../api/materialApi";
@@ -120,7 +121,8 @@ export default function SimpleOrderCreation() {
         title: "",
         colorCode: "",
         quantity: "",
-        batchNumber: ""
+        batchNumber: "",
+        footerText: ""
     });
     const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
 
@@ -375,13 +377,21 @@ export default function SimpleOrderCreation() {
     };
 
     const openQrPreview = (url, title = "", meta = {}) => {
+        // build footer line as material|colorCode|quantity|batch|type (values only)
+        const material = meta.material || "";
+        const colorCode = meta.colorCode || "";
+        const quantity = meta.quantity || "";
+        const batch = meta.batchNumber || "";
+        const typeLabel = meta.typeLabel || "";
+        const footer = [material, colorCode, quantity, batch, typeLabel].filter(v => v !== "").join("|");
         setQrPreview({
             open: true,
             url,
             title,
-            colorCode: meta.colorCode || "",
-            quantity: meta.quantity || "",
-            batchNumber: meta.batchNumber || ""
+            colorCode,
+            quantity,
+            batchNumber: batch,
+            footerText: footer
         });
     };
 
@@ -467,12 +477,13 @@ export default function SimpleOrderCreation() {
         });
     };
 
-    const printQr = (url, title = "QR") => {
+    const printQr = (url, title = "QR", footer = "") => {
         const w = window.open("", "_blank", "width=600,height=700");
         if (!w) return;
         w.document.write(`<!doctype html><html><head><title>${title}</title></head><body style="display:flex;align-items:center;justify-content:center;flex-direction:column;font-family:sans-serif;gap:12px;">
           <h3 style="margin:0;">${title}</h3>
           <img src="${url}" style="width:320px;height:320px;image-rendering:pixelated;" />
+          <div dir="ltr" style="margin-top:8px;font-size:14px;">${footer}</div>
           <script>window.onload = () => { window.print(); };</script>
         </body></html>`);
         w.document.close();
@@ -534,12 +545,22 @@ export default function SimpleOrderCreation() {
         const boardKeywords = ["لوح", "ألواح", "board", "boards", "لوحة", "الواح"];
         return boardKeywords.some(keyword => materialName.includes(keyword));
     }, [formData.material_id, materials]);
+    const selectedMaterial = useMemo(() => {
+        if (!formData.material_id) return null;
+        return materials.find(m => String(m.material_id) === String(formData.material_id)) || null;
+    }, [formData.material_id, materials]);
     const isSelectedMaterialPvc = useMemo(() => {
         if (!formData.material_id) return false;
-        const selectedMaterial = materials.find(m => String(m.material_id) === String(formData.material_id));
         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
         return materialName.includes("pvc");
-    }, [formData.material_id, materials]);
+    }, [formData.material_id, materials, selectedMaterial]);
+    const getMaterialConstantLabel = useCallback((material, type) => {
+        const values = material?.constant_values || [];
+        const candidates = values.filter(v => v.type === type);
+        const pick = candidates.find(v => v.isDefault) || candidates[0];
+        if (!pick) return "-";
+        return pick.label || `${pick.value ?? ""} ${pick.unit || ""}`.trim();
+    }, []);
 
     // Filters
     const availableRulers = useMemo(() => {
@@ -1142,99 +1163,40 @@ export default function SimpleOrderCreation() {
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <div className="relative flex-shrink-0">
-                {isHeaderVisible && (
-                    <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
-                        <div className="flex flex-wrap gap-3">
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setViewMode("create")}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
-                                    viewMode === "create"
-                                        ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                        : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                }`}
-                            >
-                                <ShoppingCart className="w-5 h-5 ml-2" />
-                                طلب جديد
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setViewMode("history")}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
-                                    viewMode === "history"
-                                        ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                        : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                }`}
-                            >
-                                <History className="w-5 h-5 ml-2" />
-                                سجل الطلبات
-                            </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/invoice")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <FileText className="w-5 h-5 ml-2" />
-                                الفواتير
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/customers")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <Users className="w-5 h-5 ml-2" />
-                                الزبائن
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/dashboard")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <Home className="w-5 h-5 ml-2" />
-                                الرئيسية
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={logout}
-                                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <LogOut className="w-5 h-5 ml-2" />
-                                تسجيل الخروج
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setIsHeaderVisible(false)}
-                                className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110"
-                            >
-                                <EyeOff className="w-5 h-5" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
-                {!isHeaderVisible && (
-                    <div className="absolute top-2 right-2 z-20">
+            <DashboardHeader
+                isHeaderVisible={isHeaderVisible}
+                setIsHeaderVisible={setIsHeaderVisible}
+                leftContent={
+                    <>
                         <Button
                             size="lg"
                             variant="outline"
-                            onClick={() => setIsHeaderVisible(true)}
-                            className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f hover:bg-secondary-f shadow-lg touch-manipulation"
+                            onClick={() => setViewMode("create")}
+                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
+                                viewMode === "create"
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                            }`}
                         >
-                            <Eye className="w-5 h-5 ml-2" />
-                            إظهار الهيدر
+                            <ShoppingCart className="w-5 h-5 ml-2" />
+                            طلب جديد
                         </Button>
-                    </div>
-                )}
-            </div>
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => setViewMode("history")}
+                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
+                                viewMode === "history"
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                            }`}
+                        >
+                            <History className="w-5 h-5 ml-2" />
+                            سجل الطلبات
+                        </Button>
+                    </>
+                }
+            />
 
             {/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
@@ -1391,6 +1353,26 @@ export default function SimpleOrderCreation() {
                                     >
                                         إلغاء
                                     </button>
+                                </div>
+                            )}
+
+                            {formData.material_id && !isSelectedMaterialPvc && (
+                                <div className="bg-primary-s border border-primary-f/20 text-secondary-f text-sm p-3 rounded-lg">
+                                    <div className="font-bold mb-2">معلومات الأبعاد</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
+                                            <div className="text-xs text-secondary-t">الطول</div>
+                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "height")}</div>
+                                        </div>
+                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
+                                            <div className="text-xs text-secondary-t">العرض</div>
+                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "width")}</div>
+                                        </div>
+                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
+                                            <div className="text-xs text-secondary-t">السماكة</div>
+                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "thickness")}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -1805,11 +1787,12 @@ export default function SimpleOrderCreation() {
                                                 <thead className="bg-gray-100 sticky top-0">
                                                     <tr>
                                                         <th className="p-2 text-right border-b">المادة</th>
-                                                        <th className="p-2 text-right border-b">المسطرة</th>
+                                                        <th className="p-2 text-center border-b">العرض</th>
                                                         <th className="p-2 text-right border-b">اللون</th>
                                                         <th className="p-2 text-center border-b">النوع</th>
                                                         <th className="p-2 text-center border-b">الكمية</th>
-                                                        <th className="p-2 text-center border-b">السماكة</th>
+                                                        <th className="p-2 text-right border-b">المسطرة</th>
+                                                        <th class2="p-2 text-center border-b">السماكة</th>
                                                         <th className="p-2 text-center border-b">الطبخة</th>
                                                     </tr>
                                                 </thead>
@@ -1817,12 +1800,13 @@ export default function SimpleOrderCreation() {
                                                     {orderItems.map(item => (
                                                         <tr key={item.id} className="border-b">
                                                             <td className="p-2">{item.material_name}</td>
-                                                            <td className="p-2">{item.ruler_name}</td>
+                                                            <td className="p-2 text-center">{item.width || "-"}</td>
                                                             <td className="p-2">{item.color_name}</td>
                                                             <td className="p-2 text-center">
                                                                 {formatTypeItem(item.type_item)}
                                                             </td>
                                                             <td className="p-2 text-center font-bold">{item.quantity} م</td>
+                                                            <td className="p-2">{item.ruler_name}</td>
                                                             <td className="p-2 text-center">{item.thickness || "0.6"}</td>
                                                             <td className="p-2 text-center">{item.batch_number || "-"}</td>
                                                         </tr>
@@ -1884,11 +1868,11 @@ export default function SimpleOrderCreation() {
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
                                                 <th className="p-1 text-right border-b w-[80px]">المادة</th>
-                                                <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
+                                                <th className="p-1 text-center border-b w-[55px]">العرض</th>
                                                 <th className="p-1 text-right border-b w-[90px]">اللون</th>
                                                 <th className="p-1 text-center border-b w-[45px]">النوع</th>
-                                                <th className="p-1 text-center border-b w-[55px]">العرض</th>
                                                 <th className="p-1 text-center border-b w-[55px]">الكمية</th>
+                                                <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
                                                 <th className="p-1 text-center border-b w-[70px]">السماكة</th>
                                                 <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
                                                 <th className="p-1 text-center border-b w-[80px]">الإجراءات</th>
@@ -1906,8 +1890,8 @@ export default function SimpleOrderCreation() {
                                                     <td className="p-1 break-words text-sm" title={item.material_name}>
                                                         {item.material_name}
                                                     </td>
-                                                    <td className="p-1 break-words text-sm" title={item.ruler_name}>
-                                                        {item.ruler_name}
+                                                    <td className="p-1 text-center text-sm">
+                                                        {item.width || "-"}
                                                     </td>
                                                     <td className="p-1 break-words text-sm" title={item.color_name}>
                                                         {item.color_name}
@@ -1915,11 +1899,11 @@ export default function SimpleOrderCreation() {
                                                     <td className="p-1 text-center text-sm">
                                                         {formatTypeItem(item.type_item)}
                                                     </td>
-                                                    <td className="p-1 text-center text-sm">
-                                                        {item.width || "-"}
-                                                    </td>
                                                     <td className="p-1 text-center font-bold text-sm">
                                                         {item.quantity} م
+                                                    </td>
+                                                    <td className="p-1 break-words text-sm" title={item.ruler_name}>
+                                                        {item.ruler_name}
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
                                                         {item.thickness || "0.6"} مم
@@ -2361,25 +2345,14 @@ export default function SimpleOrderCreation() {
                             <img src={qrPreview.url} alt="qr" className="h-80 w-80 border rounded" />
                         ) : null}
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-                        <div>
-                            <span className="font-semibold">كود اللون:</span>{" "}
-                            <span>{qrPreview.colorCode || "-"}</span>
-                        </div>
-                        <div>
-                            <span className="font-semibold">الكمية:</span>{" "}
-                            <span>{qrPreview.quantity || "-"}</span>
-                        </div>
-                        <div>
-                            <span className="font-semibold">الطبخة:</span>{" "}
-                            <span>{qrPreview.batchNumber || "-"}</span>
-                        </div>
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm" dir="ltr">
+                        {qrPreview.footerText || ""}
                     </div>
                     <div className="flex items-center justify-center gap-2">
                         <Button
                             size="sm"
                             className="bg-secondary-s hover:brightness-110 text-white"
-                            onClick={() => printQr(qrPreview.url, qrPreview.title)}
+                            onClick={() => printQr(qrPreview.url, qrPreview.title, qrPreview.footerText)}
                             disabled={!qrPreview.url}
                         >
                             طباعة
@@ -2476,7 +2449,16 @@ export default function SimpleOrderCreation() {
                                 <Button
                                     size="sm"
                                     className="bg-secondary-s hover:brightness-110 text-white"
-                                    onClick={() => printQr(qrGenDialog.qrUrl, `QR - ${qrGenDialog.item?.color_name || ''}`)}
+                                    onClick={() => {
+                                        const footer = [
+                                            qrGenDialog.item?.material_name || "",
+                                            qrGenDialog.item?.color_code || "",
+                                            qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
+                                            qrGenDialog.item?.batch_number || "",
+                                            formatTypeItem(qrGenDialog.item?.type_item)
+                                        ].filter(v => v).join("|");
+                                        printQr(qrGenDialog.qrUrl, `QR - ${qrGenDialog.item?.color_name || ''}`, footer);
+                                    }}
                                 >
                                     طباعة QR
                                 </Button>
@@ -2487,6 +2469,8 @@ export default function SimpleOrderCreation() {
                                         const url = qrGenDialog.qrUrl;
                                         const title = `QR - ${qrGenDialog.item?.color_name || ''}`;
                                         openQrPreview(url, title, {
+                                            material: qrGenDialog.item?.material_name || "",
+                                            typeLabel: formatTypeItem(qrGenDialog.item?.type_item),
                                             colorCode: qrGenDialog.item?.color_code || "",
                                             quantity: qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
                                             batchNumber: qrGenDialog.item?.batch_number || ""

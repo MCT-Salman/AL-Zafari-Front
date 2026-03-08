@@ -103,7 +103,9 @@ export default function Settings() {
     }
   };
 
-  const handleLogout = async () => {
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+
+  const performLogout = async () => {
     setLoading(true);
     try {
       await logout();
@@ -112,6 +114,10 @@ export default function Settings() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogout = () => {
+    setShowLogoutDialog(true);
   };
 
   return (
@@ -323,6 +329,20 @@ export default function Settings() {
           </div>
         </Card>
       </div>
+
+      <StyledDialog
+        isOpen={showLogoutDialog}
+        onOpenChange={setShowLogoutDialog}
+        title="تسجيل الخروج"
+        onCancel={() => setShowLogoutDialog(false)}
+        onConfirm={() => {
+          setShowLogoutDialog(false);
+          performLogout();
+        }}
+        confirmLabel="تسجيل الخروج"
+        cancelLabel="إلغاء"
+        confirmVariant="destructive"
+      />
     </div>
   );
 }

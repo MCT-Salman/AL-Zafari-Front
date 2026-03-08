@@ -134,6 +134,29 @@ export default function Ruler() {
       // console.error("Failed to load materials:", error);
     }
   };
+  const getMaterialNameResolved = (ruler) => {
+    if (ruler?.material?.material_name) return ruler.material.material_name;
+    if (ruler?.material_name) return ruler.material_name;
+    const materialId = ruler?.material_id || ruler?.material?.material_id;
+    if (materialId && materials.length > 0) {
+      const material = materials.find((m) => String(m.material_id) === String(materialId));
+      if (material?.material_name) return material.material_name;
+    }
+    return "غير محدد";
+  };
+  const formatEntryDateForExport = (ruler) => {
+    const raw = ruler?.entry_date || ruler?.created_at;
+    if (!raw) return "غير محدد";
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return "غير محدد";
+    return date.toLocaleDateString("ar-EG", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
@@ -146,8 +169,8 @@ export default function Ruler() {
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
       { key: "ruler_name", header: "اسم المسطرة" },
-      { key: "entry_date", header: "تاريخ الإدخال" },
-      { key: "material_name", header: "المادة", format: (item) => rulerApi.getMaterialName(item) },
+      { key: "entry_date", header: "تاريخ الإدخال", format: (item) => formatEntryDateForExport(item) },
+      { key: "material_name", header: "المادة", format: (item) => getMaterialNameResolved(item) },
       { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [

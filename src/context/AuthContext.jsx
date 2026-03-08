@@ -63,10 +63,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    // caller is responsible for any confirmation dialog
     try {
       await authApi.logout();
     } catch (error) {
-      // console.error('Logout error:', error);
+      // ignore
     } finally {
       setUser(null);
       setIsAuthenticated(false);

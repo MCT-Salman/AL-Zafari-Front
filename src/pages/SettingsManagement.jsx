@@ -1,6 +1,7 @@
 // src/pages/SettingsManagement.jsx
 import { useState, useEffect, useMemo } from "react";
 import { settingApi } from "../api/settingApi";
+import { materialApi } from "../api/materialApi";
 import { useCrud } from "../hooks/useCrud";
 import { CrudModal } from "../components/common/CrudModal";
 import { Button } from "../components/ui/button";
@@ -109,7 +110,10 @@ export default function SettingsManagement() {
     }
   });
 
+  const [materials, setMaterials] = useState([]);
+
   const [discountFormData, setDiscountFormData] = useState({
+    material_id: "",
     type: "percentage",
     quantityCondition: "GREATER_THAN",
     quantity: "",
@@ -119,6 +123,7 @@ export default function SettingsManagement() {
   // Explicit handlers for discounts
   const handleOpenCreateDiscount = () => {
     setDiscountFormData({
+      material_id: "",
       type: "percentage",
       quantityCondition: "GREATER_THAN",
       quantity: "",
@@ -129,6 +134,7 @@ export default function SettingsManagement() {
 
   const handleOpenEditDiscount = (discount) => {
     setDiscountFormData({
+      material_id: discount.material_id || "",
       type: discount.type || "percentage",
       quantityCondition: discount.quantityCondition || "GREATER_THAN",
       quantity: discount.quantity || "",
@@ -156,6 +162,9 @@ export default function SettingsManagement() {
 
   useEffect(() => {
     fetchSettings();
+    materialApi.getMaterials().then(res => {
+      if (res.success) setMaterials(res.data || []);
+    }).catch(() => {});
     // eslint-disable-next-line
   }, []);
 
@@ -277,6 +286,7 @@ export default function SettingsManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>المادة</TableHead>
                       <TableHead>النوع</TableHead>
                       <TableHead>الشرط (الكمية)</TableHead>
                       <TableHead>القيمة</TableHead>
@@ -286,6 +296,9 @@ export default function SettingsManagement() {
                   <TableBody>
                     {discounts.map((d) => (
                       <TableRow key={d.id}>
+                        <TableCell>
+                          {materials.find(m => String(m.material_id) === String(d.material_id))?.material_name || '-'}
+                        </TableCell>
                         <TableCell>
                           <Badge className={d.type === 'percentage' ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}>
                             {d.type === 'percentage' ? 'نسبة مئوية' : d.type}
@@ -420,27 +433,38 @@ export default function SettingsManagement() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
+              <label className="text-sm font-medium">المادة</label>
+              <FilterSelect
+                value={discountFormData.material_id}
+                onChange={(e) => setDiscountFormData({ ...discountFormData, material_id: e.target.value })}
+                options={materials.map(m=>({value:String(m.material_id),label:m.material_name}))}
+                placeholder="اختر المادة"
+              />
+            </div>
+            <div className="space-y-2">
               <label className="text-sm font-medium">النوع</label>
               <FilterSelect
                 value={discountFormData.type}
                 onChange={(e) => setDiscountFormData({ ...discountFormData, type: e.target.value })}
-                options={[{ value: "percentage", label: "Percentage" }]}
-                placeholder="Select type"
+                options={[{ value: "percentage", label: "نسبة مئوية" }]}
+                placeholder="اختر النوع"
               />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">الشرط</label>
               <FilterSelect
                 value={discountFormData.quantityCondition}
                 onChange={(e) => setDiscountFormData({ ...discountFormData, quantityCondition: e.target.value })}
                 options={[
-                  { value: "GREATER_THAN", label: "Greater than" },
-                  { value: "LESS_THAN", label: "Less than" },
-                  { value: "EQUAL_TO", label: "Equal to" },
-                  { value: "GREATER_THAN_OR_EQUAL_TO", label: "Greater than or equal" },
-                  { value: "LESS_THAN_OR_EQUAL_TO", label: "Less than or equal" },
+                  { value: "GREATER_THAN", label: "أكبر من" },
+                  { value: "LESS_THAN", label: "أقل من" },
+                  { value: "EQUAL_TO", label: "يساوي" },
+                  { value: "GREATER_THAN_OR_EQUAL_TO", label: "أكبر من أو يساوي" },
+                  { value: "LESS_THAN_OR_EQUAL_TO", label: "أقل من أو يساوي" },
                 ]}
-                placeholder="Select condition"
+                placeholder="اختر الشرط"
               />
             </div>
           </div>
@@ -451,7 +475,7 @@ export default function SettingsManagement() {
                 type="number"
                 value={discountFormData.quantity || ""}
                 onChange={(e) => setDiscountFormData({ ...discountFormData, quantity: e.target.value })}
-                placeholder="أدخل الكمية المستهدفة"
+                placeholder="أدخل الكمية"
               />
             </div>
             <div className="space-y-2">

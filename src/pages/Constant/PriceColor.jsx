@@ -42,6 +42,26 @@ const resolveColorImage = (color) => {
   if (!raw) return null;
   return raw.startsWith("http") ? raw : `${API_BASE_URL}${raw}`;
 };
+const formatTypeItemForExport = (value) => {
+  if (value === "Machine") return "مكنة";
+  if (value === "Presser") return "كوي";
+  return "غير محدد";
+};
+const formatPricingByForExport = (value) => {
+  switch (value) {
+    case "isByMeter22":
+      return "22 متر";
+    case "isByMeter44":
+      return "44 متر";
+    case "isByMeter66":
+      return "66 متر";
+    case "isByBlanck":
+    case "blanck":
+      return "لوح";
+    default:
+      return "غير محدد";
+  }
+};
 
 export default function PriceColor() {
   // Create adapter to map generic CRUD method names to priceColorApi method names
@@ -203,6 +223,42 @@ export default function PriceColor() {
       // console.error("Failed to load materials:", error);
     }
   };
+  const getColorNameResolved = (priceColor) => {
+    const name = priceColor?.color?.color_name || priceColor?.color_name;
+    if (name) return name;
+    const colorId = priceColor?.color_id || priceColor?.color?.color_id;
+    if (colorId && colors.length > 0) {
+      const color = colors.find(c => String(c.color_id) === String(colorId));
+      if (color?.color_name) return color.color_name;
+    }
+    return "غير محدد";
+  };
+  const getRulerNameResolved = (priceColor) => {
+    const name = priceColor?.color?.ruler?.ruler_name || priceColor?.ruler_name;
+    if (name) return name;
+    const rulerId =
+      priceColor?.ruler_id ||
+      priceColor?.color?.ruler_id ||
+      priceColor?.color?.ruler?.ruler_id;
+    if (rulerId && rulers.length > 0) {
+      const ruler = rulers.find(r => String(r.ruler_id) === String(rulerId));
+      if (ruler?.ruler_name) return ruler.ruler_name;
+    }
+    return "غير محدد";
+  };
+  const getMaterialNameResolved = (priceColor) => {
+    const name = priceColor?.color?.ruler?.material?.material_name || priceColor?.material_name;
+    if (name) return name;
+    const materialId =
+      priceColor?.material_id ||
+      priceColor?.color?.ruler?.material_id ||
+      priceColor?.color?.ruler?.material?.material_id;
+    if (materialId && materials.length > 0) {
+      const material = materials.find(m => String(m.material_id) === String(materialId));
+      if (material?.material_name) return material.material_name;
+    }
+    return "غير محدد";
+  };
 
   // Mapping for labels
   const typeItemOptions = [
@@ -235,11 +291,11 @@ export default function PriceColor() {
   // Use export hook
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
-      { key: "color_name", header: "اللون", format: (item) => priceColorApi.getColorName(item) },
-      { key: "ruler_name", header: "المسطرة", format: (item) => priceColorApi.getRulerName(item) },
-      { key: "material_name", header: "المادة", format: (item) => priceColorApi.getMaterialName(item) },
-      { key: "type_item", header: "النوع" },
-      { key: "price_color_By", header: "طريقة التسعير" },
+      { key: "color_name", header: "اللون", format: (item) => getColorNameResolved(item) },
+      { key: "ruler_name", header: "المسطرة", format: (item) => getRulerNameResolved(item) },
+      { key: "material_name", header: "المادة", format: (item) => getMaterialNameResolved(item) },
+      { key: "type_item", header: "النوع", format: (item) => formatTypeItemForExport(item?.type_item) },
+      { key: "price_color_By", header: "طريقة التسعير", format: (item) => formatPricingByForExport(item?.price_color_By) },
       { key: "price_per_meter", header: "السعر ($)" },
       { key: "notes", header: "الملاحظات" },
     ],

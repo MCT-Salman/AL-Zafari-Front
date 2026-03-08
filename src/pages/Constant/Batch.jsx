@@ -133,6 +133,29 @@ export default function Batch() {
       // console.error("Failed to load materials:", error);
     }
   };
+  const getMaterialNameResolved = (batch) => {
+    if (batch?.material?.material_name) return batch.material.material_name;
+    if (batch?.material_name) return batch.material_name;
+    const materialId = batch?.material_id || batch?.material?.material_id;
+    if (materialId && materials.length > 0) {
+      const material = materials.find(m => String(m.material_id) === String(materialId));
+      if (material?.material_name) return material.material_name;
+    }
+    return "غير محدد";
+  };
+  const formatEntryDateForExport = (batch) => {
+    const raw = batch?.entry_date || batch?.created_at;
+    if (!raw) return "غير محدد";
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return "غير محدد";
+    return date.toLocaleDateString("ar-EG", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
@@ -145,8 +168,8 @@ export default function Batch() {
   const { exportToExcel, loading: exportLoading } = useExport({
     columns: [
       { key: "batch_number", header: "رقم الطبخة" },
-      { key: "entry_date", header: "تاريخ الإدخال", format: (item) => batchApi.formatEntryDate(item) },
-      { key: "material_name", header: "المادة", format: (item) => batchApi.getMaterialName(item) },
+      { key: "entry_date", header: "تاريخ الإدخال", format: (item) => formatEntryDateForExport(item) },
+      { key: "material_name", header: "المادة", format: (item) => getMaterialNameResolved(item) },
       { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [
