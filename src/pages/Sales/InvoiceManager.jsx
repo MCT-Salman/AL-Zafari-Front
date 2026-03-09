@@ -1896,17 +1896,21 @@ export default function InvoiceManager() {
                                             <span>الكمية:</span>
                                             <span>{priceCalculation.quantity} م</span>
                                         </div>
-
-                                        <div className="flex justify-between border-t pt-1 mt-1">
-                                            <span>الإجمالي:</span>
-                                            <span className="font-bold text-primary-f">{invoiceApi.formatCurrency(priceCalculation.total)}</span>
+                                        <div className="flex justify-between">
+                                            <span>الإجمالي الكامل:</span>
+                                            <span>{invoiceApi.formatCurrency(priceCalculation.subtotal)}</span>
                                         </div>
+
                                         {priceCalculation.discount > 0 && (
                                             <div className="flex justify-between text-green-600">
                                                 <span>الخصم ({priceCalculation.discountType === 'percentage' ? `${priceCalculation.discountValue}%` : ''}):</span>
                                                 <span>-{invoiceApi.formatCurrency(priceCalculation.discount)}</span>
                                             </div>
                                         )}
+                                        <div className="flex justify-between border-t pt-1 mt-1">
+                                            <span>الإجمالي بعد الخصم:</span>
+                                            <span className="font-bold text-primary-f">{invoiceApi.formatCurrency(priceCalculation.total)}</span>
+                                        </div>
                                     </div>
                                 </Card>
                             )}
