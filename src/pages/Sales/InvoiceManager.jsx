@@ -1,4 +1,4 @@
-// src/pages/Invoices/InvoiceManager.jsx
+// src/pages/Sales/InvoiceManager.jsx
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoiceApi } from "../../api/invoiceApi";
@@ -10,6 +10,7 @@ import { colorApi } from "../../api/colorApi";
 import { batchApi } from "../../api/batchApi";
 import { priceColorApi } from "../../api/priceColorApi";
 import { constantApi } from "../../api/constantApi";
+import { convertArabicToEnglishNumbers, parseArabicNumber } from "../../utils/helpers";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import FilterSelect from "../../components/common/FilterSelect";
@@ -265,6 +266,8 @@ export default function InvoiceManager() {
     const [customerSearchTerm, setCustomerSearchTerm] = useState("");
     const [customerOption, setCustomerOption] = useLocalStorage("invoice_customer_option", "none");
     const [loadingCustomers, setLoadingCustomers] = useState(false);
+    const [customerBalance, setCustomerBalance] = useState(0);
+    const [loadingCustomerBalance, setLoadingCustomerBalance] = useState(false);
 
     // New Customer Form
     const [newCustomer, setNewCustomer] = useState({
@@ -397,6 +400,7 @@ export default function InvoiceManager() {
                 toast.success("تم إنشاء الزبون بنجاح");
                 setCustomers(prev => [...prev, createdCustomer]);
                 setSelectedCustomer(createdCustomer);
+                loadCustomerBalance(createdCustomer.customer_id);
                 setCustomerOption("existing");
                 setNewCustomer({
                     name: "",
@@ -414,6 +418,31 @@ export default function InvoiceManager() {
             setLoadingCustomers(false);
         }
     }, [newCustomer, setCustomerOption]);
+
+    const loadCustomerBalance = useCallback(async (customerId) => {
+        if (!customerId) {
+            setCustomerBalance(0);
+            return;
+        }
+        try {
+            setLoadingCustomerBalance(true);
+            const response = await invoiceApi.getInvoicesByCustomerId(customerId);
+            if (response.success && response.data) {
+                const totalBalance = response.data.reduce((sum, invoice) => {
+                    const remaining = invoice.remaining_amount || 0;
+                    return sum + (remaining > 0 ? remaining : 0);
+                }, 0);
+                setCustomerBalance(totalBalance);
+            } else {
+                setCustomerBalance(0);
+            }
+        } catch (error) {
+            console.error("Error loading customer balance:", error);
+            setCustomerBalance(0);
+        } finally {
+            setLoadingCustomerBalance(false);
+        }
+    }, []);
 
     const formatPhoneNumber = useCallback((phone) => {
         if (!phone) return "";
@@ -640,8 +669,14 @@ export default function InvoiceManager() {
 
     // Handlers
     const handleFieldChange = useCallback((field, value) => {
+        // Convert Arabic numerals to English for numeric fields
+        let processedValue = value;
+        if (['quantity', 'width', 'thickness', 'length', 'paid_amount', 'discount'].includes(field)) {
+            processedValue = convertArabicToEnglishNumbers(value);
+        }
+        
         setFormData(prev => {
-            const newData = { ...prev, [field]: value };
+            const newData = { ...prev, [field]: processedValue };
 
             if (field === "material_id") {
                 newData.ruler_id = "";
@@ -771,78 +806,91 @@ export default function InvoiceManager() {
         handleFieldChange(activeField, current);
     }, [numpadMode, colorSearchCode, availablePricedColors, formData, activeField, handleFieldChange, showPaymentPopup, paymentFormData, showPaymentDialog, paymentAmount, setPaymentAmount]);
 
-    const addOrUpdateItem = useCallback(() => {
-        if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity) {
-            toast.error("يرجى اكمال جميع البيانات");
-            return;
-        }
+   const addOrUpdateItem = useCallback(() => {
+    if (!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity) {
+        toast.error("يرجى اكمال جميع البيانات");
+        return;
+    }
 
-        if (isSelectedMaterialPvc && !formData.type_item) {
-            toast.error("يرجى اختيار النوع");
-            return;
-        }
+    if (isSelectedMaterialPvc && !formData.type_item) {
+        toast.error("يرجى اختيار النوع");
+        return;
+    }
 
-        if (!isSelectedMaterialBoard && !formData.width) {
-            toast.error("يرجى اختيار العرض");
-            return;
-        }
+    if (!isSelectedMaterialBoard && !formData.width) {
+        toast.error("يرجى اختيار العرض");
+        return;
+    }
 
-        if (!isColorPriced) {
-            toast.error("اللون المحدد غير مسعر لهذه المواصفات");
-            return;
-        }
+    if (!isColorPriced) {
+        toast.error("اللون المحدد غير مسعر لهذه المواصفات");
+        return;
+    }
 
-        const material = materials.find(m => String(m.material_id) === String(formData.material_id));
-        const ruler = rulers.find(r => String(r.ruler_id) === String(formData.ruler_id));
-        const color = colors.find(c => String(c.color_id) === String(formData.color_id));
-        const batch = batches.find(b => String(b.batch_id) === String(formData.batch_id));
+    const material = materials.find(m => String(m.material_id) === String(formData.material_id));
+    const ruler = rulers.find(r => String(r.ruler_id) === String(formData.ruler_id));
+    const color = colors.find(c => String(c.color_id) === String(formData.color_id));
+    const batch = batches.find(b => String(b.batch_id) === String(formData.batch_id));
 
-        const newItem = {
-            id: editingItemId || Date.now(),
-            material_id: formData.material_id,
-            type_item: formData.type_item,
-            ruler_id: formData.ruler_id,
-            color_id: formData.color_id,
-            batch_id: formData.batch_id,
-            width: formData.width,
-            thickness: formData.thickness,
-            length: formData.length,
-            quantity: formData.quantity,
-            notes: formData.notes,
-            material_name: material?.material_name,
-            ruler_name: ruler?.ruler_name,
-            color_name: color?.color_name,
-            batch_number: batch?.batch_number,
-            unit_price: priceCalculation?.unitPrice || 0,
-            subtotal: priceCalculation?.subtotal || 0
-        };
+    // تحضير batch_id - فقط إذا كانت لها قيمة صالحة
+    let batchIdValue = null;
+    if (formData.batch_id && 
+        formData.batch_id !== "" && 
+        formData.batch_id !== null && 
+        formData.batch_id !== undefined && 
+        formData.batch_id !== "null" && 
+        formData.batch_id !== "undefined" && 
+        String(formData.batch_id).trim() !== "") {
+        batchIdValue = formData.batch_id;
+    }
 
-        if (editingItemId) {
-            setOrderItems(prev => prev.map(item =>
-                item.id === editingItemId ? newItem : item
-            ));
-            toast.success("تم تحديث العنصر بنجاح");
-            setEditingItemId(null);
-        } else {
-            setOrderItems(prev => [...prev, newItem]);
-            toast.success("تم إضافة العنصر بنجاح");
-        }
+    const newItem = {
+        id: editingItemId || Date.now(),
+        material_id: formData.material_id,
+        type_item: formData.type_item,
+        ruler_id: formData.ruler_id,
+        color_id: formData.color_id,
+        // إذا كانت batch_id غير صالحة، لا نضيف الخاصية نهائياً
+        ...(batchIdValue && { batch_id: batchIdValue }),
+        width: formData.width,
+        thickness: formData.thickness,
+        length: formData.length,
+        quantity: formData.quantity,
+        notes: formData.notes,
+        material_name: material?.material_name,
+        ruler_name: ruler?.ruler_name,
+        color_name: color?.color_name,
+        batch_number: batch?.batch_number,
+        unit_price: priceCalculation?.unitPrice || 0,
+        subtotal: priceCalculation?.subtotal || 0
+    };
 
-        // Reset form
-        setFormData(prev => ({
-            material_id: prev.material_id,
-            thickness: "0.6",
-            type_item: "",
-            ruler_id: "",
-            color_id: "",
-            batch_id: "",
-            width: "",
-            quantity: "",
-            notes: ""
-        }));
-        setColorSearchCode("");
-        setPriceCalculation(null);
-    }, [formData, isSelectedMaterialBoard, isSelectedMaterialPvc, isColorPriced, materials, rulers, colors, batches, editingItemId, priceCalculation, setOrderItems]);
+    if (editingItemId) {
+        setOrderItems(prev => prev.map(item =>
+            item.id === editingItemId ? newItem : item
+        ));
+        toast.success("تم تحديث العنصر بنجاح");
+        setEditingItemId(null);
+    } else {
+        setOrderItems(prev => [...prev, newItem]);
+        toast.success("تم إضافة العنصر بنجاح");
+    }
+
+    // Reset form
+    setFormData(prev => ({
+        material_id: prev.material_id,
+        thickness: "0.6",
+        type_item: "",
+        ruler_id: "",
+        color_id: "",
+        batch_id: "",
+        width: "",
+        quantity: "",
+        notes: ""
+    }));
+    setColorSearchCode("");
+    setPriceCalculation(null);
+}, [formData, isSelectedMaterialBoard, isSelectedMaterialPvc, isColorPriced, materials, rulers, colors, batches, editingItemId, priceCalculation, setOrderItems]);
 
     const handleEditItem = useCallback((item) => {
         setFormData({
@@ -943,104 +991,122 @@ export default function InvoiceManager() {
         }
     }, [manualCode, orders]);
 
-    const saveInvoice = useCallback(async () => {
-        const paidAmount = parseFloat(formData.paid_amount);
-        if (isNaN(paidAmount) || paidAmount < 0) {
-            toast.error("يرجى إدخال مبلغ صحيح");
-            return;
+   const saveInvoice = useCallback(async () => {
+    const paidAmount = parseFloat(formData.paid_amount);
+    if (isNaN(paidAmount) || paidAmount < 0) {
+        toast.error("يرجى إدخال مبلغ صحيح");
+        return;
+    }
+
+    // حساب المبلغ الكامل من العناصر إذا لم يكن هناك طلب
+    const totalAmount = selectedOrder?.total_amount || orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+
+    try {
+        // حساب الخصم
+        let discount = parseFloat(formData.discount) || 0;
+        if (formData.discount_type === "percentage") {
+            discount = (parseFloat(totalAmount) * discount) / 100;
         }
 
-        // حساب المبلغ الكامل من العناصر إذا لم يكن هناك طلب
-        const totalAmount = selectedOrder?.total_amount || orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+        const invoiceData = {
+            order_id: selectedOrder?.order_id ? Number(selectedOrder.order_id) : null,
+            customer_id: selectedOrder?.customer_id ? Number(selectedOrder.customer_id) : (selectedCustomer?.customer_id ? Number(selectedCustomer.customer_id) : null),
+            total_amount: parseFloat(totalAmount),
+            discount: discount,
+            paid_amount: paidAmount,
+            notes: formData.notes || "",
+            items: orderItems.map(item => {
+                console.log("Processing item:", JSON.stringify(item, null, 2));
+                const payload = {
+                    color_id: parseInt(item.color_id),
+                    width: parseFloat(item.width) || 0,
+                    length: parseFloat(item.length) || 1,
+                    thickness: parseFloat(item.thickness) || 0.6,
+                    quantity: parseFloat(item.quantity),
+                    unit_price: parseFloat(item.unit_price) || 0,
+                    subtotal: parseFloat(item.subtotal) || 0,
+                    notes: item.notes || ""
+                };
+                
+                if (item.type_item) payload.type_item = item.type_item;
 
-        try {
-            // حساب الخصم
-            let discount = parseFloat(formData.discount) || 0;
-            if (formData.discount_type === "percentage") {
-                discount = (parseFloat(totalAmount) * discount) / 100;
-            }
-
-            const invoiceData = {
-                order_id: selectedOrder?.order_id ? Number(selectedOrder.order_id) : null,
-                customer_id: selectedOrder?.customer_id ? Number(selectedOrder.customer_id) : (selectedCustomer?.customer_id ? Number(selectedCustomer.customer_id) : null),
-                total_amount: parseFloat(totalAmount),
-                discount: discount,
-                paid_amount: paidAmount,
-                notes: formData.notes || "",
-                items: orderItems.map(item => {
-                    const payload = {
-                        color_id: parseInt(item.color_id),
-                        width: parseFloat(item.width) || 0,
-                        length: parseFloat(item.length) || 1,
-                        thickness: parseFloat(item.thickness) || 0.6,
-                        quantity: parseFloat(item.quantity),
-                        unit_price: parseFloat(item.unit_price) || 0,
-                        subtotal: parseFloat(item.subtotal) || 0,
-                        notes: item.notes || ""
-                    };
-                    if (item.type_item) payload.type_item = item.type_item;
-                    if (item.batch_id) payload.batch_id = parseInt(item.batch_id);
-                    return payload;
-                })
-            };
-
-            let response;
-            if (editingInvoiceId) {
-                response = await invoiceApi.updateInvoice(editingInvoiceId, invoiceData);
-            } else {
-                response = await invoiceApi.createInvoice(invoiceData);
-            }
-
-            if (response.success) {
-                toast.success(editingInvoiceId ? "تم تحديث الفاتورة بنجاح" : "تم إنشاء الفاتورة بنجاح");
-
-                // Reset form
-                setShowPreview(false);
-                setEditingInvoiceId(null);
-                setSelectedOrder(null);
-                setSelectedCustomer(null);
-                setCustomerOption("none");
-                setOrderItems([]);
-                setFormData(prev => ({
-                    material_id: "",
-                    thickness: "0.6",
-                    length: "1",
-                    type_item: "",
-                    ruler_id: "",
-                    color_id: "",
-                    batch_id: "",
-                    width: "",
-                    quantity: "",
-                    discount: "0",
-                    discount_type: "fixed",
-                    notes: ""
-                }));
-                setPaymentFormData({
-                    paid_amount: "",
-                    discount: "0",
-                    discount_type: "fixed"
-                });
-
-                if (viewMode === "history") {
-                    loadInvoices();
+                // تعديل هنا: فقط أضف batch_id إذا كانت موجودة وقيمتها صالحة
+                if (item.hasOwnProperty('batch_id') && item.batch_id && 
+                    item.batch_id !== "" && 
+                    item.batch_id !== null && 
+                    item.batch_id !== undefined && 
+                    item.batch_id !== "null" && 
+                    item.batch_id !== "undefined" && 
+                    String(item.batch_id).trim() !== "") {
+                    
+                    payload.batch_id = parseInt(item.batch_id);
+                    console.log("Debug - batch_id added to payload:", payload.batch_id);
+                } else {
+                    // لا نضيف batch_id للـ payload إذا كانت null أو غير موجودة
+                    console.log("Debug - batch_id NOT added to payload (null/empty/not present)");
                 }
-            }
-        } catch (error) {
-            // Extract error message from various possible error formats
-            let errorMessage = "فشل في حفظ الفاتورة";
-            if (error.message) {
-                errorMessage = error.message;
-            } else if (error.details && typeof error.details === 'string') {
-                errorMessage = error.details;
-            } else if (error.error) {
-                errorMessage = error.error;
-            } else if (typeof error === 'string') {
-                errorMessage = error;
-            }
-            toast.error(errorMessage);
-        }
-    }, [selectedOrder, formData, editingInvoiceId, viewMode, loadInvoices, orderItems, setOrderItems, selectedCustomer]);
 
+                console.log("Final item payload:", JSON.stringify(payload, null, 2));
+                return payload;
+            })
+        };
+
+        let response;
+        if (editingInvoiceId) {
+            response = await invoiceApi.updateInvoice(editingInvoiceId, invoiceData);
+        } else {
+            response = await invoiceApi.createInvoice(invoiceData);
+        }
+
+        if (response.success) {
+            toast.success(editingInvoiceId ? "تم تحديث الفاتورة بنجاح" : "تم إنشاء الفاتورة بنجاح");
+
+            // Reset form
+            setShowPreview(false);
+            setEditingInvoiceId(null);
+            setSelectedOrder(null);
+            setSelectedCustomer(null);
+            setCustomerOption("none");
+            setOrderItems([]);
+            setFormData(prev => ({
+                material_id: "",
+                thickness: "0.6",
+                length: "1",
+                type_item: "",
+                ruler_id: "",
+                color_id: "",
+                batch_id: "",
+                width: "",
+                quantity: "",
+                discount: "0",
+                discount_type: "fixed",
+                notes: ""
+            }));
+            setPaymentFormData({
+                paid_amount: "",
+                discount: "0",
+                discount_type: "fixed"
+            });
+
+            if (viewMode === "history") {
+                loadInvoices();
+            }
+        }
+    } catch (error) {
+        // Extract error message from various possible error formats
+        let errorMessage = "فشل في حفظ الفاتورة";
+        if (error.message) {
+            errorMessage = error.message;
+        } else if (error.details && typeof error.details === 'string') {
+            errorMessage = error.details;
+        } else if (error.error) {
+            errorMessage = error.error;
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+        }
+        toast.error(errorMessage);
+    }
+}, [selectedOrder, formData, editingInvoiceId, viewMode, loadInvoices, orderItems, setOrderItems, selectedCustomer]);
     const handleAddPayment = useCallback(async () => {
         if (!selectedInvoiceForPayment) return;
 
@@ -1937,6 +2003,11 @@ export default function InvoiceManager() {
                                                     onChange={(e) => {
                                                         const customer = customers.find(c => String(c.customer_id) === e.target.value);
                                                         setSelectedCustomer(customer || null);
+                                                        if (customer) {
+                                                            loadCustomerBalance(customer.customer_id);
+                                                        } else {
+                                                            setCustomerBalance(0);
+                                                        }
                                                     }}
                                                     options={customerOptions}
                                                     placeholder="اختر الزبون..."
@@ -1952,6 +2023,18 @@ export default function InvoiceManager() {
                                             <div className="bg-blue-50 p-2 rounded-lg text-xs">
                                                 <div className="font-bold">{selectedCustomer.name}</div>
                                                 <div className="text-gray-600"><span dir="ltr">{selectedCustomer.phone}</span> - {selectedCustomer.city || "لا يوجد مدينة"}</div>
+                                                <div className="mt-1 pt-1 border-t border-blue-200">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-blue-700">الذمة المتبقية:</span>
+                                                        <span className={`font-bold ${customerBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                            {loadingCustomerBalance ? (
+                                                                <span className="text-gray-500">جاري التحميل...</span>
+                                                            ) : (
+                                                                invoiceApi.formatCurrency(customerBalance)
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -2115,6 +2198,10 @@ export default function InvoiceManager() {
                                             discount: paymentFormData.discount,
                                             discount_type: paymentFormData.discount_type
                                         }));
+                                        // Load customer balance when opening preview for manual invoices
+                                        if (selectedCustomer && !selectedOrder) {
+                                            loadCustomerBalance(selectedCustomer.customer_id);
+                                        }
                                         setShowPreview(true);
                                         setShowPaymentPopup(false);
                                     }}
@@ -2142,6 +2229,20 @@ export default function InvoiceManager() {
                                                 <div className="col-span-2 font-bold text-base">
                                                     المبلغ الكامل: {invoiceApi.formatCurrency(selectedOrder?.total_amount || orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0))}
                                                 </div>
+                                                {selectedCustomer && (
+                                                    <div className="col-span-2 mt-2 pt-2 border-t border-blue-200">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-blue-700 font-medium">الذمة المتبقية:</span>
+                                                            <span className={`font-bold ${customerBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                                {loadingCustomerBalance ? (
+                                                                    <span className="text-gray-500">جاري التحميل...</span>
+                                                                ) : (
+                                                                    invoiceApi.formatCurrency(customerBalance)
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -2150,13 +2251,13 @@ export default function InvoiceManager() {
                                             <div>
                                                 <Label className="font-bold text-sm mb-2 block">
                                                     المبلغ المدفوع
-                                                    <span className="text-xs text-gray-500 font-normal mr-1">(hint)</span>
+                                                    {/* <span className="text-xs text-gray-500 font-normal mr-1">(hint)</span> */}
                                                 </Label>
                                                 <div className="flex items-center gap-2">
                                                     <Input
                                                         type="number"
                                                         value={paymentFormData.paid_amount}
-                                                        onChange={(e) => setPaymentFormData(prev => ({ ...prev, paid_amount: e.target.value }))}
+                                                        onChange={(e) => setPaymentFormData(prev => ({ ...prev, paid_amount: convertArabicToEnglishNumbers(e.target.value) }))}
                                                         onFocus={() => { setActiveField('paid_amount'); setNumpadMode('paid'); }}
                                                         onClick={() => { setActiveField('paid_amount'); setNumpadMode('paid'); }}
                                                         placeholder="0.00"
@@ -2176,7 +2277,7 @@ export default function InvoiceManager() {
                                                 <Input
                                                     type="number"
                                                     value={paymentFormData.discount}
-                                                    onChange={(e) => setPaymentFormData(prev => ({ ...prev, discount: e.target.value }))}
+                                                    onChange={(e) => setPaymentFormData(prev => ({ ...prev, discount: convertArabicToEnglishNumbers(e.target.value) }))}
                                                     onFocus={() => { setActiveField('discount'); setNumpadMode('paid'); }}
                                                     onClick={() => { setActiveField('discount'); setNumpadMode('paid'); }}
                                                     placeholder="0"
@@ -2254,20 +2355,7 @@ export default function InvoiceManager() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-1">
-                                                <button
-                                                    onClick={() => { setActiveField('paid_amount'); setNumpadMode('paid'); }}
-                                                    className={`py-2 rounded text-sm font-bold transition-all ${activeField === 'paid_amount' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-                                                >
-                                                    المبلغ
-                                                </button>
-                                                <button
-                                                    onClick={() => { setActiveField('discount'); setNumpadMode('paid'); }}
-                                                    className={`py-2 rounded text-sm font-bold transition-all ${activeField === 'discount' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-                                                >
-                                                    الخصم
-                                                </button>
-                                            </div>
+                                           
 
                                             <button
                                                 onClick={() => handleNumpadPress("clear")}

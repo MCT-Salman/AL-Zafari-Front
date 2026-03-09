@@ -1,5 +1,6 @@
 // src/api/invoiceApi.js
 import axiosInstance from "./axiosConfig";
+import { convertArabicToEnglishNumbers } from "../utils/helpers";
 
 export const invoiceApi = {
   // Get all invoices
@@ -53,22 +54,41 @@ export const invoiceApi = {
         total_amount: invoiceData.total_amount !== undefined ? Number(invoiceData.total_amount) : undefined,
         discount: invoiceData.discount !== undefined ? Number(invoiceData.discount) : undefined,
         paid_amount: invoiceData.paid_amount !== undefined ? Number(invoiceData.paid_amount) : undefined,
-        items: (invoiceData.items || []).map((it) => ({
-          ...it,
-          color_id: it.color_id ? Number(it.color_id) : null,
-          batch_id: it.batch_id === "" ? "" : (it.batch_id ? Number(it.batch_id) : null),
-          width: it.width !== undefined ? Number(it.width) : 0,
-          length: it.length !== undefined ? Number(it.length) : 0,
-          thickness: it.thickness !== undefined ? Number(it.thickness) : 0,
-          quantity: it.quantity !== undefined ? Number(it.quantity) : 0,
-          unit_price: it.unit_price !== undefined ? Number(it.unit_price) : 0,
-          subtotal: it.subtotal !== undefined ? Number(it.subtotal) : 0,
-        }))
+        items: (invoiceData.items || []).map((it) => {
+          const itemPayload = {
+            ...it,
+            color_id: it.color_id ? Number(it.color_id) : null,
+            width: it.width !== undefined ? Number(it.width) : 0,
+            length: it.length !== undefined ? Number(it.length) : 0,
+            thickness: it.thickness !== undefined ? Number(it.thickness) : 0,
+            quantity: it.quantity !== undefined ? Number(it.quantity) : 0,
+            unit_price: it.unit_price !== undefined ? Number(it.unit_price) : 0,
+            subtotal: it.subtotal !== undefined ? Number(it.subtotal) : 0,
+          };
+          
+          // Only add batch_id if it exists and is not null/undefined
+          if (it.hasOwnProperty('batch_id') && it.batch_id !== null && it.batch_id !== undefined && it.batch_id !== "") {
+            itemPayload.batch_id = Number(it.batch_id);
+          }
+          
+          return itemPayload;
+        })
       };
 
       // Remove nullable fields that are explicitly null to avoid strict backend validation
       if (payload.order_id === null) delete payload.order_id;
       if (payload.customer_id === null) delete payload.customer_id;
+      
+      // Remove batch_id from items if they are null or undefined
+      payload.items = payload.items.map(item => {
+        const cleanItem = { ...item };
+        if (!cleanItem.hasOwnProperty('batch_id') || cleanItem.batch_id === null || cleanItem.batch_id === undefined || cleanItem.batch_id === "") {
+          delete cleanItem.batch_id;
+        }
+        return cleanItem;
+      });
+
+      console.log("Final payload being sent to API:", JSON.stringify(payload, null, 2));
 
       const response = await axiosInstance.post('/invoice', payload);
       return response.data;
@@ -99,22 +119,41 @@ export const invoiceApi = {
         total_amount: invoiceData.total_amount !== undefined ? Number(invoiceData.total_amount) : undefined,
         discount: invoiceData.discount !== undefined ? Number(invoiceData.discount) : undefined,
         paid_amount: invoiceData.paid_amount !== undefined ? Number(invoiceData.paid_amount) : undefined,
-        items: (invoiceData.items || []).map((it) => ({
-          ...it,
-          color_id: it.color_id ? Number(it.color_id) : null,
-          batch_id: it.batch_id === "" ? "" : (it.batch_id ? Number(it.batch_id) : null),
-          width: it.width !== undefined ? Number(it.width) : 0,
-          length: it.length !== undefined ? Number(it.length) : 0,
-          thickness: it.thickness !== undefined ? Number(it.thickness) : 0,
-          quantity: it.quantity !== undefined ? Number(it.quantity) : 0,
-          unit_price: it.unit_price !== undefined ? Number(it.unit_price) : 0,
-          subtotal: it.subtotal !== undefined ? Number(it.subtotal) : 0,
-        }))
+        items: (invoiceData.items || []).map((it) => {
+          const itemPayload = {
+            ...it,
+            color_id: it.color_id ? Number(it.color_id) : null,
+            width: it.width !== undefined ? Number(it.width) : 0,
+            length: it.length !== undefined ? Number(it.length) : 0,
+            thickness: it.thickness !== undefined ? Number(it.thickness) : 0,
+            quantity: it.quantity !== undefined ? Number(it.quantity) : 0,
+            unit_price: it.unit_price !== undefined ? Number(it.unit_price) : 0,
+            subtotal: it.subtotal !== undefined ? Number(it.subtotal) : 0,
+          };
+          
+          // Only add batch_id if it exists and is not null/undefined
+          if (it.hasOwnProperty('batch_id') && it.batch_id !== null && it.batch_id !== undefined && it.batch_id !== "") {
+            itemPayload.batch_id = Number(it.batch_id);
+          }
+          
+          return itemPayload;
+        })
       };
 
       // Remove nullable fields that are explicitly null to avoid strict backend validation
       if (payload.order_id === null) delete payload.order_id;
       if (payload.customer_id === null) delete payload.customer_id;
+      
+      // Remove batch_id from items if they are null or undefined
+      payload.items = payload.items.map(item => {
+        const cleanItem = { ...item };
+        if (!cleanItem.hasOwnProperty('batch_id') || cleanItem.batch_id === null || cleanItem.batch_id === undefined || cleanItem.batch_id === "") {
+          delete cleanItem.batch_id;
+        }
+        return cleanItem;
+      });
+
+      console.log("Final payload being sent to API (update):", JSON.stringify(payload, null, 2));
 
       const response = await axiosInstance.put(`/invoice/${id}`, payload);
       return response.data;
@@ -179,7 +218,7 @@ export const invoiceApi = {
   // Helper functions
   getFormattedDate: (dateString) => {
     if (!dateString) return 'غير محدد';
-    return new Date(dateString).toLocaleDateString("ar-EG", {
+    return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "numeric",
       day: "numeric",
@@ -190,7 +229,7 @@ export const invoiceApi = {
 
   formatCurrency: (amount) => {
     const num = parseFloat(amount) || 0;
-    const formatted = new Intl.NumberFormat("ar-EG", {
+    const formatted = new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(num);

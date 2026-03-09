@@ -50,11 +50,11 @@ const formatTypeItemForExport = (value) => {
 const formatPricingByForExport = (value) => {
   switch (value) {
     case "isByMeter22":
-      return "22 متر";
+      return "22 مم";
     case "isByMeter44":
-      return "44 متر";
+      return "44 مم";
     case "isByMeter66":
-      return "66 متر";
+      return "66 مم";
     case "isByBlanck":
     case "blanck":
       return "لوح";
@@ -267,9 +267,9 @@ export default function PriceColor() {
   ];
 
   const pricingOptions = [
-    { value: "isByMeter22", label: "22 متر" },
-    { value: "isByMeter44", label: "44 متر" },
-    { value: "isByMeter66", label: "66 متر" },
+    { value: "isByMeter22", label: "22 مم" },
+    { value: "isByMeter44", label: "44 مم" },
+    { value: "isByMeter66", label: "66 مم" },
     { value: "isByBlanck", label: "لوح" },
   ];
 
