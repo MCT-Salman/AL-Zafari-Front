@@ -47,7 +47,7 @@ const StyledDialog = ({
       <DialogContent className=" max-h-[90vh] overflow-y-auto bg-white">
         {/* Header */}
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-right">
+          <DialogTitle className="text-lg font-bold text-center">
             {title}
           </DialogTitle>
           {description && (

@@ -99,13 +99,13 @@ const App = () => {
                   <InvoiceManager />
                 </RoleProtectedRoute>
               } />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
               <Route path="/production" element={
                 <RoleProtectedRoute allowedRoles="production_manager">
                   <ProductionManager />
                 </RoleProtectedRoute>
               } />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Route>
           </Routes>
         </Suspense>
       </AuthProvider>

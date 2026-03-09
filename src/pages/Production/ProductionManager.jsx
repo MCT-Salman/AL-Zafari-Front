@@ -244,7 +244,38 @@ export default function ProductionManager() {
         try {
             setLoadingOrders(true);
             const response = await productionApi.getProductionOrders();
-            setProductionOrders(getApiData(response.data?.orders || response, []) || []);
+            const orders = getApiData(response.data?.orders || response, []) || [];
+            
+            // جلب تفاصيل كل طلب بشكل منفصل
+            const ordersWithDetails = await Promise.all(
+                orders.map(async (order) => {
+                    try {
+                        const itemsResponse = await productionApi.getProductionOrderItems(order.production_order_id);
+                        const items = getApiData(itemsResponse.data || itemsResponse, []) || [];
+                        
+                        // إذا كانت هناك عناصر، نأخذ أول عنصر لعرض بياناته في الجدول الرئيسي
+                        if (items.length > 0) {
+                            const firstItem = items[0];
+                            return {
+                                ...order,
+                                color_name: firstItem.color?.color_name || '-',
+                                color_code: firstItem.color?.color_code || '-',
+                                type_item: firstItem.type_item || '-',
+                                thickness: firstItem.thickness || '-',
+                                batch_number: firstItem.batch?.batch_number || '-',
+                                material_name: firstItem.color?.ruler?.material?.material_name || '-',
+                                ruler_type: firstItem.color?.ruler?.ruler_name || '-'
+                            };
+                        }
+                        return order;
+                    } catch (error) {
+                        console.error(`Error loading items for order ${order.production_order_id}:`, error);
+                        return order;
+                    }
+                })
+            );
+            
+            setProductionOrders(ordersWithDetails);
         } catch (error) {
             // console.error("Error loading production orders:", error);
             toast.error("فشل في تحميل طلبات الإنتاج");
@@ -307,8 +338,24 @@ export default function ProductionManager() {
             } else if (activeTextTarget === "batch_search") {
                 setBatchSearchTerm((prev) => apply(prev));
             }
+        } else {
+            // Handle numpad input for currentItem fields
+            const apply = (prev) => {
+                let next = String(prev || "");
+                if (val === "clear") next = "";
+                else if (val === "back") next = next.slice(0, -1);
+                else next = next + val;
+                return next;
+            };
+
+            if (activeField === "width" || activeField === "length") {
+                setCurrentItem(prev => ({
+                    ...prev,
+                    [activeField]: apply(prev[activeField])
+                }));
+            }
         }
-    }, [activeTextTarget]);
+    }, [activeTextTarget, activeField]);
 
     const filteredProductionOrders = useMemo(() => {
         if (!searchTerm) return productionOrders;
@@ -322,7 +369,8 @@ export default function ProductionManager() {
             order.batch_number?.toLowerCase().includes(term) ||
             order.status?.toLowerCase().includes(term) ||
             order.material_name?.toLowerCase().includes(term) ||
-            order.ruler_type?.toLowerCase().includes(term)
+            order.ruler_type?.toLowerCase().includes(term) ||
+            order.notes?.toLowerCase().includes(term)
         );
     }, [productionOrders, searchTerm]);
 
@@ -353,7 +401,7 @@ export default function ProductionManager() {
                 color: `${order.color_name || "-"} (${order.color_code || "-"})`,
                 type_item: formatTypeItem(order.type_item),
                 thickness: order.thickness ?? "-",
-                batch: order.batch?.batch_number || order.batch_number || "-",
+                batch: order.batch_number || order.batch?.batch_number || "-",
                 status: statusBadge?.label || "-",
                 notes: order.notes || "",
             };
@@ -474,24 +522,20 @@ export default function ProductionManager() {
 
             // تحضير items حسب الصيغة المطلوبة
             const items = productionItems.map(item => ({
+                color_id: Number(formData.color_id),
+                batch_id: Number(formData.batch_id),
+                type_item: formData.type_item,
+                thickness: Number(formData.thickness),
                 production_types: item.production_types,
                 width: Number(item.width),
                 length: Number(item.length)
             }));
 
             const orderData = {
-                color_id: Number(formData.color_id),
-                thickness: Number(formData.thickness),
                 notes: formData.notes || "",
                 status: formData.status || ProductionStatus.pending,
                 items: items
             };
-            if (formData.type_item) {
-                orderData.type_item = formData.type_item;
-            }
-            if (formData.batch_id) {
-                orderData.batch_id = Number(formData.batch_id);
-            }
 
             // console.log("Saving production order:", orderData);
 
@@ -506,8 +550,8 @@ export default function ProductionManager() {
             }
 
             // إعادة تعيين النموذج
-            setFormData({
-                material_id: "",
+            setFormData(prev => ({
+                ...prev,
                 ruler_id: "",
                 color_id: "",
                 batch_id: "",
@@ -515,7 +559,7 @@ export default function ProductionManager() {
                 thickness: "0.6",
                 notes: "",
                 status: ProductionStatus.pending
-            });
+            }));
             setProductionItems([]);
             setShowPreview(false);
             setEditingOrderId(null);
@@ -657,7 +701,7 @@ export default function ProductionManager() {
                             </Button>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            <Button
+                            {/* <Button
                                 size="lg"
                                 variant="outline"
                                 onClick={() => navigate("/dashboard")}
@@ -665,7 +709,7 @@ export default function ProductionManager() {
                             >
                                 <Home className="w-5 h-5 ml-2" />
                                 الرئيسية
-                            </Button>
+                            </Button> */}
                             <Button
                                 size="lg"
                                 variant="outline"
@@ -804,7 +848,7 @@ export default function ProductionManager() {
                                     </div>
                                 </div>
 
-                                {/* <div className="grid grid-cols-2 gap-2 mt-2">
+                                <div className="grid grid-cols-2 gap-2 mt-2">
                                     <button
                                         onClick={() => {
                                             setActiveField("width");
@@ -823,7 +867,7 @@ export default function ProductionManager() {
                                     >
                                         الكمية
                                     </button>
-                                </div> */}
+                                </div>
 
                                 <button
                                     onClick={() => handleNumpadPress("clear")}
@@ -1283,7 +1327,7 @@ export default function ProductionManager() {
                                                         {formatTypeItem(order.type_item)}
                                                     </td>
                                                     <td className="p-2 text-center text-sm">{order.thickness} مم</td>
-                                                    <td className="p-2 text-center text-sm">{order.batch?.batch_number || order.batch_number || '-'}</td>
+                                                    <td className="p-2 text-center text-sm">{order.batch_number || '-'}</td>
                                                     <td className="p-2 text-center">
                                                         <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
                                                             {statusBadge.label}
@@ -1449,7 +1493,7 @@ export default function ProductionManager() {
                             </div>
                             <div className="bg-gray-50 p-2 rounded-lg col-span-2">
                                 <div className="text-xs text-gray-500">الحالة</div>
-                                <div className="font-bold text-sm">
+                                <div className="font-bold text-sm mt-3">
                                     <span className={`px-2 py-1 rounded-lg text-xs ${productionApi.getStatusBadge(selectedOrder.status).className}`}>
                                         {productionApi.getStatusBadge(selectedOrder.status).label}
                                     </span>
