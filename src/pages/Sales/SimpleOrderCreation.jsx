@@ -67,8 +67,10 @@ export default function SimpleOrderCreation() {
     const [batches, setBatches] = useState([]);
     const [priceColors, setPriceColors] = useState([]);
     const [widthValues, setWidthValues] = useState([]);
+    const [thicknessValues, setThicknessValues] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [loadingWidths, setLoadingWidths] = useState(false);
+    const [loadingThickness, setLoadingThickness] = useState(false);
     const [loadingCustomers, setLoadingCustomers] = useState(false);
 
     // Customer State
@@ -95,7 +97,7 @@ export default function SimpleOrderCreation() {
         color_id: "",
         batch_id: "",
         width: "",
-        thickness: "0.6",
+        thickness: "",
         quantity: "",
         notes: ""
     });
@@ -262,12 +264,14 @@ export default function SimpleOrderCreation() {
         }
     }, [viewMode]);
 
-    // Load width values when material changes
+    // Load width values and thickness when material changes
     useEffect(() => {
         if (formData.material_id) {
             loadWidthValues(formData.material_id);
+            loadThicknessFromMaterial(formData.material_id);
         } else {
             setWidthValues([]);
+            setFormData(prev => ({ ...prev, width: "" }));
         }
     }, [formData.material_id]);
 
@@ -315,13 +319,45 @@ export default function SimpleOrderCreation() {
             const response = await constantApi.getConstantValuesByMaterial(materialId, 'width');
             const widthData = getApiData(response, []);
             setWidthValues(widthData);
-            setFormData(prev => ({ ...prev, width: "" }));
+            
+            // Set default width if isDefault is true
+            const defaultWidth = widthData.find(w => w.isDefault);
+            if (defaultWidth) {
+                setFormData(prev => ({ ...prev, width: String(defaultWidth.value) }));
+            } else {
+                setFormData(prev => ({ ...prev, width: "" }));
+            }
         } catch (error) {
             // console.error("Error loading widths:", error);
             toast.error("فشل في تحميل قيم العرض");
             setWidthValues([]);
+            setFormData(prev => ({ ...prev, width: "" }));
         } finally {
             setLoadingWidths(false);
+        }
+    };
+
+    const loadThicknessFromMaterial = async (materialId) => {
+        try {
+            setLoadingThickness(true);
+            const response = await constantApi.getConstantValuesByMaterial(materialId, 'thickness');
+            const thicknessData = getApiData(response, []);
+            setThicknessValues(thicknessData);
+            
+            // Set default thickness if isDefault is true
+            const defaultThickness = thicknessData.find(t => t.isDefault);
+            if (defaultThickness) {
+                setFormData(prev => ({ ...prev, thickness: String(defaultThickness.value) }));
+            } else if (thicknessData.length > 0) {
+                // If no default but has values, set the first one
+                setFormData(prev => ({ ...prev, thickness: String(thicknessData[0].value) }));
+            }
+        } catch (error) {
+            // console.error("Error loading thickness:", error);
+            setThicknessValues([]);
+            // Keep existing thickness if error occurs
+        } finally {
+            setLoadingThickness(false);
         }
     };
 
@@ -357,38 +393,44 @@ export default function SimpleOrderCreation() {
 
     const getQrUrl = (data) => {
         const encoded = encodeURIComponent(String(data || ""));
-        return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encoded}`;
+        return `https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=${encoded}`;
     };
 
     const buildItemQrData = (item) => {
-        const payload = {
-            kind: "order_item",
-            local_item_id: item?.id ?? null,
-            material: item?.material_name ?? item?.material_name ?? "",
-            ruler: item?.ruler_name ?? item?.ruler_type ?? item?.rulerType ?? item?.ruler?.ruler_name ?? item?.ruler?.ruler_type ?? "",
-            color: item?.color_name ?? item?.color_name ?? "",
-            color_code: item?.color_code ?? item?.color_code ?? "",
-            width: item?.width ?? "",
-            thickness: item?.thickness ?? "0.6",
-            quantity: item?.quantity ?? "",
-            batch: item?.batch_number ?? "",
-        };
-        return JSON.stringify(payload);
+        const values = [
+            item?.material_name ?? "",
+            item?.ruler_name ?? item?.ruler_type ?? item?.rulerType ?? item?.ruler?.ruler_name ?? item?.ruler?.ruler_type ?? "",
+            item?.color_code ?? item?.color_code ?? "",
+            item?.width ?? "",
+            item?.thickness ?? "",
+            item?.quantity ?? "",
+            item?.batch_number ?? ""
+        ];
+        return values.join('|');
     };
 
     const openQrPreview = (url, title = "", meta = {}) => {
-        // build footer line as material|colorCode|quantity|batch|type (values only)
-        const material = meta.material || "";
-        const colorCode = meta.colorCode || "";
+        // Use the same values and order as buildItemQrData
+        const material = meta.material_name || meta.material || "";
+        const ruler = meta.ruler_name || meta.ruler_type || meta.rulerType || meta.ruler?.ruler_name || meta.ruler?.ruler_type || "";
+        const colorCode = meta.color_code || meta.colorCode || "";
+        const width = meta.width || "";
+        const thickness = meta.thickness || "";
         const quantity = meta.quantity || "";
-        const batch = meta.batchNumber || "";
-        const typeLabel = meta.typeLabel || "";
-        const footer = [material, colorCode, quantity, batch, typeLabel].filter(v => v !== "").join("|");
+        const batch = meta.batch_number || meta.batchNumber || "";
+        
+        // Build footer with same order as QR data: material|ruler|color_code|width|thickness|quantity|batch
+        const footer = [material, ruler, colorCode, width, thickness, quantity, batch].filter(v => v !== "").join("|");
+        
         setQrPreview({
             open: true,
             url,
             title,
+            material,
+            ruler,
             colorCode,
+            width,
+            thickness,
             quantity,
             batchNumber: batch,
             footerText: footer
@@ -477,13 +519,13 @@ export default function SimpleOrderCreation() {
         });
     };
 
-    const printQr = (url, title = "QR", footer = "") => {
+    const printQr = (url, title = "QR", footer = "", direction = "rtl") => {
         const w = window.open("", "_blank", "width=600,height=700");
         if (!w) return;
-        w.document.write(`<!doctype html><html><head><title>${title}</title></head><body style="display:flex;align-items:center;justify-content:center;flex-direction:column;font-family:sans-serif;gap:12px;">
+        w.document.write(`<!doctype html><html><head><title>${title}</title></head><body style="display:flex;align-items:center;justify-content:center;flex-direction:column;font-family:sans-serif;gap:12px;direction:${direction};">
           <h3 style="margin:0;">${title}</h3>
           <img src="${url}" style="width:320px;height:320px;image-rendering:pixelated;" />
-          <div dir="ltr" style="margin-top:8px;font-size:14px;">${footer}</div>
+          <div dir="${direction}" style="margin-top:8px;font-size:14px;text-align:${direction === 'rtl' ? 'right' : 'left'};">${footer}</div>
           <script>window.onload = () => { window.print(); };</script>
         </body></html>`);
         w.document.close();
@@ -798,12 +840,12 @@ export default function SimpleOrderCreation() {
 
         setFormData(prev => ({
             material_id: prev.material_id,
-            thickness: "0.6",
-            type_item: "",
+            thickness: prev.thickness,
+            type_item: prev.type_item,
+            width: prev.width,
             ruler_id: "",
             color_id: "",
             batch_id: "",
-            width: "",
             quantity: "",
             notes: ""
         }));
@@ -819,7 +861,7 @@ export default function SimpleOrderCreation() {
             color_id: String(item.color_id),
             batch_id: item.batch_id ? String(item.batch_id) : "",
             width: item.width || "",
-            thickness: item.thickness || "0.6",
+            thickness: item.thickness || "",
             quantity: item.quantity,
             notes: item.notes || ""
         });
@@ -915,7 +957,7 @@ export default function SimpleOrderCreation() {
                     color_id: resolvedColorId ? String(resolvedColorId) : "",
                     batch_id: rawBatchId ? String(rawBatchId) : "",
                     width: it.width !== undefined && it.width !== null ? String(it.width) : "",
-                    thickness: String(it.thickness ?? "0.6"),
+                    thickness: String(it.thickness ?? ""),
                     quantity: String(it.quantity ?? ""),
                     notes: it.notes || "",
                     material_name: it.material_name ?? it.material?.material_name ?? resolvedMaterial?.material_name ?? "",
@@ -958,12 +1000,12 @@ export default function SimpleOrderCreation() {
             setEditingItemId(null);
             setFormData(prev => ({
                 material_id: prev.material_id,
-                thickness: "0.6",
-                type_item: "",
+                thickness: prev.thickness,
+                type_item: prev.type_item,
+                width: prev.width,
                 ruler_id: "",
                 color_id: "",
                 batch_id: "",
-                width: "",
                 quantity: "",
                 notes: ""
             }));
@@ -985,7 +1027,7 @@ export default function SimpleOrderCreation() {
                 const payload = {
                     color_id: Number(item.color_id),
                     width: Number(item.width) || 0,
-                    thickness: Number(item.thickness ?? formData.thickness ?? 0.6),
+                    thickness: Number(item.thickness ?? formData.thickness ?? 0),
                     quantity: Number(item.quantity),
                     notes: item.notes || ""
                 };
@@ -1061,12 +1103,12 @@ export default function SimpleOrderCreation() {
             setEditingItemId(null);
             setFormData(prev => ({
                 material_id: prev.material_id,
-                thickness: "0.6",
-                type_item: "",
+                thickness: prev.thickness,
+                type_item: prev.type_item,
+                width: prev.width,
                 ruler_id: "",
                 color_id: "",
                 batch_id: "",
-                width: "",
                 quantity: "",
                 notes: ""
             }));
@@ -1078,12 +1120,12 @@ export default function SimpleOrderCreation() {
         setEditingItemId(null);
         setFormData(prev => ({
             material_id: prev.material_id,
-            thickness: "0.6",
-            type_item: "",
+            thickness: prev.thickness,
+            type_item: prev.type_item,
+            width: prev.width,
             ruler_id: "",
             color_id: "",
             batch_id: "",
-            width: "",
             quantity: "",
             notes: ""
         }));
@@ -1134,6 +1176,22 @@ export default function SimpleOrderCreation() {
             };
         });
     }, [filteredColorsBySearch, getColorPricingStatus]);
+
+    // Width options for select
+    const widthOptions = useMemo(() => {
+        return widthValues.map(w => ({
+            value: String(w.value),
+            label: w.label || `${w.value} ${w.unit || ""}`.trim()
+        }));
+    }, [widthValues]);
+
+    // Thickness options for select
+    const thicknessOptions = useMemo(() => {
+        return thicknessValues.map(t => ({
+            value: String(t.value),
+            label: t.label || `${t.value} ${t.unit || ""}`.trim()
+        }));
+    }, [thicknessValues]);
 
     // Batch options for select
     const batchOptions = useMemo(() => {
@@ -1525,18 +1583,28 @@ export default function SimpleOrderCreation() {
                                     
                                     <div>
                                         <Label className="font-bold text-sm mb-2 block">السماكة</Label>
-                                        <div className="flex items-center gap-2">
-                                            <Input
-                                                type="number"
-                                                value={formData.thickness}
-                                                className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
-                                                placeholder="0.6"
-                                                step="0.1"
-                                                readOnly
-                                                disabled
+                                        {thicknessValues.length > 1 ? (
+                                            <FilterSelect
+                                                value={formData.thickness ? String(formData.thickness) : ""}
+                                                onChange={(value) => handleFieldChange("thickness", value)}
+                                                options={thicknessOptions}
+                                                placeholder="اختر السماكة"
+                                                className="w-full text-sm"
                                             />
-                                            <span className="text-base font-bold text-gray-600 whitespace-nowrap">مم</span>
-                                        </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <Input
+                                                    type="number"
+                                                    value={formData.thickness}
+                                                    className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
+                                                    placeholder={thicknessValues.length === 1 ? thicknessValues[0].label : "0.6"}
+                                                    step="0.1"
+                                                    readOnly={thicknessValues.length === 1}
+                                                    disabled={thicknessValues.length === 1}
+                                                />
+                                                <span className="text-base font-bold text-gray-600 whitespace-nowrap">مم</span>
+                                            </div>
+                                        )}
                                     </div>
                                     
                                     <div >
@@ -1906,7 +1974,7 @@ export default function SimpleOrderCreation() {
                                                         {item.ruler_name}
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
-                                                        {item.thickness || "0.6"} مم
+                                                        {item.thickness || ""} مم
                                                     </td>
                                                     <td className="p-1 text-center text-sm" title={item.batch_number}>
                                                         {item.batch_number || "-"}
@@ -2279,7 +2347,7 @@ export default function SimpleOrderCreation() {
                                             </td>
                                             <td className="p-3 text-center">{resolvedRulerName}</td>
                                             <td className="p-3 text-center">
-                                                {item.width || '-'} × {item.thickness || '0.6'}
+                                                {item.width || '-'} × {item.thickness || ''}
                                             </td>
                                             <td className="p-3 text-center font-bold">{item.quantity} م</td>
                                             <td className="p-3 text-center font-mono text-xs">{item.batch_number || '-'}</td>
@@ -2345,14 +2413,14 @@ export default function SimpleOrderCreation() {
                             <img src={qrPreview.url} alt="qr" className="h-80 w-80 border rounded" />
                         ) : null}
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3 text-sm" dir="ltr">
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm" dir="rtl" style={{ textAlign: "right" }}>
                         {qrPreview.footerText || ""}
                     </div>
                     <div className="flex items-center justify-center gap-2">
                         <Button
                             size="sm"
                             className="bg-secondary-s hover:brightness-110 text-white"
-                            onClick={() => printQr(qrPreview.url, qrPreview.title, qrPreview.footerText)}
+                            onClick={() => printQr(qrPreview.url, qrPreview.title, qrPreview.footerText, 'rtl')}
                             disabled={!qrPreview.url}
                         >
                             طباعة
@@ -2452,12 +2520,14 @@ export default function SimpleOrderCreation() {
                                     onClick={() => {
                                         const footer = [
                                             qrGenDialog.item?.material_name || "",
+                                            qrGenDialog.item?.ruler_name || qrGenDialog.item?.ruler_type || "",
                                             qrGenDialog.item?.color_code || "",
+                                            qrGenDialog.item?.width || "",
+                                            qrGenDialog.item?.thickness || "",
                                             qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
-                                            qrGenDialog.item?.batch_number || "",
-                                            formatTypeItem(qrGenDialog.item?.type_item)
-                                        ].filter(v => v).join("|");
-                                        printQr(qrGenDialog.qrUrl, `QR - ${qrGenDialog.item?.color_name || ''}`, footer);
+                                            qrGenDialog.item?.batch_number || ""
+                                        ].filter(v => v !== "").join("|");
+                                        printQr(qrGenDialog.qrUrl, `QR - ${qrGenDialog.item?.color_name || ''}`, footer, 'rtl');
                                     }}
                                 >
                                     طباعة QR
@@ -2469,11 +2539,13 @@ export default function SimpleOrderCreation() {
                                         const url = qrGenDialog.qrUrl;
                                         const title = `QR - ${qrGenDialog.item?.color_name || ''}`;
                                         openQrPreview(url, title, {
-                                            material: qrGenDialog.item?.material_name || "",
-                                            typeLabel: formatTypeItem(qrGenDialog.item?.type_item),
-                                            colorCode: qrGenDialog.item?.color_code || "",
+                                            material_name: qrGenDialog.item?.material_name || "",
+                                            ruler_name: qrGenDialog.item?.ruler_name || qrGenDialog.item?.ruler_type || "",
+                                            color_code: qrGenDialog.item?.color_code || "",
+                                            width: qrGenDialog.item?.width || "",
+                                            thickness: qrGenDialog.item?.thickness || "",
                                             quantity: qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
-                                            batchNumber: qrGenDialog.item?.batch_number || ""
+                                            batch_number: qrGenDialog.item?.batch_number || ""
                                         });
                                         closeQrGenDialog();
                                     }}
@@ -2881,7 +2953,7 @@ export default function SimpleOrderCreation() {
 //         // Reset form keeping material and thickness
 //         setFormData(prev => ({
 //             material_id: prev.material_id,
-//             thickness: "0.6",
+//             thickness: "",
 //             type_item: prev.type_item,
 //             ruler_id: "",
 //             color_id: "",

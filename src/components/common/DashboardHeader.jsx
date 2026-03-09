@@ -35,9 +35,9 @@ export default function DashboardHeader({
   };
 
   return (
-    <div className="relative flex-shrink-0">
+    <div className="relative flex-shrink-0 mb-20">
       {isHeaderVisible ? (
-        <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
+        <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-50 ">
           <div className="flex flex-wrap gap-3">{leftContent}</div>
 
           <div className="flex flex-wrap gap-2">

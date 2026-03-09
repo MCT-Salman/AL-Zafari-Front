@@ -66,6 +66,7 @@ export default function ProductionManager() {
     const [showOrderDetails, setShowOrderDetails] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [selectedOrderItems, setSelectedOrderItems] = useState([]);
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const tableContainerRef = useRef(null);
     const [activeTextTarget, setActiveTextTarget] = useState(null); // color_search | batch_search
     const [colorSearchCode, setColorSearchCode] = useState("");
@@ -713,7 +714,7 @@ export default function ProductionManager() {
                             <Button
                                 size="lg"
                                 variant="outline"
-                                onClick={logout}
+                                onClick={() => setShowLogoutDialog(true)}
                                 className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
                             >
                                 <LogOut className="w-5 h-5 ml-2" />
@@ -1584,6 +1585,21 @@ export default function ProductionManager() {
                     </div>
                 </StyledDialog>
             )}
+
+            {/* Logout confirmation dialog */}
+            <StyledDialog
+                isOpen={showLogoutDialog}
+                onOpenChange={setShowLogoutDialog}
+                title="تسجيل الخروج"
+                onCancel={() => setShowLogoutDialog(false)}
+                onConfirm={() => {
+                    logout();
+                    navigate("/login");
+                }}
+                confirmLabel="تسجيل الخروج"
+                cancelLabel="إلغاء"
+                confirmVariant="destructive"
+            />
         </div>
     );
 }

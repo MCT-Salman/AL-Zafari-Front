@@ -467,8 +467,6 @@ export default function SettingsManagement() {
                 placeholder="اختر الشرط"
               />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">الكمية</label>
               <Input
@@ -478,6 +476,8 @@ export default function SettingsManagement() {
                 placeholder="أدخل الكمية"
               />
             </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">القيمة</label>
               <Input
