@@ -474,6 +474,7 @@ export default function SettingsManagement() {
                 value={discountFormData.quantity || ""}
                 onChange={(e) => setDiscountFormData({ ...discountFormData, quantity: e.target.value })}
                 placeholder="أدخل الكمية"
+                className={'py-6'}
               />
             </div>
           </div>

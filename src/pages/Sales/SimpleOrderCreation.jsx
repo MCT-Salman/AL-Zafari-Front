@@ -51,7 +51,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").r
 
 export default function SimpleOrderCreation() {
     const navigate = useNavigate();
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
     const [viewMode, setViewMode] = useState("create");
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -397,6 +397,14 @@ export default function SimpleOrderCreation() {
     };
 
     const buildItemQrData = (item) => {
+        console.log("Debug - buildItemQrData item:", item);
+        console.log("Debug - item.employee_id:", item.employee_id);
+        console.log("Debug - user object:", user);
+        console.log("Debug - user keys:", user ? Object.keys(user) : "user is null");
+        console.log("Debug - user.user_id:", user?.user_id);
+        console.log("Debug - user.id:", user?.id);
+        console.log("Debug - user.employee_id:", user?.employee_id);
+        
         const values = [
             item?.material_name ?? "",
             item?.ruler_name ?? item?.ruler_type ?? item?.rulerType ?? item?.ruler?.ruler_name ?? item?.ruler?.ruler_type ?? "",
@@ -404,9 +412,12 @@ export default function SimpleOrderCreation() {
             item?.width ?? "",
             item?.thickness ?? "",
             item?.quantity ?? "",
-            item?.batch_number ?? ""
+            item?.batch_number ?? "",
+            item?.employee_id ?? user?.user_id ?? user?.id ?? user?.employee_id ?? ""
         ];
-        return values.join('|');
+        const result = values.join('|');
+        console.log("Debug - QR data result:", result);
+        return result;
     };
 
     const openQrPreview = (url, title = "", meta = {}) => {
@@ -418,9 +429,10 @@ export default function SimpleOrderCreation() {
         const thickness = meta.thickness || "";
         const quantity = meta.quantity || "";
         const batch = meta.batch_number || meta.batchNumber || "";
+        const employeeId = meta.employeeId || meta.employee_id || user?.user_id || user?.id || user?.employee_id || "";
         
-        // Build footer with same order as QR data: material|ruler|color_code|width|thickness|quantity|batch
-        const footer = [material, ruler, colorCode, width, thickness, quantity, batch].filter(v => v !== "").join("|");
+        // Build footer with same order as QR data: material|ruler|color_code|width|thickness|quantity|batch|employeeId
+        const footer = [material, ruler, colorCode, width, thickness, quantity, batch, employeeId].filter(v => v !== "").join("|");
         
         setQrPreview({
             open: true,
@@ -433,6 +445,7 @@ export default function SimpleOrderCreation() {
             thickness,
             quantity,
             batchNumber: batch,
+            employeeId,
             footerText: footer
         });
     };
@@ -525,7 +538,7 @@ export default function SimpleOrderCreation() {
         w.document.write(`<!doctype html><html><head><title>${title}</title></head><body style="display:flex;align-items:center;justify-content:center;flex-direction:column;font-family:sans-serif;gap:12px;direction:${direction};">
           <h3 style="margin:0;">${title}</h3>
           <img src="${url}" style="width:320px;height:320px;image-rendering:pixelated;" />
-          <div dir="${direction}" style="margin-top:8px;font-size:14px;text-align:${direction === 'rtl' ? 'right' : 'left'};">${footer}</div>
+          <div dir="${direction}" style="margin-top:8px;font-size:28px;font-weight:bold;text-align:${direction === 'rtl' ? 'right' : 'left'};">${footer}</div>
           <script>window.onload = () => { window.print(); };</script>
         </body></html>`);
         w.document.close();
@@ -904,6 +917,12 @@ export default function SimpleOrderCreation() {
             }
 
             const mappedItems = (details.items || []).map((it, idx) => {
+                console.log("Debug - Item data:", it);
+                console.log("Debug - Details data:", details);
+                console.log("Debug - employee_id from item:", it.employee_id);
+                console.log("Debug - employee_id from details:", details.employee_id);
+                console.log("Debug - current user:", user?.user_id);
+                
                 const rawColorCode = it.color_code ?? it.color?.color_code ?? it.colorCode ?? null;
                 const rawColorName = it.color_name ?? it.color?.color_name ?? it.colorName ?? null;
                 const rawColorId = it.color_id ?? it.color?.color_id ?? it.colorId ?? null;
@@ -965,6 +984,7 @@ export default function SimpleOrderCreation() {
                     color_name: it.color_name ?? it.color?.color_name ?? resolvedColor?.color_name ?? "",
                     color_code: it.color_code ?? it.color?.color_code ?? resolvedColor?.color_code ?? "",
                     batch_number: it.batch_number ?? it.batch?.batch_number ?? resolvedBatch?.batch_number ?? "",
+                    employee_id: it.employee_id ?? details?.employee_id ?? user?.user_id ?? ""
                 };
                 const qrData = buildItemQrData(local);
                 return { ...local, qrData, qrUrl: getQrUrl(qrData) };
@@ -2413,7 +2433,7 @@ export default function SimpleOrderCreation() {
                             <img src={qrPreview.url} alt="qr" className="h-80 w-80 border rounded" />
                         ) : null}
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3 text-sm" dir="rtl" style={{ textAlign: "right" }}>
+                    <div className="bg-gray-50 rounded-lg p-3 text-lg font-bold" dir="rtl" style={{ textAlign: "right" }}>
                         {qrPreview.footerText || ""}
                     </div>
                     <div className="flex items-center justify-center gap-2">
@@ -2525,7 +2545,8 @@ export default function SimpleOrderCreation() {
                                             qrGenDialog.item?.width || "",
                                             qrGenDialog.item?.thickness || "",
                                             qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
-                                            qrGenDialog.item?.batch_number || ""
+                                            qrGenDialog.item?.batch_number || "",
+                                            user?.user_id || user?.id || user?.employee_id || ""
                                         ].filter(v => v !== "").join("|");
                                         printQr(qrGenDialog.qrUrl, `QR - ${qrGenDialog.item?.color_name || ''}`, footer, 'rtl');
                                     }}
@@ -2545,7 +2566,8 @@ export default function SimpleOrderCreation() {
                                             width: qrGenDialog.item?.width || "",
                                             thickness: qrGenDialog.item?.thickness || "",
                                             quantity: qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
-                                            batch_number: qrGenDialog.item?.batch_number || ""
+                                            batch_number: qrGenDialog.item?.batch_number || "",
+                                            employeeId: user?.user_id || user?.id || user?.employee_id || ""
                                         });
                                         closeQrGenDialog();
                                     }}
