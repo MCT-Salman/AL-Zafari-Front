@@ -136,7 +136,7 @@ export default function SettingsManagement() {
     setDiscountFormData({
       material_id: discount.material_id || "",
       type: discount.type || "percentage",
-      quantityCondition: discount.quantityCondition || "GREATER_THAN",
+      quantityCondition: "GREATER_THAN",
       quantity: discount.quantity || "",
       value: discount.value || ""
     });
@@ -422,7 +422,7 @@ export default function SettingsManagement() {
         isOpen={discountsModal.isOpen}
         mode={discountsModal.mode}
         onClose={closeDiscountsModal}
-        onSubmit={handleSaveDiscount}
+        onSubmit={(data) => handleSaveDiscount({ ...data, quantityCondition: "GREATER_THAN" })}
         onDelete={handleDeleteDiscount}
         data={selectedDiscount}
         title={discountsModal.mode === 'create' ? "إضافة خصم جديد" : "تعديل الخصم"}
@@ -454,18 +454,7 @@ export default function SettingsManagement() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">الشرط</label>
-              <FilterSelect
-                value={discountFormData.quantityCondition}
-                onChange={(e) => setDiscountFormData({ ...discountFormData, quantityCondition: e.target.value })}
-                options={[
-                  { value: "GREATER_THAN", label: "أكبر من" },
-                  { value: "LESS_THAN", label: "أقل من" },
-                  { value: "EQUAL_TO", label: "يساوي" },
-                  { value: "GREATER_THAN_OR_EQUAL_TO", label: "أكبر من أو يساوي" },
-                  { value: "LESS_THAN_OR_EQUAL_TO", label: "أقل من أو يساوي" },
-                ]}
-                placeholder="اختر الشرط"
-              />
+              <Input value="أكبر من" readOnly className="py-6 bg-gray-100" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">الكمية</label>

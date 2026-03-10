@@ -332,6 +332,43 @@ export default function InvoiceManager() {
     const [priceCalculation, setPriceCalculation] = useState(null);
     const [calculatingPrice, setCalculatingPrice] = useState(false);
 
+    const invoiceTotalsSummary = useMemo(() => {
+        // إذا كانت الفاتورة مرتبطة بطلب، نستخدم قيمة الطلب فقط مع خصم الفاتورة
+        if (selectedOrder) {
+            const totalBeforeDiscount = parseFloat(selectedOrder.total_amount) || 0;
+            let invoiceDiscount = parseFloat(formData.discount) || 0;
+            if (formData.discount_type === "percentage") {
+                invoiceDiscount = (totalBeforeDiscount * invoiceDiscount) / 100;
+            }
+            const discountAmount = Math.max(invoiceDiscount, 0);
+            const totalAfterDiscount = Math.max(totalBeforeDiscount - discountAmount, 0);
+            return { totalBeforeDiscount, discountAmount, totalAfterDiscount };
+        }
+
+        // في الفاتورة اليدوية: نجمع خصم العناصر + خصم الفاتورة
+        const sumBefore = orderItems.reduce(
+            (sum, it) => sum + (parseFloat(it.subtotal_before_discount ?? it.subtotal ?? 0) || 0),
+            0
+        );
+        const sumAfter = orderItems.reduce(
+            (sum, it) => sum + (parseFloat(it.subtotal ?? it.subtotal_before_discount ?? 0) || 0),
+            0
+        );
+        const itemsDiscount = Math.max(sumBefore - sumAfter, 0);
+
+        let extraDiscount = parseFloat(formData.discount) || 0;
+        if (formData.discount_type === "percentage") {
+            // خصم الفاتورة ينطبق على المبلغ بعد خصم العناصر
+            extraDiscount = (sumAfter * extraDiscount) / 100;
+        }
+
+        const totalBeforeDiscount = sumBefore;
+        const discountAmount = Math.max(itemsDiscount + extraDiscount, 0);
+        const totalAfterDiscount = Math.max(totalBeforeDiscount - discountAmount, 0);
+
+        return { totalBeforeDiscount, discountAmount, totalAfterDiscount };
+    }, [selectedOrder, orderItems, formData.discount, formData.discount_type]);
+
     // Load initial data
     useEffect(() => {
         loadInitialData();
@@ -466,6 +503,15 @@ export default function InvoiceManager() {
         if (!formData.material_id) return null;
         return materials.find(m => String(m.material_id) === String(formData.material_id)) || null;
     }, [formData.material_id, materials]);
+
+    const materialBorderClass = useMemo(() => {
+        const name = String(selectedMaterial?.material_name || "").toLowerCase();
+        if (!name) return "border-gray-200";
+        if (name.includes("pvc")) return "border-blue-500";
+        if (name.includes("فوم")) return "border-green-400";
+        if (name.includes("ديكور")) return "border-purple-600";
+        return "border-orange-500";
+    }, [selectedMaterial?.material_name]);
     const isSelectedMaterialBoard = useMemo(() => {
         if (!formData.material_id) return false;
         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
@@ -477,6 +523,19 @@ export default function InvoiceManager() {
         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
         return materialName.includes("pvc");
     }, [formData.material_id, materials, selectedMaterial]);
+
+    // Auto-select default width for PVC when available
+    useEffect(() => {
+        if (!isSelectedMaterialPvc) return;
+        if (!formData.material_id) return;
+        if (formData.width) return; // don't override user choice
+        if (!widthValues || widthValues.length === 0) return;
+
+        const def = widthValues.find(w => w?.isDefault) || null;
+        if (def?.value !== undefined && def?.value !== null && String(def.value).trim() !== "") {
+            setFormData(prev => ({ ...prev, width: String(def.value) }));
+        }
+    }, [isSelectedMaterialPvc, formData.material_id, formData.width, widthValues]);
     const getMaterialConstantLabel = useCallback((material, type) => {
         const values = material?.constant_values || [];
         const candidates = values.filter(v => v.type === type);
@@ -629,11 +688,14 @@ export default function InvoiceManager() {
     }, [filteredColorsBySearch]);
 
     const batchOptions = useMemo(() => {
-        return batches.map(b => ({
+        const base = formData.material_id
+            ? batches.filter(b => String(b.material_id) === String(formData.material_id))
+            : batches;
+        return base.map(b => ({
             value: String(b.batch_id),
             label: b.batch_number || `دفعة ${b.batch_id}`
         }));
-    }, [batches]);
+    }, [batches, formData.material_id]);
 
     const filteredInvoices = useMemo(() => {
         if (!searchTerm) return invoices;
@@ -681,14 +743,18 @@ export default function InvoiceManager() {
             if (field === "material_id") {
                 newData.ruler_id = "";
                 newData.color_id = "";
+                newData.batch_id = "";
                 newData.width = "";
                 newData.type_item = "";
             } else if (field === "ruler_id") {
                 newData.color_id = "";
+                newData.batch_id = "";
             } else if (field === "width") {
                 newData.color_id = "";
+                newData.batch_id = "";
             } else if (field === "type_item") {
                 newData.color_id = "";
+                newData.batch_id = "";
             }
 
             return newData;
@@ -862,7 +928,9 @@ export default function InvoiceManager() {
         color_name: color?.color_name,
         batch_number: batch?.batch_number,
         unit_price: priceCalculation?.unitPrice || 0,
-        subtotal: priceCalculation?.subtotal || 0
+        subtotal_before_discount: priceCalculation?.subtotal || 0,
+        discount_amount: priceCalculation?.discount || 0,
+        subtotal: priceCalculation?.total ?? priceCalculation?.subtotal ?? 0
     };
 
     if (editingItemId) {
@@ -998,20 +1066,15 @@ export default function InvoiceManager() {
         return;
     }
 
-    // حساب المبلغ الكامل من العناصر إذا لم يكن هناك طلب
-    const totalAmount = selectedOrder?.total_amount || orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-
     try {
-        // حساب الخصم
-        let discount = parseFloat(formData.discount) || 0;
-        if (formData.discount_type === "percentage") {
-            discount = (parseFloat(totalAmount) * discount) / 100;
-        }
+        const totalBeforeDiscount = invoiceTotalsSummary.totalBeforeDiscount;
+        const discount = invoiceTotalsSummary.discountAmount;
+        const totalAfterDiscount = invoiceTotalsSummary.totalAfterDiscount;
 
         const invoiceData = {
             order_id: selectedOrder?.order_id ? Number(selectedOrder.order_id) : null,
             customer_id: selectedOrder?.customer_id ? Number(selectedOrder.customer_id) : (selectedCustomer?.customer_id ? Number(selectedCustomer.customer_id) : null),
-            total_amount: parseFloat(totalAmount),
+            total_amount: parseFloat(totalBeforeDiscount),
             discount: discount,
             paid_amount: paidAmount,
             notes: formData.notes || "",
@@ -1644,7 +1707,7 @@ export default function InvoiceManager() {
                         </div>
 
                         {/* العمود الأوسط - العناصر الإضافية */}
-                        <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
+                        <div className={`flex flex-col gap-3 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-2 ${materialBorderClass}`}>
                             {/* شريط التقدم للتعديل */}
                             {editingItemId && (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">
@@ -2149,23 +2212,63 @@ export default function InvoiceManager() {
                                         {/* معلومات الفاتورة */}
                                         <div className="bg-purple-50 p-2 rounded-lg">
                                             <div className="text-xs text-purple-600 font-bold">معلومات الفاتورة:</div>
-                                            <div className="text-sm">
-                                                {selectedOrder ? (
-                                                    <>طلب مرتبط - {invoiceApi.formatCurrency(selectedOrder.total_amount)}</>
-                                                ) : (
-                                                    <>فاتورة يدوية - {invoiceApi.formatCurrency(orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0))}</>
-                                                )}
+                                            <div className="space-y-1 text-sm">
+                                                <div>
+                                                    {selectedOrder ? (
+                                                        <>طلب مرتبط</>
+                                                    ) : (
+                                                        <>فاتورة يدوية</>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-1 gap-1">
+                                                    <div className="flex justify-between">
+                                                        <span>الإجمالي:</span>
+                                                        <span className="font-bold">{invoiceApi.formatCurrency(invoiceTotalsSummary.totalBeforeDiscount)}</span>
+                                                    </div>
+                                                    {invoiceTotalsSummary.discountAmount > 0 && (
+                                                        <div className="flex justify-between text-red-600">
+                                                            <span>الخصم:</span>
+                                                            <span className="font-bold">-{invoiceApi.formatCurrency(invoiceTotalsSummary.discountAmount)}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex justify-between border-t pt-1">
+                                                        <span>الإجمالي بعد الخصم:</span>
+                                                        <span className="font-bold">{invoiceApi.formatCurrency(invoiceTotalsSummary.totalAfterDiscount)}</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
                                         {/* معلومات الدفع */}
                                         <div className="bg-green-50 p-2 rounded-lg">
                                             <div className="text-xs text-green-600 font-bold">معلومات الدفع:</div>
-                                            <div className="text-sm">
-                                                المدفوع: {invoiceApi.formatCurrency(formData.paid_amount || 0)}
-                                                {formData.discount && parseFloat(formData.discount) > 0 && (
-                                                    <> - الخصم: {invoiceApi.formatCurrency(formData.discount)}</>
-                                                )}
+                                            <div className="text-sm space-y-1">
+                                                <div className="grid grid-cols-1 gap-1">
+                                                    <div>
+                                                        الإجمالي قبل الخصم:{" "}
+                                                        <span className="font-bold">
+                                                            {invoiceApi.formatCurrency(invoiceTotalsSummary.totalBeforeDiscount)}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        قيمة الخصم:{" "}
+                                                        <span className="font-bold text-red-600">
+                                                            {invoiceApi.formatCurrency(invoiceTotalsSummary.discountAmount)}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        الإجمالي بعد الخصم:{" "}
+                                                        <span className="font-bold text-primary-f">
+                                                            {invoiceApi.formatCurrency(invoiceTotalsSummary.totalAfterDiscount)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="pt-1 border-t mt-1">
+                                                    المدفوع:{" "}
+                                                    <span className="font-bold">
+                                                        {invoiceApi.formatCurrency(formData.paid_amount || 0)}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -2195,7 +2298,7 @@ export default function InvoiceManager() {
                                         });
                                     }}
                                     onConfirm={() => {
-                                        // نسخ بيانات الدفع إلى formData ثم حفظ
+                                        // نسخ بيانات الدفع إلى formData ثم فتح المعاينة
                                         setFormData(prev => ({
                                             ...prev,
                                             paid_amount: paymentFormData.paid_amount,
@@ -2369,55 +2472,7 @@ export default function InvoiceManager() {
                                             </button>
                                         </div>
 
-                                        {/* حساب الذمة (المتبقي) */}
-                                        {paymentFormData.paid_amount && (
-                                            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                                                {(() => {
-                                                    const total = parseFloat(selectedOrder?.total_amount || orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0));
-                                                    const discount = parseFloat(paymentFormData.discount) || 0;
-                                                    const paid = parseFloat(paymentFormData.paid_amount) || 0;
-                                                    const afterDiscount = total - discount;
-                                                    const remaining = afterDiscount - paid;
-                                                    const paymentStatus = invoiceApi.getPaymentStatus(afterDiscount, paid);
-                                                    return (
-                                                        <div className="space-y-2">
-                                                            <div className="text-sm font-bold text-green-700 mb-2">حساب الذمة</div>
-                                                            <div className="space-y-1 text-sm">
-                                                                <div className="flex justify-between">
-                                                                    <span>المبلغ الكامل:</span>
-                                                                    <span className="font-bold">{invoiceApi.formatCurrency(total)}</span>
-                                                                </div>
-                                                                {discount > 0 && (
-                                                                    <div className="flex justify-between text-red-600">
-                                                                        <span>الخصم:</span>
-                                                                        <span className="font-bold">-{invoiceApi.formatCurrency(discount)}</span>
-                                                                    </div>
-                                                                )}
-                                                                <div className="flex justify-between">
-                                                                    <span>المبلغ بعد الخصم:</span>
-                                                                    <span className="font-bold">{invoiceApi.formatCurrency(afterDiscount)}</span>
-                                                                </div>
-                                                                <div className="flex justify-between text-green-600">
-                                                                    <span>المدفوع:</span>
-                                                                    <span className="font-bold">{invoiceApi.formatCurrency(paid)}</span>
-                                                                </div>
-                                                                <div className="flex justify-between border-t pt-2 mt-2">
-                                                                    <span className="font-bold">الذمة (المتبقي):</span>
-                                                                    <span className={`font-bold ${remaining > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                                        {invoiceApi.formatCurrency(Math.max(remaining, 0))}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="mt-2">
-                                                                    <span className={`px-2 py-1 rounded-full text-xs ${paymentStatus.className}`}>
-                                                                        {paymentStatus.label}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
-                                        )}
+                                      
                                     </div>
                                 </StyledDialog>
                             )}
@@ -2481,11 +2536,18 @@ export default function InvoiceManager() {
                                                 <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
                                                 <th className="p-1 text-center border-b w-[80px]">سعر الوحدة</th>
                                                 <th className="p-1 text-center border-b w-[80px]">الإجمالي</th>
+                                                <th className="p-1 text-center border-b w-[80px]">الخصم</th>
+                                                <th className="p-1 text-center border-b w-[90px]">بعد الخصم</th>
                                                 <th className="p-1 text-center border-b w-[80px]">الإجراءات</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {orderItems.map(item => (
+                                                (() => {
+                                                    const subtotalBefore = parseFloat(item.subtotal_before_discount ?? item.subtotal ?? 0) || 0;
+                                                    const discountAmount = parseFloat(item.discount_amount ?? 0) || 0;
+                                                    const afterDiscount = parseFloat(item.subtotal ?? 0) || 0;
+                                                    return (
                                                 <tr
                                                     key={item.id}
                                                     className={`border-b hover:bg-gray-50 cursor-pointer transition-colors ${editingItemId === item.id ? 'bg-blue-50 border-blue-300' : ''
@@ -2520,7 +2582,13 @@ export default function InvoiceManager() {
                                                         {invoiceApi.formatCurrency(item.unit_price || 0)}
                                                     </td>
                                                     <td className="p-1 text-center text-sm font-bold text-primary-f">
-                                                        {invoiceApi.formatCurrency(item.subtotal || 0)}
+                                                        {invoiceApi.formatCurrency(subtotalBefore)}
+                                                    </td>
+                                                    <td className="p-1 text-center text-sm font-bold text-red-600">
+                                                        {discountAmount > 0 ? `-${invoiceApi.formatCurrency(discountAmount)}` : "-"}
+                                                    </td>
+                                                    <td className="p-1 text-center text-sm font-bold text-primary-f">
+                                                        {invoiceApi.formatCurrency(afterDiscount)}
                                                     </td>
                                                     <td className="p-1 text-center">
                                                         <div className="flex items-center justify-center gap-1">
@@ -2542,10 +2610,12 @@ export default function InvoiceManager() {
                                                         </div>
                                                     </td>
                                                 </tr>
+                                                    );
+                                                })()
                                             ))}
                                             {orderItems.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="10" className="p-8 text-center text-primary-f">
+                                                    <td colSpan="13" className="p-8 text-center text-primary-f">
                                                         <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                         <span className="text-sm">لا توجد عناصر مضافة</span>
                                                         <p className="text-xs mt-1">اضغط على العناصر في اليمين لإضافتها</p>
@@ -2553,11 +2623,19 @@ export default function InvoiceManager() {
                                                 </tr>
                                             )}
                                         </tbody>
+                                       
                                     </table>
                                 </div>
                                 <div className="flex justify-end pt-2">
                                     <Button
-                                        onClick={() => setShowPaymentPopup(true)}
+                                                onClick={() => {
+                                                    const totalToPay = invoiceTotalsSummary.totalAfterDiscount || invoiceTotalsSummary.totalBeforeDiscount || 0;
+                                                    setPaymentFormData(prev => ({
+                                                        ...prev,
+                                                        paid_amount: totalToPay ? String(totalToPay) : "",
+                                                    }));
+                                                    setShowPaymentPopup(true);
+                                                }}
                                         size="lg"
                                         className={`h-12 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform ${
                                             editingInvoiceId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
@@ -2643,6 +2721,8 @@ export default function InvoiceManager() {
                                         <th className="p-2 text-right border-b w-32">المنشئ</th>
                                         <th className="p-2 text-right border-b w-40">الزبون</th>
                                         <th className="p-2 text-center border-b w-28">الإجمالي</th>
+                                        <th className="p-2 text-center border-b w-28">الخصم</th>
+                                        <th className="p-2 text-center border-b w-36">الإجمالي بعد الخصم</th>
                                         <th className="p-2 text-center border-b w-28">المدفوع</th>
                                         <th className="p-2 text-center border-b w-28">المتبقي</th>
                                         <th className="p-2 text-center border-b w-28">الحالة</th>
@@ -2653,23 +2733,26 @@ export default function InvoiceManager() {
                                 <tbody>
                                     {invoicesLoading ? (
                                         <tr>
-                                            <td colSpan="10" className="p-8">
+                                            <td colSpan="12" className="p-8">
                                                 <LoadingState />
                                             </td>
                                         </tr>
                                     ) : filteredInvoices.length === 0 ? (
                                         <tr>
-                                            <td colSpan="10" className="p-8 text-center text-gray-400">
+                                            <td colSpan="12" className="p-8 text-center text-gray-400">
                                                 <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                 لا توجد فواتير
                                             </td>
                                         </tr>
                                     ) : (
                                         filteredInvoices.map(invoice => {
-                                            const total = parseFloat(invoice.total_amount);
+                                            const totalNet = parseFloat(invoice.total_amount) || 0; // after discount (as stored by backend)
+                                            const discount = parseFloat(invoice.discount) || 0;
+                                            const totalGross = Math.max(totalNet + discount, 0); // before discount
+                                            const totalAfterDiscount = totalNet;
                                             const paid = parseFloat(invoice.paid_amount);
                                             const remaining = parseFloat(invoice.remaining_amount);
-                                            const progress = (paid / total) * 100;
+                                            const progress = (paid / (totalNet || 1)) * 100;
 
                                             return (
                                                 <tr key={invoice.invoice_id} className="border-b hover:bg-gray-50">
@@ -2680,7 +2763,13 @@ export default function InvoiceManager() {
                                                         <CustomerInfo customer={invoice.customer} compact />
                                                     </td>
                                                     <td className="p-2 text-center font-bold text-primary-f text-sm">
-                                                        {invoiceApi.formatCurrency(total)}
+                                                        {invoiceApi.formatCurrency(totalGross)}
+                                                    </td>
+                                                    <td className="p-2 text-center text-red-600 font-bold text-sm">
+                                                        {discount > 0 ? `-${invoiceApi.formatCurrency(discount)}` : invoiceApi.formatCurrency(0)}
+                                                    </td>
+                                                    <td className="p-2 text-center font-bold text-primary-f text-sm">
+                                                        {invoiceApi.formatCurrency(totalAfterDiscount)}
                                                     </td>
                                                     <td className="p-2 text-center text-green-600 font-bold text-sm">
                                                         {invoiceApi.formatCurrency(paid)}
@@ -2690,8 +2779,8 @@ export default function InvoiceManager() {
                                                     </td>
                                                     <td className="p-2 text-center">
                                                         <div className="flex flex-col items-center gap-1">
-                                                            <PaymentStatusBadge total={total} paid={paid} />
-                                                            <ProgressBar value={paid} max={total} />
+                                                            <PaymentStatusBadge total={totalNet} paid={paid} />
+                                                            <ProgressBar value={paid} max={totalNet} />
                                                         </div>
                                                     </td>
                                                     <td className="p-2 text-center max-w-[150px] truncate text-sm" title={invoice.notes}>
@@ -2922,7 +3011,20 @@ export default function InvoiceManager() {
                                     <div className="bg-blue-50 p-3 rounded-lg">
                                         <div className="text-sm font-bold mb-2">معلومات الدفع</div>
                                         <div className="grid grid-cols-2 gap-2">
-                                            <div>الإجمالي: {invoiceApi.formatCurrency(selectedInvoice.total_amount)}</div>
+                                            {(() => {
+                                                const net = parseFloat(selectedInvoice.total_amount) || 0; // stored after discount
+                                                const discount = parseFloat(selectedInvoice.discount) || 0;
+                                                const gross = Math.max(net + discount, 0);
+                                                return (
+                                                    <>
+                                                        <div>الإجمالي قبل الخصم: {invoiceApi.formatCurrency(gross)}</div>
+                                                        <div>قيمة الخصم: -{invoiceApi.formatCurrency(discount)}</div>
+                                                        <div className="col-span-2 font-bold">
+                                                            الإجمالي بعد الخصم: {invoiceApi.formatCurrency(net)}
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
                                             <div>المدفوع: {invoiceApi.formatCurrency(selectedInvoice.paid_amount)}</div>
                                             <div>المتبقي: {invoiceApi.formatCurrency(selectedInvoice.remaining_amount)}</div>
                                             <div>

@@ -604,6 +604,15 @@ export default function SimpleOrderCreation() {
         if (!formData.material_id) return null;
         return materials.find(m => String(m.material_id) === String(formData.material_id)) || null;
     }, [formData.material_id, materials]);
+
+    const materialBorderClass = useMemo(() => {
+        const name = String(selectedMaterial?.material_name || "").toLowerCase();
+        if (!name) return "border-gray-200";
+        if (name.includes("pvc")) return "border-blue-500";
+        if (name.includes("فوم")) return "border-green-400";
+        if (name.includes("ديكور")) return "border-purple-600";
+        return "border-orange-500";
+    }, [selectedMaterial?.material_name]);
     const isSelectedMaterialPvc = useMemo(() => {
         if (!formData.material_id) return false;
         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
@@ -727,14 +736,18 @@ export default function SimpleOrderCreation() {
             if (field === "material_id") {
                 newData.ruler_id = "";
                 newData.color_id = "";
+                newData.batch_id = "";
                 newData.width = "";
                 newData.type_item = "";
             } else if (field === "ruler_id") {
                 newData.color_id = "";
+                newData.batch_id = "";
             } else if (field === "width") {
                 newData.color_id = "";
+                newData.batch_id = "";
             } else if (field === "type_item") {
                 newData.color_id = "";
+                newData.batch_id = "";
             }
 
             return newData;
@@ -1172,13 +1185,16 @@ export default function SimpleOrderCreation() {
 
     const filteredBatchOptions = useMemo(() => {
         const term = String(batchSearchTerm || "").trim().toLowerCase();
-        const base = batches.map(b => ({
+        const visibleBatches = formData.material_id
+            ? batches.filter(b => String(b.material_id) === String(formData.material_id))
+            : batches;
+        const base = visibleBatches.map(b => ({
             value: String(b.batch_id),
             label: b.batch_number || `دفعة ${b.batch_id}`
         }));
         if (!term) return base;
         return base.filter(opt => String(opt.label || "").toLowerCase().includes(term) || String(opt.value || "").toLowerCase().includes(term));
-    }, [batches, batchSearchTerm]);
+    }, [batches, batchSearchTerm, formData.material_id]);
 
     // Color options for select
     const colorOptions = useMemo(() => {
@@ -1215,11 +1231,14 @@ export default function SimpleOrderCreation() {
 
     // Batch options for select
     const batchOptions = useMemo(() => {
-        return batches.map(b => ({
+        const base = formData.material_id
+            ? batches.filter(b => String(b.material_id) === String(formData.material_id))
+            : batches;
+        return base.map(b => ({
             value: String(b.batch_id),
             label: b.batch_number || `دفعة ${b.batch_id}`
         }));
-    }, [batches]);
+    }, [batches, formData.material_id]);
 
     // Scroll table horizontally
     const scrollTable = (direction) => {
@@ -1417,7 +1436,7 @@ export default function SimpleOrderCreation() {
                         </div>
 
                         {/* العمود الأوسط - العناصر الإضافية */}
-                        <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
+                        <div className={`flex flex-col gap-3 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-2 ${materialBorderClass}`}>
                             {/* شريط التقدم للتعديل */}
                             {editingItemId && (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">

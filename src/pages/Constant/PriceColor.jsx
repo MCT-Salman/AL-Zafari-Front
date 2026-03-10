@@ -90,6 +90,7 @@ export default function PriceColor() {
     handleDelete,
   } = useCrud(priceColorApiAdapter, {
     idField: 'price_color_id',
+    keepOpenOnCreate: true,
     successMessages: {
       create: "تم إنشاء سعر اللون بنجاح",
       update: "تم تحديث سعر اللون بنجاح",
@@ -143,11 +144,11 @@ export default function PriceColor() {
   const handleOpenCreate = () => {
     setFormError("");
     setFormData({
-      material_id: "",
-      ruler_id: "",
+      material_id: formData.material_id || "",
+      ruler_id: formData.ruler_id || "",
       color_id: "",
       type_item: "Machine",
-      price_color_By: "isByMeter22",
+      price_color_By: formData.price_color_By || "isByMeter22",
       price_per_meter: "",
       notes: "",
     });
@@ -366,6 +367,19 @@ export default function PriceColor() {
     // (Assuming standard payload based on previous context, but ensuring clean values)
 
     await handleSave(dataToSend);
+
+    // Keep dialog open but clear only editable fields
+    if (modalState.mode === "create") {
+      setFormData((prev) => ({
+        material_id: prev.material_id,
+        ruler_id: prev.ruler_id,
+        color_id: "",
+        type_item: "Machine",
+        price_color_By: prev.price_color_By,
+        price_per_meter: "",
+        notes: "",
+      }));
+    }
   };
 
   // Lists for filters

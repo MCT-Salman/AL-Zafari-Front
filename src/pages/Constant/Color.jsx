@@ -207,10 +207,27 @@ export default function Color() {
     return "غير محدد";
   };
 
+  const getMaterialIdFromColor = (color) => {
+    const direct =
+      color?.material_id ||
+      color?.ruler?.material_id ||
+      color?.ruler?.material?.material_id ||
+      color?.material?.material_id;
+    if (direct) return String(direct);
+
+    const rulerId = color?.ruler_id || color?.ruler?.ruler_id;
+    if (rulerId && rulers.length > 0) {
+      const r = rulers.find(rr => String(rr.ruler_id) === String(rulerId));
+      const mid = r?.material_id || r?.material?.material_id;
+      if (mid) return String(mid);
+    }
+    return "";
+  };
+
   // Filter and pagination state
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRulerId, setSelectedRulerId] = useState("");
-  const [selectedMaterialName, setSelectedMaterialName] = useState("");
+  const [selectedMaterialId, setSelectedMaterialId] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -349,7 +366,8 @@ export default function Color() {
 
       const rulerId = (color.ruler_id || color.ruler?.ruler_id)?.toString();
       const matchesRuler = selectedRulerId === "" || rulerId === selectedRulerId;
-      const matchesMaterial = selectedMaterialName === "" || getMaterialName(color) === selectedMaterialName;
+      const materialIdResolved = getMaterialIdFromColor(color);
+      const matchesMaterial = selectedMaterialId === "" || materialIdResolved === selectedMaterialId;
 
       return matchesSearch && matchesRuler && matchesMaterial;
     }
@@ -376,7 +394,7 @@ export default function Color() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedRulerId, selectedMaterialName]);
+  }, [searchTerm, selectedRulerId, selectedMaterialId]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredColors.length / rowsPerPage);
@@ -446,22 +464,33 @@ export default function Color() {
           {/* Filters and Results */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FilterSelect
-              label="المسطرة"
-              value={selectedRulerId}
-              onChange={(e) => setSelectedRulerId(e.target.value)}
+              label="المادة"
+              value={selectedMaterialId}
+              onChange={(e) => {
+                const next = e.target.value;
+                setSelectedMaterialId(next);
+                setSelectedRulerId("");
+              }}
               options={[
-                { value: "", label: "جميع المساطر" },
-                ...rulers.map(r => ({ value: r.ruler_id.toString(), label: r.ruler_name }))
+                { value: "", label: "جميع المواد" },
+                ...materials
+                  .slice()
+                  .sort((a, b) => (a.material_name || "").localeCompare((b.material_name || ""), "ar"))
+                  .map(m => ({ value: String(m.material_id), label: m.material_name }))
               ]}
             />
 
             <FilterSelect
-              label="المادة"
-              value={selectedMaterialName}
-              onChange={(e) => setSelectedMaterialName(e.target.value)}
+              label="المسطرة"
+              value={selectedRulerId}
+              onChange={(e) => setSelectedRulerId(e.target.value)}
+              disabled={!selectedMaterialId}
+              placeholder={!selectedMaterialId ? "اختر المادة أولاً" : "اختر المسطرة"}
               options={[
-                { value: "", label: "جميع المواد" },
-                ...[...new Set(rulers.map(r => r.material?.material_name).filter(Boolean))].map(name => ({ value: name, label: name }))
+                { value: "", label: "جميع المساطر" },
+                ...rulers
+                  .filter(r => String(r.material_id) === String(selectedMaterialId))
+                  .map(r => ({ value: r.ruler_id.toString(), label: r.ruler_name }))
               ]}
             />
 

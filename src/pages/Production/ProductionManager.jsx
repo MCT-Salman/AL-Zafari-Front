@@ -228,11 +228,35 @@ export default function ProductionManager() {
         if (!formData.material_id) return null;
         return materials.find(m => String(m.material_id) === String(formData.material_id)) || null;
     }, [formData.material_id, materials]);
+
+    const materialBorderClass = useMemo(() => {
+        const name = String(selectedMaterial?.material_name || "").toLowerCase();
+        if (!name) return "border-gray-200";
+        if (name.includes("pvc")) return "border-blue-500";
+        if (name.includes("فوم")) return "border-green-400";
+        if (name.includes("ديكور")) return "border-purple-600";
+        return "border-orange-500";
+    }, [selectedMaterial?.material_name]);
     const isSelectedMaterialPvc = useMemo(() => {
         if (!formData.material_id) return false;
         const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
         return materialName.includes("pvc");
     }, [formData.material_id, materials, selectedMaterial]);
+
+    // Auto-select default width for PVC when available
+    useEffect(() => {
+        if (!isSelectedMaterialPvc) return;
+        if (!formData.material_id) return;
+        if (!widthValues || widthValues.length === 0) return;
+
+        const def = widthValues.find(w => w?.isDefault) || null;
+        if (!def || def.value === undefined || def.value === null || String(def.value).trim() === "") return;
+
+        setCurrentItem(prev => {
+            if (String(prev.width || "") === String(def.value)) return prev;
+            return { ...prev, width: String(def.value) };
+        });
+    }, [isSelectedMaterialPvc, formData.material_id, widthValues]);
     const getMaterialConstantLabel = useCallback((material, type) => {
         const values = material?.constant_values || [];
         const candidates = values.filter(v => v.type === type);
@@ -377,7 +401,10 @@ export default function ProductionManager() {
 
     const filteredBatchOptions = useMemo(() => {
         const term = String(batchSearchTerm || "").trim().toLowerCase();
-        const base = batches.map(b => ({
+        const visibleBatches = formData.material_id
+            ? batches.filter(b => String(b.material_id) === String(formData.material_id))
+            : batches;
+        const base = visibleBatches.map(b => ({
             value: String(b.batch_id),
             label: b.batch_number || `دفعة ${b.batch_id}`
         }));
@@ -386,7 +413,7 @@ export default function ProductionManager() {
             String(opt.label || "").toLowerCase().includes(term) ||
             String(opt.value || "").toLowerCase().includes(term)
         );
-    }, [batches, batchSearchTerm]);
+    }, [batches, batchSearchTerm, formData.material_id]);
 
     const handleExportProduction = () => {
         if (!filteredProductionOrders || filteredProductionOrders.length === 0) {
@@ -880,7 +907,7 @@ export default function ProductionManager() {
                         </div>
 
                         {/* العمود الأوسط - باقي المحتوى */}
-                        <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
+                        <div className={`flex flex-col gap-3 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-2 ${materialBorderClass}`}>
                             {editingItemId && (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">
                                     <span className="text-blue-700 text-sm font-medium">
