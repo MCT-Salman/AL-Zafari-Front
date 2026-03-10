@@ -188,6 +188,15 @@ export default function SimpleOrderCreation() {
         if (value === TypeItem.Presser) return "كوي";
         return "-";
     };
+    const formatTypeItemString = (value) => {
+        if (!value) return "-";
+        const raw = String(value);
+        const v = raw.toLowerCase();
+        if (v === String(TypeItem.Machine).toLowerCase() || v.includes("machine")) return "مكنة";
+        if (v === String(TypeItem.Presser).toLowerCase() || v.includes("presser")) return "كوي";
+        // إن كانت قيمة أخرى معرّفة نعرضها كما هي
+        return raw;
+    };
 
     const CUSTOMER_OPTIONS = [
         { value: "none", label: "بدون زبون", icon: UserX },
@@ -405,6 +414,8 @@ export default function SimpleOrderCreation() {
         console.log("Debug - user.id:", user?.id);
         console.log("Debug - user.employee_id:", user?.employee_id);
         
+        const typeLabel = formatTypeItemString(item?.type_item);
+
         const values = [
             item?.material_name ?? "",
             item?.ruler_name ?? item?.ruler_type ?? item?.rulerType ?? item?.ruler?.ruler_name ?? item?.ruler?.ruler_type ?? "",
@@ -413,6 +424,7 @@ export default function SimpleOrderCreation() {
             item?.thickness ?? "",
             item?.quantity ?? "",
             item?.batch_number ?? "",
+            typeLabel ?? "",
             item?.employee_id ?? user?.user_id ?? user?.id ?? user?.employee_id ?? ""
         ];
         const result = values.join('|');
@@ -429,10 +441,11 @@ export default function SimpleOrderCreation() {
         const thickness = meta.thickness || "";
         const quantity = meta.quantity || "";
         const batch = meta.batch_number || meta.batchNumber || "";
+        const typeLabel = meta.type_label || meta.typeLabel || "";
         const employeeId = meta.employeeId || meta.employee_id || user?.user_id || user?.id || user?.employee_id || "";
         
-        // Build footer with same order as QR data: material|ruler|color_code|width|thickness|quantity|batch|employeeId
-        const footer = [material, ruler, colorCode, width, thickness, quantity, batch, employeeId].filter(v => v !== "").join("|");
+        // Build footer with same order as QR data: material|ruler|color_code|width|thickness|quantity|batch|type|employeeId
+        const footer = [material, ruler, colorCode, width, thickness, quantity, batch, typeLabel, employeeId].filter(v => v !== "").join("|");
         
         setQrPreview({
             open: true,
@@ -445,6 +458,7 @@ export default function SimpleOrderCreation() {
             thickness,
             quantity,
             batchNumber: batch,
+            typeLabel,
             employeeId,
             footerText: footer
         });
@@ -1327,7 +1341,7 @@ export default function SimpleOrderCreation() {
                             </Card>
 
                             {/* الأرقام */}
-                            <Card className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
+                            <Card className="flex-[3] flex flex-col p-3 min-h-0 overflow-hidden">
                                 <div className="flex-shrink-0 mb-2">
                                     {/* <div className="flex gap-2 mb-2">
                                         <button
@@ -2366,6 +2380,7 @@ export default function SimpleOrderCreation() {
                                                 thickness: item.thickness,
                                                 quantity: item.quantity,
                                                 batch_number: item.batch_number,
+                                                type_item: item.type_item ?? item.order_type ?? item.typeItem ?? null,
                                             };
                                             return (
                                         <tr key={index} className="border-t hover:bg-gray-50">
@@ -2538,20 +2553,24 @@ export default function SimpleOrderCreation() {
                                     className="h-64 w-64 border rounded shadow-sm" 
                                 />
                             </div>
-                            <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1 border">
-                                <div>
-                                    <span className="font-semibold">كود اللون:</span>{" "}
-                                    <span>{qrGenDialog.item?.color_code || "-"}</span>
+                                <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1 border">
+                                    <div>
+                                        <span className="font-semibold">كود اللون:</span>{" "}
+                                        <span>{qrGenDialog.item?.color_code || "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold">الكمية:</span>{" "}
+                                        <span>{qrGenDialog.quantity || qrGenDialog.item?.quantity || "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold">الطبخة:</span>{" "}
+                                        <span>{qrGenDialog.item?.batch_number || "-"}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-semibold">نوع الطلب:</span>{" "}
+                                        <span>{formatTypeItemString(qrGenDialog.item?.type_item)}</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <span className="font-semibold">الكمية:</span>{" "}
-                                    <span>{qrGenDialog.quantity || qrGenDialog.item?.quantity || "-"}</span>
-                                </div>
-                                <div>
-                                    <span className="font-semibold">الطبخة:</span>{" "}
-                                    <span>{qrGenDialog.item?.batch_number || "-"}</span>
-                                </div>
-                            </div>
                             <div className="flex items-center justify-center gap-2">
                                 <Button
                                     size="sm"
@@ -2565,6 +2584,7 @@ export default function SimpleOrderCreation() {
                                             qrGenDialog.item?.thickness || "",
                                             qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
                                             qrGenDialog.item?.batch_number || "",
+                                            formatTypeItemString(qrGenDialog.item?.type_item),
                                             user?.user_id || user?.id || user?.employee_id || ""
                                         ].filter(v => v !== "").join("|");
                                         printQr(qrGenDialog.qrUrl, `QR - ${qrGenDialog.item?.color_name || ''}`, footer, 'rtl');
@@ -2586,6 +2606,7 @@ export default function SimpleOrderCreation() {
                                             thickness: qrGenDialog.item?.thickness || "",
                                             quantity: qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
                                             batch_number: qrGenDialog.item?.batch_number || "",
+                                            type_label: formatTypeItemString(qrGenDialog.item?.type_item),
                                             employeeId: user?.user_id || user?.id || user?.employee_id || ""
                                         });
                                         closeQrGenDialog();

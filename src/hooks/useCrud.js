@@ -37,6 +37,9 @@ const extractErrorMessage = (err, defaultMessage) => {
   if (err?.message) {
     return err.message;
   }
+  if (err?.details) {
+    return err.details;
+  }
 
   // Return default message if nothing found
   return defaultMessage || 'حدث خطأ غير متوقع';

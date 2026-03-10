@@ -808,7 +808,7 @@ export default function ProductionManager() {
                                 </div>
                             </Card>
 
-                            <Card className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
+                            <Card className="flex-[3] flex flex-col p-3 min-h-0 overflow-hidden">
                                 <div className="flex-shrink-0 mb-2">
                                     <div className="bg-gray-100 rounded-lg py-2 px-3">
                                         <div className="text-xs text-gray-500 mb-0.5">
