@@ -139,6 +139,7 @@ export default function CustomerManagement() {
     columns: [
       { key: "name", header: "اسم العميل" },
       { key: "phone", header: "رقم الهاتف" },
+      { key: "balance", header: "الذمة" },
       { key: "customer_type", header: "نوع العميل" },
       { key: "city", header: "المدينة" },
       { key: "address", header: "العنوان" },
@@ -150,6 +151,7 @@ export default function CustomerManagement() {
       { wch: 5 },   // #
       { wch: 25 },  // اسم العميل
       { wch: 20 },  // رقم الهاتف
+      { wch: 15 },  // الذمة
       { wch: 15 },  // نوع العميل
       { wch: 15 },  // المدينة
       { wch: 25 },  // العنوان
@@ -475,6 +477,7 @@ export default function CustomerManagement() {
                     <TableRow>
                       <TableHead sortable sortKey="name">اسم العميل</TableHead>
                       <TableHead sortable sortKey="phone">رقم الهاتف</TableHead>
+                      <TableHead sortable sortKey="balance">الذمة</TableHead>
                       <TableHead>المدينة</TableHead>
                       <TableHead>العنوان</TableHead>
                       <TableHead>الحالة</TableHead>
@@ -496,6 +499,9 @@ export default function CustomerManagement() {
                             <Phone className="w-4 h-4 text-gray-500" />
                             <span dir="ltr">{customer.phone}</span>
                           </div>
+                        </TableCell>
+                        <TableCell className="font-bold text-primary-f">
+                          {new Intl.NumberFormat("ar-SY").format(parseFloat(customer.balance || 0) || 0)} ل.س
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">

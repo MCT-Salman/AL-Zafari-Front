@@ -83,8 +83,9 @@ export const priceColorApi = {
     return `${colorName} - ${typeItem} (${pricingBy}): ${price} $`;
   },
 
-  formatPriceDisplay: (priceColor) => {
+  formatPriceDisplay: (priceColor, showUsd = true) => {
     if (!priceColor) return '0';
-    return `${priceColor.price_per_meter || '0'} $`;
+    const price = priceColor.price_per_meter || '0';
+    return showUsd ? `${price} $` : price;
   }
 };

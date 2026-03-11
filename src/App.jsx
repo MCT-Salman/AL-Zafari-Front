@@ -20,6 +20,7 @@ const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const ConstantTabs = lazy(() => import("./pages/Constant/ConstantTabs"));
 const CustomerManagement = lazy(() => import("./pages/Sales/CustomerManagement"));
 const OrderManagement = lazy(() => import("./pages/Sales/OrderManagement"));
+const InvoiceHistory = lazy(() => import("./pages/Admin/InvoiceHistory"));
 const SalesHome = lazy(() => import("./pages/Sales/SalesHome"));
 
 const RouteFallback = () => (
@@ -78,7 +79,11 @@ const App = () => {
                   <SettingsManagement />
                 </RoleProtectedRoute>
               } />
-             
+              <Route path="/invoice-history" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <InvoiceHistory />
+                </RoleProtectedRoute>
+              } />
               <Route path="/users" element={
                 <RoleProtectedRoute allowedRoles="admin">
                   <Users />
@@ -97,7 +102,7 @@ const App = () => {
                 </RoleProtectedRoute>
               } />
               <Route path="/invoice" element={
-                <RoleProtectedRoute allowedRoles="sales">
+                <RoleProtectedRoute allowedRoles={["sales", "admin"]}>
                   <InvoiceManager />
                 </RoleProtectedRoute>
               } />

@@ -1,10 +1,11 @@
-import { Home, Settings, Users, User, Sliders, Layers, ShoppingCart } from "lucide-react";
+import { Home, Settings, Users, User, Sliders, Layers, ShoppingCart, Receipt } from "lucide-react";
 
 export const sideData = [
     { id: 1, title: 'الرئيسية', link: '/dashboard', logo: Home },
     { id: 3, title: 'المستخدمون', link: '/users', logo: Users, role: 'admin' },
     { id: 4, title: 'إدارة الثوابت', link: '/constants', logo: Layers, role: 'admin' },
     { id: 7, title: 'إدارة الإعدادات', link: '/settings-management', logo: Settings, role: 'admin' },
+    { id: 12, title: 'سجل الفواتير', link: '/invoice-history', logo: Receipt, role: 'admin' },
     // { id: 8, title: 'إرسال OTP', link: '/admin/password-reset', logo: Sliders, role: 'admin' },
     { id: 2, title: 'الملف الشخصي', link: '/profile', role: 'admin', logo: User },
     { id: 5, title: 'الزبائن', link: '/customers', logo: User, role: 'sales' },

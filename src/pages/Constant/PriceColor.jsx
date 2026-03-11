@@ -4,6 +4,7 @@ import { priceColorApi } from "../../api/priceColorApi";
 import { colorApi } from "../../api/colorApi";
 import { rulerApi } from "../../api/rulerApi";
 import { materialApi } from "../../api/materialApi";
+import { settingApi } from "../../api/settingApi";
 import { useCrud } from "../../hooks/useCrud";
 import { useExport } from "../../hooks/useExport";
 import { CrudModal } from "../../components/common/CrudModal";
@@ -72,6 +73,26 @@ export default function PriceColor() {
     updateItem: (...args) => priceColorApi.updatePriceColor(...args),
     deleteItem: (...args) => priceColorApi.deletePriceColor(...args),
   }), []);
+
+  // State for USD price display setting
+  const [showUsdPrice, setShowUsdPrice] = useState(true);
+
+  // Load USD setting
+  useEffect(() => {
+    const loadUsdSetting = async () => {
+      try {
+        const res = await settingApi.getSettingByKey?.("price_color_show_usd_price");
+        const payload = res?.data ?? res;
+        const value = payload?.data?.value ?? payload?.data?.setting_value ?? payload?.value ?? payload?.setting_value ?? payload?.data ?? null;
+        if (value == null) return;
+        const v = String(value).toLowerCase();
+        setShowUsdPrice(v === "true" || v === "1" || v === "yes" || v === "on");
+      } catch {
+        // keep default
+      }
+    };
+    loadUsdSetting();
+  }, []);
 
   // Use CRUD hook
   const {
@@ -297,7 +318,7 @@ export default function PriceColor() {
       { key: "material_name", header: "المادة", format: (item) => getMaterialNameResolved(item) },
       { key: "type_item", header: "النوع", format: (item) => formatTypeItemForExport(item?.type_item) },
       { key: "price_color_By", header: "طريقة التسعير", format: (item) => formatPricingByForExport(item?.price_color_By) },
-      { key: "price_per_meter", header: "السعر ($)" },
+      { key: "price_per_meter", header: `السعر ${showUsdPrice ? "($)" : ""}` },
       { key: "notes", header: "الملاحظات" },
     ],
     columnWidths: [
@@ -628,7 +649,9 @@ export default function PriceColor() {
                       <TableHead>المادة</TableHead>
                       <TableHead>النوع</TableHead>
                       <TableHead>طريقة التسعير</TableHead>
-                      <TableHead sortable sortKey="price_per_meter">السعر بالمتر/لوح ($)</TableHead>
+                      <TableHead sortable sortKey="price_per_meter">
+                        السعر بالمتر/لوح {showUsdPrice && "($)"}
+                      </TableHead>
                       <TableHead>الملاحظات</TableHead>
                       <TableHead>الإجراءات</TableHead>
                     </TableRow>
@@ -671,7 +694,7 @@ export default function PriceColor() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="bg-green-50 text-green-800 font-bold">
-                            {priceColorApi.formatPriceDisplay(priceColor)}
+                            {priceColorApi.formatPriceDisplay(priceColor, showUsdPrice)}
                           </Badge>
                         </TableCell>
                         <TableCell className="max-w-xs truncate">
@@ -760,7 +783,7 @@ export default function PriceColor() {
                 ? [{ key: "type_item", label: "النوع", formatValue: (key, value) => getLabel(typeItemOptions, value) }]
                 : []),
               { key: "price_color_By", label: "طريقة التسعير", formatValue: (key, value) => getLabel(pricingOptions, value) },
-              { key: "price_per_meter", label: "السعر بالمتر/لوح ($)", formatValue: (key, value) => `${value} $` },
+              { key: "price_per_meter", label: `السعر بالمتر/لوح ${showUsdPrice ? "($)" : ""}`, formatValue: (key, value) => showUsdPrice ? `${value} $` : value },
               { key: "notes", label: "الملاحظات" },
             ]
             : []
@@ -856,7 +879,9 @@ export default function PriceColor() {
             </div>
 
             <div className="space-y-2">
-              <Label>السعر بالمتر/لوح ($) <span className="text-red-500">*</span></Label>
+              <Label>
+                السعر بالمتر/لوح {showUsdPrice && "($)"} <span className="text-red-500">*</span>
+              </Label>
               <Input
                 type="number"
                 value={formData.price_per_meter || ""}

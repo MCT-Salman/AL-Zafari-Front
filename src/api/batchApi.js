@@ -64,11 +64,11 @@ export const batchApi = {
   formatEntryDate: (batch) => {
     if (!batch?.entry_date) return 'غير محدد';
     return new Date(batch.entry_date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
     });
   },
 

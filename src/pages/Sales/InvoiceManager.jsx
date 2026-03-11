@@ -10,6 +10,7 @@ import { colorApi } from "../../api/colorApi";
 import { batchApi } from "../../api/batchApi";
 import { priceColorApi } from "../../api/priceColorApi";
 import { constantApi } from "../../api/constantApi";
+import { settingApi } from "../../api/settingApi";
 import { convertArabicToEnglishNumbers, parseArabicNumber } from "../../utils/helpers";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -207,9 +208,39 @@ const useMaterialsData = () => {
 
 export default function InvoiceManager() {
     const navigate = useNavigate();
-    const { logout } = useAuth();
-    const [viewMode, setViewMode] = useLocalStorage("invoice_view_mode", "create");
+    const { logout, user } = useAuth();
+    
+    const isAdmin = useMemo(() => {
+        const role = (user?.role ?? user?.user_role ?? user?.userRole ?? user?.type ?? "").toString().toLowerCase();
+        return role === "admin" || role.includes("admin");
+    }, [user]);
+    
+    const [viewMode, setViewMode] = useLocalStorage("invoice_view_mode", isAdmin ? "history" : "create");
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
+    const [showUsdPrice, setShowUsdPrice] = useState(true);
+
+    useEffect(() => {
+        const loadUsdSetting = async () => {
+            try {
+                const res = await settingApi.getSettingByKey?.("invoice_show_usd_price");
+                const payload = res?.data ?? res;
+                const value = payload?.data?.value ?? payload?.data?.setting_value ?? payload?.value ?? payload?.setting_value ?? payload?.data ?? null;
+                if (value == null) return;
+                const v = String(value).toLowerCase();
+                setShowUsdPrice(v === "true" || v === "1" || v === "yes" || v === "on");
+            } catch {
+                // keep default
+            }
+        };
+        loadUsdSetting();
+    }, []);
+
+    useEffect(() => {
+        if (!isAdmin && viewMode === "history") {
+            setViewMode("create");
+        }
+    }, [isAdmin, viewMode, setViewMode]);
     const [showPreview, setShowPreview] = useState(false);
     const [editingItemId, setEditingItemId] = useState(null);
     const tableContainerRef = useRef(null);
@@ -705,7 +736,13 @@ export default function InvoiceManager() {
             String(inv.invoice_id).includes(term) ||
             inv.customer?.name?.toLowerCase().includes(term) ||
             inv.customer?.phone?.toLowerCase().includes(term) ||
-            (inv.order_id && String(inv.order_id).includes(term))
+            (inv.order_id && String(inv.order_id).includes(term)) ||
+            (inv.issued_at && new Date(inv.issued_at).toLocaleDateString('ar-SA').includes(term)) ||
+            (inv.total_amount && String(inv.total_amount).includes(term)) ||
+            (inv.paid_amount && String(inv.paid_amount).includes(term)) ||
+            (inv.remaining_amount && String(inv.remaining_amount).includes(term)) ||
+            (inv.notes && inv.notes.toLowerCase().includes(term)) ||
+            (inv.status && inv.status.toLowerCase().includes(term))
         );
     }, [invoices, searchTerm]);
 
@@ -1478,22 +1515,24 @@ export default function InvoiceManager() {
                             <Receipt className="w-5 h-5 ml-2" />
                             فاتورة جديدة
                         </Button>
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => {
-                                setViewMode("history");
-                                loadInvoices();
-                                loadOrders();
-                            }}
-                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
-                                ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                }`}
-                        >
-                            <History className="w-5 h-5 ml-2" />
-                            سجل الفواتير
-                        </Button>
+                        {isAdmin && (
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={() => {
+                                    setViewMode("history");
+                                    loadInvoices();
+                                    loadOrders();
+                                }}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                    }`}
+                            >
+                                <History className="w-5 h-5 ml-2" />
+                                سجل الفواتير
+                            </Button>
+                        )}
                     </>
                 }
             />
@@ -1957,7 +1996,7 @@ export default function InvoiceManager() {
                                             <span>سعر الوحدة:</span>
                                             <span className="font-bold flex items-center gap-2">
                                                 {invoiceApi.formatCurrency(priceCalculation.unitPrice)}
-                                                {priceCalculation.price_per_meter !== undefined && (
+                                                {showUsdPrice && priceCalculation.price_per_meter !== undefined && (
                                                     <span className="text-xs text-gray-600">
                                                         ({priceCalculation.price_per_meter} $)
                                                     </span>
@@ -2277,7 +2316,7 @@ export default function InvoiceManager() {
                                                                 <td className="p-1 text-center">
                                                                     <span className="flex flex-col items-center gap-0.5">
                                                                         <span>{invoiceApi.formatCurrency(it.unit_price || 0)}</span>
-                                                                        {it.price_per_meter != null && (
+                                                                        {showUsdPrice && it.price_per_meter != null && (
                                                                             <span className="text-[10px] text-gray-600">
                                                                                 ({it.price_per_meter} $)
                                                                             </span>
@@ -2658,7 +2697,7 @@ export default function InvoiceManager() {
                                                 <th className="p-1 text-center border-b w-[80px]">سعر الوحدة</th>
                                                 <th className="p-1 text-center border-b w-[80px]">الإجمالي</th>
                                                 <th className="p-1 text-center border-b w-[80px]">الخصم</th>
-                                                <th className="p-1 text-center border-b w-[90px]">بعد الخصم</th>
+                                                <th className="p-1 text-center border-b w-[190px]">بعد الخصم</th>
                                                 <th className="p-1 text-center border-b w-[80px]">الإجراءات</th>
                                             </tr>
                                         </thead>
@@ -2702,7 +2741,7 @@ export default function InvoiceManager() {
                                                     <td className="p-1 text-center text-sm">
                                                         <span className="flex flex-col items-center gap-0.5">
                                                             <span>{invoiceApi.formatCurrency(item.unit_price || 0)}</span>
-                                                            {item.price_per_meter != null && (
+                                                            {showUsdPrice && item.price_per_meter != null && (
                                                                 <span className="text-[10px] text-gray-600">
                                                                     ({item.price_per_meter} $)
                                                                 </span>
@@ -2716,7 +2755,43 @@ export default function InvoiceManager() {
                                                         {discountAmount > 0 ? `-${invoiceApi.formatCurrency(discountAmount)}` : "-"}
                                                     </td>
                                                     <td className="p-1 text-center text-sm font-bold text-primary-f">
-                                                        {invoiceApi.formatCurrency(afterDiscount)}
+                                                        {editingItemId === item.id ? (
+                                                            <div className="flex items-center gap-2 w-48">
+                                                                <Input
+                                                                    type="number"
+                                                                    inputMode="decimal"
+                                                                    value={String(afterDiscount)}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    onChange={(e) => {
+                                                                        const next = parseFloat(e.target.value || "0") || 0;
+                                                                        setOrderItems(prev => prev.map(it => {
+                                                                            if (it.id !== item.id) return it;
+                                                                            const before = parseFloat(it.subtotal_before_discount ?? it.subtotal ?? 0) || 0;
+                                                                            const discount = Math.max(0, before - next);
+                                                                            return {
+                                                                                ...it,
+                                                                                subtotal: next,
+                                                                                discount_amount: discount
+                                                                            };
+                                                                        }));
+                                                                    }}
+                                                                    className="h-12 w-48 text-center font-bold text-lg"
+                                                                />
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setEditingItemId(null);
+                                                                        toast.success("تم حفظ السعر بنجاح");
+                                                                    }}
+                                                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2"
+                                                                >
+                                                                    <Save className="w-4 h-4" />
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            invoiceApi.formatCurrency(afterDiscount)
+                                                        )}
                                                     </td>
                                                     <td className="p-1 text-center">
                                                         <div className="flex items-center justify-center gap-1">

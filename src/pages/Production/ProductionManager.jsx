@@ -57,6 +57,8 @@ export default function ProductionManager() {
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [typeFilter, setTypeFilter] = useState("");
     const [showPreview, setShowPreview] = useState(false);
     const [editingItemId, setEditingItemId] = useState(null);
     const [editingOrderId, setEditingOrderId] = useState(null);
@@ -383,21 +385,32 @@ export default function ProductionManager() {
     }, [activeTextTarget, activeField]);
 
     const filteredProductionOrders = useMemo(() => {
-        if (!searchTerm) return productionOrders;
         const term = searchTerm.toLowerCase();
-        return productionOrders.filter(order =>
-            String(order.production_order_id).includes(term) ||
-            order.issued_by?.username?.toLowerCase().includes(term) ||
-            order.color_name?.toLowerCase().includes(term) ||
-            order.color_code?.toLowerCase().includes(term) ||
-            order.batch?.batch_number?.toLowerCase().includes(term) ||
-            order.batch_number?.toLowerCase().includes(term) ||
-            order.status?.toLowerCase().includes(term) ||
-            order.material_name?.toLowerCase().includes(term) ||
-            order.ruler_type?.toLowerCase().includes(term) ||
-            order.notes?.toLowerCase().includes(term)
-        );
-    }, [productionOrders, searchTerm]);
+        return productionOrders.filter(order => {
+            // Search filter
+            const matchesSearch = !term || (
+                String(order.production_order_id).includes(term) ||
+                order.issued_by?.username?.toLowerCase().includes(term) ||
+                order.color_name?.toLowerCase().includes(term) ||
+                order.color_code?.toLowerCase().includes(term) ||
+                order.batch?.batch_number?.toLowerCase().includes(term) ||
+                order.batch_number?.toLowerCase().includes(term) ||
+                order.status?.toLowerCase().includes(term) ||
+                order.material_name?.toLowerCase().includes(term) ||
+                order.ruler_type?.toLowerCase().includes(term) ||
+                order.notes?.toLowerCase().includes(term) ||
+                order.type_item?.toLowerCase().includes(term)
+            );
+            
+            // Status filter
+            const matchesStatus = !statusFilter || String(order.status || "").toLowerCase() === String(statusFilter).toLowerCase();
+            
+            // Type filter
+            const matchesType = !typeFilter || String(order.type_item || "").toLowerCase() === String(typeFilter).toLowerCase();
+            
+            return matchesSearch && matchesStatus && matchesType;
+        });
+    }, [productionOrders, searchTerm, statusFilter, typeFilter]);
 
     const filteredBatchOptions = useMemo(() => {
         const term = String(batchSearchTerm || "").trim().toLowerCase();
@@ -1265,54 +1278,83 @@ export default function ProductionManager() {
                 ) : (
                     /* وضع السجل */
                     <Card className="flex flex-col h-full min-h-0 overflow-hidden p-3">
-                        <div className="flex justify-between items-center mb-2 flex-shrink-0">
+                        <div className="flex justify-between items-center mb-2 flex-shrink-0 w-full">
                             <h2 className="font-bold text-lg">سجل طلبات الإنتاج</h2>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    type="text"
-                                    placeholder="بحث..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="h-8 w-48 text-sm"
-                                />
-                                <Button
-                                    size="sm"
-                                    onClick={loadProductionOrders}
-                                    className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white"
-                                    disabled={loadingOrders}
-                                >
-                                    {loadingOrders ? (
-                                        <RefreshCw className="w-4 h-4 ml-1 animate-spin" />
-                                    ) : (
-                                        <RotateCcw className="w-4 h-4 ml-1" />
-                                    )}
-                                    تحديث
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="px-4 py-2 text-sm"
-                                    onClick={() => {
-                                        handleExportProduction();
-                                    }}
-                                    disabled={exportingProduction || filteredProductionOrders.length === 0}
-                                >
-                                    <Download className="w-4 h-4 ml-1" />
-                                    {exportingProduction ? "جارٍ التصدير..." : "تصدير Excel"}
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="px-4 py-2 text-sm"
-                                    onClick={() => {
-                                        // طباعة
-                                        window.print();
-                                    }}
-                                >
-                                    <Printer className="w-4 h-4 ml-1" />
-                                    طباعة
-                                </Button>
-                            </div>
+                        </div>
+                        
+                        {/* First row - Search and filters */}
+                        <div className="flex  gap-2 mb-2">
+                            <Input
+                                type="text"
+                                placeholder="بحث..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="h-8 p-6 flex-1 max-w-[400px] text-sm"
+                            />
+                            <FilterSelect
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                options={[
+                                    { value: "", label: "كل الحالات" },
+                                    { value: "pending", label: "معلق" },
+                                    { value: "preparing", label: "قيد التحضير" },
+                                    { value: "in_progress", label: "قيد التنفيذ" },
+                                    { value: "completed", label: "مكتمل" },
+                                    { value: "cancelled", label: "ملغي" },
+                                ]}
+                                className="h-8 text-sm max-w-[250px]"
+                            />
+                            <FilterSelect
+                                value={typeFilter}
+                                onChange={(e) => setTypeFilter(e.target.value)}
+                                options={[
+                                    { value: "", label: "كل الأنواع" },
+                                    { value: "machine", label: "مكنة" },
+                                    { value: "presser", label: "كوي" },
+                                ]}
+                                className="h-8 text-sm max-w-[250px]"
+                            />
+                        </div>
+                        
+                        {/* Second row - Action buttons */}
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                size="sm"
+                                onClick={loadProductionOrders}
+                                className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white"
+                                disabled={loadingOrders}
+                            >
+                                {loadingOrders ? (
+                                    <RefreshCw className="w-4 h-4 ml-1 animate-spin" />
+                                ) : (
+                                    <RotateCcw className="w-4 h-4 ml-1" />
+                                )}
+                                تحديث
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="px-4 py-2 text-sm"
+                                onClick={() => {
+                                    handleExportProduction();
+                                }}
+                                disabled={exportingProduction || filteredProductionOrders.length === 0}
+                            >
+                                <Download className="w-4 h-4 ml-1" />
+                                {exportingProduction ? "جارٍ التصدير..." : "تصدير Excel"}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="px-4 py-2 text-sm"
+                                onClick={() => {
+                                    // طباعة
+                                    window.print();
+                                }}
+                            >
+                                <Printer className="w-4 h-4 ml-1" />
+                                طباعة
+                            </Button>
                         </div>
 
                         {/* جدول السجل */}

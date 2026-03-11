@@ -149,7 +149,7 @@ export default function Ruler() {
     if (!raw) return "غير محدد";
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) return "غير محدد";
-    return date.toLocaleDateString("ar-EG", {
+    return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",

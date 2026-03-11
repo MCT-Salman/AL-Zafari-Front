@@ -17,6 +17,7 @@ import {
 import { Input } from "../components/ui/input";
 import FilterSelect from "../components/common/FilterSelect";
 import { Badge } from "../components/ui/badge";
+import { Switch } from "../components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Settings, Percent, History, Edit, Trash2, Plus, Info } from "lucide-react";
 import CrudActions from "../components/common/CrudActions";
@@ -28,6 +29,8 @@ import { getApiData } from "../utils/api";
 
 export default function SettingsManagement() {
   const [activeTab, setActiveTab] = useState("general");
+  const [savingUsdSetting, setSavingUsdSetting] = useState(false);
+  const [savingPriceColorUsdSetting, setSavingPriceColorUsdSetting] = useState(false);
 
   // --- General Settings CRUD ---
   const settingsAdapter = useMemo(() => ({
@@ -64,6 +67,64 @@ export default function SettingsManagement() {
     value: "",
     description: ""
   });
+
+  const invoiceUsdSetting = useMemo(() => {
+    return (settings || []).find(s => String(s.key) === "invoice_show_usd_price") || null;
+  }, [settings]);
+
+  const invoiceUsdEnabled = useMemo(() => {
+    if (!invoiceUsdSetting) return true;
+    const v = String(invoiceUsdSetting.value ?? "").toLowerCase();
+    return v === "true" || v === "1" || v === "yes" || v === "on";
+  }, [invoiceUsdSetting]);
+
+  const priceColorUsdSetting = useMemo(() => {
+    return (settings || []).find(s => String(s.key) === "price_color_show_usd_price") || null;
+  }, [settings]);
+
+  const priceColorUsdEnabled = useMemo(() => {
+    if (!priceColorUsdSetting) return true;
+    const v = String(priceColorUsdSetting.value ?? "").toLowerCase();
+    return v === "true" || v === "1" || v === "yes" || v === "on";
+  }, [priceColorUsdSetting]);
+
+  const handleToggleInvoiceUsd = async (nextEnabled) => {
+    try {
+      setSavingUsdSetting(true);
+      const payload = {
+        key: "invoice_show_usd_price",
+        value: nextEnabled ? "true" : "false",
+        description: "التحكم بإظهار سعر الدولار في صفحة وسجل الفواتير",
+      };
+      if (invoiceUsdSetting?.id) {
+        await settingApi.updateSettingById(invoiceUsdSetting.id, payload);
+      } else {
+        await settingApi.createSetting(payload);
+      }
+      await fetchSettings();
+    } finally {
+      setSavingUsdSetting(false);
+    }
+  };
+
+  const handleTogglePriceColorUsd = async (nextEnabled) => {
+    try {
+      setSavingPriceColorUsdSetting(true);
+      const payload = {
+        key: "price_color_show_usd_price",
+        value: nextEnabled ? "true" : "false",
+        description: "التحكم بإظهار سعر الدولار في صفحة ألوان التسعير",
+      };
+      if (priceColorUsdSetting?.id) {
+        await settingApi.updateSettingById(priceColorUsdSetting.id, payload);
+      } else {
+        await settingApi.createSetting(payload);
+      }
+      await fetchSettings();
+    } finally {
+      setSavingPriceColorUsdSetting(false);
+    }
+  };
 
   // Explicit handlers for settings
   const handleOpenCreateSetting = () => {
@@ -218,6 +279,49 @@ export default function SettingsManagement() {
                 <Plus className="w-4 h-4" />
                 إضافة إعداد جديد
               </Button>
+            </div>
+
+            <div className="mb-6 rounded-lg border bg-gray-50 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="font-bold">إظهار سعر الدولار في الفواتير</div>
+                  <div className="text-sm text-gray-600">
+                    يتحكم بإظهار/إخفاء سعر الدولار في صفحة الفواتير وسجلها.
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="text-primary-f border-primary-f/30">
+                    key: invoice_show_usd_price
+                  </Badge>
+                  <Switch
+                    checked={invoiceUsdEnabled}
+                    onCheckedChange={(checked) => handleToggleInvoiceUsd(Boolean(checked))}
+                    disabled={savingUsdSetting}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Price Color USD Setting */}
+            <div className="bg-white rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg">إظهار سعر الدولار في ألوان التسعير</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    التحكم في إظهار أو إخفاء رمز الدولار ($) في صفحة إدارة أسعار الألوان
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="text-primary-f border-primary-f/30">
+                    key: price_color_show_usd_price
+                  </Badge>
+                  <Switch
+                    checked={priceColorUsdEnabled}
+                    onCheckedChange={(checked) => handleTogglePriceColorUsd(Boolean(checked))}
+                    disabled={savingPriceColorUsdSetting}
+                  />
+                </div>
+              </div>
             </div>
 
             {settingsError && <MessageAlert type="error" message={settingsError} />}

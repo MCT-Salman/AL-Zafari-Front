@@ -320,7 +320,7 @@ export const orderApi = {
 
   getFormattedDate: (order) => {
     if (!order?.created_at) return 'غير محدد';
-    return new Date(order.created_at).toLocaleDateString("ar-EG", {
+    return new Date(order.created_at).toLocaleDateString("en-US", {
       year: "numeric",
       month: "numeric",
       day: "numeric",
@@ -369,7 +369,7 @@ export const orderApi = {
   // Format currency - always display in ل.س
   formatCurrency: (amount) => {
     const num = parseFloat(amount) || 0;
-    const formatted = new Intl.NumberFormat("ar-EG", {
+    const formatted = new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(num);

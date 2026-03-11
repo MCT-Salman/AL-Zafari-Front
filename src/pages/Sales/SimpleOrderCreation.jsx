@@ -39,20 +39,23 @@ import {
     UserPlus,
     User,
     UserX,
-    FileText
+    FileText,
+    Palette,
+    Printer
 } from "lucide-react";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
 import toast from "react-hot-toast";
 import { TypeItem, OrderStatus, CustomerType, PriceColorBy } from "../../types/enums";
 import { useAuth } from "../../context/AuthContext";
+import ColorsReadOnly from "./ColorsReadOnly";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
 
 export default function SimpleOrderCreation() {
     const navigate = useNavigate();
     const { logout, user } = useAuth();
-    const [viewMode, setViewMode] = useState("create");
+    const [viewMode, setViewMode] = useState("create"); // create | history | colors
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [showPreview, setShowPreview] = useState(false);
@@ -72,6 +75,10 @@ export default function SimpleOrderCreation() {
     const [loadingWidths, setLoadingWidths] = useState(false);
     const [loadingThickness, setLoadingThickness] = useState(false);
     const [loadingCustomers, setLoadingCustomers] = useState(false);
+
+    // History filters
+    const [historySearchTerm, setHistorySearchTerm] = useState("");
+    const [historyStatusFilter, setHistoryStatusFilter] = useState("");
 
     // Customer State
     const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -1263,6 +1270,61 @@ export default function SimpleOrderCreation() {
         }
     };
 
+    const printOrderItemReceipt = useCallback((item, order) => {
+        const material = materials.find(m => String(m.material_id) === String(item.material_id));
+        const ruler = rulers.find(r => String(r.ruler_id) === String(item.ruler_id));
+        const color = colors.find(c => String(c.color_id) === String(item.color_id));
+        const batch = batches.find(b => String(b.batch_id) === String(item.batch_id));
+
+        const lines = [
+            { label: "رقم الطلب", value: order?.order_id ?? "-" },
+            { label: "التاريخ", value: order?.created_at ? new Date(order.created_at).toLocaleString("ar-SY") : "-" },
+            { label: "المادة", value: material?.material_name || item.material_name || "-" },
+            { label: "المسطرة", value: ruler?.ruler_name || item.ruler_name || "-" },
+            { label: "اللون", value: color?.color_name || item.color_name || "-" },
+            { label: "كود اللون", value: color?.color_code || item.color_code || "-" },
+            { label: "العرض", value: item.width ?? "-" },
+            { label: "السماكة", value: item.thickness ?? "-" },
+            { label: "الكمية", value: item.quantity ?? "-" },
+            { label: "دفعة", value: batch?.batch_number || item.batch_number || "-" },
+            { label: "ملاحظات", value: item.notes || "-" },
+        ];
+
+        const w = window.open("", "_blank", "width=380,height=700");
+        if (!w) return;
+
+        w.document.write(`
+            <html dir="rtl" lang="ar">
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <title>طباعة سطر طلب</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 12px; }
+                .title { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 10px; }
+                .row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #ddd; }
+                .label { font-weight: 700; color: #111; }
+                .value { color: #111; text-align: right; }
+                .footer { margin-top: 10px; text-align: center; font-size: 11px; color: #666; }
+                @media print { body { width: 80mm; } }
+              </style>
+            </head>
+            <body>
+              <div class="title">سطر طلب</div>
+              ${lines.map(l => `
+                <div class="row">
+                  <div class="label">${String(l.label)}</div>
+                  <div class="value">${String(l.value)}</div>
+                </div>
+              `).join("")}
+              <div class="footer">Alzafari</div>
+              <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 250); };</script>
+            </body>
+            </html>
+        `);
+        w.document.close();
+    }, [materials, rulers, colors, batches]);
+
     if (loading && viewMode === "create" && materials.length === 0) {
         return (
             <div className="h-screen flex items-center justify-center">
@@ -1305,13 +1367,30 @@ export default function SimpleOrderCreation() {
                             <History className="w-5 h-5 ml-2" />
                             سجل الطلبات
                         </Button>
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => setViewMode("colors")}
+                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
+                                viewMode === "colors"
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                            }`}
+                        >
+                            <Palette className="w-5 h-5 ml-2" />
+                            الشركات المكافئة
+                        </Button>
                     </>
                 }
             />
 
             {/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
-                {viewMode === "create" ? (
+                {viewMode === "colors" ? (
+                    <div className="h-full min-h-0">
+                        <ColorsReadOnly />
+                    </div>
+                ) : viewMode === "create" ? (
                     <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-3 h-full min-h-0">
                         {/* العمود الأيمن - المواد والأرقام */}
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
@@ -2114,6 +2193,26 @@ export default function SimpleOrderCreation() {
                             </div>
                         </div>
 
+                        <div className="flex flex-col sm:flex-row gap-2 mb-2">
+                            <Input
+                                value={historySearchTerm}
+                                onChange={(e) => setHistorySearchTerm(e.target.value)}
+                                placeholder="بحث في الطلبات ..."
+                                className="h-10 py-6"
+                            />
+                            <FilterSelect
+                                label=""
+                                value={historyStatusFilter}
+                                onChange={(e) => setHistoryStatusFilter(e.target.value)}
+                                options={[
+                                    { value: "", label: "كل الحالات" },
+                                    { value: "pending", label: "معلق" },
+                                    { value: "completed", label: "مكتمل" },
+                                    { value: "cancelled", label: "ملغي" },
+                                ]}
+                            />
+                        </div>
+
                         {/* جدول السجل مع التمرير */}
                         <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
                             <table className="min-w-[1400px] w-full table-fixed border-collapse">
@@ -2140,7 +2239,26 @@ export default function SimpleOrderCreation() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        orders.map(order => {
+                                        orders.filter(order => {
+                                            const term = String(historySearchTerm || "").toLowerCase().trim();
+                                            const matchesSearch = !term || (
+                                                String(order.order_id || "").toLowerCase().includes(term) ||
+                                                String(order.customer_name || "").toLowerCase().includes(term) ||
+                                                String(order.phone || "").toLowerCase().includes(term) ||
+                                                (order.customer?.name && String(order.customer.name).toLowerCase().includes(term)) ||
+                                                (order.customer?.phone && String(order.customer.phone).toLowerCase().includes(term)) ||
+                                                (order.notes && String(order.notes).toLowerCase().includes(term)) ||
+                                                (order.total_amount && String(order.total_amount).toLowerCase().includes(term)) ||
+                                                (order.paid_amount && String(order.paid_amount).toLowerCase().includes(term)) ||
+                                                (order.remaining_amount && String(order.remaining_amount).toLowerCase().includes(term)) ||
+                                                (order.sales?.full_name && String(order.sales.full_name).toLowerCase().includes(term)) ||
+                                                (order.sales?.username && String(order.sales.username).toLowerCase().includes(term)) ||
+                                                (order.status && String(order.status).toLowerCase().includes(term)) ||
+                                                (order.created_at && new Date(order.created_at).toLocaleDateString('ar-SA').includes(term))
+                                            );
+                                            const matchesStatus = !historyStatusFilter || String(order.status || "").toLowerCase() === String(historyStatusFilter).toLowerCase();
+                                            return matchesSearch && matchesStatus;
+                                        }).map(order => {
                                             const statusBadge = getStatusBadge(order.status);
                                             return (
                                                     <tr key={order.order_id} className="border-b hover:bg-gray-50">
@@ -2353,6 +2471,7 @@ export default function SimpleOrderCreation() {
                                         <th className="p-3 text-center">الكمية</th>
                                         <th className="p-3 text-center">رقم الدفعة</th>
                                         <th className="p-3 text-center">QR</th>
+                                        <th className="p-3 text-center">طباعة</th>
                                         <th className="p-3 text-center">ملاحظات</th>
                                     </tr>
                                 </thead>
@@ -2413,6 +2532,17 @@ export default function SimpleOrderCreation() {
                                                     className="h-8 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
                                                 >
                                                     توليد QR
+                                                </Button>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => printOrderItemReceipt(localItem, orderDetails)}
+                                                    className="h-8 px-2 text-xs bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                                                >
+                                                    <Printer className="w-4 h-4 ml-1" />
+                                                    طباعة
                                                 </Button>
                                             </td>
                                             <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
