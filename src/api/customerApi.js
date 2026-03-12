@@ -1,5 +1,6 @@
 // src/api/customerApi.js
 import axiosInstance from "./axiosConfig";
+import { handleApiError } from "../utils/errorHandler";
 
 export const customerApi = {
   // Get all customers
@@ -8,7 +9,7 @@ export const customerApi = {
       const response = await axiosInstance.get('/customer', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب العملاء' };
+      throw handleApiError(error, 'حدث خطأ في جلب العملاء');
     }
   },
 
@@ -18,7 +19,7 @@ export const customerApi = {
       const response = await axiosInstance.get(`/customer/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب العميل' };
+      throw handleApiError(error, 'حدث خطأ في جلب العميل');
     }
   },
 
@@ -28,7 +29,7 @@ export const customerApi = {
       const response = await axiosInstance.post('/customer', customerData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في إنشاء العميل' };
+      throw handleApiError(error, 'حدث خطأ في إنشاء العميل');
     }
   },
 
@@ -38,7 +39,7 @@ export const customerApi = {
       const response = await axiosInstance.put(`/customer/${id}`, customerData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في تحديث العميل' };
+      throw handleApiError(error, 'حدث خطأ في تحديث العميل');
     }
   },
 
@@ -48,7 +49,7 @@ export const customerApi = {
       const response = await axiosInstance.delete(`/customer/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في حذف العميل' };
+      throw handleApiError(error, 'حدث خطأ في حذف العميل');
     }
   },
 

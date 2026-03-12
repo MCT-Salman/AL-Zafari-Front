@@ -118,12 +118,12 @@ export default function Users() {
       {
         key: 'created_at',
         header: 'تاريخ الإنشاء',
-        format: (value) => new Date(value).toLocaleDateString('ar-SA')
+        format: (value) => new Date(value).toLocaleDateString('en-US')
       },
       {
         key: 'updated_at',
         header: 'آخر تحديث',
-        format: (value) => value ? new Date(value).toLocaleDateString('ar-SA') : ''
+        format: (value) => value ? new Date(value).toLocaleDateString('en-US') : ''
       },
     ],
     columnWidths: [

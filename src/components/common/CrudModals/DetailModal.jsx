@@ -25,7 +25,7 @@ export const DetailsModal = ({
 
   const formatValue = customFormatValue || ((key, value) => {
     if (key.includes('date') || key.includes('_at')) {
-      return new Date(value).toLocaleDateString('ar-SA', {
+      return new Date(value).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',

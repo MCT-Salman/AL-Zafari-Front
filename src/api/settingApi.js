@@ -1,5 +1,6 @@
 // src\api\settingApi.js
 import axiosInstance from './axiosConfig';
+import { handleApiError } from "../utils/errorHandler";
 
 export const settingApi = {
   // Get all settings

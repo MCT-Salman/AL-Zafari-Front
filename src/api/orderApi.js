@@ -127,7 +127,7 @@
 
 //   getFormattedDate: (order) => {
 //     if (!order?.created_at) return 'غير محدد';
-//     // Use ar-EG for standard Arabic digits if ar-SA shows Western Arabic digits or vice-versa depending on system
+//     // Use ar-EG for standard Arabic digits if en-US shows Western Arabic digits or vice-versa depending on system
 //     return new Date(order.created_at).toLocaleDateString("en-US", {
 //       year: "numeric",
 //       month: "numeric",
@@ -184,15 +184,10 @@
 //     const formatted = new Intl.NumberFormat("en-US", {
 //       minimumFractionDigits: 0,
 //       maximumFractionDigits: 2,
-//     }).format(num);
-//     return `${formatted} ل.س`;
-//   }
-// };
-
-
 // src/api/orderApi.js
 import axiosInstance from "./axiosConfig";
 import { OrderStatus } from "../types/enums";
+import { handleApiError } from "../utils/errorHandler";
 
 export const orderApi = {
   // Get all orders
@@ -201,7 +196,7 @@ export const orderApi = {
       const response = await axiosInstance.get('/order/', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب الطلبات' };
+      throw handleApiError(error, 'حدث خطأ في جلب الطلبات');
     }
   },
 
@@ -211,7 +206,7 @@ export const orderApi = {
       const response = await axiosInstance.get(`/order/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب الطلب' };
+      throw handleApiError(error, 'حدث خطأ في جلب الطلب');
     }
   },
 
@@ -221,7 +216,7 @@ export const orderApi = {
       const response = await axiosInstance.post('/order/', orderData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في إنشاء الطلب' };
+      throw handleApiError(error, 'حدث خطأ في إنشاء الطلب');
     }
   },
 
@@ -231,7 +226,7 @@ export const orderApi = {
       const response = await axiosInstance.put(`/order/${id}`, orderData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في تحديث الطلب' };
+      throw handleApiError(error, 'حدث خطأ في تحديث الطلب');
     }
   },
 
@@ -241,7 +236,7 @@ export const orderApi = {
       const response = await axiosInstance.patch(`/order/${id}/status`, { status });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في تحديث حالة الطلب' };
+      throw handleApiError(error, 'حدث خطأ في تحديث حالة الطلب');
     }
   },
 
@@ -251,7 +246,7 @@ export const orderApi = {
       const response = await axiosInstance.post(`/order/${orderId}/items`, itemData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في إضافة العنصر' };
+      throw handleApiError(error, 'حدث خطأ في إضافة العنصر');
     }
   },
 
@@ -261,7 +256,7 @@ export const orderApi = {
       const response = await axiosInstance.put(`/order/${orderId}/items/${itemId}`, itemData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في تحديث عنصر الطلب' };
+      throw handleApiError(error, 'حدث خطأ في تحديث عنصر الطلب');
     }
   },
 
@@ -271,7 +266,7 @@ export const orderApi = {
       const response = await axiosInstance.delete(`/order/${orderId}/items/${itemId}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في حذف عنصر الطلب' };
+      throw handleApiError(error, 'حدث خطأ في حذف عنصر الطلب');
     }
   },
 
@@ -281,7 +276,56 @@ export const orderApi = {
       const response = await axiosInstance.delete(`/order/${orderId}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في حذف الطلب' };
+      throw handleApiError(error, 'حدث خطأ في حذف الطلب');
+    }
+  },
+
+  // Delete multiple orders
+  deleteMultipleOrders: async (orderIds) => {
+    try {
+      // Validate and convert all IDs to positive integers
+      if (!Array.isArray(orderIds) || orderIds.length === 0) {
+        throw new Error('يجب تحديد طلب واحد على الأقل');
+      }
+
+      const numericIds = orderIds
+        .map(id => {
+          const num = parseInt(id);
+          console.log('Processing ID:', id, '->', num); // Debug log
+          return num;
+        })
+        .filter(id => {
+          const isValid = !isNaN(id) && Number.isInteger(id) && id > 0;
+          console.log('ID validation:', id, '->', isValid); // Debug log
+          return isValid;
+        });
+
+      if (numericIds.length === 0) {
+        throw new Error('لم يتم العثور على معرفات طلبات صالحة');
+      }
+
+      console.log('Final IDs to send:', numericIds); // Debug log
+      
+      // Try different request formats
+      let response;
+      try {
+        // Method 1: Standard DELETE with data
+        response = await axiosInstance.delete('/order/all', {
+          data: { ids: numericIds }
+        });
+      } catch (error) {
+        console.log('Method 1 failed, trying Method 2...');
+        // Method 2: DELETE with params
+        response = await axiosInstance.delete('/order/all', {
+          params: { ids: numericIds }
+        });
+      }
+      
+      console.log('API Response:', response.data); // Debug log
+      return response.data;
+    } catch (error) {
+      console.error('Delete orders error:', error); // Debug log
+      throw handleApiError(error, 'حدث خطأ في حذف الطلبات');
     }
   },
 

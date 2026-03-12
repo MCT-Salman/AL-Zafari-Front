@@ -67,7 +67,7 @@ export default function SalesDashboard() {
   // Format currency
   const formatCurrency = (amount) => {
     const num = parseFloat(amount) || 0;
-    return new Intl.NumberFormat("ar-SA", {
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "SYP"
     }).format(num);

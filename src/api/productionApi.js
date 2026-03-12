@@ -113,6 +113,16 @@ export const productionApi = {
     }
   },
 
+  // Get production orders by type
+  getProductionOrdersByType: async (type) => {
+    try {
+      const response = await axiosInstance.get(`/production-order/type/${type}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في جلب طلبات الإنتاج حسب النوع' };
+    }
+  },
+
   // Helper functions
   getStatusBadge: (status) => {
     const statusMap = {

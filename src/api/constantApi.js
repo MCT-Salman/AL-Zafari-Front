@@ -1,5 +1,6 @@
 // src\api\constantApi.js
 import axiosInstance from './axiosConfig';
+import { handleApiError } from "../utils/errorHandler";
 
 export const constantApi = {
   // Constant Types

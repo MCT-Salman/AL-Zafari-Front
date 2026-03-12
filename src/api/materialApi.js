@@ -1,5 +1,6 @@
 // src\api\materialApi.js
 import axiosInstance from './axiosConfig';
+import { handleApiError } from "../utils/errorHandler";
 
 export const materialApi = {
   // Materials CRUD

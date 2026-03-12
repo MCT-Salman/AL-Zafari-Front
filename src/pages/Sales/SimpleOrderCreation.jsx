@@ -79,6 +79,9 @@ export default function SimpleOrderCreation() {
     // History filters
     const [historySearchTerm, setHistorySearchTerm] = useState("");
     const [historyStatusFilter, setHistoryStatusFilter] = useState("");
+    const [selectedOrders, setSelectedOrders] = useState([]);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [deletingOrders, setDeletingOrders] = useState(false);
 
     // Customer State
     const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -113,6 +116,30 @@ export default function SimpleOrderCreation() {
     const [orders, setOrders] = useState([]);
     const [ordersLoading, setOrdersLoading] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+
+    // Filtered orders for display
+    const filteredOrders = useMemo(() => {
+        return orders.filter(order => {
+            const term = String(historySearchTerm || "").toLowerCase().trim();
+            const matchesSearch = !term || (
+                String(order.order_id || "").toLowerCase().includes(term) ||
+                String(order.customer_name || "").toLowerCase().includes(term) ||
+                String(order.phone || "").toLowerCase().includes(term) ||
+                (order.customer?.name && String(order.customer.name).toLowerCase().includes(term)) ||
+                (order.customer?.phone && String(order.customer.phone).toLowerCase().includes(term)) ||
+                (order.notes && String(order.notes).toLowerCase().includes(term)) ||
+                (order.total_amount && String(order.total_amount).toLowerCase().includes(term)) ||
+                (order.paid_amount && String(order.paid_amount).toLowerCase().includes(term)) ||
+                (order.remaining_amount && String(order.remaining_amount).toLowerCase().includes(term)) ||
+                (order.sales?.full_name && String(order.sales.full_name).toLowerCase().includes(term)) ||
+                (order.sales?.username && String(order.sales.username).toLowerCase().includes(term)) ||
+                (order.status && String(order.status).toLowerCase().includes(term)) ||
+                (order.created_at && new Date(order.created_at).toLocaleDateString('en-US').includes(term))
+            );
+            const matchesStatus = !historyStatusFilter || String(order.status || "").toLowerCase() === String(historyStatusFilter).toLowerCase();
+            return matchesSearch && matchesStatus;
+        });
+    }, [orders, historySearchTerm, historyStatusFilter]);
 
     const [orderDetails, setOrderDetails] = useState(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
@@ -1151,6 +1178,57 @@ export default function SimpleOrderCreation() {
     }
 };
 
+    // Multiple delete functions
+    const handleSelectOrder = (orderId) => {
+        setSelectedOrders(prev => 
+            prev.includes(orderId) 
+                ? prev.filter(id => id !== orderId)
+                : [...prev, orderId]
+        );
+    };
+
+    const handleSelectAllOrders = () => {
+        if (selectedOrders.length === filteredOrders.length) {
+            setSelectedOrders([]);
+        } else {
+            setSelectedOrders(filteredOrders.map(order => order.order_id));
+        }
+    };
+
+    const handleDeleteSelectedOrders = async () => {
+        if (selectedOrders.length === 0) {
+            toast.error("يرجى تحديد طلب واحد على الأقل");
+            return;
+        }
+        setShowDeleteDialog(true);
+    };
+
+    const confirmDeleteSelectedOrders = async () => {
+        try {
+            setDeletingOrders(true);
+            
+            // Debug: Log selected orders
+            console.log('Selected orders to delete:', selectedOrders);
+            console.log('Selected orders types:', selectedOrders.map(id => typeof id));
+            
+            const response = await orderApi.deleteMultipleOrders(selectedOrders);
+            
+            if (response.success) {
+                toast.success("تم حذف الطلبات بنجاح");
+                await loadOrders();
+                setSelectedOrders([]);
+                setShowDeleteDialog(false);
+            } else {
+                toast.error(response.message || "فشل في حذف الطلبات");
+            }
+        } catch (error) {
+            console.error("Error deleting orders:", error);
+            toast.error(error.message || "حدث خطأ في حذف الطلبات");
+        } finally {
+            setDeletingOrders(false);
+        }
+    };
+
     const clearAllItems = () => {
         if (orderItems.length > 0) {
             setOrderItems([]);
@@ -2170,6 +2248,17 @@ export default function SimpleOrderCreation() {
                         <div className="flex justify-between items-center mb-2 flex-shrink-0">
                             <h2 className="font-bold text-lg">سجل الطلبات</h2>
                             <div className="flex items-center gap-2">
+                                {selectedOrders.length > 0 && (
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={handleDeleteSelectedOrders}
+                                        className="px-4 py-2 text-sm"
+                                    >
+                                        <Trash2 className="w-4 h-4 ml-1" />
+                                        حذف المحدد ({selectedOrders.length})
+                                    </Button>
+                                )}
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -2218,6 +2307,14 @@ export default function SimpleOrderCreation() {
                             <table className="min-w-[1400px] w-full table-fixed border-collapse">
                                 <thead className="bg-gray-100 sticky top-0 z-20">
                                     <tr>
+                                        <th className="p-2 text-center border-b w-12">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                                                onChange={handleSelectAllOrders}
+                                                className="w-4 h-4 text-primary-f border-gray-300 rounded focus:ring-primary-f"
+                                            />
+                                        </th>
                                         <th className="p-2 text-right border-b w-16">#</th>
                                         <th className="p-2 text-right border-b w-28">التاريخ</th>
                                         <th className="p-2 text-center border-b w-20">العناصر</th>
@@ -2230,38 +2327,27 @@ export default function SimpleOrderCreation() {
                                 </thead>
                                 <tbody>
                                     {ordersLoading ? (
-                                        <tr><td colSpan="9" className="p-6"><LoadingState /></td></tr>
-                                    ) : orders.length === 0 ? (
+                                        <tr><td colSpan="10" className="p-6"><LoadingState /></td></tr>
+                                    ) : filteredOrders.length === 0 ? (
                                         <tr>
-                                            <td colSpan="9" className="p-8 text-center text-gray-400">
+                                            <td colSpan="10" className="p-8 text-center text-gray-400">
                                                 <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                 لا توجد طلبات
                                             </td>
                                         </tr>
                                     ) : (
-                                        orders.filter(order => {
-                                            const term = String(historySearchTerm || "").toLowerCase().trim();
-                                            const matchesSearch = !term || (
-                                                String(order.order_id || "").toLowerCase().includes(term) ||
-                                                String(order.customer_name || "").toLowerCase().includes(term) ||
-                                                String(order.phone || "").toLowerCase().includes(term) ||
-                                                (order.customer?.name && String(order.customer.name).toLowerCase().includes(term)) ||
-                                                (order.customer?.phone && String(order.customer.phone).toLowerCase().includes(term)) ||
-                                                (order.notes && String(order.notes).toLowerCase().includes(term)) ||
-                                                (order.total_amount && String(order.total_amount).toLowerCase().includes(term)) ||
-                                                (order.paid_amount && String(order.paid_amount).toLowerCase().includes(term)) ||
-                                                (order.remaining_amount && String(order.remaining_amount).toLowerCase().includes(term)) ||
-                                                (order.sales?.full_name && String(order.sales.full_name).toLowerCase().includes(term)) ||
-                                                (order.sales?.username && String(order.sales.username).toLowerCase().includes(term)) ||
-                                                (order.status && String(order.status).toLowerCase().includes(term)) ||
-                                                (order.created_at && new Date(order.created_at).toLocaleDateString('ar-SA').includes(term))
-                                            );
-                                            const matchesStatus = !historyStatusFilter || String(order.status || "").toLowerCase() === String(historyStatusFilter).toLowerCase();
-                                            return matchesSearch && matchesStatus;
-                                        }).map(order => {
+                                        filteredOrders.map(order => {
                                             const statusBadge = getStatusBadge(order.status);
                                             return (
                                                     <tr key={order.order_id} className="border-b hover:bg-gray-50">
+                                                        <td className="p-2 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedOrders.includes(order.order_id)}
+                                                                onChange={() => handleSelectOrder(order.order_id)}
+                                                                className="w-4 h-4 text-primary-f border-gray-300 rounded focus:ring-primary-f"
+                                                            />
+                                                        </td>
                                                         <td className="p-2 font-medium text-sm">{order.order_id ? `#${order.order_id}` : 'بدون طلب'}</td>
                                                     <td className="p-2 text-sm">{getFormattedDate(order)}</td>
                                                     <td className="p-2 text-center">
@@ -2347,7 +2433,7 @@ export default function SimpleOrderCreation() {
                 <div className="bg-gray-50 p-3 rounded-lg border">
                     <div className="text-xs text-gray-500">تاريخ الإنشاء</div>
                     <div className="font-bold text-sm">
-                        {new Date(orderDetails.created_at).toLocaleDateString('ar-SA', {
+                        {new Date(orderDetails.created_at).toLocaleDateString('en-US', {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
@@ -2754,6 +2840,20 @@ export default function SimpleOrderCreation() {
                     </div>
                 </div>
             </StyledDialog>
+
+            {/* Delete Confirmation Dialog */}
+            <StyledDialog
+                isOpen={showDeleteDialog}
+                onOpenChange={setShowDeleteDialog}
+                title="تأكيد الحذف"
+                description={`هل أنت متأكد من حذف ${selectedOrders.length} طلب؟ لا يمكن التراجع عن هذا الإجراء. سيتم حذف جميع الطلبات المحددة بشكل نهائي.`}
+                onCancel={() => setShowDeleteDialog(false)}
+                onConfirm={confirmDeleteSelectedOrders}
+                cancelLabel="إلغاء"
+                confirmLabel={deletingOrders ? "جاري الحذف..." : `حذف (${selectedOrders.length})`}
+                isLoading={deletingOrders}
+                confirmVariant="destructive"
+            />
             </div>
         </div>
     );

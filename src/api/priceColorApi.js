@@ -1,5 +1,6 @@
 // src\api\priceColorApi.js
 import axiosInstance from './axiosConfig';
+import { handleApiError } from "../utils/errorHandler";
 
 export const priceColorApi = {
   // Price Colors CRUD
@@ -8,7 +9,7 @@ export const priceColorApi = {
       const response = await axiosInstance.get('/price-color');
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب أسعار الألوان' };
+      throw handleApiError(error, 'حدث خطأ في جلب أسعار الألوان');
     }
   },
 
@@ -17,7 +18,7 @@ export const priceColorApi = {
       const response = await axiosInstance.get(`/price-color/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب سعر اللون' };
+      throw handleApiError(error, 'حدث خطأ في جلب سعر اللون');
     }
   },
 
@@ -26,7 +27,7 @@ export const priceColorApi = {
       const response = await axiosInstance.post('/price-color', data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في إنشاء سعر اللون' };
+      throw handleApiError(error, 'حدث خطأ في إنشاء سعر اللون');
     }
   },
 
@@ -35,7 +36,7 @@ export const priceColorApi = {
       const response = await axiosInstance.put(`/price-color/${id}`, data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في تحديث سعر اللون' };
+      throw handleApiError(error, 'حدث خطأ في تحديث سعر اللون');
     }
   },
 
@@ -44,7 +45,7 @@ export const priceColorApi = {
       const response = await axiosInstance.delete(`/price-color/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في حذف سعر اللون' };
+      throw handleApiError(error, 'حدث خطأ في حذف سعر اللون');
     }
   },
 

@@ -1,5 +1,6 @@
 // src\api\authApi.js
 import axiosInstance from './axiosConfig';
+import { handleApiError } from "../utils/errorHandler";
 
 export const authApi = {
   login: async (credentials) => {
@@ -7,7 +8,7 @@ export const authApi = {
       const response = await axiosInstance.post('/auth/login', credentials);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في الاتصال' };
+      throw handleApiError(error, 'حدث خطأ في الاتصال');
     }
   },
 
@@ -16,7 +17,7 @@ export const authApi = {
       const refreshToken = localStorage.getItem('refreshToken');
       await axiosInstance.post('/auth/logout', { refreshToken });
     } catch (error) {
-      // console.error('Logout error:');
+      throw handleApiError(error, 'حدث خطأ في تسجيل الخروج');
     } finally {
       localStorage.clear();
     }
@@ -27,7 +28,7 @@ export const authApi = {
       const response = await axiosInstance.post('/auth/register', userData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في التسجيل' };
+      throw handleApiError(error, 'حدث خطأ في التسجيل');
     }
   },
 
@@ -36,7 +37,7 @@ export const authApi = {
       const response = await axiosInstance.get('/auth/profile');
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب البيانات' };
+      throw handleApiError(error, 'حدث خطأ في جلب البيانات');
     }
   },
 
@@ -45,7 +46,7 @@ export const authApi = {
       const response = await axiosInstance.put('/auth/profile', profileData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في تحديث الملف الشخصي' };
+      throw handleApiError(error, 'حدث خطأ في تحديث الملف الشخصي');
     }
   },
 
@@ -54,7 +55,7 @@ export const authApi = {
       const response = await axiosInstance.post('/auth/validate-token', { token });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'فشل التحقق من التوكن' };
+      throw handleApiError(error, 'فشل التحقق من التوكن');
     }
   },
 
@@ -63,7 +64,7 @@ export const authApi = {
       const response = await axiosInstance.post('/auth/refresh', { refreshToken });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'فشل تجديد التوكن' };
+      throw handleApiError(error, 'فشل تجديد التوكن');
     }
   },
 
@@ -72,7 +73,7 @@ export const authApi = {
       const response = await axiosInstance.post('/auth/forgot-password', { phone });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'فشل في إرسال رمز التحقق' };
+      throw handleApiError(error, 'فشل في إرسال رمز التحقق');
     }
   },
 
@@ -81,7 +82,7 @@ export const authApi = {
       const response = await axiosInstance.post('/auth/verify-otp', { phone, otp });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'فشل التحقق من الرمز' };
+      throw handleApiError(error, 'فشل التحقق من الرمز');
     }
   },
 
@@ -93,7 +94,7 @@ export const authApi = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'فشل في تغيير كلمة المرور' };
+      throw handleApiError(error, 'فشل في تغيير كلمة المرور');
     }
   }
 };

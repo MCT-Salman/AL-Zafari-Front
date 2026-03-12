@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Toaster } from 'react-hot-toast';
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import ProductionManager from "./pages/Production/ProductionManager";
+import ProductionRecords from "./pages/ProductionRecords";
 import InvoiceManager from "./pages/Sales/InvoiceManager";
 
 const MainLayout = lazy(() => import("@/components/Layout/MainLayout"));
@@ -111,6 +112,12 @@ const App = () => {
                   <ProductionManager />
                 </RoleProtectedRoute>
               } />
+              <Route path="/production-records" element={
+                <RoleProtectedRoute allowedRoles="production_manager">
+                  <ProductionRecords />
+                </RoleProtectedRoute>
+              } />
+            
           </Routes>
         </Suspense>
       </AuthProvider>

@@ -1,5 +1,6 @@
 // src\pages\Constant\PriceColor.jsx
 import { useState, useEffect, useMemo } from "react";
+import toast from "react-hot-toast";
 import { priceColorApi } from "../../api/priceColorApi";
 import { colorApi } from "../../api/colorApi";
 import { rulerApi } from "../../api/rulerApi";
@@ -245,6 +246,32 @@ export default function PriceColor() {
       // console.error("Failed to load materials:", error);
     }
   };
+
+  // Load rulers for a specific material
+  const loadRulersByMaterial = async (materialId) => {
+    if (!materialId) {
+      setRulers([]);
+      return;
+    }
+    try {
+      const response = await rulerApi.getRulersByMaterial(materialId);
+      setRulers(getApiData(response, []) || []);
+    } catch (error) {
+      // console.error("Failed to load rulers by material:", error);
+      setRulers([]);
+    }
+  };
+
+  // Handle material change - load rulers for the selected material
+  const handleMaterialChange = (materialId) => {
+    setFormData({
+      ...formData,
+      material_id: materialId,
+      ruler_id: "",
+      color_id: "",
+    });
+    loadRulersByMaterial(materialId);
+  };
   const getColorNameResolved = (priceColor) => {
     const name = priceColor?.color?.color_name || priceColor?.color_name;
     if (name) return name;
@@ -301,11 +328,35 @@ export default function PriceColor() {
     return options.find(opt => opt.value === actualValue)?.label || actualValue || "-";
   };
 
-  // Filter and pagination state
+  // Filter states for the main page
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedColorId, setSelectedColorId] = useState("");
   const [selectedRulerId, setSelectedRulerId] = useState("");
   const [selectedMaterialName, setSelectedMaterialName] = useState("");
+  const [filteredRulers, setFilteredRulers] = useState([]);
+
+  // Handle material filter change - update rulers list
+  const handleMaterialFilterChange = (materialName) => {
+    setSelectedMaterialName(materialName);
+    setSelectedRulerId(""); // Reset ruler selection
+    setSelectedColorId(""); // Reset color selection too
+    
+    if (!materialName) {
+      // Show all rulers when no material is selected
+      setFilteredRulers(sortedRulers);
+    } else {
+      // Find the selected material and filter rulers by material_id
+      const material = materials.find(m => m.material_name === materialName);
+      const materialId = material?.material_id;
+      if (materialId) {
+        const filtered = sortedRulers.filter(r => r.material_id?.toString() === materialId?.toString());
+        setFilteredRulers(filtered);
+      } else {
+        setFilteredRulers([]);
+      }
+    }
+  };
+
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
@@ -411,6 +462,11 @@ export default function PriceColor() {
   const sortedRulers = useMemo(() => {
     return [...rulers].sort((a, b) => (a.ruler_name || "").localeCompare(b.ruler_name || "", "ar"));
   }, [rulers]);
+
+  // Initialize filteredRulers when rulers data is loaded
+  useEffect(() => {
+    setFilteredRulers(sortedRulers);
+  }, [sortedRulers]);
 
   const uniqueSortedMaterials = useMemo(() => {
     const list = materials.map(m => m.material_name).filter(Boolean);
@@ -563,6 +619,27 @@ export default function PriceColor() {
           {/* Filters and Results */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <FilterSelect
+              label="المادة"
+              value={selectedMaterialName}
+              onChange={(e) => handleMaterialFilterChange(e.target.value)}
+              options={[
+                { value: "", label: "جميع المواد" },
+                ...uniqueSortedMaterials.map(name => ({ value: name, label: name }))
+              ]}
+            />
+
+            <FilterSelect
+              label="المسطرة"
+              value={selectedRulerId}
+              onChange={(e) => setSelectedRulerId(e.target.value)}
+              disabled={!selectedMaterialName}
+              options={[
+                { value: "", label: selectedMaterialName ? "جميع المساطر" : "اختر المادة أولاً" },
+                ...filteredRulers.map(r => ({ value: r.ruler_id.toString(), label: r.ruler_name }))
+              ]}
+            />
+
+            <FilterSelect
               label="اللون"
               value={selectedColorId}
               onChange={(e) => setSelectedColorId(e.target.value)}
@@ -574,26 +651,6 @@ export default function PriceColor() {
                   label: c.color_name,
                   imageUrl: resolveColorImage(c),
                 }))
-              ]}
-            />
-
-            <FilterSelect
-              label="المسطرة"
-              value={selectedRulerId}
-              onChange={(e) => setSelectedRulerId(e.target.value)}
-              options={[
-                { value: "", label: "جميع المساطر" },
-                ...sortedRulers.map(r => ({ value: r.ruler_id.toString(), label: r.ruler_name }))
-              ]}
-            />
-
-            <FilterSelect
-              label="المادة"
-              value={selectedMaterialName}
-              onChange={(e) => setSelectedMaterialName(e.target.value)}
-              options={[
-                { value: "", label: "جميع المواد" },
-                ...uniqueSortedMaterials.map(name => ({ value: name, label: name }))
               ]}
             />
 
@@ -806,14 +863,7 @@ export default function PriceColor() {
                 <Label>المادة <span className="text-red-500">*</span></Label>
                 <FilterSelect
                   value={formData.material_id?.toString() || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      material_id: e.target.value,
-                      ruler_id: "",
-                      color_id: "",
-                    })
-                  }
+                  onChange={(e) => handleMaterialChange(e.target.value)}
                   options={materials.map((m) => ({
                     value: m.material_id.toString(),
                     label: m.material_name,
@@ -828,9 +878,7 @@ export default function PriceColor() {
                   value={formData.ruler_id?.toString() || ""}
                   onChange={(e) => setFormData({ ...formData, ruler_id: e.target.value, color_id: "" })}
                   disabled={!formData.material_id}
-                  options={rulers
-                    .filter((r) => r.material_id?.toString() === formData.material_id?.toString())
-                    .map((r) => ({ value: r.ruler_id.toString(), label: r.ruler_name }))}
+                  options={rulers.map((r) => ({ value: r.ruler_id.toString(), label: r.ruler_name }))}
                   placeholder={!formData.material_id ? "اختر المادة أولاً" : "اختر المسطرة"}
                 />
               </div>

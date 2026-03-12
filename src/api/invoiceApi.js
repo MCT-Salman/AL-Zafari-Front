@@ -1,6 +1,7 @@
 // src/api/invoiceApi.js
 import axiosInstance from "./axiosConfig";
 import { convertArabicToEnglishNumbers } from "../utils/helpers";
+import { handleApiError, isSuccessResponse, getSuccessMessage } from "../utils/errorHandler";
 
 export const invoiceApi = {
   // Get all invoices
@@ -9,7 +10,7 @@ export const invoiceApi = {
       const response = await axiosInstance.get('/invoice', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب الفواتير' };
+      throw handleApiError(error, 'حدث خطأ في جلب الفواتير');
     }
   },
 
@@ -19,7 +20,7 @@ export const invoiceApi = {
       const response = await axiosInstance.get(`/invoice/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب الفاتورة' };
+      throw handleApiError(error, 'حدث خطأ في جلب الفاتورة');
     }
   },
 
@@ -29,7 +30,7 @@ export const invoiceApi = {
       const response = await axiosInstance.get(`/invoice/customer/${customerId}`, { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب فواتير العميل' };
+      throw handleApiError(error, 'حدث خطأ في جلب فواتير العميل');
     }
   },
 
@@ -39,7 +40,7 @@ export const invoiceApi = {
       const response = await axiosInstance.post('/invoice/price-material', priceData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب سعر المادة' };
+      throw handleApiError(error, 'حدث خطأ في جلب سعر المادة');
     }
   },
 
@@ -93,18 +94,7 @@ export const invoiceApi = {
       const response = await axiosInstance.post('/invoice', payload);
       return response.data;
     } catch (error) {
-      // Extract error message from various formats and create a proper error with message property
-      const errorData = error.response?.data || {};
-      const errorMessage = 
-        (errorData.details && typeof errorData.details === 'string' ? errorData.details : null) ||
-        (errorData.message) ||
-        (errorData.error) ||
-        'حدث خطأ في إنشاء الفاتورة';
-      
-      const errorObj = new Error(errorMessage);
-      errorObj.details = errorData.details;
-      errorObj.error = errorData.error;
-      throw errorObj;
+      throw handleApiError(error, 'حدث خطأ في إنشاء الفاتورة');
     }
   },
 
@@ -158,18 +148,7 @@ export const invoiceApi = {
       const response = await axiosInstance.put(`/invoice/${id}`, payload);
       return response.data;
     } catch (error) {
-      // Extract error message from various formats and create a proper error with message property
-      const errorData = error.response?.data || {};
-      const errorMessage = 
-        (errorData.details && typeof errorData.details === 'string' ? errorData.details : null) ||
-        (errorData.message) ||
-        (errorData.error) ||
-        'حدث خطأ في تحديث الفاتورة';
-      
-      const errorObj = new Error(errorMessage);
-      errorObj.details = errorData.details;
-      errorObj.error = errorData.error;
-      throw errorObj;
+      throw handleApiError(error, 'حدث خطأ في تحديث الفاتورة');
     }
   },
 
@@ -179,18 +158,7 @@ export const invoiceApi = {
       const response = await axiosInstance.delete(`/invoice/${id}`, { data: deleteData });
       return response.data;
     } catch (error) {
-      // Extract error message from various formats and create a proper error with message property
-      const errorData = error.response?.data || {};
-      const errorMessage = 
-        (errorData.details && typeof errorData.details === 'string' ? errorData.details : null) ||
-        (errorData.message) ||
-        (errorData.error) ||
-        'حدث خطأ في حذف الفاتورة';
-      
-      const errorObj = new Error(errorMessage);
-      errorObj.details = errorData.details;
-      errorObj.error = errorData.error;
-      throw errorObj;
+      throw handleApiError(error, 'حدث خطأ في حذف الفاتورة');
     }
   },
 
@@ -200,18 +168,7 @@ export const invoiceApi = {
       const response = await axiosInstance.post(`/invoice/${id}/payment`, paymentData);
       return response.data;
     } catch (error) {
-      // Extract error message from various formats and create a proper error with message property
-      const errorData = error.response?.data || {};
-      const errorMessage = 
-        (errorData.details && typeof errorData.details === 'string' ? errorData.details : null) ||
-        (errorData.message) ||
-        (errorData.error) ||
-        'حدث خطأ في إضافة الدفعة';
-      
-      const errorObj = new Error(errorMessage);
-      errorObj.details = errorData.details;
-      errorObj.error = errorData.error;
-      throw errorObj;
+      throw handleApiError(error, 'حدث خطأ في إضافة الدفعة');
     }
   },
 
@@ -298,5 +255,54 @@ export const invoiceApi = {
   // Helper function to get material details from ruler
   getMaterialFromRuler: (ruler) => {
     return ruler?.material || null;
+  },
+
+  // Delete multiple invoices
+  deleteMultipleInvoices: async (invoiceIds) => {
+    try {
+      // Validate and convert all IDs to positive integers
+      if (!Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+        throw new Error('يجب تحديد فاتورة واحدة على الأقل');
+      }
+
+      const numericIds = invoiceIds
+        .map(id => {
+          const num = parseInt(id);
+          console.log('Processing Invoice ID:', id, '->', num); // Debug log
+          return num;
+        })
+        .filter(id => {
+          const isValid = !isNaN(id) && Number.isInteger(id) && id > 0;
+          console.log('Invoice ID validation:', id, '->', isValid); // Debug log
+          return isValid;
+        });
+
+      if (numericIds.length === 0) {
+        throw new Error('لم يتم العثور على معرفات فواتير صالحة');
+      }
+
+      console.log('Final Invoice IDs to send:', numericIds); // Debug log
+      
+      // Try different request formats
+      let response;
+      try {
+        // Method 1: Standard DELETE with data
+        response = await axiosInstance.delete('/invoice/all', {
+          data: { ids: numericIds }
+        });
+      } catch (error) {
+        console.log('Method 1 failed, trying Method 2...');
+        // Method 2: DELETE with params
+        response = await axiosInstance.delete('/invoice/all', {
+          params: { ids: numericIds }
+        });
+      }
+      
+      console.log('Invoice API Response:', response.data); // Debug log
+      return response.data;
+    } catch (error) {
+      console.error('Delete invoices error:', error); // Debug log
+      throw handleApiError(error, 'حدث خطأ في حذف الفواتير');
+    }
   }
 };

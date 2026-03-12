@@ -1,0 +1,671 @@
+// src/pages/ProductionRecords.jsx
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { productionApi } from "../api/productionApi";
+import { colorApi } from "../api/colorApi";
+import { batchApi } from "../api/batchApi";
+import { useAuth } from "../context/AuthContext";
+import { Card } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import FilterSelect from "../components/common/FilterSelect";
+import StyledDialog from "../components/common/StyledDialog";
+import { Label } from "../components/ui/label";
+import { Input } from "../components/ui/input";
+import {
+    ShoppingCart,
+    Plus,
+    History,
+    Trash2,
+    Eye,
+    RotateCcw,
+    Check,
+    EyeOff,
+    Home,
+    LogOut,
+    Users,
+    X,
+    AlertCircle,
+    Edit,
+    Save,
+    ChevronLeft,
+    ChevronRight,
+    Download,
+    Printer,
+    RefreshCw,
+    Package,
+    Settings,
+    Wrench,
+    Scissors,
+    Droplet,
+    Layers,
+    Search,
+    Filter
+} from "lucide-react";
+import LoadingState from "../components/common/LoadingState";
+import { getApiData } from "../utils/api";
+import toast from "react-hot-toast";
+import { ProductionType, ProductionStatus } from "../types/enums";
+
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+
+// Production Departments Configuration
+const PRODUCTION_DEPARTMENTS = [
+    { 
+        value: ProductionType.warehouse, 
+        label: "المستودع", 
+        icon: Package,
+        color: "blue"
+    },
+    { 
+        value: ProductionType.slitting, 
+        label: "الشق", 
+        icon: Scissors,
+        color: "green"
+    },
+    { 
+        value: ProductionType.cutting, 
+        label: "القطع", 
+        icon: Settings,
+        color: "orange"
+    },
+    { 
+        value: ProductionType.gluing, 
+        label: "اللصق", 
+        icon: Droplet,
+        color: "purple"
+    }
+];
+
+export default function ProductionRecords() {
+    const navigate = useNavigate();
+    const { logout } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+    const [activeTab, setActiveTab] = useState(ProductionType.warehouse);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [showItemDetails, setShowItemDetails] = useState(false);
+
+    // Data for all departments
+    const [productionData, setProductionData] = useState({
+        warehouse: [],
+        slitting: [],
+        cutting: [],
+        gluing: []
+    });
+    const [loadingData, setLoadingData] = useState({
+        warehouse: false,
+        slitting: false,
+        cutting: false,
+        gluing: false
+    });
+
+    // Reference data
+    const [colors, setColors] = useState([]);
+    const [batches, setBatches] = useState([]);
+
+    // Status options
+    const STATUS_OPTIONS = [
+        { value: ProductionStatus.pending, label: "قيد الانتظار" },
+        { value: ProductionStatus.preparing, label: "قيد التحضير" },
+        { value: ProductionStatus.completed, label: "مكتمل" },
+        { value: ProductionStatus.canceled, label: "ملغي" }
+    ];
+
+    // Load initial data
+    useEffect(() => {
+        loadReferenceData();
+        loadAllProductionData();
+    }, []);
+
+    // Load data for specific department
+    useEffect(() => {
+        if (activeTab) {
+            // Only load if data is not already loaded and not currently loading
+            if (!productionData[activeTab] && !loadingData[activeTab]) {
+                loadProductionDataByType(activeTab);
+            }
+        }
+    }, [activeTab]);
+
+    const loadReferenceData = async () => {
+        try {
+            const [colorRes, batchRes] = await Promise.all([
+                colorApi.getColors(),
+                batchApi.getBatches()
+            ]);
+            setColors(getApiData(colorRes, []) || []);
+            setBatches(getApiData(batchRes, []) || []);
+        } catch (error) {
+            toast.error("فشل في تحميل البيانات المرجعية");
+        }
+    };
+
+    const loadAllProductionData = async () => {
+        const types = Object.keys(productionData);
+        setLoadingData(prev => ({ ...prev, ...Object.fromEntries(types.map(t => [t, true])) }));
+        
+        try {
+            const promises = types.map(type => loadProductionDataByType(type));
+            await Promise.allSettled(promises); // Use Promise.allSettled to prevent one failure from stopping others
+        } catch (error) {
+            console.error("Error loading production data:", error);
+            toast.error("فشل في تحميل بيانات الإنتاج");
+        } finally {
+            setLoadingData(prev => ({ ...prev, ...Object.fromEntries(types.map(t => [t, false])) }));
+        }
+    };
+
+    const loadProductionDataByType = async (type) => {
+        try {
+            setLoadingData(prev => ({ ...prev, [type]: true }));
+            const response = await productionApi.getProductionOrdersByType(type);
+            const data = getApiData(response, []) || [];
+            
+            setProductionData(prev => ({
+                ...prev,
+                [type]: data
+            }));
+        } catch (error) {
+            console.error(`Error loading ${type} production data:`, error);
+            
+            // Check if it's the database schema error
+            if (error.message?.includes('production_order_item_id') || 
+                error.message?.includes('does not exist in the current database')) {
+                
+                // Show a clear message about the backend issue
+                toast.error(`مشكلة في قاعدة البيانات - يرجى إبلاغ فريق التطوير`, {
+                    duration: 5000,
+                    style: {
+                        background: 'rgba(239, 68, 68, 0.9)',
+                        color: 'white',
+                        fontSize: '14px'
+                    }
+                });
+                
+                // Set empty data to prevent repeated calls
+                setProductionData(prev => ({
+                    ...prev,
+                    [type]: []
+                }));
+            } else {
+                // For other errors, show the normal error message
+                toast.error(`فشل في تحميل بيانات ${PRODUCTION_DEPARTMENTS.find(d => d.value === type)?.label}`);
+                setProductionData(prev => ({
+                    ...prev,
+                    [type]: []
+                }));
+            }
+        } finally {
+            setLoadingData(prev => ({ ...prev, [type]: false }));
+        }
+    };
+
+    // Check if there's a database error (empty data with previous error)
+    const hasDatabaseError = useMemo(() => {
+        const data = productionData[activeTab] || [];
+        return data.length === 0 && !loadingData[activeTab];
+    }, [productionData, activeTab, loadingData]);
+    const filteredData = useMemo(() => {
+        const data = productionData[activeTab] || [];
+        const term = searchTerm.toLowerCase();
+        
+        return data.filter(item => {
+            // Search filter
+            const matchesSearch = !term || (
+                String(item.production_order_item_id).includes(term) ||
+                String(item.production_order_id).includes(term) ||
+                item.color?.color_name?.toLowerCase().includes(term) ||
+                item.color?.color_code?.toLowerCase().includes(term) ||
+                item.batch?.batch_number?.toLowerCase().includes(term) ||
+                item.type_item?.toLowerCase().includes(term) ||
+                item.thickness?.toLowerCase().includes(term) ||
+                item.width?.toLowerCase().includes(term) ||
+                item.length?.toLowerCase().includes(term) ||
+                item.status?.toLowerCase().includes(term) ||
+                item.notes?.toLowerCase().includes(term)
+            );
+            
+            // Status filter
+            const matchesStatus = !statusFilter || String(item.status || "").toLowerCase() === String(statusFilter).toLowerCase();
+            
+            return matchesSearch && matchesStatus;
+        });
+    }, [productionData, activeTab, searchTerm, statusFilter]);
+
+    const handleViewItem = (item) => {
+        setSelectedItem(item);
+        setShowItemDetails(true);
+    };
+
+    const handleRefreshData = () => {
+        loadProductionDataByType(activeTab);
+    };
+
+    const handleRefreshAll = () => {
+        loadAllProductionData();
+    };
+
+    const getStatusBadge = (status) => {
+        const statusMap = {
+            [ProductionStatus.pending]: { label: 'قيد الانتظار', className: 'bg-yellow-100 text-yellow-800' },
+            [ProductionStatus.preparing]: { label: 'قيد التحضير', className: 'bg-blue-100 text-blue-800' },
+            [ProductionStatus.completed]: { label: 'مكتمل', className: 'bg-green-100 text-green-800' },
+            [ProductionStatus.canceled]: { label: 'ملغي', className: 'bg-red-100 text-red-800' }
+        };
+        return statusMap[status] || { label: status || 'غير محدد', className: 'bg-gray-100 text-gray-800' };
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'غير محدد';
+        return new Date(dateString).toLocaleDateString("ar-SA", {
+            year: "numeric",
+            month: "numeric",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+    };
+
+    const getStatistics = (type) => {
+        const data = productionData[type] || [];
+        const total = data.length;
+        const pending = data.filter(item => item.status === ProductionStatus.pending).length;
+        const preparing = data.filter(item => item.status === ProductionStatus.preparing).length;
+        const completed = data.filter(item => item.status === ProductionStatus.completed).length;
+        const canceled = data.filter(item => item.status === ProductionStatus.canceled).length;
+
+        return { total, pending, preparing, completed, canceled };
+    };
+
+    const renderTabButton = (department) => {
+        const isActive = activeTab === department.value;
+        const stats = getStatistics(department.value);
+        const Icon = department.icon;
+        
+        return (
+            <Button
+                key={department.value}
+                variant={isActive ? "default" : "outline"}
+                onClick={() => setActiveTab(department.value)}
+                className={`flex items-center gap-2 px-4 py-2 h-auto transition-all ${
+                    isActive 
+                        ? `bg-${department.color}-500 text-white border-${department.color}-500` 
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+            >
+                <Icon className="w-4 h-4" />
+                <span className="font-medium">{department.label}</span>
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                    isActive 
+                        ? 'bg-white/20 text-white' 
+                        : `bg-${department.color}-100 text-${department.color}-700`
+                }`}>
+                    {stats.total}
+                </span>
+            </Button>
+        );
+    };
+
+    const renderStatisticsCards = () => {
+        const stats = getStatistics(activeTab);
+        const department = PRODUCTION_DEPARTMENTS.find(d => d.value === activeTab);
+        
+        return (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                <Card className="p-3 bg-white border-gray-200">
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                        <div className="text-sm text-gray-600">الإجمالي</div>
+                    </div>
+                </Card>
+                <Card className="p-3 bg-yellow-50 border-yellow-200">
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-yellow-700">{stats.pending}</div>
+                        <div className="text-sm text-yellow-600">قيد الانتظار</div>
+                    </div>
+                </Card>
+                <Card className="p-3 bg-blue-50 border-blue-200">
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-700">{stats.preparing}</div>
+                        <div className="text-sm text-blue-600">قيد التحضير</div>
+                    </div>
+                </Card>
+                <Card className="p-3 bg-green-50 border-green-200">
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-green-700">{stats.completed}</div>
+                        <div className="text-sm text-green-600">مكتمل</div>
+                    </div>
+                </Card>
+                <Card className="p-3 bg-red-50 border-red-200">
+                    <div className="text-center">
+                        <div className="text-2xl font-bold text-red-700">{stats.canceled}</div>
+                        <div className="text-sm text-red-600">ملغي</div>
+                    </div>
+                </Card>
+            </div>
+        );
+    };
+
+    const renderTable = () => {
+        const department = PRODUCTION_DEPARTMENTS.find(d => d.value === activeTab);
+        
+        if (loadingData[activeTab]) {
+            return (
+                <div className="flex items-center justify-center h-64">
+                    <LoadingState />
+                </div>
+            );
+        }
+
+        if (filteredData.length === 0) {
+            return (
+                <div className="text-center py-12 text-gray-500">
+                    <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <div className="text-lg font-medium">لا توجد بيانات</div>
+                    <div className="text-sm">لا توجد عناصر إنتاج في قسم {department.label}</div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="overflow-x-auto">
+                <table className="w-full border-collapse bg-white">
+                    <thead>
+                        <tr className="bg-gray-50 border-b">
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">#</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">رقم الطلب</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">اللون</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الدفعة</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">النوع</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">السماكة</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">العرض</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الطول</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الكمية</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">المصدر</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الوجهة</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الحالة</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">التاريخ</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredData.map((item, index) => (
+                            <tr key={item.production_order_item_id} className="border-b hover:bg-gray-50">
+                                <td className="px-4 py-3 text-sm">{index + 1}</td>
+                                <td className="px-4 py-3 text-sm font-medium">{item.production_order_id}</td>
+                                <td className="px-4 py-3 text-sm">
+                                    <div className="flex items-center gap-2">
+                                        <span>{item.color?.color_name || '-'}</span>
+                                        <span className="text-gray-500">({item.color?.color_code || '-'})</span>
+                                    </div>
+                                </td>
+                                <td className="px-4 py-3 text-sm">{item.batch?.batch_number || '-'}</td>
+                                <td className="px-4 py-3 text-sm">{item.type_item || '-'}</td>
+                                <td className="px-4 py-3 text-sm">{item.thickness || '-'}</td>
+                                <td className="px-4 py-3 text-sm">{item.width || '-'}</td>
+                                <td className="px-4 py-3 text-sm">{item.length || '-'}</td>
+                                <td className="px-4 py-3 text-sm">{item.quantity || 0}</td>
+                                <td className="px-4 py-3 text-sm">{item.source || '-'}</td>
+                                <td className="px-4 py-3 text-sm">{item.destination || '-'}</td>
+                                <td className="px-4 py-3 text-sm">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status).className}`}>
+                                        {getStatusBadge(item.status).label}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm">{formatDate(item.created_at)}</td>
+                                <td className="px-4 py-3 text-sm">
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleViewItem(item)}
+                                            className="p-1 h-8 w-8"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
+    return (
+        <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+            {/* Header */}
+            {isHeaderVisible && (
+                <div className="relative flex-shrink-0">
+                    <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
+                        <div className="flex flex-wrap gap-3">
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={() => navigate('/production')}
+                                className="px-6 py-3 text-base min-w-[140px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            >
+                                <Plus className="w-5 h-5 ml-2" />
+                                طلب إنتاج جديد
+                            </Button>
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                className="px-6 py-3 text-base min-w-[140px] touch-manipulation border-2 bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                            >
+                                <History className="w-5 h-5 ml-2" />
+                                سجل الإنتاج
+                            </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={handleRefreshAll}
+                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            >
+                                <RefreshCw className="w-5 h-5 ml-2" />
+                                تحديث الكل
+                            </Button>
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={() => setShowLogoutDialog(true)}
+                                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            >
+                                <LogOut className="w-5 h-5 ml-2" />
+                                تسجيل الخروج
+                            </Button>
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={() => setIsHeaderVisible(false)}
+                                className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110"
+                            >
+                                <EyeOff className="w-5 h-5" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {!isHeaderVisible && (
+                <div className="absolute top-2 right-2 z-20">
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={() => setIsHeaderVisible(true)}
+                        className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f hover:bg-secondary-f shadow-lg touch-manipulation"
+                    >
+                        <Eye className="w-5 h-5 ml-2" />
+                        إظهار الهيدر
+                    </Button>
+                </div>
+            )}
+
+            {/* Main Content */}
+            <div className="flex-1 min-h-0 p-3 overflow-hidden">
+                <div className="h-full flex flex-col min-h-0">
+                    {/* Department Tabs */}
+                    <div className="flex flex-wrap gap-2 mb-4 p-3 bg-white rounded-lg border">
+                        {PRODUCTION_DEPARTMENTS.map(department => renderTabButton(department))}
+                    </div>
+
+                    {/* Filters */}
+                    <div className="flex flex-wrap gap-3 mb-4 p-3 bg-white rounded-lg border">
+                        <div className="flex-1 min-w-[200px]">
+                            <div className="relative">
+                                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <Input
+                                    placeholder="بحث..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pr-10"
+                                />
+                            </div>
+                        </div>
+                        <div className="min-w-[150px]">
+                            <FilterSelect
+                                value={statusFilter}
+                                onChange={setStatusFilter}
+                                options={[
+                                    { value: "", label: "جميع الحالات" },
+                                    ...STATUS_OPTIONS
+                                ]}
+                                placeholder="الحالة"
+                            />
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={handleRefreshData}
+                            className="px-4 py-2"
+                        >
+                            <RefreshCw className="w-4 h-4 ml-2" />
+                            تحديث
+                        </Button>
+                    </div>
+
+                    {/* Statistics Cards */}
+                    {renderStatisticsCards()}
+                    
+               
+
+                    {/* Table */}
+                    <div className="flex-1 min-h-0 bg-white rounded-lg border overflow-hidden">
+                        {renderTable()}
+                    </div>
+                </div>
+            </div>
+
+            {/* Item Details Dialog */}
+            <StyledDialog
+                open={showItemDetails}
+                onOpenChange={setShowItemDetails}
+                title="تفاصيل عنصر الإنتاج"
+                className="max-w-2xl"
+            >
+                {selectedItem && (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">رقم العنصر</Label>
+                                <div className="mt-1 text-sm">{selectedItem.production_order_item_id}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">رقم الطلب</Label>
+                                <div className="mt-1 text-sm">{selectedItem.production_order_id}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">اللون</Label>
+                                <div className="mt-1 text-sm">
+                                    {selectedItem.color?.color_name} ({selectedItem.color?.color_code})
+                                </div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">الدفعة</Label>
+                                <div className="mt-1 text-sm">{selectedItem.batch?.batch_number}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">النوع</Label>
+                                <div className="mt-1 text-sm">{selectedItem.type_item}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">السماكة</Label>
+                                <div className="mt-1 text-sm">{selectedItem.thickness}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">العرض</Label>
+                                <div className="mt-1 text-sm">{selectedItem.width}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">الطول</Label>
+                                <div className="mt-1 text-sm">{selectedItem.length}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">الكمية</Label>
+                                <div className="mt-1 text-sm">{selectedItem.quantity}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">المصدر</Label>
+                                <div className="mt-1 text-sm">{selectedItem.source}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">الوجهة</Label>
+                                <div className="mt-1 text-sm">{selectedItem.destination}</div>
+                            </div>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700">الحالة</Label>
+                                <div className="mt-1">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(selectedItem.status).className}`}>
+                                        {getStatusBadge(selectedItem.status).label}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="col-span-2">
+                                <Label className="text-sm font-medium text-gray-700">الملاحظات</Label>
+                                <div className="mt-1 text-sm">{selectedItem.notes || '-'}</div>
+                            </div>
+                            <div className="col-span-2">
+                                <Label className="text-sm font-medium text-gray-700">تاريخ الإنشاء</Label>
+                                <div className="mt-1 text-sm">{formatDate(selectedItem.created_at)}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </StyledDialog>
+
+            {/* Logout Dialog */}
+            <StyledDialog
+                open={showLogoutDialog}
+                onOpenChange={setShowLogoutDialog}
+                title="تأكيد تسجيل الخروج"
+                className="max-w-md"
+            >
+                <div className="space-y-4">
+                    <p className="text-gray-600">هل أنت متأكد من أنك تريد تسجيل الخروج؟</p>
+                    <div className="flex justify-end gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowLogoutDialog(false)}
+                        >
+                            إلغاء
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                logout();
+                                navigate('/login');
+                            }}
+                            className="bg-red-500 hover:bg-red-600 text-white"
+                        >
+                            تسجيل الخروج
+                        </Button>
+                    </div>
+                </div>
+            </StyledDialog>
+        </div>
+    );
+}

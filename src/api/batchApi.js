@@ -1,5 +1,6 @@
 // src\api\batchApi.js
 import axiosInstance from './axiosConfig';
+import { handleApiError } from "../utils/errorHandler";
 
 export const batchApi = {
   // Batches CRUD
@@ -8,7 +9,7 @@ export const batchApi = {
       const response = await axiosInstance.get('/batch');
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب الطبخات' };
+      throw handleApiError(error, 'حدث خطأ في جلب الطبخات');
     }
   },
 
@@ -17,7 +18,7 @@ export const batchApi = {
       const response = await axiosInstance.get(`/batch/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب الطبخة' };
+      throw handleApiError(error, 'حدث خطأ في جلب الطبخة');
     }
   },
 
@@ -26,7 +27,7 @@ export const batchApi = {
       const response = await axiosInstance.post('/batch', data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في إنشاء الطبخة' };
+      throw handleApiError(error, 'حدث خطأ في إنشاء الطبخة');
     }
   },
 
@@ -35,7 +36,7 @@ export const batchApi = {
       const response = await axiosInstance.put(`/batch/${id}`, data);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في تحديث الطبخة' };
+      throw handleApiError(error, 'حدث خطأ في تحديث الطبخة');
     }
   },
 
@@ -44,7 +45,7 @@ export const batchApi = {
       const response = await axiosInstance.delete(`/batch/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في حذف الطبخة' };
+      throw handleApiError(error, 'حدث خطأ في حذف الطبخة');
     }
   },
 
@@ -90,7 +91,7 @@ export const batchApi = {
 
     const batchNumber = batch.batch_number || 'غير محدد';
     const materialName = batch.material?.material_name || 'غير محدد';
-    const entryDate = batch.entry_date ? new Date(batch.entry_date).toLocaleDateString('ar-SA') : 'غير محدد';
+    const entryDate = batch.entry_date ? new Date(batch.entry_date).toLocaleDateString('en-US') : 'غير محدد';
     return `${batchNumber} - ${materialName} - ${entryDate}`;
   },
 

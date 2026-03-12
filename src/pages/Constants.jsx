@@ -1,6 +1,7 @@
 // src\pages\Constants.jsx
 import { useState, useEffect } from "react";
 import { constantApi } from "../api/constantApi";
+import toast from "react-hot-toast";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -95,7 +96,9 @@ export default function Constants() {
         setSelectedTab(data[0].constant_type_id.toString());
       }
     } catch (err) {
-      setError(err.message || "فشل في تحميل أنواع الثوابت");
+      const errorMessage = err.message || "فشل في تحميل أنواع الثوابت";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -113,7 +116,9 @@ export default function Constants() {
         )
       );
     } catch (err) {
-      setError(err.message || "فشل في تحميل القيم الثابتة");
+      const errorMessage = err.message || "فشل في تحميل القيم الثابتة";
+      setError(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -164,7 +169,9 @@ export default function Constants() {
           notes: formValueData.notes,
           isDefault: formValueData.isDefault,
         });
-        setMessage("تم تحديث القيمة الثابتة بنجاح");
+        const successMessage = "تم تحديث القيمة الثابتة بنجاح";
+        setMessage(successMessage);
+        toast.success(successMessage);
       } else {
         await constantApi.createConstantValue({
           constant_type_id: typeId,
@@ -174,13 +181,17 @@ export default function Constants() {
           notes: formValueData.notes,
           isDefault: formValueData.isDefault,
         });
-        setMessage("تم إنشاء القيمة الثابتة بنجاح");
+        const successMessage = "تم إنشاء القيمة الثابتة بنجاح";
+        setMessage(successMessage);
+        toast.success(successMessage);
       }
 
       setShowValueModal(false);
       await reloadConstantValues(typeId);
     } catch (err) {
-      setError(err.message || "حدث خطأ في حفظ القيمة");
+      const errorMessage = err.message || "حدث خطأ في حفظ القيمة";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setFormLoading(false);
     }
@@ -200,11 +211,15 @@ export default function Constants() {
     try {
       const typeId = parseInt(selectedTab);
       await constantApi.deleteConstantValue(deleteConfirm.id);
-      setMessage("تم حذف القيمة الثابتة بنجاح");
+      const successMessage = "تم حذف القيمة الثابتة بنجاح";
+      setMessage(successMessage);
+      toast.success(successMessage);
       await reloadConstantValues(typeId);
       setDeleteConfirm({ isOpen: false, type: null, id: null, loading: false });
     } catch (err) {
-      setError(err.message || "حدث خطأ في حذف القيمة");
+      const errorMessage = err.message || "حدث خطأ في حذف القيمة";
+      setError(errorMessage);
+      toast.error(errorMessage);
       setDeleteConfirm({ isOpen: false, type: null, id: null, loading: false });
     }
   };
@@ -240,16 +255,22 @@ export default function Constants() {
     try {
       if (editingType) {
         await constantApi.updateConstantType(editingType.constant_type_id, formTypeData);
-        setMessage("تم تحديث نوع الثابت بنجاح");
+        const successMessage = "تم تحديث نوع الثابت بنجاح";
+        setMessage(successMessage);
+        toast.success(successMessage);
       } else {
         await constantApi.createConstantType(formTypeData);
-        setMessage("تم إنشاء نوع الثابت بنجاح");
+        const successMessage = "تم إنشاء نوع الثابت بنجاح";
+        setMessage(successMessage);
+        toast.success(successMessage);
       }
 
       setShowTypeModal(false);
       await loadConstantTypes();
     } catch (err) {
-      setError(err.message || "حدث خطأ في حفظ النوع");
+      const errorMessage = err.message || "حدث خطأ في حفظ النوع";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setFormLoading(false);
     }
@@ -268,11 +289,15 @@ export default function Constants() {
     setDeleteConfirm((prev) => ({ ...prev, loading: true }));
     try {
       await constantApi.deleteConstantType(deleteConfirm.id);
-      setMessage("تم حذف نوع الثابت بنجاح");
+      const successMessage = "تم حذف نوع الثابت بنجاح";
+      setMessage(successMessage);
+      toast.success(successMessage);
       await loadConstantTypes();
       setDeleteConfirm({ isOpen: false, type: null, id: null, loading: false });
     } catch (err) {
-      setError(err.message || "حدث خطأ في حذف النوع");
+      const errorMessage = err.message || "حدث خطأ في حذف النوع";
+      setError(errorMessage);
+      toast.error(errorMessage);
       setDeleteConfirm({ isOpen: false, type: null, id: null, loading: false });
     }
   };

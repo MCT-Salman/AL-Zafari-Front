@@ -1,5 +1,6 @@
 // src\api\colorApi.js
 import axiosInstance from './axiosConfig';
+import { handleApiError } from "../utils/errorHandler";
 
 export const colorApi = {
   // Colors CRUD
@@ -9,7 +10,7 @@ export const colorApi = {
       // The API returns { success: true, message: "...", data: [...], total: X }
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب الألوان' };
+      throw handleApiError(error, 'حدث خطأ في جلب الألوان');
     }
   },
 
@@ -18,7 +19,7 @@ export const colorApi = {
       const response = await axiosInstance.get(`/color/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب اللون' };
+      throw handleApiError(error, 'حدث خطأ في جلب اللون');
     }
   },
 
@@ -27,7 +28,7 @@ export const colorApi = {
       const response = await axiosInstance.get(`/color/ruler/${rulerId}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في جلب ألوان المسطرة' };
+      throw handleApiError(error, 'حدث خطأ في جلب ألوان المسطرة');
     }
   },
 
@@ -41,7 +42,7 @@ export const colorApi = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في إنشاء اللون' };
+      throw handleApiError(error, 'حدث خطأ في إنشاء اللون');
     }
   },
 
@@ -55,7 +56,7 @@ export const colorApi = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في تحديث اللون' };
+      throw handleApiError(error, 'حدث خطأ في تحديث اللون');
     }
   },
 
@@ -64,7 +65,7 @@ export const colorApi = {
       const response = await axiosInstance.delete(`/color/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في حذف اللون' };
+      throw handleApiError(error, 'حدث خطأ في حذف اللون');
     }
   },
 

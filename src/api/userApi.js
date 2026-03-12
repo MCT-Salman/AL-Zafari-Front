@@ -1,5 +1,6 @@
 // src\api\userApi.js
 import axiosInstance from './axiosConfig';
+import { handleApiError } from "../utils/errorHandler";
 
 export const userApi = {
   // Get all users

@@ -737,7 +737,7 @@ export default function InvoiceManager() {
             inv.customer?.name?.toLowerCase().includes(term) ||
             inv.customer?.phone?.toLowerCase().includes(term) ||
             (inv.order_id && String(inv.order_id).includes(term)) ||
-            (inv.issued_at && new Date(inv.issued_at).toLocaleDateString('ar-SA').includes(term)) ||
+            (inv.issued_at && new Date(inv.issued_at).toLocaleDateString('en-US').includes(term)) ||
             (inv.total_amount && String(inv.total_amount).includes(term)) ||
             (inv.paid_amount && String(inv.paid_amount).includes(term)) ||
             (inv.remaining_amount && String(inv.remaining_amount).includes(term)) ||

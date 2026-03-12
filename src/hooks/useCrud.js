@@ -1,49 +1,7 @@
 // src\hooks\useCrud.js
 import { useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
-
-/**
- * Extract error message from error object
- * Handles different error response structures:
- * - { error: "...", details: "..." }
- * - { message: "..." }
- * - { response: { data: { error: "...", details: "..." } } }
- */
-const extractErrorMessage = (err, defaultMessage) => {
-  // If error is a string, return it
-  if (typeof err === 'string') {
-    return err;
-  }
-
-  // Check for error.response.data (axios error structure)
-  if (err?.response?.data) {
-    const errorData = err.response.data;
-    // Check for { error: "...", details: "..." } structure
-    if (errorData.error) {
-      return errorData.details ? `${errorData.error}: ${errorData.details}` : errorData.error;
-    }
-    // Check for { message: "..." } structure
-    if (errorData.message) {
-      return errorData.message;
-    }
-  }
-
-  // Check for direct error object { error: "...", details: "..." }
-  if (err?.error) {
-    return err.details ? `${err.error}: ${err.details}` : err.error;
-  }
-
-  // Check for message property
-  if (err?.message) {
-    return err.message;
-  }
-  if (err?.details) {
-    return err.details;
-  }
-
-  // Return default message if nothing found
-  return defaultMessage || 'حدث خطأ غير متوقع';
-};
+import { handleApiError, getSuccessMessage, isSuccessResponse } from '../utils/errorHandler';
 
 /**
  * Custom hook for CRUD operations
@@ -122,9 +80,9 @@ export const useCrud = (api, options = {}) => {
       setItems(items);
       return response;
     } catch (err) {
-      const errorMsg = extractErrorMessage(err, errorMessages.fetch);
-      setError(errorMsg);
-      toast.error(errorMsg);
+      const errorResult = handleApiError(err, errorMessages.fetch);
+      setError(errorResult.message);
+      toast.error(errorResult.message);
       if (onError) onError(err, 'fetch');
       throw err;
     } finally {
@@ -144,8 +102,8 @@ export const useCrud = (api, options = {}) => {
       }
       return response;
     } catch (err) {
-      const errorMsg = extractErrorMessage(err, errorMessages.fetch);
-      toast.error(errorMsg);
+      const errorResult = handleApiError(err, errorMessages.fetch);
+      toast.error(errorResult.message);
       if (onError) onError(err, 'fetchById');
       throw err;
     }
@@ -156,7 +114,7 @@ export const useCrud = (api, options = {}) => {
     setModalState(prev => ({ ...prev, loading: true }));
     try {
       const response = await api.createItem(data);
-      const successMsg = successMessages.create;
+      const successMsg = getSuccessMessage(response, successMessages.create);
       toast.success(successMsg);
       if (onSuccess) onSuccess(response, 'create');
       if (!keepOpenOnCreate) {
@@ -165,8 +123,8 @@ export const useCrud = (api, options = {}) => {
       await fetchItems();
       return response;
     } catch (err) {
-      const errorMsg = extractErrorMessage(err, errorMessages.create);
-      toast.error(errorMsg);
+      const errorResult = handleApiError(err, errorMessages.create);
+      toast.error(errorResult.message);
       if (onError) onError(err, 'create');
       throw err;
     } finally {
@@ -179,7 +137,7 @@ export const useCrud = (api, options = {}) => {
     setModalState(prev => ({ ...prev, loading: true }));
     try {
       const response = await api.updateItem(id, data);
-      const successMsg = successMessages.update;
+      const successMsg = getSuccessMessage(response, successMessages.update);
       toast.success(successMsg);
       if (onSuccess) onSuccess(response, 'update');
       if (!keepOpenOnUpdate) {
@@ -189,8 +147,8 @@ export const useCrud = (api, options = {}) => {
       await fetchItems();
       return response;
     } catch (err) {
-      const errorMsg = extractErrorMessage(err, errorMessages.update);
-      toast.error(errorMsg);
+      const errorResult = handleApiError(err, errorMessages.update);
+      toast.error(errorResult.message);
       if (onError) onError(err, 'update');
       throw err;
     } finally {
@@ -203,15 +161,15 @@ export const useCrud = (api, options = {}) => {
     setModalState(prev => ({ ...prev, loading: true }));
     try {
       const response = await api.deleteItem(id);
-      const successMsg = successMessages.delete;
+      const successMsg = getSuccessMessage(response, successMessages.delete);
       toast.success(successMsg);
       if (onSuccess) onSuccess(response, 'delete');
       setModalState({ isOpen: false, mode: null, loading: false });
       await fetchItems();
       return response;
     } catch (err) {
-      const errorMsg = extractErrorMessage(err, errorMessages.delete);
-      toast.error(errorMsg);
+      const errorResult = handleApiError(err, errorMessages.delete);
+      toast.error(errorResult.message);
       if (onError) onError(err, 'delete');
       throw err;
     } finally {
@@ -227,14 +185,14 @@ export const useCrud = (api, options = {}) => {
     }
     try {
       const response = await api.toggleStatus(id);
-      const successMsg = successMessages.toggle;
+      const successMsg = getSuccessMessage(response, successMessages.toggle);
       toast.success(successMsg);
       if (onSuccess) onSuccess(response, 'toggle');
       await fetchItems();
       return response;
     } catch (err) {
-      const errorMsg = extractErrorMessage(err, errorMessages.toggle);
-      toast.error(errorMsg);
+      const errorResult = handleApiError(err, errorMessages.toggle);
+      toast.error(errorResult.message);
       if (onError) onError(err, 'toggle');
       throw err;
     }

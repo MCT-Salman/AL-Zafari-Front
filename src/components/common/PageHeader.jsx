@@ -34,7 +34,7 @@ const PageHeader = ({
         </div>
         <div className="flex items-center gap-3">
           {/* <span className="px-4 py-2 bg-white/20 backdrop-blur-md rounded-xl text-sm font-bold border border-white/30">
-            {new Date().toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </span> */}
           {actionLabel && onAction && (
             <Button

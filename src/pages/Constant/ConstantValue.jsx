@@ -1,6 +1,7 @@
 // src\pages\constants\ConstantValue.jsx
 
 import { useState, useEffect, useMemo } from "react";
+import toast from "react-hot-toast";
 
 import { constantApi } from "../../api/constantApi";
 
@@ -1242,7 +1243,7 @@ export default function ConstantValue() {
 
                               value.type === 'height' ? 'الطول' :
 
-                                value.type === 'thickness' ? 'السمك' : value.type}
+                                value.type === 'thickness' ? 'السماكة' : value.type}
 
                           </Badge>
 
@@ -1430,7 +1431,12 @@ export default function ConstantValue() {
 
               { key: 'unit', label: 'الوحدة' },
 
-              { key: 'type', label: 'النوع' },
+              { key: 'type', label: 'النوع', formatValue: (key, value) => {
+                if (value === 'width') return 'العرض';
+                if (value === 'height') return 'الطول';
+                if (value === 'thickness') return 'السماكة';
+                return value || '-';
+              } },
 
               { key: 'label', label: 'العنوان' },
 

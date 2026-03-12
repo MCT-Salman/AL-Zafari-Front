@@ -1,5 +1,6 @@
 // src\pages\Constant\Color.jsx
 import { useState, useEffect, useMemo, useRef } from "react";
+import toast from "react-hot-toast";
 import { colorApi } from "../../api/colorApi";
 import { rulerApi } from "../../api/rulerApi";
 import { materialApi } from "../../api/materialApi";

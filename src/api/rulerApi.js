@@ -1,5 +1,6 @@
 // src\api\rulerApi.js
 import axiosInstance from './axiosConfig';
+import { handleApiError } from "../utils/errorHandler";
 
 export const rulerApi = {
   // Rulers CRUD

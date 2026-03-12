@@ -1,5 +1,6 @@
 // src/pages/SettingsManagement.jsx
 import { useState, useEffect, useMemo } from "react";
+import toast from "react-hot-toast";
 import { settingApi } from "../api/settingApi";
 import { materialApi } from "../api/materialApi";
 import { useCrud } from "../hooks/useCrud";
@@ -25,6 +26,7 @@ import MessageAlert from "../components/common/MessageAlert";
 import PageHeader from "../components/common/PageHeader";
 import LoadingState from "../components/common/LoadingState";
 import EmptyState from "../components/common/EmptyState";
+import SwitchActive from "../components/common/SwitchActive";
 import { getApiData } from "../utils/api";
 
 export default function SettingsManagement() {
@@ -139,6 +141,25 @@ export default function SettingsManagement() {
       description: setting.description || ""
     });
     openEditSetting(setting);
+  };
+
+  // Handle toggle setting (enable/disable)
+  const handleToggleSetting = async (setting) => {
+    try {
+      const newValue = setting.value === "true" ? "false" : "true";
+      const payload = {
+        key: setting.key,
+        value: newValue,
+        description: setting.description || ""
+      };
+      
+      await settingApi.updateSettingById(setting.setting_id || setting.id, payload);
+      await fetchSettings();
+      
+      toast.success(`تم ${newValue === "true" ? "تفعيل" : "تعطيل"} الإعداد بنجاح`);
+    } catch (error) {
+      toast.error("فشل في تحديث الإعداد");
+    }
   };
 
   // --- Discounts CRUD ---
@@ -274,56 +295,14 @@ export default function SettingsManagement() {
         <TabsContent value="general">
           <Card className="p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">قائمة الإعدادات</h2>
+              <h2 className="text-xl font-bold">الإعدادات العامة</h2>
               <Button onClick={handleOpenCreateSetting} className="bg-primary-f hover:bg-secondary-f text-white gap-2">
                 <Plus className="w-4 h-4" />
                 إضافة إعداد جديد
               </Button>
             </div>
 
-            <div className="mb-6 rounded-lg border bg-gray-50 p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="font-bold">إظهار سعر الدولار في الفواتير</div>
-                  <div className="text-sm text-gray-600">
-                    يتحكم بإظهار/إخفاء سعر الدولار في صفحة الفواتير وسجلها.
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-primary-f border-primary-f/30">
-                    key: invoice_show_usd_price
-                  </Badge>
-                  <Switch
-                    checked={invoiceUsdEnabled}
-                    onCheckedChange={(checked) => handleToggleInvoiceUsd(Boolean(checked))}
-                    disabled={savingUsdSetting}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Price Color USD Setting */}
-            <div className="bg-white rounded-lg border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-lg">إظهار سعر الدولار في ألوان التسعير</h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    التحكم في إظهار أو إخفاء رمز الدولار ($) في صفحة إدارة أسعار الألوان
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-primary-f border-primary-f/30">
-                    key: price_color_show_usd_price
-                  </Badge>
-                  <Switch
-                    checked={priceColorUsdEnabled}
-                    onCheckedChange={(checked) => handleTogglePriceColorUsd(Boolean(checked))}
-                    disabled={savingPriceColorUsdSetting}
-                  />
-                </div>
-              </div>
-            </div>
-
+       
             {settingsError && <MessageAlert type="error" message={settingsError} />}
 
             {settingsLoading ? (
@@ -352,12 +331,20 @@ export default function SettingsManagement() {
                         </TableCell>
                         <TableCell className="text-gray-600 italic text-sm">{s.description || "-"}</TableCell>
                         <TableCell>
-                          <div className="flex justify-center gap-2">
-                            <CrudActions
-                              onEdit={() => handleOpenEditSetting(s)}
-                              onDelete={() => openDeleteSetting(s)}
+                           <div className="flex items-center gap-2">
+
+                          <SwitchActive
+                            isActive={s.value === "true"}
+                            onToggle={() => handleToggleSetting(s)}
+                            mode="playPause"
+                            confirmBeforeToggle={true}
                             />
-                          </div>
+                          <CrudActions
+                            onEdit={() => handleOpenEditSetting(s)}
+                            onDelete={() => openDeleteSetting(s)}
+                            size="md"
+                            />
+                            </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -465,7 +452,7 @@ export default function SettingsManagement() {
                           </div>
                         </TableCell>
                         <TableCell className="text-xs text-gray-600">
-                          {new Date(log.createdAt).toLocaleString('ar-SA')}
+                          {new Date(log.createdAt).toLocaleString('en-US')}
                         </TableCell>
                       </TableRow>
                     ))}
