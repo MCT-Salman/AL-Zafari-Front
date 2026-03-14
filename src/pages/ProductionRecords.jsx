@@ -58,19 +58,18 @@ const PRODUCTION_DEPARTMENTS = [
     },
     { 
         value: ProductionType.slitting, 
-        label: "الشق", 
+        label: "التشريح", 
         icon: Scissors,
         color: "green"
     },
     { 
         value: ProductionType.cutting, 
-        label: "القطع", 
-        icon: Settings,
+        label: "القص", 
         color: "orange"
     },
     { 
         value: ProductionType.gluing, 
-        label: "اللصق", 
+        label: "التغرية", 
         icon: Droplet,
         color: "purple"
     }
@@ -119,6 +118,39 @@ export default function ProductionRecords() {
         loadReferenceData();
         loadAllProductionData();
     }, []);
+
+    const formatType = (type) => {
+        const typeMap = {
+            'warehouse': 'المستودع',
+            'slitting': 'التشريح',
+            'cutting': 'القص',
+            'gluing': 'التغرية',
+            'orderproduction': 'الإنتاج'
+        };
+        return typeMap[type] || type || 'غير محدد';
+    };
+
+    const formatDestination = (destination) => {
+        const destMap = {
+            'warehouse': 'المستودع',
+            'slitting': 'التشريح',
+            'cutting': 'القص',
+            'gluing': 'التغرية',
+            'production': 'الإنتاج'
+        };
+        return destMap[destination] || destination || 'غير محدد';
+    };
+
+    const formatSource = (source) => {
+        const sourceMap = {
+            'warehouse': 'المستودع',
+            'slitting': 'التشريح',
+            'cutting': 'القص',
+            'gluing': 'التغرية',
+            'production': 'الإنتاج'
+        };
+        return sourceMap[source] || source || 'غير محدد';
+    };
 
     // Load data for specific department
     useEffect(() => {
@@ -236,6 +268,7 @@ export default function ProductionRecords() {
     }, [productionData, activeTab, searchTerm, statusFilter]);
 
     const handleViewItem = (item) => {
+        console.log('Viewing item:', item); // Debug log
         setSelectedItem(item);
         setShowItemDetails(true);
     };
@@ -283,7 +316,7 @@ export default function ProductionRecords() {
     const renderTabButton = (department) => {
         const isActive = activeTab === department.value;
         const stats = getStatistics(department.value);
-        const Icon = department.icon;
+        // const Icon = department.icon;
         
         return (
             <Button
@@ -292,15 +325,15 @@ export default function ProductionRecords() {
                 onClick={() => setActiveTab(department.value)}
                 className={`flex items-center gap-2 px-4 py-2 h-auto transition-all ${
                     isActive 
-                        ? `bg-${department.color}-500 text-white border-${department.color}-500` 
+                        ? `bg-secondary-s text-white border-${department.color}-500` 
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                 }`}
             >
-                <Icon className="w-4 h-4" />
+                {/* <Icon className="w-4 h-4" /> */}
                 <span className="font-medium">{department.label}</span>
                 <span className={`text-xs px-2 py-1 rounded-full ${
                     isActive 
-                        ? 'bg-white/20 text-white' 
+                        ? 'bg-secondary-f/20 text-white' 
                         : `bg-${department.color}-100 text-${department.color}-700`
                 }`}>
                     {stats.total}
@@ -378,11 +411,10 @@ export default function ProductionRecords() {
                             <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">#</th>
                             <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">رقم الطلب</th>
                             <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">اللون</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الدفعة</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الطبخة</th>
                             <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">النوع</th>
                             <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">السماكة</th>
                             <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">العرض</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الطول</th>
                             <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الكمية</th>
                             <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">المصدر</th>
                             <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الوجهة</th>
@@ -393,9 +425,9 @@ export default function ProductionRecords() {
                     </thead>
                     <tbody>
                         {filteredData.map((item, index) => (
-                            <tr key={item.production_order_item_id} className="border-b hover:bg-gray-50">
+                            <tr key={item.production_order_item_id || index} className="border-b hover:bg-gray-50">
                                 <td className="px-4 py-3 text-sm">{index + 1}</td>
-                                <td className="px-4 py-3 text-sm font-medium">{item.production_order_id}</td>
+                                <td className="px-4 py-3 text-sm font-medium">{item.production_order_id || '-'}</td>
                                 <td className="px-4 py-3 text-sm">
                                     <div className="flex items-center gap-2">
                                         <span>{item.color?.color_name || '-'}</span>
@@ -403,13 +435,12 @@ export default function ProductionRecords() {
                                     </div>
                                 </td>
                                 <td className="px-4 py-3 text-sm">{item.batch?.batch_number || '-'}</td>
-                                <td className="px-4 py-3 text-sm">{item.type_item || '-'}</td>
+                                <td className="px-4 py-3 text-sm">{formatType(item.type)}</td>
                                 <td className="px-4 py-3 text-sm">{item.thickness || '-'}</td>
                                 <td className="px-4 py-3 text-sm">{item.width || '-'}</td>
                                 <td className="px-4 py-3 text-sm">{item.length || '-'}</td>
-                                <td className="px-4 py-3 text-sm">{item.quantity || 0}</td>
-                                <td className="px-4 py-3 text-sm">{item.source || '-'}</td>
-                                <td className="px-4 py-3 text-sm">{item.destination || '-'}</td>
+                                <td className="px-4 py-3 text-sm">{formatSource(item.source)}</td>
+                                <td className="px-4 py-3 text-sm">{formatDestination(item.destination)}</td>
                                 <td className="px-4 py-3 text-sm">
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status).className}`}>
                                         {getStatusBadge(item.status).label}
@@ -563,75 +594,166 @@ export default function ProductionRecords() {
 
             {/* Item Details Dialog */}
             <StyledDialog
-                open={showItemDetails}
+                isOpen={showItemDetails}
                 onOpenChange={setShowItemDetails}
                 title="تفاصيل عنصر الإنتاج"
-                className="max-w-2xl"
+                className="max-w-4xl"
+                showFooter={false}
             >
                 {selectedItem && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">رقم العنصر</Label>
-                                <div className="mt-1 text-sm">{selectedItem.production_order_item_id}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">رقم الطلب</Label>
-                                <div className="mt-1 text-sm">{selectedItem.production_order_id}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">اللون</Label>
-                                <div className="mt-1 text-sm">
-                                    {selectedItem.color?.color_name} ({selectedItem.color?.color_code})
+                    <div className="space-y-6">
+                        {/* Header Section */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">عنصر الإنتاج #{selectedItem.production_order_item_id}</h3>
+                                    <p className="text-sm text-gray-600">طلب الإنتاج #{selectedItem.production_order_id}</p>
                                 </div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">الدفعة</Label>
-                                <div className="mt-1 text-sm">{selectedItem.batch?.batch_number}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">النوع</Label>
-                                <div className="mt-1 text-sm">{selectedItem.type_item}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">السماكة</Label>
-                                <div className="mt-1 text-sm">{selectedItem.thickness}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">العرض</Label>
-                                <div className="mt-1 text-sm">{selectedItem.width}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">الطول</Label>
-                                <div className="mt-1 text-sm">{selectedItem.length}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">الكمية</Label>
-                                <div className="mt-1 text-sm">{selectedItem.quantity}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">المصدر</Label>
-                                <div className="mt-1 text-sm">{selectedItem.source}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">الوجهة</Label>
-                                <div className="mt-1 text-sm">{selectedItem.destination}</div>
-                            </div>
-                            <div>
-                                <Label className="text-sm font-medium text-gray-700">الحالة</Label>
-                                <div className="mt-1">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(selectedItem.status).className}`}>
+                                <div className="text-left">
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(selectedItem.status).className}`}>
                                         {getStatusBadge(selectedItem.status).label}
                                     </span>
                                 </div>
                             </div>
-                            <div className="col-span-2">
-                                <Label className="text-sm font-medium text-gray-700">الملاحظات</Label>
-                                <div className="mt-1 text-sm">{selectedItem.notes || '-'}</div>
+                        </div>
+
+                        {/* Main Information Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {/* Basic Information */}
+                            <div className="space-y-4">
+                                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                    <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                        <Package className="w-4 h-4 text-blue-600" />
+                                        المعلومات الأساسية
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">رقم العنصر</Label>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.production_order_item_id || '-'}</div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">رقم الطلب</Label>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.production_order_id || '-'}</div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">النوع</Label>
+                                            <div className="text-sm font-medium text-gray-900">{formatType(selectedItem.type)}</div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">نوع العنصر</Label>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.type_item || '-'}</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="col-span-2">
-                                <Label className="text-sm font-medium text-gray-700">تاريخ الإنشاء</Label>
-                                <div className="mt-1 text-sm">{formatDate(selectedItem.created_at)}</div>
+
+                            {/* Material Information */}
+                            <div className="space-y-4">
+                                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                    <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                        <Droplet className="w-4 h-4 text-green-600" />
+                                        معلومات المادة
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">اللون</Label>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-4 h-4 rounded border border-gray-300" 
+                                                     style={{ backgroundColor: selectedItem.color?.color_code ? `#${selectedItem.color.color_code}` : '#f3f4f6' }}></div>
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-900">{selectedItem.color?.color_name || '-'}</div>
+                                                    <div className="text-xs text-gray-500">({selectedItem.color?.color_code || '-'})</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">الدفعة</Label>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.batch?.batch_number || '-'}</div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">الكمية</Label>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.quantity || 0}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Dimensions */}
+                            <div className="space-y-4">
+                                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                    <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                        <Settings className="w-4 h-4 text-purple-600" />
+                                        الأبعاد
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">السماكة</Label>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.thickness || '-'} مم</div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">العرض</Label>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.width || '-'} سم</div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs font-medium text-gray-500">الطول</Label>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.length || '-'} سم</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Flow Information */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                    <Layers className="w-4 h-4 text-orange-600" />
+                                    تدفق العمل
+                                </h4>
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-xs font-medium text-gray-500">المصدر</Label>
+                                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm font-medium">
+                                            {formatSource(selectedItem.source)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-xs font-medium text-gray-500">الوجهة</Label>
+                                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm font-medium">
+                                            {formatDestination(selectedItem.destination)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                    <History className="w-4 h-4 text-indigo-600" />
+                                    معلومات إضافية
+                                </h4>
+                                <div className="space-y-3">
+                                    <div>
+                                        <Label className="text-xs font-medium text-gray-500">تاريخ الإنشاء</Label>
+                                        <div className="text-sm font-medium text-gray-900">{formatDate(selectedItem.created_at)}</div>
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs font-medium text-gray-500">حالة الطلب</Label>
+                                        <div className="text-sm font-medium text-gray-900">
+                                            {selectedItem.productionOrder?.status ? getStatusBadge(selectedItem.productionOrder.status).label : '-'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Notes Section */}
+                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                            <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 text-yellow-600" />
+                                ملاحظات
+                            </h4>
+                            <div className="text-sm text-gray-700 bg-white rounded p-3 border border-gray-200 min-h-[60px]">
+                                {selectedItem.notes || 'لا توجد ملاحظات'}
                             </div>
                         </div>
                     </div>

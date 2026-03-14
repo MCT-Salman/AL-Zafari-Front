@@ -113,9 +113,9 @@ export const ProductionType = {
 export const ProductionTypeLabels = {
   [ProductionType.orderproduction]: 'الإنتاج بالطلب',
   [ProductionType.warehouse]: 'المستودع',
-  [ProductionType.slitting]: 'السلخ',
-  [ProductionType.cutting]: 'القطع',
-  [ProductionType.gluing]: 'اللصق',
+  [ProductionType.slitting]: 'التشريح',
+  [ProductionType.cutting]: 'القص',
+  [ProductionType.gluing]: 'التغرية',
 };
 
 export const ProductionStatus = {
@@ -139,8 +139,8 @@ export const MovementDestination = {
 };
 
 export const MovementDestinationLabels = {
-  [MovementDestination.slitting]: 'السلخ',
-  [MovementDestination.cutting]: 'القطع',
+  [MovementDestination.slitting]: 'التشريح',
+  [MovementDestination.cutting]: 'القص',
   [MovementDestination.production]: 'الإنتاج',
 };
 
@@ -153,7 +153,7 @@ export const ProcessSource = {
 
 export const ProcessSourceLabels = {
   [ProcessSource.warehouse]: 'المستودع',
-  [ProcessSource.slitting]: 'السلخ',
-  [ProcessSource.cutting]: 'القطع',
+  [ProcessSource.slitting]: 'التشريح',
+  [ProcessSource.cutting]: 'القص',
   [ProcessSource.production]: 'الإنتاج',
 };
