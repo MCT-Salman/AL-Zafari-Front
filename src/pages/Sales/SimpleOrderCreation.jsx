@@ -1,4 +1,4 @@
-// src/pages/Sales/SimpleOrderCreation.jsx
+// src\pages\Sales\SimpleOrderCreation.jsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "../../components/common/DashboardHeader";
@@ -15,6 +15,9 @@ import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import FilterSelect from "../../components/common/FilterSelect";
 import StyledDialog from "../../components/common/StyledDialog";
+import PaginationControls from "../../components/common/PaginationControls";
+import ResultsCounter from "../../components/common/ResultsCounter";
+import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import {
@@ -83,6 +86,10 @@ export default function SimpleOrderCreation() {
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [deletingOrders, setDeletingOrders] = useState(false);
 
+    // Pagination states for orders history table
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(20);
+
     // Customer State
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerSearchTerm, setCustomerSearchTerm] = useState("");
@@ -140,6 +147,17 @@ export default function SimpleOrderCreation() {
             return matchesSearch && matchesStatus;
         });
     }, [orders, historySearchTerm, historyStatusFilter]);
+
+    // Pagination logic for orders history table
+    const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [historySearchTerm, historyStatusFilter]);
 
     const [orderDetails, setOrderDetails] = useState(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
@@ -1265,9 +1283,10 @@ export default function SimpleOrderCreation() {
 
     // Filter customers based on search
     const filteredCustomers = useMemo(() => {
-        if (!customerSearchTerm) return customers;
+        const baseCustomers = Array.isArray(customers) ? customers : [];
+        if (!customerSearchTerm) return baseCustomers;
         const term = customerSearchTerm.toLowerCase();
-        return customers.filter(c => 
+        return baseCustomers.filter(c => 
             c.name?.toLowerCase().includes(term) || 
             c.phone?.toLowerCase().includes(term) ||
             c.city?.toLowerCase().includes(term)
@@ -1284,9 +1303,10 @@ export default function SimpleOrderCreation() {
 
     const filteredBatchOptions = useMemo(() => {
         const term = String(batchSearchTerm || "").trim().toLowerCase();
+        const baseBatches = Array.isArray(batches) ? batches : [];
         const visibleBatches = formData.material_id
-            ? batches.filter(b => String(b.material_id) === String(formData.material_id))
-            : batches;
+            ? baseBatches.filter(b => String(b.material_id) === String(formData.material_id))
+            : baseBatches;
         const base = visibleBatches.map(b => ({
             value: String(b.batch_id),
             label: b.batch_number || `دفعة ${b.batch_id}`
@@ -1330,9 +1350,10 @@ export default function SimpleOrderCreation() {
 
     // Batch options for select
     const batchOptions = useMemo(() => {
+        const baseBatches = Array.isArray(batches) ? batches : [];
         const base = formData.material_id
-            ? batches.filter(b => String(b.material_id) === String(formData.material_id))
-            : batches;
+            ? baseBatches.filter(b => String(b.material_id) === String(formData.material_id))
+            : baseBatches;
         return base.map(b => ({
             value: String(b.batch_id),
             label: b.batch_number || `دفعة ${b.batch_id}`
@@ -1476,7 +1497,7 @@ export default function SimpleOrderCreation() {
                             <Card className="flex-1 p-4 flex flex-col">
                                 <Label className="font-bold text-base mb-3 block">المادة</Label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
-                                    {materials.map(m => (
+                                    {(Array.isArray(materials) ? materials : []).map(m => (
                                         <button
                                             key={m.material_id}
                                             onClick={() => handleFieldChange("material_id", String(m.material_id))}
@@ -1806,6 +1827,7 @@ export default function SimpleOrderCreation() {
                                                 <Input
                                                     type="number"
                                                     value={formData.thickness}
+                                                    onChange={(e) => handleFieldChange("thickness", e.target.value)}
                                                     className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
                                                     placeholder={thicknessValues.length === 1 ? thicknessValues[0].label : "0.6"}
                                                     step="0.1"
@@ -2310,18 +2332,18 @@ export default function SimpleOrderCreation() {
                                         <th className="p-2 text-center border-b w-12">
                                             <input
                                                 type="checkbox"
-                                                checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                                                checked={selectedOrders.length === paginatedOrders.length && paginatedOrders.length > 0 && selectedOrders.length > 0}
                                                 onChange={handleSelectAllOrders}
                                                 className="w-4 h-4 text-primary-f border-gray-300 rounded focus:ring-primary-f"
                                             />
                                         </th>
-                                        <th className="p-2 text-right border-b w-16">#</th>
-                                        <th className="p-2 text-right border-b w-28">التاريخ</th>
-                                        <th className="p-2 text-center border-b w-20">العناصر</th>
-                                        <th className="p-2 text-center border-b w-28">المبيعات</th>
-                                        <th className="p-2 text-center border-b w-40">الزبون</th>
+                                        <th className="p-2 text-right border-b w-10">#</th>
+                                        <th className="p-2 text-right border-b w-20">التاريخ</th>
+                                        <th className="p-2 text-center border-b w-10">العناصر</th>
+                                        <th className="p-2 text-center border-b w-10">المبيعات</th>
+                                        <th className="p-2 text-center border-b w-20">الزبون</th>
                                         <th className="p-2 text-center border-b w-32">ملاحظات</th>
-                                        <th className="p-2 text-center border-b w-24">الحالة</th>
+                                        <th className="p-2 text-center border-b w-15">الحالة</th>
                                         <th className="p-2 text-center border-b w-20">عرض</th>
                                     </tr>
                                 </thead>
@@ -2336,7 +2358,7 @@ export default function SimpleOrderCreation() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredOrders.map(order => {
+                                        paginatedOrders.map((order, index) => {
                                             const statusBadge = getStatusBadge(order.status);
                                             return (
                                                     <tr key={order.order_id} className="border-b hover:bg-gray-50">
@@ -2348,7 +2370,7 @@ export default function SimpleOrderCreation() {
                                                                 className="w-4 h-4 text-primary-f border-gray-300 rounded focus:ring-primary-f"
                                                             />
                                                         </td>
-                                                        <td className="p-2 font-medium text-sm">{order.order_id ? `#${order.order_id}` : 'بدون طلب'}</td>
+                                                        <td className="p-2 font-medium text-sm">#{startIndex + index + 1}</td>
                                                     <td className="p-2 text-sm">{getFormattedDate(order)}</td>
                                                     <td className="p-2 text-center">
                                                         <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
@@ -2408,6 +2430,27 @@ export default function SimpleOrderCreation() {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Pagination Controls */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-gray-50 border-t">
+                            <ResultsCounter
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                rowsPerPage={rowsPerPage}
+                                totalResults={filteredOrders.length}
+                            />
+                            <div className="flex items-center gap-2">
+                                <RowsPerPageSelector
+                                    value={rowsPerPage}
+                                    onChange={setRowsPerPage}
+                                />
+                                <PaginationControls
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    onPageChange={setCurrentPage}
+                                />
+                            </div>
                         </div>
 
                         {/* نافذة تفاصيل الطلب */}

@@ -1,4 +1,4 @@
-// src/utils/api.js
+// src\utils\api.js
 export const getApiData = (response, fallback = null) => {
   if (response === null || response === undefined) return fallback;
   if (response.data !== undefined) return response.data;

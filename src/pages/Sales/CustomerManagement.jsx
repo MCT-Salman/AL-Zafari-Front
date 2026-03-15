@@ -1,4 +1,4 @@
-// src/pages/Sales/CustomerManagement.jsx
+// src\pages\Sales\CustomerManagement.jsx
 import { useState, useEffect, useMemo } from "react";
 import { customerApi } from "../../api/customerApi";
 import { useCrud } from "../../hooks/useCrud";

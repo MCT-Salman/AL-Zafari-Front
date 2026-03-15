@@ -1,4 +1,4 @@
-// src/types/enums.js
+// src\types\enums.js
 export const UserRole = {
     admin: 'admin',
     accountant: 'accountant',

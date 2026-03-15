@@ -1,4 +1,4 @@
-// src/pages/Sales/SalesHome.jsx
+// src\pages\Sales\SalesHome.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { orderApi } from "../../api/orderApi";
@@ -55,7 +55,7 @@ export default function SalesHome() {
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <PageHeader
         title="لوحة تحكم المبيعات"
-        subtitle="واجهة لمس مبسطة للعمليات اليومية"
+        subtitle="واجهة  مبسطة للعمليات اليومية"
       />
 
       {error && (

@@ -1,3 +1,4 @@
+// src\components\common\RowsPerPageSelector.jsx
 /**
  * RowsPerPageSelector Component
  * Allows users to select how many rows to display per page

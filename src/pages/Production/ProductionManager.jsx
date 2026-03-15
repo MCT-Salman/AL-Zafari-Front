@@ -1,4 +1,4 @@
-// src/pages/Production/ProductionManager.jsx
+// src\pages\Production\ProductionManager.jsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { productionApi } from "../../api/productionApi";
@@ -13,6 +13,9 @@ import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import FilterSelect from "../../components/common/FilterSelect";
 import StyledDialog from "../../components/common/StyledDialog";
+import PaginationControls from "../../components/common/PaginationControls";
+import ResultsCounter from "../../components/common/ResultsCounter";
+import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import {
@@ -60,6 +63,8 @@ export default function ProductionManager() {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [typeFilter, setTypeFilter] = useState("");
+    const [widthFilter, setWidthFilter] = useState(""); // فلتر العرض
+    const [widthTab, setWidthTab] = useState("all"); // تبويب حسب العرض: all, 22, 44, 66, 88, 110
     const [showPreview, setShowPreview] = useState(false);
     const [editingItemId, setEditingItemId] = useState(null);
     const [editingOrderId, setEditingOrderId] = useState(null);
@@ -74,6 +79,10 @@ export default function ProductionManager() {
     const [activeTextTarget, setActiveTextTarget] = useState(null); // color_search | batch_search
     const [colorSearchCode, setColorSearchCode] = useState("");
     const [batchSearchTerm, setBatchSearchTerm] = useState("");
+
+    // Pagination states for production orders table
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(20);
 
     // Data
     const [colors, setColors] = useState([]);
@@ -137,6 +146,11 @@ export default function ProductionManager() {
         { value: ProductionStatus.canceled, label: "ملغي" }
     ];
 
+    const SOURCE_OPTIONS = [
+        { value: "production", label: "إنتاج" },
+        { value: "warehouse", label: "مستودع" }
+    ];
+
     // Form State for Production Order
     const [formData, setFormData] = useState({
         material_id: "",
@@ -146,7 +160,7 @@ export default function ProductionManager() {
         type_item: "",
         thickness: "0.6",
         notes: "",
-        status: ProductionStatus.pending
+        source: "production" // استبدال status بـ source
     });
 
     // Production Items State
@@ -268,6 +282,14 @@ export default function ProductionManager() {
         return pick.label || `${pick.value ?? ""} ${pick.unit || ""}`.trim();
     }, []);
 
+    const filteredWidthValues = useMemo(() => {
+        if (currentItem.production_types?.includes(ProductionType.warehouse)) {
+            // عند اختيار مستودع من أنواع الإنتاج، عرض فقط قيمة 66
+            return widthValues.filter(w => String(w.value) === "66");
+        }
+        return widthValues;
+    }, [widthValues, currentItem.production_types]);
+
     const loadProductionOrders = async () => {
         try {
             setLoadingOrders(true);
@@ -292,6 +314,7 @@ export default function ProductionManager() {
                                 color_code: firstItem.color?.color_code || '-',
                                 type_item: firstItem.type_item || '-',
                                 thickness: firstItem.thickness || '-',
+                                width: firstItem.width || '-',
                                 batch_number: firstItem.batch?.batch_number || '-',
                                 material_name: firstItem.color?.ruler?.material?.material_name || '-',
                                 ruler_type: firstItem.color?.ruler?.ruler_name || '-'
@@ -344,6 +367,11 @@ export default function ProductionManager() {
                 newData.batch_id = "";
             } else if (field === "color_id") {
                 newData.batch_id = "";
+            } else if (field === "source") {
+                // عند تغيير المصدر، إعادة تعيين العرض إذا كان warehouse
+                if (value === "warehouse") {
+                    setCurrentItem(prev => ({ ...prev, width: "66" }));
+                }
             }
 
             return newData;
@@ -412,9 +440,26 @@ export default function ProductionManager() {
             // Type filter
             const matchesType = !typeFilter || String(order.type_item || "").toLowerCase() === String(typeFilter).toLowerCase();
             
-            return matchesSearch && matchesStatus && matchesType;
+            // Width filter
+            const matchesWidth = !widthFilter || String(order.width || "").toLowerCase().includes(widthFilter.toLowerCase());
+            
+            // Width tab filter
+            const matchesWidthTab = widthTab === "all" || String(order.width || "") === widthTab;
+            
+            return matchesSearch && matchesStatus && matchesType && matchesWidth && matchesWidthTab;
         });
-    }, [productionOrders, searchTerm, statusFilter, typeFilter]);
+    }, [productionOrders, searchTerm, statusFilter, typeFilter, widthFilter, widthTab]);
+
+    // Pagination logic for production orders table
+    const totalPages = Math.ceil(filteredProductionOrders.length / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const paginatedProductionOrders = filteredProductionOrders.slice(startIndex, endIndex);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter, typeFilter, widthFilter, widthTab]);
 
     const filteredBatchOptions = useMemo(() => {
         const term = String(batchSearchTerm || "").trim().toLowerCase();
@@ -458,8 +503,14 @@ export default function ProductionManager() {
         setCurrentItem(prev => {
             const types = prev.production_types || [];
             if (types.includes(type)) {
+                // إزالة النوع إذا كان موجوداً
                 return { ...prev, production_types: types.filter(t => t !== type) };
             } else {
+                // إضافة النوع، لكن إذا كان هناك نوع واحد فقط، لا نضيف المزيد
+                if (types.length >= 1) {
+                    // عند اختيار نوع واحد، تعطيل الاختيار
+                    return prev;
+                }
                 return { ...prev, production_types: [...types, type] };
             }
         });
@@ -579,7 +630,8 @@ export default function ProductionManager() {
 
             const orderData = {
                 notes: formData.notes || "",
-                status: formData.status || ProductionStatus.pending,
+                status: ProductionStatus.pending, // الحفاظ على الحالة كما هي
+                source: formData.source, // إضافة المصدر
                 items: items
             };
 
@@ -951,7 +1003,7 @@ export default function ProductionManager() {
                             )}
 
                             
-                            {isSelectedMaterialPvc && (
+                            {isSelectedMaterialPvc && !currentItem.production_types?.includes(ProductionType.warehouse) && (
                                 <div className="flex-shrink-0 p-3 border-b-2 border-dashed border-gray-300">
                                     <div className="grid grid-cols-2 gap-3">
                                         {TYPE_ITEM_OPTIONS.map(option => (
@@ -980,9 +1032,9 @@ export default function ProductionManager() {
                                     العرض
                                     {loadingWidths && <span className="mr-2 text-gray-500 text-xs">جاري التحميل...</span>}
                                 </Label>
-                                {widthValues.length > 0 ? (
+                                {filteredWidthValues.length > 0 ? (
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                        {widthValues.map(w => (
+                                        {filteredWidthValues.map(w => (
                                             <button
                                                 key={w.id}
                                                 onClick={() => {
@@ -1105,11 +1157,11 @@ export default function ProductionManager() {
 
 
                                     <div>
-                                        <Label className="font-bold text-sm mb-1 block">الحالة</Label>
+                                        <Label className="font-bold text-sm mb-1 block">المصدر</Label>
                                         <FilterSelect
-                                            value={formData.status}
-                                            onChange={(e) => handleFieldChange("status", e.target.value)}
-                                            options={STATUS_OPTIONS.map(s => ({ value: s.value, label: s.label }))}
+                                            value={formData.source}
+                                            onChange={(e) => handleFieldChange("source", e.target.value)}
+                                            options={SOURCE_OPTIONS.map(s => ({ value: s.value, label: s.label }))}
                                             className="w-full text-sm"
                                         />
                                     </div>
@@ -1179,17 +1231,21 @@ export default function ProductionManager() {
                                     {PRODUCTION_TYPES.map(type => {
                                         const Icon = type.icon;
                                         const isSelected = currentItem.production_types?.includes(type.value);
+                                        const isDisabled = !isSelected && (currentItem.production_types?.length || 0) >= 1;
                                         return (
                                             <button
                                                 key={type.value}
-                                                onClick={() => handleProductionTypeToggle(type.value)}
+                                                onClick={() => !isDisabled && handleProductionTypeToggle(type.value)}
+                                                disabled={isDisabled}
                                                 className={`
                                                     py-3 px-3 rounded-xl text-sm font-bold border-2
                                                     transition-all touch-manipulation active:scale-95 min-h-[48px]
                                                     flex items-center justify-center gap-2
                                                     ${isSelected
                                                         ? "border-green-600 bg-green-50 text-green-700"
-                                                        : "border-gray-300 bg-white hover:border-gray-400"
+                                                        : isDisabled
+                                                            ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+                                                            : "border-gray-300 bg-white hover:border-gray-400"
                                                     }
                                                 `}
                                             >
@@ -1328,6 +1384,7 @@ export default function ProductionManager() {
                                 ]}
                                 className="h-8 text-sm max-w-[250px]"
                             />
+                          
                         </div>
                         
                         {/* Second row - Action buttons */}
@@ -1371,6 +1428,28 @@ export default function ProductionManager() {
                             </Button>
                         </div>
 
+                        {/* Width Tabs */}
+                        <div className="flex gap-1 mb-2 flex-wrap">
+                            {[
+                                { value: "all", label: "الكل" },
+                                { value: "22", label: "22" },
+                                { value: "44", label: "44" },
+                                { value: "66", label: "66" },
+                            ].map(tab => (
+                                <button
+                                    key={tab.value}
+                                    onClick={() => setWidthTab(tab.value)}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                        widthTab === tab.value
+                                            ? "bg-primary-f text-white"
+                                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                                    }`}
+                                >
+                                    عرض {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
                         {/* جدول السجل */}
                         <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
                             <table className="min-w-[1400px] w-full table-fixed border-collapse">
@@ -1380,6 +1459,7 @@ export default function ProductionManager() {
                                         <th className="p-2 text-right border-b w-32">التاريخ</th>
                                         <th className="p-2 text-right border-b w-32">المنشئ</th>
                                         <th className="p-2 text-right border-b w-32">اللون</th>
+                                        <th className="p-2 text-center border-b w-24">العرض</th>
                                         <th className="p-2 text-center border-b w-24">النوع</th>
                                         <th className="p-2 text-center border-b w-24">السماكة</th>
                                         <th className="p-2 text-center border-b w-32">رقم الطبخة</th>
@@ -1390,23 +1470,24 @@ export default function ProductionManager() {
                                 </thead>
                                 <tbody>
                                     {loadingOrders ? (
-                                        <tr><td colSpan="10" className="p-6"><LoadingState /></td></tr>
+                                        <tr><td colSpan="11" className="p-6"><LoadingState /></td></tr>
                                     ) : filteredProductionOrders.length === 0 ? (
                                         <tr>
-                                            <td colSpan="10" className="p-8 text-center text-gray-400">
+                                            <td colSpan="11" className="p-8 text-center text-gray-400">
                                                 <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                 لا توجد طلبات إنتاج
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredProductionOrders.map(order => {
+                                        paginatedProductionOrders.map((order, index) => {
                                             const statusBadge = productionApi.getStatusBadge(order.status);
                                             return (
                                                 <tr key={order.production_order_id} className="border-b hover:bg-gray-50">
-                                                    <td className="p-2 font-medium text-sm">#{order.production_order_id}</td>
+                                                    <td className="p-2 font-medium text-sm">#{startIndex + index + 1}</td>
                                                     <td className="p-2 text-sm">{productionApi.getFormattedDate(order.created_at)}</td>
                                                     <td className="p-2 text-sm">{productionApi.formatIssuedBy(order.issued_by)}</td>
                                                     <td className="p-2 text-sm">{order.color_name} ({order.color_code})</td>
+                                                    <td className="p-2 text-center text-sm">{order.width}</td>
                                                     <td className="p-2 text-center text-sm">
                                                         {formatTypeItem(order.type_item)}
                                                     </td>
@@ -1444,6 +1525,27 @@ export default function ProductionManager() {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Pagination Controls */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-gray-50 border-t">
+                            <ResultsCounter
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                rowsPerPage={rowsPerPage}
+                                totalResults={filteredProductionOrders.length}
+                            />
+                            <div className="flex items-center gap-2">
+                                <RowsPerPageSelector
+                                    value={rowsPerPage}
+                                    onChange={setRowsPerPage}
+                                />
+                                <PaginationControls
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    onPageChange={setCurrentPage}
+                                />
+                            </div>
                         </div>
                     </Card>
                 )}

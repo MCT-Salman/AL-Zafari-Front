@@ -1,4 +1,4 @@
-// src/pages/ProductionRecords.jsx
+// src\pages\ProductionRecords.jsx
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { productionApi } from "../api/productionApi";
@@ -9,6 +9,9 @@ import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import FilterSelect from "../components/common/FilterSelect";
 import StyledDialog from "../components/common/StyledDialog";
+import PaginationControls from "../components/common/PaginationControls";
+import ResultsCounter from "../components/common/ResultsCounter";
+import RowsPerPageSelector from "../components/common/RowsPerPageSelector";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import {
@@ -44,36 +47,43 @@ import {
 import LoadingState from "../components/common/LoadingState";
 import { getApiData } from "../utils/api";
 import toast from "react-hot-toast";
-import { ProductionType, ProductionStatus } from "../types/enums";
+import { ProductionType, ProductionStatus, TypeItem } from "../types/enums";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
 
 // Production Departments Configuration
 const PRODUCTION_DEPARTMENTS = [
-    { 
-        value: ProductionType.warehouse, 
-        label: "المستودع", 
+    {
+        value: ProductionType.warehouse,
+        label: "المستودع",
         icon: Package,
         color: "blue"
     },
-    { 
-        value: ProductionType.slitting, 
-        label: "التشريح", 
+    {
+        value: ProductionType.slitting,
+        label: "التشريح",
         icon: Scissors,
         color: "green"
     },
-    { 
-        value: ProductionType.cutting, 
-        label: "القص", 
+    {
+        value: ProductionType.cutting,
+        label: "القص",
         color: "orange"
     },
-    { 
-        value: ProductionType.gluing, 
-        label: "التغرية", 
+    {
+        value: ProductionType.gluing,
+        label: "التغرية",
         icon: Droplet,
         color: "purple"
     }
 ];
+
+    // Format type item function
+    const formatTypeItem = (value) => {
+        if (value === TypeItem.Machine) return "مكنة";
+        if (value === TypeItem.Presser) return "كوي";
+        return "-";
+    };
 
 export default function ProductionRecords() {
     const navigate = useNavigate();
@@ -83,6 +93,9 @@ export default function ProductionRecords() {
     const [activeTab, setActiveTab] = useState(ProductionType.warehouse);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
+    const [widthFilter, setWidthFilter] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(20); // فلتر العرض
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [showItemDetails, setShowItemDetails] = useState(false);
@@ -178,7 +191,7 @@ export default function ProductionRecords() {
     const loadAllProductionData = async () => {
         const types = Object.keys(productionData);
         setLoadingData(prev => ({ ...prev, ...Object.fromEntries(types.map(t => [t, true])) }));
-        
+
         try {
             const promises = types.map(type => loadProductionDataByType(type));
             await Promise.allSettled(promises); // Use Promise.allSettled to prevent one failure from stopping others
@@ -195,18 +208,18 @@ export default function ProductionRecords() {
             setLoadingData(prev => ({ ...prev, [type]: true }));
             const response = await productionApi.getProductionOrdersByType(type);
             const data = getApiData(response, []) || [];
-            
+
             setProductionData(prev => ({
                 ...prev,
                 [type]: data
             }));
         } catch (error) {
             console.error(`Error loading ${type} production data:`, error);
-            
+
             // Check if it's the database schema error
-            if (error.message?.includes('production_order_item_id') || 
+            if (error.message?.includes('production_order_item_id') ||
                 error.message?.includes('does not exist in the current database')) {
-                
+
                 // Show a clear message about the backend issue
                 toast.error(`مشكلة في قاعدة البيانات - يرجى إبلاغ فريق التطوير`, {
                     duration: 5000,
@@ -216,7 +229,7 @@ export default function ProductionRecords() {
                         fontSize: '14px'
                     }
                 });
-                
+
                 // Set empty data to prevent repeated calls
                 setProductionData(prev => ({
                     ...prev,
@@ -243,7 +256,7 @@ export default function ProductionRecords() {
     const filteredData = useMemo(() => {
         const data = productionData[activeTab] || [];
         const term = searchTerm.toLowerCase();
-        
+
         return data.filter(item => {
             // Search filter
             const matchesSearch = !term || (
@@ -259,13 +272,27 @@ export default function ProductionRecords() {
                 item.status?.toLowerCase().includes(term) ||
                 item.notes?.toLowerCase().includes(term)
             );
-            
+
             // Status filter
             const matchesStatus = !statusFilter || String(item.status || "").toLowerCase() === String(statusFilter).toLowerCase();
-            
-            return matchesSearch && matchesStatus;
+
+            // Width filter
+            const matchesWidth = !widthFilter || String(item.width || "").toLowerCase().includes(String(widthFilter).toLowerCase());
+
+            return matchesSearch && matchesStatus && matchesWidth;
         });
-    }, [productionData, activeTab, searchTerm, statusFilter]);
+    }, [productionData, activeTab, searchTerm, statusFilter, widthFilter]);
+
+    // Pagination logic
+    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter, widthFilter, activeTab]);
 
     const handleViewItem = (item) => {
         console.log('Viewing item:', item); // Debug log
@@ -293,7 +320,7 @@ export default function ProductionRecords() {
 
     const formatDate = (dateString) => {
         if (!dateString) return 'غير محدد';
-        return new Date(dateString).toLocaleDateString("ar-SA", {
+        return new Date(dateString).toLocaleDateString("en-US", {
             year: "numeric",
             month: "numeric",
             day: "numeric",
@@ -317,25 +344,23 @@ export default function ProductionRecords() {
         const isActive = activeTab === department.value;
         const stats = getStatistics(department.value);
         // const Icon = department.icon;
-        
+
         return (
             <Button
                 key={department.value}
                 variant={isActive ? "default" : "outline"}
                 onClick={() => setActiveTab(department.value)}
-                className={`flex items-center gap-2 px-4 py-2 h-auto transition-all ${
-                    isActive 
-                        ? `bg-secondary-s text-white border-${department.color}-500` 
+                className={`flex items-center gap-2 px-4 py-2 h-auto transition-all ${isActive
+                        ? `bg-secondary-s text-white border-${department.color}-500`
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
+                    }`}
             >
                 {/* <Icon className="w-4 h-4" /> */}
                 <span className="font-medium">{department.label}</span>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                    isActive 
-                        ? 'bg-secondary-f/20 text-white' 
+                <span className={`text-xs px-2 py-1 rounded-full ${isActive
+                        ? 'bg-secondary-f/20 text-white'
                         : `bg-${department.color}-100 text-${department.color}-700`
-                }`}>
+                    }`}>
                     {stats.total}
                 </span>
             </Button>
@@ -345,7 +370,7 @@ export default function ProductionRecords() {
     const renderStatisticsCards = () => {
         const stats = getStatistics(activeTab);
         const department = PRODUCTION_DEPARTMENTS.find(d => d.value === activeTab);
-        
+
         return (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
                 <Card className="p-3 bg-white border-gray-200">
@@ -384,7 +409,7 @@ export default function ProductionRecords() {
 
     const renderTable = () => {
         const department = PRODUCTION_DEPARTMENTS.find(d => d.value === activeTab);
-        
+
         if (loadingData[activeTab]) {
             return (
                 <div className="flex items-center justify-center h-64">
@@ -404,65 +429,88 @@ export default function ProductionRecords() {
         }
 
         return (
-            <div className="overflow-x-auto">
-                <table className="w-full border-collapse bg-white">
-                    <thead>
-                        <tr className="bg-gray-50 border-b">
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">#</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">رقم الطلب</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">اللون</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الطبخة</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">النوع</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">السماكة</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">العرض</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الكمية</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">المصدر</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الوجهة</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الحالة</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">التاريخ</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredData.map((item, index) => (
-                            <tr key={item.production_order_item_id || index} className="border-b hover:bg-gray-50">
-                                <td className="px-4 py-3 text-sm">{index + 1}</td>
-                                <td className="px-4 py-3 text-sm font-medium">{item.production_order_id || '-'}</td>
-                                <td className="px-4 py-3 text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <span>{item.color?.color_name || '-'}</span>
-                                        <span className="text-gray-500">({item.color?.color_code || '-'})</span>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3 text-sm">{item.batch?.batch_number || '-'}</td>
-                                <td className="px-4 py-3 text-sm">{formatType(item.type)}</td>
-                                <td className="px-4 py-3 text-sm">{item.thickness || '-'}</td>
-                                <td className="px-4 py-3 text-sm">{item.width || '-'}</td>
-                                <td className="px-4 py-3 text-sm">{item.length || '-'}</td>
-                                <td className="px-4 py-3 text-sm">{formatSource(item.source)}</td>
-                                <td className="px-4 py-3 text-sm">{formatDestination(item.destination)}</td>
-                                <td className="px-4 py-3 text-sm">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status).className}`}>
-                                        {getStatusBadge(item.status).label}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 text-sm">{formatDate(item.created_at)}</td>
-                                <td className="px-4 py-3 text-sm">
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => handleViewItem(item)}
-                                            className="p-1 h-8 w-8"
-                                        >
-                                            <Eye className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </td>
+            <div className="flex flex-col h-full">
+                <div className="overflow-x-auto flex-1">
+                    <table className="w-full border-collapse bg-white">
+                        <thead>
+                            <tr className="bg-gray-50 border-b">
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">#</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">رقم الطلب</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">اللون</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الطبخة</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">النوع</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">السماكة</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">العرض</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الكمية</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">المصدر</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الوجهة</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الحالة</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">التاريخ</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">إجراءات</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {paginatedData.map((item, index) => (
+                                <tr key={item.production_order_item_id || index} className="border-b hover:bg-gray-50">
+                                    <td className="px-4 py-3 text-sm">{startIndex + index + 1}</td>
+                                    <td className="px-4 py-3 text-sm font-medium">{item.production_order_id || '-'}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <span>{item.color?.color_name || '-'}</span>
+                                            <span className="text-gray-500">({item.color?.color_code || '-'})</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-sm">{item.batch?.batch_number || '-'}</td>
+                                    <td className="px-4 py-3 text-sm">{formatType(item.type)}</td>
+                                    <td className="px-4 py-3 text-sm">{item.thickness || '-'}</td>
+                                    <td className="px-4 py-3 text-sm">{item.width || '-'}</td>
+                                    <td className="px-4 py-3 text-sm">{item.length || '-'}</td>
+                                    <td className="px-4 py-3 text-sm">{formatSource(item.source)}</td>
+                                    <td className="px-4 py-3 text-sm">{formatDestination(item.destination)}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(item.status).className}`}>
+                                            {getStatusBadge(item.status).label}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-sm">{formatDate(item.created_at)}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleViewItem(item)}
+                                                className="p-1 h-8 w-8"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-gray-50 border-t">
+                    <ResultsCounter
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        rowsPerPage={rowsPerPage}
+                        totalResults={filteredData.length}
+                    />
+                    <div className="flex items-center gap-2">
+                        <RowsPerPageSelector
+                            value={rowsPerPage}
+                            onChange={setRowsPerPage}
+                        />
+                        <PaginationControls
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={setCurrentPage}
+                        />
+                    </div>
+                </div>
             </div>
         );
     };
@@ -562,12 +610,26 @@ export default function ProductionRecords() {
                         <div className="min-w-[150px]">
                             <FilterSelect
                                 value={statusFilter}
-                                onChange={setStatusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
                                 options={[
                                     { value: "", label: "جميع الحالات" },
                                     ...STATUS_OPTIONS
                                 ]}
                                 placeholder="الحالة"
+                            />
+                        </div>
+                        <div className="min-w-[120px]">
+                            <FilterSelect
+                                value={widthFilter}
+                                onChange={(e) => setWidthFilter(e.target.value)}
+                                options={[
+                                    { value: "", label: "جميع الأعراض" },
+                                    { value: "22", label: "22" },
+                                    { value: "44", label: "44" },
+                                    { value: "66", label: "66" },
+
+                                ]}
+                                placeholder="العرض"
                             />
                         </div>
                         <Button
@@ -582,8 +644,8 @@ export default function ProductionRecords() {
 
                     {/* Statistics Cards */}
                     {renderStatisticsCards()}
-                    
-               
+
+
 
                     {/* Table */}
                     <div className="flex-1 min-h-0 bg-white rounded-lg border overflow-hidden">
@@ -641,7 +703,7 @@ export default function ProductionRecords() {
                                         </div>
                                         <div>
                                             <Label className="text-xs font-medium text-gray-500">نوع العنصر</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.type_item || '-'}</div>
+                                            <div className="text-sm font-medium text-gray-900">{formatTypeItem(selectedItem.type_item) || '-'}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -658,8 +720,10 @@ export default function ProductionRecords() {
                                         <div>
                                             <Label className="text-xs font-medium text-gray-500">اللون</Label>
                                             <div className="flex items-center gap-2">
-                                                <div className="w-4 h-4 rounded border border-gray-300" 
-                                                     style={{ backgroundColor: selectedItem.color?.color_code ? `#${selectedItem.color.color_code}` : '#f3f4f6' }}></div>
+                                                {/* <div className="w-4 h-4 rounded border border-gray-300"
+                                                    style={{ backgroundColor: selectedItem.color?.color_code ? `#${selectedItem.color.color_code}` : '#f3f4f6' }}>
+
+                                                    </div> */}
                                                 <div>
                                                     <div className="text-sm font-medium text-gray-900">{selectedItem.color?.color_name || '-'}</div>
                                                     <div className="text-xs text-gray-500">({selectedItem.color?.color_code || '-'})</div>
@@ -667,12 +731,8 @@ export default function ProductionRecords() {
                                             </div>
                                         </div>
                                         <div>
-                                            <Label className="text-xs font-medium text-gray-500">الدفعة</Label>
+                                            <Label className="text-xs font-medium text-gray-500">الطبخة</Label>
                                             <div className="text-sm font-medium text-gray-900">{selectedItem.batch?.batch_number || '-'}</div>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">الكمية</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.quantity || 0}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -692,11 +752,11 @@ export default function ProductionRecords() {
                                         </div>
                                         <div>
                                             <Label className="text-xs font-medium text-gray-500">العرض</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.width || '-'} سم</div>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.width || '-'} مم</div>
                                         </div>
                                         <div>
-                                            <Label className="text-xs font-medium text-gray-500">الطول</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.length || '-'} سم</div>
+                                            <Label className="text-xs font-medium text-gray-500">الكمية</Label>
+                                            <div className="text-sm font-medium text-gray-900">{selectedItem.length || '-'} م</div>
                                         </div>
                                     </div>
                                 </div>

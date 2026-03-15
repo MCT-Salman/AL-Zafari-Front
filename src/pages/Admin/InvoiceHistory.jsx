@@ -1,3 +1,4 @@
+// src\pages\Admin\InvoiceHistory.jsx
 import { useState, useEffect, useMemo } from "react";
 import { invoiceApi } from "../../api/invoiceApi";
 import { Card } from "../../components/ui/card";
@@ -85,6 +86,11 @@ export default function InvoiceHistory() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
+  // Reset page when rows per page changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [rowsPerPage]);
 
   // Calculate pagination for filtered results
   const totalPages = Math.ceil(filteredInvoices.length / rowsPerPage);
