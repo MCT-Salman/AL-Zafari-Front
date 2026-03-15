@@ -623,15 +623,24 @@ export default function ProductionManager() {
 
             // تحضير items حسب الصيغة المطلوبة من الـ API
             // length في الواجهة تمثل الكمية (height) في الـ API
-            const items = productionItems.map(item => ({
-                color_id: Number(formData.color_id),
-                batch_id: Number(formData.batch_id),
-                type_item: formData.type_item,
-                thickness: Number(formData.thickness),
-                production_types: item.production_types,
-                width: Number(item.width),
-                length: Number(item.length) // length هنا تمثل الكمية (height)
-            }));
+            const items = productionItems.map(item => {
+                const payload = {
+                    color_id: Number(formData.color_id),
+                    type_item: formData.type_item,
+                    thickness: Number(formData.thickness),
+                    production_types: item.production_types,
+                    width: Number(item.width),
+                    length: Number(item.length) // length هنا تمثل الكمية (height)
+                };
+
+                // لا ترسل batch_id إذا لم يتم اختيارها أو كانت 0/قيمة فارغة
+                const rawBatchId = formData.batch_id;
+                if (rawBatchId && rawBatchId !== "0") {
+                    payload.batch_id = Number(rawBatchId);
+                }
+
+                return payload;
+            });
 
             const orderData = {
                 notes: formData.notes || "",
@@ -1547,8 +1556,9 @@ export default function ProductionManager() {
     cancelLabel="إلغاء"
     confirmVariant="default"
     isLoading={loading}
+    contentClassName="w-screen max-w-[100vw] h-screen max-h-screen p-4"
 >
-    <div className="space-y-4 max-h-[70vh]  overflow-y-auto p-1">
+    <div className="space-y-4">
         {/* معلومات أساسية موسعة */}
         <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
             <h3 className="font-bold text-blue-700 mb-2 text-sm flex items-center">
@@ -1630,8 +1640,8 @@ export default function ProductionManager() {
                 <Package className="w-4 h-4 ml-1" />
                 عناصر الإنتاج ({productionItems.length})
             </h3>
-            <div className="border rounded-lg overflow-hidden bg-white">
-                <table className="min-w-[900px] w-full text-sm">
+            <div className="border rounded-lg bg-white">
+                <table className="w-full text-sm table-fixed">
                     <thead className="bg-gray-100">
                         <tr>
                             <th className="p-2 text-center border-b">#</th>

@@ -42,10 +42,11 @@ const StyledDialog = ({
   isLoading = false,
   confirmVariant = "default",
   showFooter = true,
+  contentClassName = "",
 }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className=" max-h-[90vh] overflow-y-auto bg-white">
+      <DialogContent className={`max-h-[90vh] overflow-y-auto bg-white ${contentClassName}`}>
         {/* Header */}
         <DialogHeader>
           <DialogTitle className="text-lg font-bold text-center">

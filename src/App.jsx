@@ -1,4 +1,4 @@
-﻿// src\App.jsx
+// src\App.jsx
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -84,11 +84,6 @@ const App = () => {
               <Route path="/invoice-history" element={
                 <RoleProtectedRoute allowedRoles="admin">
                   <InvoiceHistory />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/warehouse" element={
-                <RoleProtectedRoute allowedRoles="Warehouse_Keeper">
-                  <WarehouseKeeper />
                 </RoleProtectedRoute>
               } />
               <Route path="/customers" element={

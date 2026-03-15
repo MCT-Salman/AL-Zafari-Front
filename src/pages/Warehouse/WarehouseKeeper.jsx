@@ -148,14 +148,28 @@ export default function WarehouseKeeper() {
     // Handle output submission
     const handleOutputSubmit = async () => {
         try {
-            // Validate required fields
-            if (!outputForm.color_id || !outputForm.batch_id || !outputForm.length ||
+            // Validate required fields (batch_id is optional)
+            if (!outputForm.color_id || !outputForm.length ||
                 !outputForm.width || !outputForm.thickness || !outputForm.destination) {
                 toast.error("يرجى ملء جميع الحقول المطلوبة");
                 return;
             }
 
-            const response = await warehouseApi.createWarehouseMovement(outputForm);
+            // Build payload without sending batch_id when not selected or equals "0"
+            const payload = {
+                color_id: outputForm.color_id,
+                length: outputForm.length,
+                width: outputForm.width,
+                thickness: outputForm.thickness,
+                destination: outputForm.destination,
+                notes: outputForm.notes,
+            };
+
+            if (outputForm.batch_id && outputForm.batch_id !== "0") {
+                payload.batch_id = outputForm.batch_id;
+            }
+
+            const response = await warehouseApi.createWarehouseMovement(payload);
             if (response.success) {
                 toast.success("تم إنشاء حركة المستودع بنجاح");
                 setOutputForm({
@@ -225,10 +239,12 @@ export default function WarehouseKeeper() {
                 </div>
             </div>
 
-            {/* Main Content - 2x2 Grid */}
-            <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-4 p-4 min-h-0">
-                {/* Top Left - Inputs */}
-                <Card className="p-4 flex flex-col">
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col gap-4 p-4 min-h-0">
+                {/* Top Area - Inputs + Orders */}
+                <div className="grid grid-cols-2 gap-4 min-h-[260px]">
+                    {/* Inputs */}
+                    <Card className="p-4 flex flex-col">
                     <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                         <ArrowRight className="w-5 h-5 text-blue-600" />
                         المدخلات
@@ -257,12 +273,12 @@ export default function WarehouseKeeper() {
                                     />
                                 </div>
                                 <div>
-                                    <Label>الدفعة</Label>
+                                    <Label>رقم الطبخة (اختياري)</Label>
                                     <FilterSelect
                                         value={outputForm.batch_id}
                                         onChange={(e) => setOutputForm(prev => ({ ...prev, batch_id: e.target.value }))}
-                                        options={[]} // Will be populated from API
-                                        placeholder="اختر الدفعة"
+                                        options={[]} // Will be populated من API مشابه لصفحة الطلبات
+                                        placeholder="اختر رقم الطبخة إن وجد"
                                     />
                                 </div>
                             </div>
@@ -322,17 +338,17 @@ export default function WarehouseKeeper() {
                             <Button
                                 onClick={handleOutputSubmit}
                                 className="w-full bg-green-600 hover:bg-green-700"
-                                disabled={!outputForm.color_id || !outputForm.batch_id || !outputForm.length || !outputForm.width || !outputForm.thickness || !outputForm.destination}
+                                disabled={!outputForm.color_id || !outputForm.length || !outputForm.width || !outputForm.thickness || !outputForm.destination}
                             >
                                 <Check className="w-5 h-5 ml-2" />
                                 إخراج
                             </Button>
                         </div>
                     </div>
-                </Card>
+                    </Card>
 
-                {/* Top Right - Current or Completed Orders */}
-                <Card className="p-4 flex flex-col">
+                    {/* Current / Completed Orders */}
+                    <Card className="p-4 flex flex-col">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                             <Package className="w-5 h-5 text-orange-600" />
@@ -391,106 +407,110 @@ export default function WarehouseKeeper() {
                             </div>
                         )}
                     </div>
-                </Card>
+                    </Card>
+                </div>
 
-                {/* Bottom Left - Number Pad */}
-                <Card className="p-4">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <Calculator className="w-5 h-5 text-green-600" />
-                        لوحة الأرقام
-                    </h3>
-                    <div className="grid grid-cols-3 gap-2">
-                        {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(num => (
+                {/* Bottom Area - Outputs (full width) + Number Pad on the right */}
+                <div className="flex gap-4 min-h-[260px]">
+                    {/* Outputs Table - takes remaining width */}
+                    <Card className="p-4 flex flex-col flex-1">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                <Package className="w-5 h-5 text-purple-600" />
+                                جدول المخرجات
+                            </h3>
                             <Button
-                                key={num}
                                 variant="outline"
-                                className="h-12 text-lg font-bold"
-                                onClick={() => handleNumberClick(num)}
+                                size="sm"
+                                onClick={loadMovements}
+                                disabled={loadingMovements}
                             >
-                                {num}
+                                <RefreshCw className={`w-4 h-4 ml-2 ${loadingMovements ? 'animate-spin' : ''}`} />
+                                تحديث
                             </Button>
-                        ))}
-                        <Button
-                            variant="outline"
-                            className="h-12 text-lg"
-                            onClick={handleClear}
-                        >
-                            <X className="w-4 h-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="h-12 text-lg font-bold"
-                            onClick={() => handleNumberClick(0)}
-                        >
-                            0
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="h-12 text-lg"
-                            onClick={handleBackspace}
-                        >
-                            <ArrowRight className="w-4 h-4" />
-                        </Button>
-                    </div>
-                </Card>
-
-                {/* Bottom Right - Outputs Table */}
-                <Card className="p-4 flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                            <Package className="w-5 h-5 text-purple-600" />
-                            جدول المخرجات
-                        </h3>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={loadMovements}
-                            disabled={loadingMovements}
-                        >
-                            <RefreshCw className={`w-4 h-4 ml-2 ${loadingMovements ? 'animate-spin' : ''}`} />
-                            تحديث
-                        </Button>
-                    </div>
-                    <div className="flex-1 overflow-auto border rounded-lg bg-white">
-                        {loadingMovements ? (
-                            <div className="flex items-center justify-center h-32">
-                                <LoadingState />
-                            </div>
-                        ) : movements.length === 0 ? (
-                            <div className="text-center py-8 text-gray-500">
-                                <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                                <div className="text-lg font-medium">لا توجد مخرجات</div>
-                                <div className="text-sm">لم يتم تسجيل أي حركات مستودع بعد</div>
-                            </div>
-                        ) : (
-                            <div className="divide-y">
-                                {movements.map(movement => (
-                                    <div key={movement.movement_id} className="p-3">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <div className="font-medium">حركة #{movement.movement_id}</div>
-                                                <div className="text-sm text-gray-600">
-                                                    {movement.color?.color_name} ({movement.color?.color_code})
+                        </div>
+                        <div className="flex-1 overflow-auto border rounded-lg bg-white">
+                            {loadingMovements ? (
+                                <div className="flex items-center justify-center h-32">
+                                    <LoadingState />
+                                </div>
+                            ) : movements.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                                    <div className="text-lg font-medium">لا توجد مخرجات</div>
+                                    <div className="text-sm">لم يتم تسجيل أي حركات مستودع بعد</div>
+                                </div>
+                            ) : (
+                                <div className="divide-y">
+                                    {movements.map(movement => (
+                                        <div key={movement.movement_id} className="p-3">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div>
+                                                    <div className="font-medium">حركة #{movement.movement_id}</div>
+                                                    <div className="text-sm text-gray-600">
+                                                        {movement.color?.color_name} ({movement.color?.color_code})
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {formatDate(movement.created_at)}
+                                                    </div>
                                                 </div>
-                                                <div className="text-xs text-gray-500">
-                                                    {formatDate(movement.created_at)}
-                                                </div>
-                                            </div>
-                                            <div className="text-left">
-                                                <div className="text-sm font-medium">
-                                                    {movement.length} م × {movement.width} مم × {movement.thickness} مم
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    {formatDestination(movement.destination)}
+                                                <div className="text-left">
+                                                    <div className="text-sm font-medium">
+                                                        {movement.length} م × {movement.width} مم × {movement.thickness} مم
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {formatDestination(movement.destination)}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </Card>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+
+                    {/* Number Pad - fixed width on the right */}
+                    <Card className="p-4 w-[260px] flex-shrink-0">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <Calculator className="w-5 h-5 text-green-600" />
+                            لوحة الأرقام
+                        </h3>
+                        <div className="grid grid-cols-3 gap-2">
+                            {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(num => (
+                                <Button
+                                    key={num}
+                                    variant="outline"
+                                    className="h-12 text-lg font-bold"
+                                    onClick={() => handleNumberClick(num)}
+                                >
+                                    {num}
+                                </Button>
+                            ))}
+                            <Button
+                                variant="outline"
+                                className="h-12 text-lg"
+                                onClick={handleClear}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-12 text-lg font-bold"
+                                onClick={() => handleNumberClick(0)}
+                            >
+                                0
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-12 text-lg"
+                                onClick={handleBackspace}
+                            >
+                                <ArrowRight className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
             </div>
 
             {/* Order Details Dialog */}
@@ -498,7 +518,7 @@ export default function WarehouseKeeper() {
                 isOpen={showOrderDetails}
                 onOpenChange={setShowOrderDetails}
                 title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ''}`}
-                className="max-w-4xl"
+                contentClassName="max-w-4xl w-full"
             >
                 {selectedOrder && (
                     <div className="space-y-4">
@@ -545,8 +565,8 @@ export default function WarehouseKeeper() {
                         ) : orderItems.length > 0 ? (
                             <div>
                                 <h4 className="font-bold mb-3">عناصر الطلب</h4>
-                                <div className="border rounded-lg overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                <div className="border rounded-lg">
+                                    <table className="w-full text-sm table-fixed">
                                         <thead className="bg-gray-100">
                                             <tr>
                                                 <th className="p-2 text-center">العرض</th>
