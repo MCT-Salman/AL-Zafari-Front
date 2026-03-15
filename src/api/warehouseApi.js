@@ -173,28 +173,6 @@ class WarehouseApi {
   // Get production order items for warehouse processing
   async getProductionOrderItems(orderId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/production-orders/${orderId}/items`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch production order items');
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching production order items:', error);
-      throw error;
-    }
-  // Get production order items
-  async getProductionOrderItems(orderId) {
-    try {
       const response = await fetch(`${API_BASE_URL}/production-orders/${orderId}/items`, {
         method: 'GET',
         headers: {

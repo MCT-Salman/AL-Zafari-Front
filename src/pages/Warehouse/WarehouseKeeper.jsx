@@ -588,5 +588,3 @@ export default function WarehouseKeeper() {
         </div>
     );
 }
-
-export default WarehouseKeeper;
