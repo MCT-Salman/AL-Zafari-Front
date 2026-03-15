@@ -1,4 +1,4 @@
-// src/pages/SettingsManagement.jsx
+// src\pages\SettingsManagement.jsx
 import { useState, useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
 import { settingApi } from "../api/settingApi";

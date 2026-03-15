@@ -169,7 +169,7 @@ const FilterSelect = ({
           }}
           disabled={disabled}
           className="absolute left-2 top-1/2 -translate-y-1/2 text-secondary-fo transition-transform duration-200 disabled:cursor-not-allowed"
-          aria-label="تبديل القائمة"
+          aria-label="تبديل قائمة"
         >
           <ChevronDown className={`h-4 w-4 ${isOpen ? "rotate-180" : ""}`} />
         </button>

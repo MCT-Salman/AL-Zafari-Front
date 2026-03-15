@@ -23,6 +23,7 @@ const CustomerManagement = lazy(() => import("./pages/Sales/CustomerManagement")
 const OrderManagement = lazy(() => import("./pages/Sales/OrderManagement"));
 const InvoiceHistory = lazy(() => import("./pages/Admin/InvoiceHistory"));
 const SalesHome = lazy(() => import("./pages/Sales/SalesHome"));
+const WarehouseKeeper = lazy(() => import("./pages/Warehouse/WarehouseKeeper"));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center text-sm text-gray-600">
@@ -85,12 +86,12 @@ const App = () => {
                   <InvoiceHistory />
                 </RoleProtectedRoute>
               } />
-              <Route path="/users" element={
-                <RoleProtectedRoute allowedRoles="admin">
-                  <Users />
+              <Route path="/warehouse" element={
+                <RoleProtectedRoute allowedRoles="Warehouse_Keeper">
+                  <WarehouseKeeper />
                 </RoleProtectedRoute>
               } />
-             <Route path="/customers" element={
+              <Route path="/customers" element={
                 <RoleProtectedRoute allowedRoles="sales">
                   <CustomerManagement />
                 </RoleProtectedRoute>
@@ -115,6 +116,11 @@ const App = () => {
               <Route path="/production-records" element={
                 <RoleProtectedRoute allowedRoles="production_manager">
                   <ProductionRecords />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/warehouse" element={
+                <RoleProtectedRoute allowedRoles="Warehouse_Keeper">
+                  <WarehouseKeeper />
                 </RoleProtectedRoute>
               } />
             

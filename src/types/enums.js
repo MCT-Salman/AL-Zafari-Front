@@ -28,7 +28,7 @@ export const ActivityAction = {
     CREATE: 'CREATE',
     UPDATE: 'UPDATE',
     DELETE: 'DELETE',
-    VIEW: 'VIEW',
+    VIEW:    'VIEW',
     LOGIN: 'LOGIN',
     LOGOUT: 'LOGOUT',
     EXPORT: 'EXPORT'

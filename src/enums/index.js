@@ -1,3 +1,4 @@
+// src\enums\index.js
 /**
  * ===================== ENUMS =====================
  * Centralized enums for the application

@@ -170,7 +170,7 @@ export default function ProductionManager() {
     const [currentItem, setCurrentItem] = useState({
         width: "",
         length: "", // هذه تمثل الكمية (height في الـ API)
-        production_types: [ProductionType.warehouse] // افتراضي
+        production_types: [] // افتراضي فارغ
     });
     const [activeField, setActiveField] = useState("length");
 
@@ -506,12 +506,18 @@ export default function ProductionManager() {
                 // إزالة النوع إذا كان موجوداً
                 return { ...prev, production_types: types.filter(t => t !== type) };
             } else {
-                // إضافة النوع، لكن إذا كان هناك نوع واحد فقط، لا نضيف المزيد
-                if (types.length >= 1) {
-                    // عند اختيار نوع واحد، تعطيل الاختيار
-                    return prev;
+                // إضافة النوع
+                if (type === ProductionType.warehouse) {
+                    // إذا اخترت المستودع، اجعله وحده
+                    return { ...prev, production_types: [type] };
+                } else {
+                    // إذا كان المستودع مختار، لا تضيف
+                    if (types.includes(ProductionType.warehouse)) {
+                        return prev;
+                    }
+                    // إلا، أضف إلى الثلاثة
+                    return { ...prev, production_types: [...types, type] };
                 }
-                return { ...prev, production_types: [...types, type] };
             }
         });
     };
@@ -546,11 +552,10 @@ export default function ProductionManager() {
         }
         setShowPreview(true);
 
-        // Reset current item
         setCurrentItem({
             width: "",
             length: "",
-            production_types: [ProductionType.warehouse]
+            production_types: []
         });
     };
 
@@ -569,7 +574,7 @@ export default function ProductionManager() {
             setCurrentItem({
                 width: "",
                 length: "",
-                production_types: [ProductionType.warehouse]
+                production_types: []
             });
         }
         setProductionItems(prev => prev.filter(item => item.id !== id));
@@ -583,7 +588,7 @@ export default function ProductionManager() {
             setCurrentItem({
                 width: "",
                 length: "",
-                production_types: [ProductionType.warehouse]
+                production_types: []
             });
             toast.success("تم مسح جميع العناصر");
         }
@@ -594,7 +599,7 @@ export default function ProductionManager() {
         setCurrentItem({
             width: "",
             length: "",
-            production_types: [ProductionType.warehouse]
+            production_types: []
         });
     };
 
@@ -955,27 +960,6 @@ export default function ProductionManager() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2 mt-2">
-                                    <button
-                                        onClick={() => {
-                                            setActiveField("width");
-                                            setActiveTextTarget(null);
-                                        }}
-                                        className={`py-2 rounded-lg text-sm font-bold transition-all ${activeField === "width" ? "bg-primary-f text-white" : "bg-gray-200 text-gray-700"}`}
-                                    >
-                                        العرض
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setActiveField("length");
-                                            setActiveTextTarget(null);
-                                        }}
-                                        className={`py-2 rounded-lg text-sm font-bold transition-all ${activeField === "length" ? "bg-primary-f text-white" : "bg-gray-200 text-gray-700"}`}
-                                    >
-                                        الكمية
-                                    </button>
-                                </div>
-
                                 <button
                                     onClick={() => handleNumpadPress("clear")}
                                     className="mt-2 w-full bg-red-100 text-red-700 border-2 border-red-200 rounded-lg py-2 font-bold hover:bg-red-200 active:bg-red-300 transition-all touch-manipulation active:scale-95"
@@ -1231,7 +1215,8 @@ export default function ProductionManager() {
                                     {PRODUCTION_TYPES.map(type => {
                                         const Icon = type.icon;
                                         const isSelected = currentItem.production_types?.includes(type.value);
-                                        const isDisabled = !isSelected && (currentItem.production_types?.length || 0) >= 1;
+                                        const isDisabled = type.value === ProductionType.warehouse && currentItem.production_types?.some(t => t !== ProductionType.warehouse) ||
+                                                             type.value !== ProductionType.warehouse && currentItem.production_types?.includes(ProductionType.warehouse);
                                         return (
                                             <button
                                                 key={type.value}
@@ -1275,10 +1260,10 @@ export default function ProductionManager() {
                                     <table className="min-w-[520px] w-full table-fixed border-collapse">
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
-                                                <th className="p-1 text-center border-b w-16">العرض</th>
-                                                <th className="p-1 text-center border-b w-20">الكمية</th>
-                                                <th className="p-1 text-center border-b">أنواع الإنتاج</th>
-                                                <th className="p-1 text-center border-b w-16">إجراء</th>
+                                                <th className="p-1 text-center border-b w-5">العرض</th>
+                                                <th className="p-1 text-center border-b w-5">الكمية</th>
+                                                <th className="p-1 text-center border-b w-5">أنواع الإنتاج</th>
+                                                <th className="p-1 text-center border-b w-5">إجراء</th>
                                             </tr>
                                         </thead>
                                         <tbody>

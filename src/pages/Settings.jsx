@@ -1,3 +1,4 @@
+// src\pages\Settings.jsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { authApi } from "../api/authApi";
