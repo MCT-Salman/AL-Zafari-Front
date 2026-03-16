@@ -23,7 +23,7 @@ class WarehouseApi {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
 
@@ -47,7 +47,7 @@ class WarehouseApi {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
 
@@ -71,7 +71,7 @@ class WarehouseApi {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         },
         body: JSON.stringify(movementData)
       });
@@ -96,7 +96,7 @@ class WarehouseApi {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         },
         body: JSON.stringify(movementData)
       });
@@ -121,7 +121,7 @@ class WarehouseApi {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         },
         body: JSON.stringify({ ids })
       });
@@ -142,28 +142,11 @@ class WarehouseApi {
   // Get pending/completed orders for warehouse input
   async getWarehouseOrders(params = {}) {
     try {
-      const queryParams = new URLSearchParams();
-      queryParams.append('status', 'completed,preparing'); // Get completed and preparing orders
-      if (params.page) queryParams.append('page', params.page);
-      if (params.limit) queryParams.append('limit', params.limit);
-
-      const url = `${API_BASE_URL}/api/production-orders?${queryParams.toString()}`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch warehouse orders');
-      }
-
-      return data;
+      return {
+        success: true,
+        message: "لا يوجد endpoint للطلبات في هذا السيرفر (تم الاعتماد على السوكيت)",
+        data: []
+      };
     } catch (error) {
       console.error('Error fetching warehouse orders:', error);
       throw error;
@@ -173,11 +156,12 @@ class WarehouseApi {
   // Get production order items for warehouse processing
   async getProductionOrderItems(orderId) {
     try {
+      // مطابق للـ endpoint: GET {{autolocal}}/production-orders/:id/items
       const response = await fetch(`${API_BASE_URL}/production-orders/${orderId}/items`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
         }
       });
 

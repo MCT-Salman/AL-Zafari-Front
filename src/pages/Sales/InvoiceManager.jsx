@@ -964,6 +964,7 @@ export default function InvoiceManager() {
         material_name: material?.material_name,
         ruler_name: ruler?.ruler_name,
         color_name: color?.color_name,
+        color_code: color?.color_code,
         batch_number: batch?.batch_number,
         unit_price: priceCalculation?.unitPrice || 0,
         price_per_meter: priceCalculation?.price_per_meter ?? null,
@@ -2041,26 +2042,36 @@ export default function InvoiceManager() {
                             </Card>
 
                             <div className="mt-auto space-y-2">
-                                <Button
-                                    onClick={addOrUpdateItem}
-                                    size="lg"
-                                    className={`h-14 w-full text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform ${
-                                        editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
-                                    }`}
-                                    disabled={!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity}
-                                >
-                                    {editingItemId ? (
-                                        <>
-                                            <Save className="w-5 h-5 ml-2" />
-                                            تحديث العنصر
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Plus className="w-5 h-5 ml-2" />
-                                            إضافة للجدول
-                                        </>
+                                <div className="flex gap-2">
+                                    {editingItemId && (
+                                        <button
+                                            onClick={cancelEdit}
+                                            className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors h-14"
+                                        >
+                                            إلغاء التعديل
+                                        </button>
                                     )}
-                                </Button>
+                                    <Button
+                                        onClick={addOrUpdateItem}
+                                        size="lg"
+                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-14 text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform ${
+                                            editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
+                                        }`}
+                                        disabled={!formData.material_id || !formData.ruler_id || !formData.color_id || !formData.quantity}
+                                    >
+                                        {editingItemId ? (
+                                            <>
+                                                <Save className="w-5 h-5 ml-2" />
+                                                تحديث العنصر
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Plus className="w-5 h-5 ml-2" />
+                                                إضافة للجدول
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
                                 {(selectedOrder || formData.notes) && (
                                     <Button
                                         onClick={clearForm}
@@ -2377,7 +2388,7 @@ export default function InvoiceManager() {
                                     </div>
                                 </StyledDialog>
                             )}
-
+                            
                             {/* بوب أب معلومات الدفع عند إنشاء الفاتورة */}
                             {showPaymentPopup && (
                                 <StyledDialog
@@ -2641,37 +2652,38 @@ export default function InvoiceManager() {
                                 {/* رأس الجدول مع أزرار التحكم */}
                                 <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
                                     <div className="flex items-center gap-2">
-                                        <span className="font-bold text-sm">العناصر: {orderItems.length}</span>
+                                        <span className="font-bold text-lg">العناصر: {orderItems.length}</span>
                                         {orderItems.length > 0 && (
                                             <>
                                                 <button
                                                     onClick={clearAllItems}
-                                                    className="text-secondary-s hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
-                                                    title="مسح الكل"
+                                                    className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform flex items-center gap-1"
+                                                    title="مسح جميع العناصر"
                                                 >
-                                                    <X className="w-4 h-4" />
+                                                    <Trash2 className="w-4 h-4" />
+                                                    <span className="text-xs font-medium">مسح العناصر</span>
                                                 </button>
                                                 <div className="flex gap-1 mr-2">
                                                     <button
                                                         onClick={() => scrollTable('right')}
-                                                        className="bg-gray-200 hover:bg-gray-300 p-1 rounded touch-manipulation"
+                                                        className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform"
                                                         title="التمرير لليسار"
                                                     >
-                                                        <ChevronRight className="w-4 h-4" />
+                                                        <ChevronRight className="w-5 h-5" />
                                                     </button>
                                                     <button
                                                         onClick={() => scrollTable('left')}
-                                                        className="bg-gray-200 hover:bg-gray-300 p-1 rounded touch-manipulation"
+                                                        className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform"
                                                         title="التمرير لليمين"
                                                     >
-                                                        <ChevronLeft className="w-4 h-4" />
+                                                        <ChevronLeft className="w-5 h-5" />
                                                     </button>
                                                 </div>
                                             </>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className="bg-green-50 px-2 py-1 rounded-lg text-xs">
+                                        <div className="bg-green-50 px-2 py-1 rounded-lg text-lg">
                                             إجمالي: <span className="font-bold text-primary-f">{totalPreviewQuantity} م</span>
                                         </div>
                                     </div>
@@ -2686,9 +2698,9 @@ export default function InvoiceManager() {
                                     <table className="min-w-[750px] w-full table-fixed border-collapse">
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
-                                                <th className="p-1 text-right border-b w-[80px]">المادة</th>
+                                                <th className="p-1 text-right border-b w-[50px]">المادة</th>
                                                 <th className="p-1 text-center border-b w-[55px]">العرض</th>
-                                                <th className="p-1 text-right border-b w-[90px]">اللون</th>
+                                                <th className="p-1 text-right border-b w-[50px]">اللون</th>
                                                 <th className="p-1 text-center border-b w-[45px]">النوع</th>
                                                 <th className="p-1 text-center border-b w-[55px]">الكمية</th>
                                                 <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
@@ -2720,8 +2732,8 @@ export default function InvoiceManager() {
                                                     <td className="p-1 text-center text-sm">
                                                         {item.width || "-"}
                                                     </td>
-                                                    <td className="p-1 break-words text-sm" title={item.color_name}>
-                                                        {item.color_name}
+                                                    <td className="p-1 break-words text-sm font-mono" title={item.color_code}>
+                                                        {item.color_code}
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
                                                         {formatTypeItem(item.type_item)}

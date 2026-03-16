@@ -123,10 +123,9 @@ export default function ProductionManager() {
     // Production Types
     const PRODUCTION_TYPES = [
         { value: ProductionType.warehouse, label: "مستودع", icon: Package },
-        { value: ProductionType.slitting, label: "تشريح", icon: Scissors },
-        { value: ProductionType.cutting, label: "قص/تمتير", icon: Scissors },
-        { value: ProductionType.gluing, label: "تغرية", icon: Droplet },
-        // { value: ProductionType.orderproduction, label: "إنتاج", icon: Settings }
+        { value: ProductionType.slitting, label: "تقطيع", icon: Scissors },
+        { value: ProductionType.cutting, label: "قص", icon: Scissors },
+        { value: ProductionType.gluing, label: "لصق", icon: Droplet },
     ];
 
     const TYPE_ITEM_OPTIONS = [
@@ -173,6 +172,16 @@ export default function ProductionManager() {
         production_types: [] // افتراضي فارغ
     });
     const [activeField, setActiveField] = useState("length");
+
+    // Auto-select width 66 when warehouse is selected
+    useEffect(() => {
+        if (currentItem && currentItem.production_types?.includes(ProductionType.warehouse)) {
+            setCurrentItem(prev => ({
+                ...prev,
+                width: "66"
+            }));
+        }
+    }, [currentItem?.production_types]);
 
     // Load initial data
     useEffect(() => {
@@ -550,7 +559,8 @@ export default function ProductionManager() {
             setProductionItems(prev => [...prev, newItem]);
             toast.success("تم إضافة العنصر بنجاح");
         }
-        setShowPreview(true);
+        // Don't show preview after adding item
+        // setShowPreview(true);
 
         setCurrentItem({
             width: "",
@@ -566,6 +576,8 @@ export default function ProductionManager() {
             production_types: item.production_types
         });
         setEditingItemId(item.id);
+        // Show preview when editing
+        setShowPreview(false);
     };
 
     const removeItem = (id) => {
@@ -646,6 +658,7 @@ export default function ProductionManager() {
                 notes: formData.notes || "",
                 status: ProductionStatus.pending, // الحفاظ على الحالة كما هي
                 source: formData.source, // إضافة المصدر
+                production_types: formData.source === "warehouse" ? [ProductionType.warehouse] : item.production_types,
                 items: items
             };
 
@@ -1173,23 +1186,33 @@ export default function ProductionManager() {
                             </Card>
 
                             <div className="mt-auto">
-                                <Button
-                                    onClick={addProductionItem}
-                                    className={`w-full h-14 text-lg font-bold ${editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
-                                        } text-white`}
-                                >
-                                    {editingItemId ? (
-                                        <>
-                                            <Save className="w-4 h-4 ml-1" />
-                                            تحديث العنصر
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Plus className="w-4 h-4 ml-1" />
-                                            إضافة عنصر
-                                        </>
+                                <div className="flex gap-2">
+                                    {editingItemId && (
+                                        <button
+                                            onClick={cancelEdit}
+                                            className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors h-14"
+                                        >
+                                            إلغاء التعديل
+                                        </button>
                                     )}
-                                </Button>
+                                    <Button
+                                        onClick={addProductionItem}
+                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-14 text-lg font-bold ${editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
+                                            } text-white`}
+                                    >
+                                        {editingItemId ? (
+                                            <>
+                                                <Save className="w-4 h-4 ml-1" />
+                                                تحديث العنصر
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Plus className="w-4 h-4 ml-1" />
+                                                إضافة عنصر
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
                             {/* <Card className="p-4">
                                 <Label className="font-bold text-base mb-3 block">إضافة عنصر إنتاج</Label>
@@ -1256,12 +1279,13 @@ export default function ProductionManager() {
                                     <span className="font-bold text-sm">العناصر المضافة: {productionItems.length}</span>
                                     {productionItems.length > 0 && (
                                         <button
-                                            onClick={clearAllItems}
-                                            className="text-secondary-s hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
-                                            title="مسح الكل"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                                                    onClick={clearAllItems}
+                                                    className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform flex items-center gap-1"
+                                                    title="مسح جميع العناصر"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                    <span className="text-xs font-medium">مسح العناصر</span>
+                                                </button>
                                     )}
                                 </div>
 
@@ -1269,17 +1293,20 @@ export default function ProductionManager() {
                                     <table className="min-w-[520px] w-full table-fixed border-collapse">
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
-                                                <th className="p-1 text-center border-b w-5">العرض</th>
-                                                <th className="p-1 text-center border-b w-5">الكمية</th>
-                                                <th className="p-1 text-center border-b w-5">أنواع الإنتاج</th>
-                                                <th className="p-1 text-center border-b w-5">إجراء</th>
+                                                <th className="p-1 text-center border-b w-20">العرض</th>
+                                                <th className="p-1 text-center border-b w-20">الكمية</th>
+                                                <th className="p-1 text-center border-b w-20">أنواع الإنتاج</th>
+                                                <th className="p-1 text-center border-b w-20">اللون</th>
+                                                <th className="p-1 text-center border-b w-20">المصدر</th>
+                                                <th className="p-1 text-center border-b w-20">الإجراءات</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {productionItems.map(item => (
                                                 <tr
                                                     key={item.id}
-                                                    className="border-b"
+                                                    className="border-b hover:bg-gray-50 cursor-pointer transition-colors"
+                                                    onClick={() => handleEditItem(item)}
                                                 >
                                                     <td className="p-1 text-center text-sm">{item.width}</td>
                                                     <td className="p-1 text-center text-sm">{item.length}</td>
@@ -1294,6 +1321,13 @@ export default function ProductionManager() {
                                                                 );
                                                             })}
                                                         </div>
+                                                    </td>
+                                                    <td className="p-1 text-center text-sm font-mono">{colors.find(c => String(c.color_id) === String(formData.color_id))?.color_code || '-'}</td>
+                                                    <td className="p-1 text-center text-sm">
+                                                        {(() => {
+                                                            const sourceOption = SOURCE_OPTIONS.find(s => s.value === formData.source);
+                                                            return sourceOption?.label || '-';
+                                                        })()}
                                                     </td>
                                                     <td className="p-1 text-center">
                                                         <button
@@ -1311,7 +1345,7 @@ export default function ProductionManager() {
                                             ))}
                                             {productionItems.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="4" className="p-8 text-center text-gray-400">
+                                                    <td colSpan="6" className="p-8 text-center text-gray-400">
                                                         <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                         لا توجد عناصر مضافة
                                                     </td>
@@ -1614,7 +1648,7 @@ export default function ProductionManager() {
                     <div className="text-xs text-gray-500">السماكة</div>
                     <div className="font-bold text-sm">{formData.thickness} مم</div>
                 </div>
-                <div className="bg-white p-2 rounded-lg shadow-sm">
+                {/* <div className="bg-white p-2 rounded-lg shadow-sm">
                     <div className="text-xs text-gray-500">الحالة</div>
                     <div className="font-bold text-sm">
                         <span className={`px-2 py-1 rounded-lg text-xs ${(() => {
@@ -1624,7 +1658,7 @@ export default function ProductionManager() {
                             {STATUS_OPTIONS.find(s => s.value === formData.status)?.label || formData.status}
                         </span>
                     </div>
-                </div>
+                </div> */}
                 <div className="bg-white p-2 rounded-lg shadow-sm col-span-2">
                     <div className="text-xs text-gray-500">ملاحظات</div>
                     <div className="font-bold text-sm truncate" title={formData.notes}>
@@ -1694,26 +1728,25 @@ export default function ProductionManager() {
                                         </div>
                                     </td>
                                     <td className="p-2 text-center">
-                                        {source ? (
-                                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                                {productionApi.getProcessSourceLabel(
-                                                    source === ProductionType.warehouse ? 'warehouse' :
-                                                    source === ProductionType.slitting ? 'slitting' :
-                                                    source === ProductionType.cutting ? 'cutting' :
-                                                    source === ProductionType.gluing ? 'gluing' : 'warehouse'
-                                                )}
-                                            </span>
-                                        ) : '-'}
+                                        {(() => {
+                                            const sourceOption = SOURCE_OPTIONS.find(s => s.value === formData.source);
+                                            return sourceOption ? (
+                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                                                    {sourceOption.label}
+                                                </span>
+                                            ) : '-';
+                                        })()}
                                     </td>
                                     <td className="p-2 text-center">
                                         {destination ? (
                                             <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                                                {productionApi.getMovementDestinationLabel(
-                                                    destination === ProductionType.slitting ? 'slitting' :
-                                                    destination === ProductionType.cutting ? 'cutting' :
-                                                    destination === ProductionType.gluing ? 'gluing' :
-                                                    destination === ProductionType.warehouse ? 'warehouse' : 'production'
-                                                )}
+                                                {(() => {
+                                                    if (destination === ProductionType.slitting) return "تقطيع";
+                                                    if (destination === ProductionType.cutting) return "قص";
+                                                    if (destination === ProductionType.gluing) return "لصق";
+                                                    if (destination === ProductionType.warehouse) return "مستودع";
+                                                    return "إنتاج";
+                                                })()}
                                             </span>
                                         ) : '-'}
                                     </td>

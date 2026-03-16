@@ -42,6 +42,7 @@ const StyledDialog = ({
   isLoading = false,
   confirmVariant = "default",
   showFooter = true,
+  showCancel = true,
   contentClassName = "",
 }) => {
   return (
@@ -67,14 +68,16 @@ const StyledDialog = ({
         {/* Footer */}
         {showFooter && (
           <DialogFooter className="flex gap-2 justify-start pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={onCancel}
-              disabled={isLoading}
-              className="flex-1"
-            >
-              {cancelLabel}
-            </Button>
+            {showCancel && (
+              <Button
+                variant="outline"
+                onClick={onCancel}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                {cancelLabel}
+              </Button>
+            )}
             <Button
               variant={confirmVariant}
               onClick={onConfirm}

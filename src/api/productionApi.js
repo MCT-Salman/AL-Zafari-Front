@@ -150,7 +150,8 @@ export const productionApi = {
       [MovementDestination.slitting]: 'تقطيع',
       [MovementDestination.cutting]: 'قص',
       [MovementDestination.gluing]: 'لصق',
-      [MovementDestination.production]: 'إنتاج'
+      [MovementDestination.production]: 'إنتاج',
+      [MovementDestination.warehouse]: 'مستودع'
     };
     return destMap[destination] || destination || 'غير محدد';
   },

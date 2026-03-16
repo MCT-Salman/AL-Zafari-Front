@@ -501,7 +501,7 @@ export default function CustomerManagement() {
                           </div>
                         </TableCell>
                         <TableCell className="font-bold text-primary-f">
-                          {new Intl.NumberFormat("ar-SY").format(parseFloat(customer.balance || 0) || 0)} ل.س
+                          {new Intl.NumberFormat("en-US").format(parseFloat(customer.balance || 0) || 0)} ل.س
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -592,6 +592,7 @@ export default function CustomerManagement() {
               { key: "city", label: "المدينة" },
               { key: "address", label: "العنوان" },
               { key: "country", label: "البلد" },
+              { key: "balance", label: "الذمة", formatValue: (key, value) => `${new Intl.NumberFormat("en-US").format(parseFloat(value || 0) || 0)} ل.س` },
               { key: "is_active", label: "الحالة", formatValue: (key, value) => value ? "نشط" : "غير نشط" },
               { key: "notes", label: "الملاحظات" },
             ]
