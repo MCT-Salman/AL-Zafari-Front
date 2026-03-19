@@ -142,11 +142,30 @@ class WarehouseApi {
   // Get pending/completed orders for warehouse input
   async getWarehouseOrders(params = {}) {
     try {
-      return {
-        success: true,
-        message: "لا يوجد endpoint للطلبات في هذا السيرفر (تم الاعتماد على السوكيت)",
-        data: []
-      };
+      const queryParams = new URLSearchParams();
+      if (params.page) queryParams.append('page', params.page);
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.search) queryParams.append('search', params.search);
+      if (params.status) queryParams.append('status', params.status);
+
+      const type = params.type || "warehouse";
+      const url = `${API_BASE_URL}/production-order/type/${type}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch warehouse orders');
+      }
+
+      return data;
     } catch (error) {
       console.error('Error fetching warehouse orders:', error);
       throw error;
@@ -156,8 +175,8 @@ class WarehouseApi {
   // Get production order items for warehouse processing
   async getProductionOrderItems(orderId) {
     try {
-      // مطابق للـ endpoint: GET {{autolocal}}/production-orders/:id/items
-      const response = await fetch(`${API_BASE_URL}/production-orders/${orderId}/items`, {
+      // مطابق للـ endpoint: GET {{autolocal}}/production-order/:id/items
+      const response = await fetch(`${API_BASE_URL}/production-order/${orderId}/items`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

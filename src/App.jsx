@@ -24,6 +24,9 @@ const OrderManagement = lazy(() => import("./pages/Sales/OrderManagement"));
 const InvoiceHistory = lazy(() => import("./pages/Admin/InvoiceHistory"));
 const SalesHome = lazy(() => import("./pages/Sales/SalesHome"));
 const WarehouseKeeper = lazy(() => import("./pages/Warehouse/WarehouseKeeper"));
+const SlittingManager = lazy(() => import("./pages/Slitting/SlittingManager"));
+const CuttingManager = lazy(() => import("./pages/Cutting/CuttingManager"));
+const GluingManager = lazy(() => import("./pages/Gluing/GluingManager"));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center text-sm text-gray-600">
@@ -33,7 +36,16 @@ const RouteFallback = () => (
 
 const DefaultRoute = () => {
   const { user } = useAuth();
-  const target = user?.role === 'production_manager' ? "/production" : "/dashboard";
+  const target =
+    user?.role === 'production_manager'
+      ? "/production"
+      : user?.role === 'Dissection_Technician'
+        ? "/slitting"
+        : user?.role === 'Cutting_Technician'
+          ? "/cutting"
+          : user?.role === 'Gluing_Technician'
+            ? "/gluing"
+        : "/dashboard";
   return <Navigate to={target} replace />;
 };
 
@@ -42,6 +54,9 @@ const DashboardSwitcher = () => {
   const { user } = useAuth();
   if (user?.role === 'sales') return <SalesHome />;
   if (user?.role === 'production_manager') return <Navigate to="/production" replace />;
+  if (user?.role === 'Dissection_Technician') return <Navigate to="/slitting" replace />;
+  if (user?.role === 'Cutting_Technician') return <Navigate to="/cutting" replace />;
+  if (user?.role === 'Gluing_Technician') return <Navigate to="/gluing" replace />;
   return <Dashboard />;
 };
 
@@ -81,6 +96,11 @@ const App = () => {
                   <SettingsManagement />
                 </RoleProtectedRoute>
               } />
+              <Route path="/users" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <Users />
+                </RoleProtectedRoute>
+              } />
               <Route path="/invoice-history" element={
                 <RoleProtectedRoute allowedRoles="admin">
                   <InvoiceHistory />
@@ -116,6 +136,21 @@ const App = () => {
               <Route path="/warehouse" element={
                 <RoleProtectedRoute allowedRoles="Warehouse_Keeper">
                   <WarehouseKeeper />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/slitting" element={
+                <RoleProtectedRoute allowedRoles="Dissection_Technician">
+                  <SlittingManager />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/cutting" element={
+                <RoleProtectedRoute allowedRoles="Cutting_Technician">
+                  <CuttingManager />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/gluing" element={
+                <RoleProtectedRoute allowedRoles="Gluing_Technician">
+                  <GluingManager />
                 </RoleProtectedRoute>
               } />
             

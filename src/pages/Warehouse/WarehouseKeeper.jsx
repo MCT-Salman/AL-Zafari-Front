@@ -6,6 +6,7 @@ import { colorApi } from "../../api/colorApi";
 import { batchApi } from "../../api/batchApi";
 import { materialApi } from "../../api/materialApi";
 import { rulerApi } from "../../api/rulerApi";
+import { productionApi } from "../../api/productionApi";
 import { useAuth } from "../../context/AuthContext";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -14,8 +15,10 @@ import { Label } from "../../components/ui/label";
 import FilterSelect from "../../components/common/FilterSelect";
 import StyledDialog from "../../components/common/StyledDialog";
 import LoadingState from "../../components/common/LoadingState";
+import NotificationsBell from "../../components/common/NotificationsBell";
 import { getApiData } from "../../utils/api";
 import { connectSocket, disconnectSocket } from "../../lib/socket";
+import { toast } from "react-hot-toast";
 import {
     Package,
     ArrowRight,
@@ -31,8 +34,7 @@ import {
     Hash,
     Trash2
 } from "lucide-react";
-import toast from "react-hot-toast";
-import { UserRole, MovementDestination } from "../../types/enums";
+import { UserRole, MovementDestination, ProductionStatus, ProductionType } from "../../types/enums";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
 
@@ -58,6 +60,7 @@ export default function WarehouseKeeper() {
     const [selectedMovement, setSelectedMovement] = useState(null);
     const [showMovementDetails, setShowMovementDetails] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [activeOrderItem, setActiveOrderItem] = useState(null);
     const [orderItems, setOrderItems] = useState([]);
     const [showOrderDetails, setShowOrderDetails] = useState(false);
     const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
@@ -77,7 +80,7 @@ export default function WarehouseKeeper() {
         batch_id: "",
         length: "",
         width: "",
-        thickness: "",
+        thickness: "0.6",
         destination: "",
         notes: ""
     });
@@ -142,10 +145,12 @@ export default function WarehouseKeeper() {
     const loadOrders = async () => {
         try {
             setLoadingOrders(true);
-            const response = await warehouseApi.getWarehouseOrders();
-            if (response.success) {
-                setOrders(response.data || []);
-            }
+            const response = await warehouseApi.getWarehouseOrders({
+                type: ProductionType.warehouse
+            });
+            const data = getApiData(response, response?.data ?? response);
+            const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+            setOrders(list);
         } catch (error) {
             console.error('Error loading orders:', error);
             toast.error("فشل في تحميل الطلبات");
@@ -285,36 +290,40 @@ export default function WarehouseKeeper() {
 
         const socket = connectSocket(token);
 
-        const upsertOrder = (incoming) => {
-            if (!incoming) return;
-
-            if (Array.isArray(incoming)) {
-                setOrders(incoming);
-                return;
-            }
-
-            const id = incoming.production_order_id ?? incoming.id;
-            if (!id) return;
-
-            setOrders(prev => {
-                const list = Array.isArray(prev) ? prev : [];
-                const idx = list.findIndex(o => String(o.production_order_id ?? o.id) === String(id));
-                if (idx === -1) return [incoming, ...list];
-                const next = [...list];
-                next[idx] = { ...next[idx], ...incoming };
-                return next;
-            });
-        };
-
         const handleOrderNew = (payload) => {
             console.log("📦 ORDER_NEW received:", payload);
-            const data = payload?.data ?? payload;
-            upsertOrder(data);
+            loadOrders();
         };
 
         const handleOrdersPayload = (payload) => {
+            console.log("📦 WAREHOUSE ORDERS payload:", payload);
+            loadOrders();
+        };
+
+        const handleNotification = (payload) => {
+            console.log("🔔 NOTIFICATION received:", payload);
             const data = payload?.data ?? payload;
-            upsertOrder(data);
+            
+            // Handle notifications and orders
+            if (data) {
+                // Handle warehouse notifications
+                if (payload.type === "PRODUCTION_ORDER_WAREHOUSE" && data.productionOrderId) {
+                    // Reload orders to get updated data
+                    loadOrders();
+                    
+                    // You can add more specific handling here
+                    console.log("📦 Warehouse notification:", {
+                        orderId: data.productionOrderId,
+                        itemsCount: data.itemsCount,
+                        items: data.items
+                    });
+                }
+                // If notification contains order data, update orders
+                else if (data.production_order_id || data.id) {
+                    loadOrders();
+                }
+                
+            }
         };
 
         socket.on("ORDER_NEW", handleOrderNew);
@@ -322,6 +331,7 @@ export default function WarehouseKeeper() {
         socket.on("warehouse:order:new", handleOrdersPayload);
         socket.on("order:new", handleOrdersPayload);
         socket.on("order:updated", handleOrdersPayload);
+        socket.on("notification", handleNotification);
 
         return () => {
             socket.off("ORDER_NEW", handleOrderNew);
@@ -329,6 +339,7 @@ export default function WarehouseKeeper() {
             socket.off("warehouse:order:new", handleOrdersPayload);
             socket.off("order:new", handleOrdersPayload);
             socket.off("order:updated", handleOrdersPayload);
+            socket.off("notification", handleNotification);
             disconnectSocket();
         };
     }, []);
@@ -362,6 +373,15 @@ export default function WarehouseKeeper() {
         }
     };
 
+    const handleDecimalClick = () => {
+        const currentValue = String(outputForm[currentInput] || "");
+        if (currentValue.includes(".") || currentValue.includes(",")) return;
+        setOutputForm(prev => ({
+            ...prev,
+            [currentInput]: currentValue ? `${currentValue}.` : "0."
+        }));
+    };
+
     const handleBackspace = () => {
         setOutputForm(prev => ({
             ...prev,
@@ -386,18 +406,25 @@ export default function WarehouseKeeper() {
                 return;
             }
 
+            const toNumber = (value) => {
+                if (value === null || value === undefined || value === "") return null;
+                const normalized = String(value).replace(",", ".");
+                const num = Number(normalized);
+                return Number.isNaN(num) ? null : num;
+            };
+
             // Build payload without sending batch_id when not selected or equals "0"
             const payload = {
-                color_id: outputForm.color_id,
-                length: outputForm.length,
-                width: outputForm.width,
-                thickness: outputForm.thickness,
+                color_id: toNumber(outputForm.color_id),
+                length: toNumber(outputForm.length),
+                width: toNumber(outputForm.width),
+                thickness: toNumber(outputForm.thickness),
                 destination: outputForm.destination,
                 notes: outputForm.notes,
             };
 
             if (outputForm.batch_id && outputForm.batch_id !== "0") {
-                payload.batch_id = outputForm.batch_id;
+                payload.batch_id = toNumber(outputForm.batch_id);
             }
 
             const response = await warehouseApi.createWarehouseMovement(payload);
@@ -408,15 +435,67 @@ export default function WarehouseKeeper() {
                     batch_id: "",
                     length: "",
                     width: "",
-                    thickness: "",
+                    thickness: "0.6",
                     destination: "",
                     notes: ""
                 });
+                if (activeOrderItem?.production_order_item_id) {
+                    await handleCompleteOrderItem(activeOrderItem, { showToast: false });
+                    setActiveOrderItem(null);
+                }
                 loadMovements(); // Reload movements
             }
         } catch (error) {
             console.error('Error creating warehouse movement:', error);
             toast.error("فشل في إنشاء حركة المستودع");
+        }
+    };
+
+    const handleApplyOrderToInputs = (orderItem) => {
+        if (!orderItem) return;
+        const colorInfo = orderItem.color || colors.find(c => String(c.color_id) === String(orderItem.color_id));
+        const rulerId = orderItem.ruler_id || colorInfo?.ruler_id || colorInfo?.ruler?.ruler_id;
+        const materialId =
+            orderItem.material_id ||
+            colorInfo?.ruler?.material_id ||
+            colorInfo?.ruler?.material?.material_id ||
+            rulers.find(r => String(r.ruler_id) === String(rulerId))?.material_id;
+
+        setOutputForm(prev => ({
+            ...prev,
+            material_id: materialId ? String(materialId) : prev.material_id,
+            ruler_id: rulerId ? String(rulerId) : prev.ruler_id,
+            color_id: orderItem.color_id ? String(orderItem.color_id) : prev.color_id,
+            batch_id: orderItem.batch_id ? String(orderItem.batch_id) : "",
+            length: orderItem.length ? String(orderItem.length) : "",
+            width: orderItem.width ? String(orderItem.width) : "",
+            thickness: orderItem.thickness ? String(orderItem.thickness) : "",
+            destination: orderItem.destination || "",
+            notes: orderItem.notes || ""
+        }));
+        setActiveOrderItem(orderItem);
+        setActiveTab("manual");
+        setCurrentInput("length");
+    };
+
+    const handleCompleteOrderItem = async (orderItem, options = {}) => {
+        if (!orderItem?.production_order_item_id) return;
+        try {
+            const result = await productionApi.updateProductionItemStatus(
+                orderItem.production_order_item_id,
+                ProductionStatus.completed
+            );
+            if (result?.success === false || result?.error) {
+                throw new Error(result?.message || result?.error || "فشل تحديث حالة الطلب");
+            }
+            if (options.showToast !== false) {
+                toast.success("تم تحديث حالة الطلب إلى مكتمل");
+            }
+            setOrders(prev => (Array.isArray(prev) ? prev.filter(i => String(i.production_order_item_id) !== String(orderItem.production_order_item_id)) : prev));
+            setOrderItems(prev => (Array.isArray(prev) ? prev.filter(i => String(i.production_order_item_id) !== String(orderItem.production_order_item_id)) : prev));
+        } catch (error) {
+            console.error("Error updating order item status:", error);
+            toast.error(error?.message || "فشل تحديث حالة الطلب");
         }
     };
 
@@ -441,8 +520,52 @@ export default function WarehouseKeeper() {
         });
     };
 
+    const orderStatusConfig = {
+        [ProductionStatus.pending]: { label: "قيد الانتظار", className: "bg-yellow-100 text-yellow-800" },
+        [ProductionStatus.preparing]: { label: "قيد التحضير", className: "bg-blue-100 text-blue-800" },
+        [ProductionStatus.completed]: { label: "مكتمل", className: "bg-green-100 text-green-800" },
+        [ProductionStatus.canceled]: { label: "ملغي", className: "bg-red-100 text-red-800" }
+    };
+
+    const getOrderStatusBadge = (status) => {
+        return orderStatusConfig[status] || { label: status || "غير محدد", className: "bg-gray-100 text-gray-700" };
+    };
+
+    const groupedOrders = useMemo(() => {
+        const list = Array.isArray(orders) ? [...orders] : [];
+        list.sort((a, b) => {
+            const aTime = a?.created_at ? new Date(a.created_at).getTime() : 0;
+            const bTime = b?.created_at ? new Date(b.created_at).getTime() : 0;
+            return bTime - aTime;
+        });
+        const groups = {
+            [ProductionStatus.pending]: [],
+            [ProductionStatus.preparing]: [],
+            [ProductionStatus.completed]: [],
+            [ProductionStatus.canceled]: [],
+            unknown: []
+        };
+
+        list.forEach(item => {
+            const key = String(item?.status || "").toLowerCase();
+            if (key === ProductionStatus.completed) return;
+            if (groups[key]) groups[key].push(item);
+            else groups.unknown.push(item);
+        });
+
+        return groups;
+    }, [orders]);
+
+    const orderSections = [
+        { key: ProductionStatus.pending, label: orderStatusConfig[ProductionStatus.pending].label },
+        { key: ProductionStatus.preparing, label: orderStatusConfig[ProductionStatus.preparing].label },
+        { key: ProductionStatus.completed, label: orderStatusConfig[ProductionStatus.completed].label },
+        { key: ProductionStatus.canceled, label: orderStatusConfig[ProductionStatus.canceled].label },
+        { key: "unknown", label: "غير محدد" }
+    ];
+
     return (
-        <div className="min-h-screen flex flex-col bg-gray-50" dir="rtl">
+        <div className="h-screen overflow-hidden flex flex-col bg-gray-50" dir="rtl">
             {/* Header - نفس ستايل صفحة الإنتاج */}
             <div className="flex-shrink-0">
                 <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
@@ -456,6 +579,7 @@ export default function WarehouseKeeper() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <NotificationsBell />
                         <span className="text-sm">
                             مرحباً، {user?.full_name}
                         </span>
@@ -476,197 +600,15 @@ export default function WarehouseKeeper() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col gap-4 p-4 overflow-y-auto">
+            <div className="flex-1 min-h-0 flex flex-col gap-4 p-4 overflow-hidden">
                 {/* Top Area - Inputs + Orders */}
-                <div className="grid grid-cols-2 gap-4">
-                    {/* Inputs */}
-                    <Card className="p-4 space-y-4">
-                    <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <ArrowRight className="w-5 h-5 text-blue-600" />
-                        المدخلات
-                    </h2>
-                    <div className="flex-1">
-                        {/* Input form for manual entry or QR */}
-                        <div className="space-y-4">
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    className={`flex-1 ${activeTab === "qr" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
-                                    onClick={() => setActiveTab("qr")}
-                                >
-                                    <Search className="w-4 h-4 ml-2" />
-                                    QR
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className={`flex-1 ${activeTab === "manual" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
-                                    onClick={() => setActiveTab("manual")}
-                                >
-                                    <Hash className="w-4 h-4 ml-2" />
-                                    يدوي
-                                </Button>
-                            </div>
-
-                            {activeTab === "qr" && (
-                                <div className="space-y-3">
-                                    <div className="text-sm text-gray-600">
-                                        قم بلصق بيانات QR ثم اضغط "تطبيق البيانات"
-                                    </div>
-                                    <Input
-                                        value={qrInput}
-                                        onChange={(e) => setQrInput(e.target.value)}
-                                        placeholder="material|ruler|color_code|width|thickness|quantity|batch|type|employee"
-                                    />
-                                    <Button
-                                        onClick={applyQrData}
-                                        className="w-full bg-blue-600 hover:bg-blue-700"
-                                        disabled={!qrInput.trim()}
-                                    >
-                                        <Check className="w-5 h-5 ml-2" />
-                                        تطبيق البيانات
-                                    </Button>
-                                </div>
-                            )}
-
-                            {activeTab === "manual" && (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <Label>المادة</Label>
-                                            <FilterSelect
-                                                value={outputForm.material_id}
-                                                onChange={(e) => setOutputForm(prev => ({
-                                                    ...prev,
-                                                    material_id: e.target.value,
-                                                    ruler_id: "",
-                                                    color_id: "",
-                                                    batch_id: ""
-                                                }))}
-                                                options={materials.map(m => ({
-                                                    value: String(m.material_id),
-                                                    label: m.material_name
-                                                }))}
-                                                placeholder="اختر المادة"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>المسطرة</Label>
-                                            <FilterSelect
-                                                value={outputForm.ruler_id}
-                                                onChange={(e) => setOutputForm(prev => ({
-                                                    ...prev,
-                                                    ruler_id: e.target.value,
-                                                    color_id: "",
-                                                    batch_id: ""
-                                                }))}
-                                                options={availableRulers.map(r => ({
-                                                    value: String(r.ruler_id),
-                                                    label: r.ruler_name
-                                                }))}
-                                                placeholder={!outputForm.material_id ? "اختر المادة أولاً" : "اختر المسطرة"}
-                                                disabled={!outputForm.material_id}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>اللون</Label>
-                                            <FilterSelect
-                                                value={outputForm.color_id}
-                                                onChange={(e) => setOutputForm(prev => ({ ...prev, color_id: e.target.value, batch_id: "" }))}
-                                                options={colorOptions}
-                                                placeholder={
-                                                    !outputForm.ruler_id
-                                                        ? "اختر المسطرة أولاً"
-                                                        : colorOptions.length === 0
-                                                            ? "لا توجد ألوان لهذه المسطرة"
-                                                            : "اختر اللون"
-                                                }
-                                                disabled={!outputForm.ruler_id}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>الطبخة (اختياري)</Label>
-                                            <FilterSelect
-                                                value={outputForm.batch_id}
-                                                onChange={(e) => setOutputForm(prev => ({ ...prev, batch_id: e.target.value }))}
-                                                options={filteredBatchOptions}
-                                                placeholder={!outputForm.material_id ? "اختر المادة أولاً" : "اختر الطبخة أو اتركها فارغة"}
-                                                disabled={!outputForm.material_id}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div>
-                                            <Label>الطول</Label>
-                                            <Input
-                                                value={outputForm.length}
-                                                onFocus={() => setCurrentInput("length")}
-                                                readOnly
-                                                className={`text-center ${currentInput === "length" ? "ring-2 ring-blue-500" : ""}`}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>العرض</Label>
-                                            <Input
-                                                value={outputForm.width}
-                                                onFocus={() => setCurrentInput("width")}
-                                                readOnly
-                                                className={`text-center ${currentInput === "width" ? "ring-2 ring-blue-500" : ""}`}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>السماكة</Label>
-                                            <Input
-                                                value={outputForm.thickness}
-                                                onFocus={() => setCurrentInput("thickness")}
-                                                readOnly
-                                                className={`text-center ${currentInput === "thickness" ? "ring-2 ring-blue-500" : ""}`}
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label>الوجهة</Label>
-                                        <FilterSelect
-                                            value={outputForm.destination}
-                                            onChange={(e) => setOutputForm(prev => ({ ...prev, destination: e.target.value }))}
-                                            options={[
-                                                { value: MovementDestination.slitting, label: "التشريح" },
-                                                { value: MovementDestination.cutting, label: "القص" },
-                                                { value: MovementDestination.production, label: "الإنتاج" }
-                                            ]}
-                                            placeholder="اختر الوجهة"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label>ملاحظات</Label>
-                                        <Input
-                                            value={outputForm.notes}
-                                            onChange={(e) => setOutputForm(prev => ({ ...prev, notes: e.target.value }))}
-                                            placeholder="ملاحظات اختيارية"
-                                        />
-                                    </div>
-                                    <Button
-                                        onClick={handleOutputSubmit}
-                                        className="w-full bg-green-600 hover:bg-green-700"
-                                        disabled={!outputForm.color_id || !outputForm.length || !outputForm.width || !outputForm.thickness || !outputForm.destination}
-                                    >
-                                        <Check className="w-5 h-5 ml-2" />
-                                        حفظ
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    </Card>
-
+                <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
                     {/* Current / Completed Orders */}
-                    <Card className="p-4 flex flex-col space-y-4">
+                    <Card className="p-4 flex flex-col space-y-4 min-h-0">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                                 <Package className="w-5 h-5 text-orange-600" />
-                                طلبات حالية أو مكتملة
+                                طلبات حسب الحالة
                             </h2>
                             <Button
                                 variant="outline"
@@ -678,7 +620,7 @@ export default function WarehouseKeeper() {
                                 تحديث
                             </Button>
                         </div>
-                        <div className="flex-1 min-h-[200px] overflow-auto border rounded-lg bg-white">
+                        <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
                             {loadingOrders ? (
                                 <div className="flex items-center justify-center h-32">
                                     <LoadingState />
@@ -691,43 +633,351 @@ export default function WarehouseKeeper() {
                                 </div>
                             ) : (
                                 <div className="divide-y">
-                                    {orders.map(order => (
-                                        <div
-                                            key={order.production_order_id}
-                                            className="p-3 hover:bg-gray-50 cursor-pointer"
-                                            onClick={() => handleOrderSelect(order)}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <div className="font-medium">طلب #{order.production_order_id}</div>
-                                                    <div className="text-sm text-gray-600">
-                                                        {order.color_name} ({order.color_code})
-                                                    </div>
-                                                    <div className="text-xs text-gray-500">
-                                                        {formatDate(order.created_at)}
-                                                    </div>
+                                    {orderSections.map(section => {
+                                        const items = groupedOrders[section.key] || [];
+                                        if (items.length === 0) return null;
+                                        return (
+                                            <div key={section.key}>
+                                                <div className="px-3 py-2 bg-gray-50 text-sm font-bold flex items-center justify-between">
+                                                    <span>{section.label}</span>
+                                                    <span className="text-xs text-gray-500">{items.length}</span>
                                                 </div>
-                                                <div className="text-left">
-                                                    <div className="text-sm font-medium">
-                                                        {order.width} مم × {order.thickness} مم
-                                                    </div>
-                                                    <div className="text-xs text-gray-500">
-                                                        {order.batch_number}
-                                                    </div>
-                                                </div>
+                                                {items.map(order => {
+                                                    const colorInfo = order.color || colors.find(c => String(c.color_id) === String(order.color_id));
+                                                    const batchInfo = order.batch || batches.find(b => String(b.batch_id) === String(order.batch_id));
+                                                    const colorName = order.color_name || colorInfo?.color_name || "-";
+                                                    const colorCode = order.color_code || colorInfo?.color_code || "-";
+                                                    const batchNumber = order.batch_number || order.batch?.batch_number || batchInfo?.batch_number || "-";
+                                                    const statusBadge = getOrderStatusBadge(order.status);
+                                                    const isCompleted = String(order.status || "").toLowerCase() === ProductionStatus.completed;
+                                                    return (
+                                                        <div
+                                                            key={order.production_order_item_id ?? order.production_order_id}
+                                                            className="p-3 hover:bg-gray-50 cursor-pointer"
+                                                            onClick={() => {
+                                                                if (order.production_order_id) {
+                                                                    handleOrderSelect({
+                                                                        production_order_id: order.production_order_id,
+                                                                        color_name: colorName,
+                                                                        color_code: colorCode,
+                                                                        width: order.width,
+                                                                        thickness: order.thickness,
+                                                                        batch_number: batchNumber,
+                                                                        created_at: order.created_at,
+                                                                        status: order.status
+                                                                    });
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <div className="font-medium">طلب #{order.production_order_id}</div>
+                                                                    <div className="text-sm text-gray-600">
+                                                                        {colorName} ({colorCode})
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-500">
+                                                                        {formatDate(order.created_at)}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-left">
+                                                                    <div className="text-sm font-medium">
+                                                                        {order.width} مم × {order.thickness} مم
+                                                                    </div>
+                                                                    <div className="text-xs text-gray-500">
+                                                                        {batchNumber}
+                                                                    </div>
+                                                                    <div className="mt-1">
+                                                                        <span className={`px-2 py-0.5 rounded-full text-xs ${statusBadge.className}`}>
+                                                                            {statusBadge.label}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="mt-2 flex gap-2 justify-end">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleApplyOrderToInputs(order);
+                                                                            }}
+                                                                        >
+                                                                            إدخال
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            disabled={isCompleted}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleCompleteOrderItem(order);
+                                                                            }}
+                                                                        >
+                                                                            إتمام
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
+                        </div>
+                    </Card>
+
+                    {/* Inputs */}
+                    <Card className="p-4 flex flex-col min-h-0">
+                        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <ArrowRight className="w-5 h-5 text-blue-600" />
+                            المدخلات
+                        </h2>
+                        <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
+                            {activeOrderItem && (
+                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                                    <div className="text-sm">
+                                        <div className="font-bold">تم ربط الإدخال بطلب #{activeOrderItem.production_order_id}</div>
+                                        <div className="text-xs text-gray-600">عنصر #{activeOrderItem.production_order_item_id}</div>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setActiveOrderItem(null)}
+                                    >
+                                        إلغاء الربط
+                                    </Button>
+                                </div>
+                            )}
+                            <div>
+                                {/* Input form for manual entry or QR */}
+                                <div className="space-y-4">
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="outline"
+                                            className={`flex-1 ${activeTab === "qr" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
+                                            onClick={() => setActiveTab("qr")}
+                                        >
+                                            <Search className="w-4 h-4 ml-2" />
+                                            QR
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            className={`flex-1 ${activeTab === "manual" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
+                                            onClick={() => setActiveTab("manual")}
+                                        >
+                                            <Hash className="w-4 h-4 ml-2" />
+                                            يدوي
+                                        </Button>
+                                    </div>
+
+                                    {activeTab === "qr" && (
+                                        <div className="space-y-3">
+                                            <div className="text-sm text-gray-600">
+                                                قم بلصق بيانات QR ثم اضغط "تطبيق البيانات"
+                                            </div>
+                                            <Input
+                                                value={qrInput}
+                                                onChange={(e) => setQrInput(e.target.value)}
+                                                placeholder="material|ruler|color_code|width|thickness|quantity|batch|type|employee"
+                                            />
+                                            <Button
+                                                onClick={applyQrData}
+                                                className="w-full bg-blue-600 hover:bg-blue-700"
+                                                disabled={!qrInput.trim()}
+                                            >
+                                                <Check className="w-5 h-5 ml-2" />
+                                                تطبيق البيانات
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "manual" && (
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <Label>المادة</Label>
+                                                    <FilterSelect
+                                                        value={outputForm.material_id}
+                                                        onChange={(e) => setOutputForm(prev => ({
+                                                            ...prev,
+                                                            material_id: e.target.value,
+                                                            ruler_id: "",
+                                                            color_id: "",
+                                                            batch_id: ""
+                                                        }))}
+                                                        options={materials.map(m => ({
+                                                            value: String(m.material_id),
+                                                            label: m.material_name
+                                                        }))}
+                                                        placeholder="اختر المادة"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>المسطرة</Label>
+                                                    <FilterSelect
+                                                        value={outputForm.ruler_id}
+                                                        onChange={(e) => setOutputForm(prev => ({
+                                                            ...prev,
+                                                            ruler_id: e.target.value,
+                                                            color_id: "",
+                                                            batch_id: ""
+                                                        }))}
+                                                        options={availableRulers.map(r => ({
+                                                            value: String(r.ruler_id),
+                                                            label: r.ruler_name
+                                                        }))}
+                                                        placeholder={!outputForm.material_id ? "اختر المادة أولاً" : "اختر المسطرة"}
+                                                        disabled={!outputForm.material_id}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>اللون</Label>
+                                                    <FilterSelect
+                                                        value={outputForm.color_id}
+                                                        onChange={(e) => setOutputForm(prev => ({ ...prev, color_id: e.target.value, batch_id: "" }))}
+                                                        options={colorOptions}
+                                                        placeholder={
+                                                            !outputForm.ruler_id
+                                                                ? "اختر المسطرة أولاً"
+                                                                : colorOptions.length === 0
+                                                                    ? "لا توجد ألوان لهذه المسطرة"
+                                                                    : "اختر اللون"
+                                                        }
+                                                        disabled={!outputForm.ruler_id}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>الطبخة (اختياري)</Label>
+                                                    <FilterSelect
+                                                        value={outputForm.batch_id}
+                                                        onChange={(e) => setOutputForm(prev => ({ ...prev, batch_id: e.target.value }))}
+                                                        options={filteredBatchOptions}
+                                                        placeholder={!outputForm.material_id ? "اختر المادة أولاً" : "اختر الطبخة أو اتركها فارغة"}
+                                                        disabled={!outputForm.material_id}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div>
+                                                    <Label>الطول</Label>
+                                                    <Input
+                                                        value={outputForm.length}
+                                                        onFocus={() => setCurrentInput("length")}
+                                                        readOnly
+                                                        className={`text-center ${currentInput === "length" ? "ring-2 ring-blue-500" : ""}`}
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>العرض</Label>
+                                                    <Input
+                                                        value={outputForm.width}
+                                                        onFocus={() => setCurrentInput("width")}
+                                                        readOnly
+                                                        className={`text-center ${currentInput === "width" ? "ring-2 ring-blue-500" : ""}`}
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>السماكة</Label>
+                                                    <Input
+                                                        value={outputForm.thickness}
+                                                        onFocus={() => setCurrentInput("thickness")}
+                                                        readOnly
+                                                        className={`text-center ${currentInput === "thickness" ? "ring-2 ring-blue-500" : ""}`}
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <Label>الوجهة</Label>
+                                                <FilterSelect
+                                                    value={outputForm.destination}
+                                                    onChange={(e) => setOutputForm(prev => ({ ...prev, destination: e.target.value }))}
+                                                    options={[
+                                                        { value: MovementDestination.slitting, label: "التشريح" },
+                                                        { value: MovementDestination.cutting, label: "القص" },
+                                                        { value: MovementDestination.production, label: "الإنتاج" }
+                                                    ]}
+                                                    placeholder="اختر الوجهة"
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label>ملاحظات</Label>
+                                                <Input
+                                                    value={outputForm.notes}
+                                                    onChange={(e) => setOutputForm(prev => ({ ...prev, notes: e.target.value }))}
+                                                    placeholder="ملاحظات اختيارية"
+                                                />
+                                            </div>
+                                            <Button
+                                                onClick={handleOutputSubmit}
+                                                className="w-full bg-green-600 hover:bg-green-700"
+                                                disabled={!outputForm.color_id || !outputForm.length || !outputForm.width || !outputForm.thickness || !outputForm.destination}
+                                            >
+                                                <Check className="w-5 h-5 ml-2" />
+                                                حفظ
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </Card>
                 </div>
 
                 {/* Bottom Area - Outputs (full width) + Number Pad on the right */}
-                <div className="flex gap-4">
+                <div className="flex gap-4 flex-1 min-h-0 flex-row-reverse">
+                    {/* Number Pad - fixed width on the left */}
+                    <Card className="p-4 w-[260px] flex-shrink-0 self-stretch flex flex-col">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <Calculator className="w-5 h-5 text-green-600" />
+                            لوحة الأرقام
+                        </h3>
+                        <div className="grid grid-cols-3 gap-2 flex-1 content-start overflow-auto">
+                            {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(num => (
+                                <Button
+                                    key={num}
+                                    variant="outline"
+                                    className="h-12 text-lg font-bold"
+                                    onClick={() => handleNumberClick(num)}
+                                >
+                                    {num}
+                                </Button>
+                            ))}
+                            <Button
+                                variant="outline"
+                                className="h-12 text-lg"
+                                onClick={handleClear}
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-12 text-lg font-bold"
+                                onClick={() => handleNumberClick(0)}
+                            >
+                                0
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-12 text-lg"
+                                onClick={handleDecimalClick}
+                            >
+                                ,
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-12 text-lg"
+                                onClick={handleBackspace}
+                            >
+                                <ArrowRight className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </Card>
                     {/* Outputs Table - takes remaining width */}
-                    <Card className="p-4 flex flex-col flex-1 space-y-4">
+                    <Card className="p-4 flex flex-col flex-1 space-y-4 min-h-0">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                                 <Package className="w-5 h-5 text-purple-600" />
@@ -743,7 +993,7 @@ export default function WarehouseKeeper() {
                                 تحديث
                             </Button>
                         </div>
-                        <div className="flex-1 min-h-[200px] overflow-auto border rounded-lg bg-white">
+                        <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
                             {loadingMovements ? (
                                 <div className="flex items-center justify-center h-32">
                                     <LoadingState />
@@ -797,46 +1047,6 @@ export default function WarehouseKeeper() {
                         </div>
                     </Card>
 
-                    {/* Number Pad - fixed width on the right */}
-                    <Card className="p-4 w-[260px] flex-shrink-0">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <Calculator className="w-5 h-5 text-green-600" />
-                            لوحة الأرقام
-                        </h3>
-                        <div className="grid grid-cols-3 gap-2">
-                            {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(num => (
-                                <Button
-                                    key={num}
-                                    variant="outline"
-                                    className="h-12 text-lg font-bold"
-                                    onClick={() => handleNumberClick(num)}
-                                >
-                                    {num}
-                                </Button>
-                            ))}
-                            <Button
-                                variant="outline"
-                                className="h-12 text-lg"
-                                onClick={handleClear}
-                            >
-                                <X className="w-4 h-4" />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="h-12 text-lg font-bold"
-                                onClick={() => handleNumberClick(0)}
-                            >
-                                0
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="h-12 text-lg"
-                                onClick={handleBackspace}
-                            >
-                                <ArrowRight className="w-4 h-4" />
-                            </Button>
-                        </div>
-                    </Card>
                 </div>
             </div>
 
@@ -880,8 +1090,8 @@ export default function WarehouseKeeper() {
                                 <div>
                                     <Label className="text-xs text-gray-500">الحالة</Label>
                                     <div className="font-bold">
-                                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
-                                            مكتمل
+                                        <span className={`px-2 py-1 rounded-full text-xs ${getOrderStatusBadge(selectedOrder.status).className}`}>
+                                            {getOrderStatusBadge(selectedOrder.status).label}
                                         </span>
                                     </div>
                                 </div>
@@ -906,6 +1116,7 @@ export default function WarehouseKeeper() {
                                                 <th className="p-2 text-center">المصدر</th>
                                                 <th className="p-2 text-center">الوجهة</th>
                                                 <th className="p-2 text-center">الحالة</th>
+                                                <th className="p-2 text-center">إجراءات</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -917,9 +1128,28 @@ export default function WarehouseKeeper() {
                                                     <td className="p-2 text-center">{item.source}</td>
                                                     <td className="p-2 text-center">{item.destination}</td>
                                                     <td className="p-2 text-center">
-                                                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">
-                                                            {item.status}
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs ${getOrderStatusBadge(item.status).className}`}>
+                                                            {getOrderStatusBadge(item.status).label}
                                                         </span>
+                                                    </td>
+                                                    <td className="p-2 text-center">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => handleApplyOrderToInputs(item)}
+                                                            >
+                                                                إدخال
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                disabled={String(item.status || "").toLowerCase() === ProductionStatus.completed}
+                                                                onClick={() => handleCompleteOrderItem(item)}
+                                                            >
+                                                                إتمام
+                                                            </Button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}

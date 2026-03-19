@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://192.168.3.11:3000";
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://31.97.122.195:5050";
 
 let socket;
 

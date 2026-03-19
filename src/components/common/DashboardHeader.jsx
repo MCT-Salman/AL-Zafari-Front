@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "../..//context/AuthContext";
 import { Button } from "../ui/button";
 import StyledDialog from "../common/StyledDialog";
+import NotificationsBell from "./NotificationsBell";
 import {
   ShoppingCart,
   Users,
@@ -41,6 +42,7 @@ export default function DashboardHeader({
           <div className="flex flex-wrap gap-3">{leftContent}</div>
 
           <div className="flex flex-wrap gap-2">
+            <NotificationsBell />
             <Button
               size="lg"
               variant="outline"

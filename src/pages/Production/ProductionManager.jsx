@@ -18,6 +18,8 @@ import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
+import NotificationsBell from "../../components/common/NotificationsBell";
+import { connectSocket, disconnectSocket } from "../../lib/socket";
 import {
     ShoppingCart,
     Plus,
@@ -76,9 +78,12 @@ export default function ProductionManager() {
     const [selectedOrderItems, setSelectedOrderItems] = useState([]);
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const tableContainerRef = useRef(null);
+    const notificationDedupRef = useRef(new Map());
     const [activeTextTarget, setActiveTextTarget] = useState(null); // color_search | batch_search
     const [colorSearchCode, setColorSearchCode] = useState("");
     const [batchSearchTerm, setBatchSearchTerm] = useState("");
+    const [statusNotification, setStatusNotification] = useState(null);
+    const viewModeRef = useRef(viewMode);
 
     // Pagination states for production orders table
     const [currentPage, setCurrentPage] = useState(1);
@@ -306,14 +311,14 @@ export default function ProductionManager() {
             // تعديل هنا: الوصول إلى orders داخل data حسب هيكل الـ API
             const ordersData = response.data?.orders || response.data || response;
             const orders = Array.isArray(ordersData) ? ordersData : [];
-            
+
             // جلب تفاصيل كل طلب بشكل منفصل
             const ordersWithDetails = await Promise.all(
                 orders.map(async (order) => {
                     try {
                         const itemsResponse = await productionApi.getProductionOrderItems(order.production_order_id);
                         const items = getApiData(itemsResponse.data || itemsResponse, []) || [];
-                        
+
                         // إذا كانت هناك عناصر، نأخذ أول عنصر لعرض بياناته في الجدول الرئيسي
                         if (items.length > 0) {
                             const firstItem = items[0];
@@ -336,7 +341,7 @@ export default function ProductionManager() {
                     }
                 })
             );
-            
+
             setProductionOrders(ordersWithDetails);
         } catch (error) {
             // console.error("Error loading production orders:", error);
@@ -356,6 +361,94 @@ export default function ProductionManager() {
             toast.error("فشل في تحميل عناصر الطلب");
         }
     };
+
+    const shouldNotify = (key, windowMs = 8000) => {
+        const now = Date.now();
+        const lastSeen = notificationDedupRef.current.get(key);
+        if (lastSeen && now - lastSeen < windowMs) return false;
+        notificationDedupRef.current.set(key, now);
+        return true;
+    };
+
+    useEffect(() => {
+        viewModeRef.current = viewMode;
+    }, [viewMode]);
+
+    useEffect(() => {
+        const token = localStorage.getItem("accessToken");
+        if (!token) return;
+
+        const socket = connectSocket(token);
+        const extractCompletion = (payload) => {
+            const data = payload?.data ?? payload;
+            const text = `${payload?.title || ""} ${payload?.body || ""} ${data?.message || ""}`.toLowerCase();
+            const orderIdFromLink = payload?.link?.match?.(/production-orders\/(\d+)/)?.[1];
+            const status =
+                data?.status ||
+                data?.item?.status ||
+                data?.productionOrder?.status ||
+                data?.production_order_status ||
+                "";
+            const orderId =
+                data?.productionOrderId ||
+                data?.production_order_id ||
+                data?.productionOrder?.production_order_id ||
+                data?.orderId ||
+                orderIdFromLink ||
+                "";
+            const itemsCount = data?.itemsCount || data?.items?.length || "";
+            const type = data?.type || data?.productionOrder?.type || data?.production_type;
+            const isWarehouse =
+                type === ProductionType.warehouse ||
+                data?.source === "warehouse" ||
+                data?.destination === "warehouse" ||
+                payload?.type === "PRODUCTION_ORDER_WAREHOUSE" ||
+                text.includes("مستودع") ||
+                text.includes("warehouse");
+            const isCompleted = String(status).toLowerCase() === ProductionStatus.completed;
+            const isWarehouseNotification = payload?.type === "PRODUCTION_ORDER_WAREHOUSE";
+
+            return { orderId, itemsCount, isWarehouse, isCompleted, isWarehouseNotification };
+        };
+
+        const handleWarehouseCompletion = (payload) => {
+            const { orderId, itemsCount, isWarehouse, isCompleted, isWarehouseNotification } = extractCompletion(payload);
+            if (!orderId) return;
+            if (!isCompleted && !isWarehouseNotification) return;
+            if (!isWarehouse && !isWarehouseNotification) return;
+
+            const title = "تم إخراج الطلب من قسم المستودع";
+            const body = `طلب #${orderId}${itemsCount ? ` • العناصر: ${itemsCount}` : ""}`;
+            const key = `warehouse-complete:${orderId}:${itemsCount || 0}`;
+
+            if (shouldNotify(key, 8000)) {
+                toast.success(`${title}: ${body}`);
+                setStatusNotification({
+                    title,
+                    body,
+                    created_at: new Date().toISOString()
+                });
+                if (viewModeRef.current === "history") {
+                    loadProductionOrders();
+                }
+            }
+        };
+
+        socket.on("notification", handleWarehouseCompletion);
+        socket.on("order:updated", handleWarehouseCompletion);
+        socket.on("warehouse:order:new", handleWarehouseCompletion);
+        socket.on("warehouse:orders", handleWarehouseCompletion);
+        socket.on("order:new", handleWarehouseCompletion);
+        socket.on("ORDER_NEW", handleWarehouseCompletion);
+        return () => {
+            socket.off("notification", handleWarehouseCompletion);
+            socket.off("order:updated", handleWarehouseCompletion);
+            socket.off("warehouse:order:new", handleWarehouseCompletion);
+            socket.off("warehouse:orders", handleWarehouseCompletion);
+            socket.off("order:new", handleWarehouseCompletion);
+            socket.off("ORDER_NEW", handleWarehouseCompletion);
+        };
+    }, []);
 
     const handleViewOrder = async (order) => {
         setSelectedOrder(order);
@@ -442,19 +535,19 @@ export default function ProductionManager() {
                 order.notes?.toLowerCase().includes(term) ||
                 order.type_item?.toLowerCase().includes(term)
             );
-            
+
             // Status filter
             const matchesStatus = !statusFilter || String(order.status || "").toLowerCase() === String(statusFilter).toLowerCase();
-            
+
             // Type filter
             const matchesType = !typeFilter || String(order.type_item || "").toLowerCase() === String(typeFilter).toLowerCase();
-            
+
             // Width filter
             const matchesWidth = !widthFilter || String(order.width || "").toLowerCase().includes(widthFilter.toLowerCase());
-            
+
             // Width tab filter
             const matchesWidthTab = widthTab === "all" || String(order.width || "") === widthTab;
-            
+
             return matchesSearch && matchesStatus && matchesType && matchesWidth && matchesWidthTab;
         });
     }, [productionOrders, searchTerm, statusFilter, typeFilter, widthFilter, widthTab]);
@@ -517,8 +610,15 @@ export default function ProductionManager() {
             } else {
                 // إضافة النوع
                 if (type === ProductionType.warehouse) {
-                    // إذا اخترت المستودع، اجعله وحده
-                    return { ...prev, production_types: [type] };
+                    // إذا اخترت المستودع، اجعله وحده وحدد النوع مكنة
+                    const updatedState = { 
+                        ...prev, 
+                        production_types: [type],
+                        type_item: "Machine" // تعيين النوع مكنة كقيمة افتراضية
+                    };
+                    // أيضاً حدد formData.type_item
+                    setFormData(prev => ({ ...prev, type_item: "Machine" }));
+                    return updatedState;
                 } else {
                     // إذا كان المستودع مختار، لا تضيف
                     if (types.includes(ProductionType.warehouse)) {
@@ -658,7 +758,7 @@ export default function ProductionManager() {
                 notes: formData.notes || "",
                 status: ProductionStatus.pending, // الحفاظ على الحالة كما هي
                 source: formData.source, // إضافة المصدر
-                production_types: formData.source === "warehouse" ? [ProductionType.warehouse] : item.production_types,
+                production_types: formData.source === "warehouse" ? [ProductionType.warehouse] : (items[0]?.production_types || []),
                 items: items
             };
 
@@ -835,6 +935,7 @@ export default function ProductionManager() {
                             </Button>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                            <NotificationsBell />
                             {/* <Button
                                 size="lg"
                                 variant="outline"
@@ -881,6 +982,23 @@ export default function ProductionManager() {
 
             {/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
+                {statusNotification && (
+                    <div className="mb-3">
+                        <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                            <div>
+                                <div className="font-bold text-green-700">{statusNotification.title}</div>
+                                <div className="text-sm text-green-700">{statusNotification.body}</div>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setStatusNotification(null)}
+                            >
+                                إخفاء
+                            </Button>
+                        </div>
+                    </div>
+                )}
                 {viewMode === "create" ? (
                     <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_2.2fr_1.6fr] gap-3 h-full min-h-0">
                         {/* العمود الأيمن - اختيار المادة ولوحة الأرقام */}
@@ -1008,7 +1126,7 @@ export default function ProductionManager() {
                                 </div>
                             )}
 
-                            
+
                             {isSelectedMaterialPvc && !currentItem.production_types?.includes(ProductionType.warehouse) && (
                                 <div className="flex-shrink-0 p-3 border-b-2 border-dashed border-gray-300">
                                     <div className="grid grid-cols-2 gap-3">
@@ -1042,7 +1160,7 @@ export default function ProductionManager() {
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                         {filteredWidthValues.map(w => (
                                             <button
-                                                key={w.id}
+                                                key={w.id ?? w.value}
                                                 onClick={() => {
                                                     handleItemFieldChange("width", w.value);
                                                     setActiveField("length");
@@ -1119,17 +1237,17 @@ export default function ProductionManager() {
 
                                     <div>
                                         <Label className="font-bold text-xs mb-1 block">الكمية</Label>
-                                            <Input
-                                                type="number"
-                                                value={currentItem.length}
-                                                onChange={(e) => handleItemFieldChange("length", e.target.value)}
+                                        <Input
+                                            type="number"
+                                            value={currentItem.length}
+                                            onChange={(e) => handleItemFieldChange("length", e.target.value)}
                                             onFocus={() => {
                                                 setActiveField("length");
                                                 setActiveTextTarget(null);
                                             }}
-                                                placeholder="مثال: 100"
-                                                className="h-10 text-sm"
-                                            />
+                                            placeholder="مثال: 100"
+                                            className="h-10 text-sm"
+                                        />
                                     </div>
                                     <div>
                                         <Label className="font-bold text-sm mb-1 block">السماكة (مم)</Label>
@@ -1242,13 +1360,13 @@ export default function ProductionManager() {
                         {/* العمود الأيسر - أنواع الإنتاج وجدول العناصر */}
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
                             <Card className="flex-shrink-0 p-4">
-                                <Label className="font-bold text-base mb-3 block">أنواع الإنتاج</Label>
+                                <Label className="font-bold text-base block">أنواع الإنتاج</Label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {PRODUCTION_TYPES.map(type => {
                                         const Icon = type.icon;
                                         const isSelected = currentItem.production_types?.includes(type.value);
                                         const isDisabled = type.value === ProductionType.warehouse && currentItem.production_types?.some(t => t !== ProductionType.warehouse) ||
-                                                             type.value !== ProductionType.warehouse && currentItem.production_types?.includes(ProductionType.warehouse);
+                                            type.value !== ProductionType.warehouse && currentItem.production_types?.includes(ProductionType.warehouse);
                                         return (
                                             <button
                                                 key={type.value}
@@ -1275,17 +1393,17 @@ export default function ProductionManager() {
                             </Card>
 
                             <Card className="flex-1 overflow-hidden">
-                                <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
+                                <div className="flex justify-between items-center px-2 border-b bg-gray-50 flex-shrink-0">
                                     <span className="font-bold text-sm">العناصر المضافة: {productionItems.length}</span>
                                     {productionItems.length > 0 && (
                                         <button
-                                                    onClick={clearAllItems}
-                                                    className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform flex items-center gap-1"
-                                                    title="مسح جميع العناصر"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                    <span className="text-xs font-medium">مسح العناصر</span>
-                                                </button>
+                                            onClick={clearAllItems}
+                                            className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform flex items-center gap-1"
+                                            title="مسح جميع العناصر"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span className="text-xs font-medium">مسح العناصر</span>
+                                        </button>
                                     )}
                                 </div>
 
@@ -1379,7 +1497,7 @@ export default function ProductionManager() {
                         <div className="flex justify-between items-center mb-2 flex-shrink-0 w-full">
                             <h2 className="font-bold text-lg">سجل طلبات الإنتاج</h2>
                         </div>
-                        
+
                         {/* First row - Search and filters */}
                         <div className="flex  gap-2 mb-2">
                             <Input
@@ -1412,9 +1530,9 @@ export default function ProductionManager() {
                                 ]}
                                 className="h-8 text-sm max-w-[250px]"
                             />
-                          
+
                         </div>
-                        
+
                         {/* Second row - Action buttons */}
                         <div className="flex justify-end gap-2">
                             <Button
@@ -1467,11 +1585,10 @@ export default function ProductionManager() {
                                 <button
                                     key={tab.value}
                                     onClick={() => setWidthTab(tab.value)}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                        widthTab === tab.value
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${widthTab === tab.value
                                             ? "bg-primary-f text-white"
                                             : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                                    }`}
+                                        }`}
                                 >
                                     عرض {tab.label}
                                 </button>
@@ -1580,75 +1697,75 @@ export default function ProductionManager() {
             </div>
 
             {/* نافذة معاينة الطلب */}
-<StyledDialog
-    isOpen={showPreview}
-    onOpenChange={setShowPreview}
-    title="معاينة طلب الإنتاج"
-    onCancel={() => setShowPreview(false)}
-    onConfirm={saveProductionOrder}
-    confirmLabel={editingOrderId ? "تحديث الطلب" : "إنشاء الطلب"}
-    cancelLabel="إلغاء"
-    confirmVariant="default"
-    isLoading={loading}
-    contentClassName="w-screen max-w-[100vw] h-screen max-h-screen p-4"
->
-    <div className="space-y-4">
-        {/* معلومات أساسية موسعة */}
-        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-            <h3 className="font-bold text-blue-700 mb-2 text-sm flex items-center">
-                <ShoppingCart className="w-4 h-4 ml-1" />
-                معلومات الطلب الأساسية
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div className="bg-white p-2 rounded-lg shadow-sm">
-                    <div className="text-xs text-gray-500">المادة</div>
-                    <div className="font-bold text-sm">
-                        {selectedMaterial?.material_name || materials.find(m => String(m.material_id) === String(formData.material_id))?.material_name || '-'}
-                    </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg shadow-sm">
-                    <div className="text-xs text-gray-500">المسطرة</div>
-                    <div className="font-bold text-sm">
-                        {rulers.find(r => String(r.ruler_id) === String(formData.ruler_id))?.ruler_name || '-'}
-                    </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg shadow-sm">
-                    <div className="text-xs text-gray-500">اللون</div>
-                    <div className="font-bold text-sm flex items-center gap-1">
-                        {(() => {
-                            const selectedColor = colors.find(c => String(c.color_id) === String(formData.color_id));
-                            return selectedColor ? (
-                                <>
-                                    {selectedColor.imageUrl && (
-                                        <img 
-                                            src={selectedColor.imageUrl.startsWith('http') ? selectedColor.imageUrl : `${API_BASE_URL}${selectedColor.imageUrl}`} 
-                                            alt={selectedColor.color_name}
-                                            className="w-6 h-6 rounded-full object-cover border"
-                                        />
-                                    )}
-                                    <span>{selectedColor.color_name} ({selectedColor.color_code})</span>
-                                </>
-                            ) : '-'
-                        })()}
-                    </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg shadow-sm">
-                    <div className="text-xs text-gray-500">رقم الطبخة</div>
-                    <div className="font-bold text-sm">
-                        {batches.find(b => String(b.batch_id) === String(formData.batch_id))?.batch_number || '-'}
-                    </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg shadow-sm">
-                    <div className="text-xs text-gray-500">النوع</div>
-                    <div className="font-bold text-sm">
-                        {formatTypeItem(formData.type_item)}
-                    </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg shadow-sm">
-                    <div className="text-xs text-gray-500">السماكة</div>
-                    <div className="font-bold text-sm">{formData.thickness} مم</div>
-                </div>
-                {/* <div className="bg-white p-2 rounded-lg shadow-sm">
+            <StyledDialog
+                isOpen={showPreview}
+                onOpenChange={setShowPreview}
+                title="معاينة طلب الإنتاج"
+                onCancel={() => setShowPreview(false)}
+                onConfirm={saveProductionOrder}
+                confirmLabel={editingOrderId ? "تحديث الطلب" : "إنشاء الطلب"}
+                cancelLabel="إلغاء"
+                confirmVariant="default"
+                isLoading={loading}
+                contentClassName="w-screen max-w-[100vw] h-screen max-h-screen p-4"
+            >
+                <div className="space-y-4">
+                    {/* معلومات أساسية موسعة */}
+                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                        <h3 className="font-bold text-blue-700 mb-2 text-sm flex items-center">
+                            <ShoppingCart className="w-4 h-4 ml-1" />
+                            معلومات الطلب الأساسية
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <div className="bg-white p-2 rounded-lg shadow-sm">
+                                <div className="text-xs text-gray-500">المادة</div>
+                                <div className="font-bold text-sm">
+                                    {selectedMaterial?.material_name || materials.find(m => String(m.material_id) === String(formData.material_id))?.material_name || '-'}
+                                </div>
+                            </div>
+                            <div className="bg-white p-2 rounded-lg shadow-sm">
+                                <div className="text-xs text-gray-500">المسطرة</div>
+                                <div className="font-bold text-sm">
+                                    {rulers.find(r => String(r.ruler_id) === String(formData.ruler_id))?.ruler_name || '-'}
+                                </div>
+                            </div>
+                            <div className="bg-white p-2 rounded-lg shadow-sm">
+                                <div className="text-xs text-gray-500">اللون</div>
+                                <div className="font-bold text-sm flex items-center gap-1">
+                                    {(() => {
+                                        const selectedColor = colors.find(c => String(c.color_id) === String(formData.color_id));
+                                        return selectedColor ? (
+                                            <>
+                                                {selectedColor.imageUrl && (
+                                                    <img
+                                                        src={selectedColor.imageUrl.startsWith('http') ? selectedColor.imageUrl : `${API_BASE_URL}${selectedColor.imageUrl}`}
+                                                        alt={selectedColor.color_name}
+                                                        className="w-6 h-6 rounded-full object-cover border"
+                                                    />
+                                                )}
+                                                <span>{selectedColor.color_name} ({selectedColor.color_code})</span>
+                                            </>
+                                        ) : '-'
+                                    })()}
+                                </div>
+                            </div>
+                            <div className="bg-white p-2 rounded-lg shadow-sm">
+                                <div className="text-xs text-gray-500">رقم الطبخة</div>
+                                <div className="font-bold text-sm">
+                                    {batches.find(b => String(b.batch_id) === String(formData.batch_id))?.batch_number || '-'}
+                                </div>
+                            </div>
+                            <div className="bg-white p-2 rounded-lg shadow-sm">
+                                <div className="text-xs text-gray-500">النوع</div>
+                                <div className="font-bold text-sm">
+                                    {formatTypeItem(formData.type_item)}
+                                </div>
+                            </div>
+                            <div className="bg-white p-2 rounded-lg shadow-sm">
+                                <div className="text-xs text-gray-500">السماكة</div>
+                                <div className="font-bold text-sm">{formData.thickness} مم</div>
+                            </div>
+                            {/* <div className="bg-white p-2 rounded-lg shadow-sm">
                     <div className="text-xs text-gray-500">الحالة</div>
                     <div className="font-bold text-sm">
                         <span className={`px-2 py-1 rounded-lg text-xs ${(() => {
@@ -1659,194 +1776,194 @@ export default function ProductionManager() {
                         </span>
                     </div>
                 </div> */}
-                <div className="bg-white p-2 rounded-lg shadow-sm col-span-2">
-                    <div className="text-xs text-gray-500">ملاحظات</div>
-                    <div className="font-bold text-sm truncate" title={formData.notes}>
-                        {formData.notes || 'لا توجد ملاحظات'}
+                            <div className="bg-white p-2 rounded-lg shadow-sm col-span-2">
+                                <div className="text-xs text-gray-500">ملاحظات</div>
+                                <div className="font-bold text-sm truncate" title={formData.notes}>
+                                    {formData.notes || 'لا توجد ملاحظات'}
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        {/* عناصر الإنتاج مع تفاصيل موسعة */}
-        <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-            <h3 className="font-bold text-green-700 mb-2 text-sm flex items-center">
-                <Package className="w-4 h-4 ml-1" />
-                عناصر الإنتاج ({productionItems.length})
-            </h3>
-            <div className="border rounded-lg bg-white">
-                <table className="w-full text-sm table-fixed">
-                    <thead className="bg-gray-100">
-                        <tr>
-                            <th className="p-2 text-center border-b">#</th>
-                            <th className="p-2 text-center border-b">العرض</th>
-                            <th className="p-2 text-center border-b">الكمية</th>
-                            <th className="p-2 text-center border-b">أنواع الإنتاج</th>
-                            <th className="p-2 text-center border-b">المصدر</th>
-                            <th className="p-2 text-center border-b">الوجهة</th>
-                            <th className="p-2 text-center border-b">حالة العنصر</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {productionItems.map((item, index) => {
-                            const productionTypes = item.production_types || [];
-                            // تحديد المصدر (أول نوع إنتاج)
-                            const source = productionTypes.length > 0 ? productionTypes[0] : null;
-                            // تحديد الوجهة (آخر نوع إنتاج)
-                            const destination = productionTypes.length > 0 ? productionTypes[productionTypes.length - 1] : null;
-                            
-                            // تحديد ما إذا كان سيتم إنشاء عدة عناصر (حسب أنواع الإنتاج)
-                            const willCreateMultipleItems = productionTypes.length > 1;
-                            
-                            return (
-                                <tr key={index} className="border-t hover:bg-gray-50">
-                                    <td className="p-2 text-center font-medium">{index + 1}</td>
-                                    <td className="p-2 text-center font-mono">{item.width}</td>
-                                    <td className="p-2 text-center font-mono">{item.length}</td>
-                                    <td className="p-2 text-center">
-                                        <div className="flex flex-wrap gap-1 justify-center">
-                                            {productionTypes.map((type, idx) => {
-                                                const typeInfo = PRODUCTION_TYPES.find(t => t.value === type);
-                                                return (
-                                                    <span 
-                                                        key={type} 
-                                                        className={`
+                    {/* عناصر الإنتاج مع تفاصيل موسعة */}
+                    <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                        <h3 className="font-bold text-green-700 mb-2 text-sm flex items-center">
+                            <Package className="w-4 h-4 ml-1" />
+                            عناصر الإنتاج ({productionItems.length})
+                        </h3>
+                        <div className="border rounded-lg bg-white">
+                            <table className="w-full text-sm table-fixed">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th className="p-2 text-center border-b">#</th>
+                                        <th className="p-2 text-center border-b">العرض</th>
+                                        <th className="p-2 text-center border-b">الكمية</th>
+                                        <th className="p-2 text-center border-b">أنواع الإنتاج</th>
+                                        <th className="p-2 text-center border-b">المصدر</th>
+                                        <th className="p-2 text-center border-b">الوجهة</th>
+                                        <th className="p-2 text-center border-b">حالة العنصر</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {productionItems.map((item, index) => {
+                                        const productionTypes = item.production_types || [];
+                                        // تحديد المصدر (أول نوع إنتاج)
+                                        const source = productionTypes.length > 0 ? productionTypes[0] : null;
+                                        // تحديد الوجهة (آخر نوع إنتاج)
+                                        const destination = productionTypes.length > 0 ? productionTypes[productionTypes.length - 1] : null;
+
+                                        // تحديد ما إذا كان سيتم إنشاء عدة عناصر (حسب أنواع الإنتاج)
+                                        const willCreateMultipleItems = productionTypes.length > 1;
+
+                                        return (
+                                            <tr key={index} className="border-t hover:bg-gray-50">
+                                                <td className="p-2 text-center font-medium">{index + 1}</td>
+                                                <td className="p-2 text-center font-mono">{item.width}</td>
+                                                <td className="p-2 text-center font-mono">{item.length}</td>
+                                                <td className="p-2 text-center">
+                                                    <div className="flex flex-wrap gap-1 justify-center">
+                                                        {productionTypes.map((type, idx) => {
+                                                            const typeInfo = PRODUCTION_TYPES.find(t => t.value === type);
+                                                            return (
+                                                                <span
+                                                                    key={type}
+                                                                    className={`
                                                             px-2 py-0.5 rounded-full text-xs font-medium
                                                             ${type === ProductionType.warehouse ? 'bg-blue-100 text-blue-700' : ''}
                                                             ${type === ProductionType.slitting ? 'bg-purple-100 text-purple-700' : ''}
                                                             ${type === ProductionType.cutting ? 'bg-orange-100 text-orange-700' : ''}
                                                             ${type === ProductionType.gluing ? 'bg-green-100 text-green-700' : ''}
                                                         `}
-                                                        title={idx === 0 ? 'المصدر' : idx === productionTypes.length - 1 ? 'الوجهة' : 'مرحلة وسيطة'}
-                                                    >
-                                                        {typeInfo?.label || type}
-                                                        {idx === 0 && ' →'}
-                                                        {idx === productionTypes.length - 1 && idx !== 0 && ' ✓'}
-                                                    </span>
-                                                );
-                                            })}
-                                        </div>
-                                    </td>
-                                    <td className="p-2 text-center">
-                                        {(() => {
-                                            const sourceOption = SOURCE_OPTIONS.find(s => s.value === formData.source);
-                                            return sourceOption ? (
-                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                                    {sourceOption.label}
-                                                </span>
-                                            ) : '-';
-                                        })()}
-                                    </td>
-                                    <td className="p-2 text-center">
-                                        {destination ? (
-                                            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                                                {(() => {
-                                                    if (destination === ProductionType.slitting) return "تقطيع";
-                                                    if (destination === ProductionType.cutting) return "قص";
-                                                    if (destination === ProductionType.gluing) return "لصق";
-                                                    if (destination === ProductionType.warehouse) return "مستودع";
-                                                    return "إنتاج";
-                                                })()}
-                                            </span>
-                                        ) : '-'}
-                                    </td>
-                                    <td className="p-2 text-center">
-                                        {willCreateMultipleItems ? (
-                                            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium" title="سيتم إنشاء عنصر منفصل لكل نوع إنتاج">
-                                                متعدد ({productionTypes.length})
-                                            </span>
-                                        ) : (
-                                            <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
-                                                مفرد
-                                            </span>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                        {productionItems.length === 0 && (
-                            <tr>
-                                <td colSpan="7" className="p-8 text-center text-gray-400">
-                                    <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                    لا توجد عناصر مضافة
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-            
-            {/* ملخص الكميات */}
-            {productionItems.length > 0 && (
-                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <div className="bg-white p-2 rounded-lg shadow-sm">
-                        <div className="text-xs text-gray-500">إجمالي العناصر</div>
-                        <div className="font-bold text-lg">{productionItems.length}</div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg shadow-sm">
-                        <div className="text-xs text-gray-500">إجمالي الكمية</div>
-                        <div className="font-bold text-lg">
-                            {productionItems.reduce((sum, item) => sum + (Number(item.length) || 0), 0)}
+                                                                    title={idx === 0 ? 'المصدر' : idx === productionTypes.length - 1 ? 'الوجهة' : 'مرحلة وسيطة'}
+                                                                >
+                                                                    {typeInfo?.label || type}
+                                                                    {idx === 0 && ' →'}
+                                                                    {idx === productionTypes.length - 1 && idx !== 0 && ' ✓'}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    {(() => {
+                                                        const sourceOption = SOURCE_OPTIONS.find(s => s.value === formData.source);
+                                                        return sourceOption ? (
+                                                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                                                                {sourceOption.label}
+                                                            </span>
+                                                        ) : '-';
+                                                    })()}
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    {destination ? (
+                                                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                                            {(() => {
+                                                                if (destination === ProductionType.slitting) return "تقطيع";
+                                                                if (destination === ProductionType.cutting) return "قص";
+                                                                if (destination === ProductionType.gluing) return "لصق";
+                                                                if (destination === ProductionType.warehouse) return "مستودع";
+                                                                return "إنتاج";
+                                                            })()}
+                                                        </span>
+                                                    ) : '-'}
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    {willCreateMultipleItems ? (
+                                                        <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium" title="سيتم إنشاء عنصر منفصل لكل نوع إنتاج">
+                                                            متعدد ({productionTypes.length})
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                                                            مفرد
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {productionItems.length === 0 && (
+                                        <tr>
+                                            <td colSpan="7" className="p-8 text-center text-gray-400">
+                                                <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                لا توجد عناصر مضافة
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg shadow-sm">
-                        <div className="text-xs text-gray-500">متوسط العرض</div>
-                        <div className="font-bold text-lg">
-                            {productionItems.length > 0 
-                                ? (productionItems.reduce((sum, item) => sum + (Number(item.width) || 0), 0) / productionItems.length).toFixed(1)
-                                : 0}
-                        </div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg shadow-sm">
-                        <div className="text-xs text-gray-500">أنواع الإنتاج الفريدة</div>
-                        <div className="font-bold text-lg">
-                            {new Set(productionItems.flatMap(item => item.production_types || [])).size}
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
 
-        {/* معلومات إضافية */}
-        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-            <h3 className="font-bold text-gray-700 mb-2 text-sm flex items-center">
-                <AlertCircle className="w-4 h-4 ml-1" />
-                ملخص الطلب
-            </h3>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                    <span className="text-gray-500">عدد العناصر في الطلب:</span>
-                    <span className="mr-2 font-bold">{productionItems.length}</span>
-                </div>
-                <div>
-                    <span className="text-gray-500">إجمالي القطع:</span>
-                    <span className="mr-2 font-bold">
-                        {productionItems.reduce((sum, item) => sum + (Number(item.length) || 0), 0)}
-                    </span>
-                </div>
-                <div>
-                    <span className="text-gray-500">أنواع الإنتاج المستخدمة:</span>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                        {Array.from(new Set(productionItems.flatMap(item => item.production_types || []))).map(type => {
-                            const typeInfo = PRODUCTION_TYPES.find(t => t.value === type);
-                            return (
-                                <span key={type} className="bg-gray-200 px-2 py-0.5 rounded-full text-xs">
-                                    {typeInfo?.label || type}
+                        {/* ملخص الكميات */}
+                        {productionItems.length > 0 && (
+                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <div className="bg-white p-2 rounded-lg shadow-sm">
+                                    <div className="text-xs text-gray-500">إجمالي العناصر</div>
+                                    <div className="font-bold text-lg">{productionItems.length}</div>
+                                </div>
+                                <div className="bg-white p-2 rounded-lg shadow-sm">
+                                    <div className="text-xs text-gray-500">إجمالي الكمية</div>
+                                    <div className="font-bold text-lg">
+                                        {productionItems.reduce((sum, item) => sum + (Number(item.length) || 0), 0)}
+                                    </div>
+                                </div>
+                                <div className="bg-white p-2 rounded-lg shadow-sm">
+                                    <div className="text-xs text-gray-500">متوسط العرض</div>
+                                    <div className="font-bold text-lg">
+                                        {productionItems.length > 0
+                                            ? (productionItems.reduce((sum, item) => sum + (Number(item.width) || 0), 0) / productionItems.length).toFixed(1)
+                                            : 0}
+                                    </div>
+                                </div>
+                                <div className="bg-white p-2 rounded-lg shadow-sm">
+                                    <div className="text-xs text-gray-500">أنواع الإنتاج الفريدة</div>
+                                    <div className="font-bold text-lg">
+                                        {new Set(productionItems.flatMap(item => item.production_types || [])).size}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* معلومات إضافية */}
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <h3 className="font-bold text-gray-700 mb-2 text-sm flex items-center">
+                            <AlertCircle className="w-4 h-4 ml-1" />
+                            ملخص الطلب
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <span className="text-gray-500">عدد العناصر في الطلب:</span>
+                                <span className="mr-2 font-bold">{productionItems.length}</span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500">إجمالي القطع:</span>
+                                <span className="mr-2 font-bold">
+                                    {productionItems.reduce((sum, item) => sum + (Number(item.length) || 0), 0)}
                                 </span>
-                            );
-                        })}
+                            </div>
+                            <div>
+                                <span className="text-gray-500">أنواع الإنتاج المستخدمة:</span>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                    {Array.from(new Set(productionItems.flatMap(item => item.production_types || []))).map(type => {
+                                        const typeInfo = PRODUCTION_TYPES.find(t => t.value === type);
+                                        return (
+                                            <span key={type} className="bg-gray-200 px-2 py-0.5 rounded-full text-xs">
+                                                {typeInfo?.label || type}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div>
+                                <span className="text-gray-500">عدد مراحل الإنتاج:</span>
+                                <span className="mr-2 font-bold">
+                                    {Math.max(...productionItems.map(item => (item.production_types || []).length), 0)}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div>
-                    <span className="text-gray-500">عدد مراحل الإنتاج:</span>
-                    <span className="mr-2 font-bold">
-                        {Math.max(...productionItems.map(item => (item.production_types || []).length), 0)}
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-</StyledDialog>
+            </StyledDialog>
 
             {/* نافذة تفاصيل الطلب */}
             <StyledDialog
