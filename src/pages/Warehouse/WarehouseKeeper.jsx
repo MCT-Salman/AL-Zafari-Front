@@ -1,11 +1,11 @@
-// src\pages\Warehouse\WarehouseKeeper.jsx
-import { useState, useEffect, useMemo } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { warehouseApi } from "../../api/warehouseApi";
 import { colorApi } from "../../api/colorApi";
 import { batchApi } from "../../api/batchApi";
 import { materialApi } from "../../api/materialApi";
 import { rulerApi } from "../../api/rulerApi";
+import { constantApi } from "../../api/constantApi";
 import { productionApi } from "../../api/productionApi";
 import { useAuth } from "../../context/AuthContext";
 import { Card } from "../../components/ui/card";
@@ -19,140 +19,205 @@ import NotificationsBell from "../../components/common/NotificationsBell";
 import { getApiData } from "../../utils/api";
 import { connectSocket, disconnectSocket } from "../../lib/socket";
 import { toast } from "react-hot-toast";
-import {
-    Package,
-    ArrowRight,
-    Calculator,
-    Eye,
-    Check,
-    X,
-    AlertCircle,
-    Search,
-    RefreshCw,
-    Plus,
-    Minus,
-    Hash,
-    Trash2
-} from "lucide-react";
-import { UserRole, MovementDestination, ProductionStatus, ProductionType } from "../../types/enums";
+import { Package, ArrowRight, Calculator, Eye, Check, X, AlertCircle, Search, RefreshCw, Hash, Printer, ChevronUp, ChevronDown } from "lucide-react";
+import { MovementDestination, ProductionStatus, ProductionType, TypeItem, UserRole } from "../../types/enums";
 
+const FIXED_WIDTH = "66";
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
+const ROLE_LABELS = {
+    [UserRole.admin]: "مدير النظام",
+    [UserRole.accountant]: "محاسب",
+    [UserRole.cashier]: "كاشير",
+    [UserRole.sales]: "مبيعات",
+    [UserRole.production_manager]: "مدير الإنتاج",
+    [UserRole.Warehouse_Keeper]: "أمين المستودع",
+    [UserRole.Warehouse_Products]: "أمين مستودع المنتجات",
+    [UserRole.Dissection_Technician]: "فني التشريح",
+    [UserRole.Cutting_Technician]: "فني القص",
+    [UserRole.Gluing_Technician]: "فني اللصق"
+};
+const BASE_FORM = {
+    material_id: "",
+    ruler_id: "",
+    color_id: "",
+    batch_id: "",
+    length: "",
+    width: FIXED_WIDTH,
+    thickness: "",
+    destination: MovementDestination.slitting,
+    notes: ""
+};
 
 export default function WarehouseKeeper() {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
-
-    // Check if user has warehouse keeper role
-    useEffect(() => {
-        if (!user || user.role !== UserRole.Warehouse_Keeper) {
-            toast.error("غير مصرح لك بالوصول إلى هذه الصفحة");
-            navigate('/dashboard');
-            return;
-        }
-    }, [user, navigate]);
-
-    // State management
-    const [activeTab, setActiveTab] = useState("manual"); // manual | qr
+    const [entryTab, setEntryTab] = useState("manual");
+    const [ordersTab, setOrdersTab] = useState("current");
     const [orders, setOrders] = useState([]);
     const [movements, setMovements] = useState([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
     const [loadingMovements, setLoadingMovements] = useState(false);
-    const [selectedMovement, setSelectedMovement] = useState(null);
-    const [showMovementDetails, setShowMovementDetails] = useState(false);
-    const [selectedOrder, setSelectedOrder] = useState(null);
-    const [activeOrderItem, setActiveOrderItem] = useState(null);
-    const [orderItems, setOrderItems] = useState([]);
-    const [showOrderDetails, setShowOrderDetails] = useState(false);
-    const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
-    const [colors, setColors] = useState([]);
-    const [batches, setBatches] = useState([]);
     const [materials, setMaterials] = useState([]);
     const [rulers, setRulers] = useState([]);
-    const [colorSearchCode, setColorSearchCode] = useState("");
-    const [batchSearchTerm, setBatchSearchTerm] = useState("");
+    const [colors, setColors] = useState([]);
+    const [batches, setBatches] = useState([]);
+    const [lengthValues, setLengthValues] = useState([]);
+    const [thicknessValues, setThicknessValues] = useState([]);
     const [qrInput, setQrInput] = useState("");
+    const [outputForm, setOutputForm] = useState(BASE_FORM);
+    const [activeOrderItem, setActiveOrderItem] = useState(null);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [orderItems, setOrderItems] = useState([]);
+    const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
+    const [showOrderDetails, setShowOrderDetails] = useState(false);
+    const [selectedMovement, setSelectedMovement] = useState(null);
+    const [showMovementDetails, setShowMovementDetails] = useState(false);
+    const [pendingCompleteItem, setPendingCompleteItem] = useState(null);
+    const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+    const [showHeader, setShowHeader] = useState(true);
+    const [currentInput, setCurrentInput] = useState("notes");
 
-    // Number pad and output form
-    const [outputForm, setOutputForm] = useState({
-        material_id: "",
-        ruler_id: "",
-        color_id: "",
-        batch_id: "",
-        length: "",
-        width: "",
-        thickness: "0.6",
-        destination: "",
-        notes: ""
-    });
-    const [currentInput, setCurrentInput] = useState("length");
+    useEffect(() => {
+        if (!user || user.role !== UserRole.Warehouse_Keeper) {
+            toast.error("غير مصرح لك بالوصول إلى هذه الصفحة");
+            navigate("/dashboard");
+        }
+    }, [user, navigate]);
 
-    // Derived options (reuse ProductionManager style)
-    const availableRulers = useMemo(() => {
-        if (!outputForm.material_id) return rulers;
-        return rulers.filter(r => String(r.material_id) === String(outputForm.material_id));
-    }, [rulers, outputForm.material_id]);
+    const extractArray = (response, keys = []) => {
+        const data = getApiData(response, response);
+        if (Array.isArray(data)) return data;
+        for (const key of keys) {
+            if (Array.isArray(data?.[key])) return data[key];
+            if (Array.isArray(response?.[key])) return response[key];
+        }
+        return [];
+    };
 
-    const availableColors = useMemo(() => {
-        if (!outputForm.ruler_id) return colors;
-        return colors.filter(c => String(c.ruler_id) === String(outputForm.ruler_id));
-    }, [colors, outputForm.ruler_id]);
-
-    const filteredColorsBySearch = useMemo(() => {
-        if (!colorSearchCode) return availableColors;
-        const term = String(colorSearchCode).toLowerCase();
-        return availableColors.filter(c =>
-            String(c.color_code || "").toLowerCase().includes(term) ||
-            String(c.color_name || "").toLowerCase().includes(term)
-        );
-    }, [colorSearchCode, availableColors]);
-
-    const colorOptions = useMemo(() => {
-        return filteredColorsBySearch.map(c => {
-            const rawImage = c.imageUrl || c.image_url || c.color_image || null;
-            const resolvedImage = rawImage
-                ? (rawImage.startsWith("http") ? rawImage : `${API_BASE_URL}${rawImage}`)
-                : null;
-            return {
-                value: String(c.color_id),
-                label: `${c.color_name} (${c.color_code})`,
-                imageUrl: resolvedImage
-            };
+    const pvcMaterial = useMemo(
+        () => materials.find((m) => String(m?.material_name || "").toLowerCase().includes("pvc")) || null,
+        [materials]
+    );
+    const availableRulers = useMemo(
+        () => rulers.filter((r) => String(r.material_id) === String(outputForm.material_id)),
+        [rulers, outputForm.material_id]
+    );
+    const availableColors = useMemo(
+        () => colors.filter((c) => String(c.ruler_id) === String(outputForm.ruler_id)),
+        [colors, outputForm.ruler_id]
+    );
+    const sortRecordsDesc = useCallback((list) => {
+        return [...list].sort((a, b) => {
+            const aDate = a?.created_at ? new Date(a.created_at).getTime() : 0;
+            const bDate = b?.created_at ? new Date(b.created_at).getTime() : 0;
+            if (aDate !== bDate) return bDate - aDate;
+            const aId = Number(a?.production_order_id || a?.production_order_item_id || a?.movement_id || 0);
+            const bId = Number(b?.production_order_id || b?.production_order_item_id || b?.movement_id || 0);
+            return bId - aId;
         });
-    }, [filteredColorsBySearch]);
+    }, []);
+    const currentOrders = useMemo(
+        () => sortRecordsDesc(orders.filter((o) => String(o.status || "").toLowerCase() !== ProductionStatus.completed)),
+        [orders, sortRecordsDesc]
+    );
+    const completedOrders = useMemo(
+        () => sortRecordsDesc(orders.filter((o) => String(o.status || "").toLowerCase() === ProductionStatus.completed)),
+        [orders, sortRecordsDesc]
+    );
+    const sortedMovements = useMemo(() => sortRecordsDesc(movements), [movements, sortRecordsDesc]);
+    const colorOptions = useMemo(() => availableColors.map((c) => {
+        const rawImage = c.imageUrl || c.image_url || c.color_image || null;
+        const imageUrl = rawImage ? (rawImage.startsWith("http") ? rawImage : `${API_BASE_URL}${rawImage}`) : null;
+        return { value: String(c.color_id), label: `${c.color_name} (${c.color_code})`, imageUrl };
+    }), [availableColors]);
+    const batchOptions = useMemo(
+        () => batches
+            .filter((b) => !outputForm.material_id || String(b.material_id) === String(outputForm.material_id))
+            .map((b) => ({ value: String(b.batch_id), label: b.batch_number || `دفعة ${b.batch_id}` })),
+        [batches, outputForm.material_id]
+    );
+    const lengthOptions = useMemo(
+        () => lengthValues.map((v) => ({ value: String(v.value), label: v.label || `${v.value} ${v.unit || ""}`.trim() })),
+        [lengthValues]
+    );
+    const thicknessOptions = useMemo(
+        () => thicknessValues.map((v) => ({ value: String(v.value), label: v.label || `${v.value} ${v.unit || ""}`.trim() })),
+        [thicknessValues]
+    );
 
-    const filteredBatchOptions = useMemo(() => {
-        const term = String(batchSearchTerm || "").trim().toLowerCase();
-        const allBatches = Array.isArray(batches) ? batches : [];
+    const formatDate = (date) => date ? new Date(date).toLocaleDateString("en-US", {
+        year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"
+    }) : "-";
+    const formatDestination = (value) => ({
+        [MovementDestination.slitting]: "التشريح",
+        [MovementDestination.cutting]: "القص",
+        [MovementDestination.production]: "الإنتاج",
+        [MovementDestination.gluing]: "اللصق"
+    }[value] || value || "-");
+    const formatSource = (value) => ({
+        warehouse: "المستودع",
+        slitting: "التشريح",
+        cutting: "القص",
+        production: "الإنتاج",
+        gluing: "اللصق"
+    }[value] || value || "-");
+    const formatTypeItem = (value) => value === TypeItem.Presser ? "كوي" : value === TypeItem.Machine ? "مكنة" : value || "-";
+    const getStatusBadge = (status) => productionApi.getStatusBadge(String(status || "").toLowerCase());
 
-        // ربط الطبخات بالمادة المختارة كما في صفحة الإنتاج
-        const visibleBatches = outputForm.material_id
-            ? allBatches.filter(b => String(b.material_id) === String(outputForm.material_id))
-            : allBatches;
+    const getQrUrl = (data) => {
+        const encoded = encodeURIComponent(data);
+        return `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encoded}`;
+    };
 
-        const base = visibleBatches.map(b => ({
-            value: String(b.batch_id),
-            label: b.batch_number || `دفعة ${b.batch_id}`
-        }));
+    const printQr = (url, title = "QR", footer = "") => {
+        if (!url) return;
+        const win = window.open("", "_blank", "width=420,height=520");
+        if (!win) return;
+        win.document.write(`
+          <html dir="rtl">
+            <head><title>${title}</title></head>
+            <body style="font-family: Tahoma, Arial, sans-serif; text-align:center; padding:16px;">
+              <h3>${title}</h3>
+              <img src="${url}" style="width:240px;height:240px;border:1px solid #ddd;border-radius:8px;" />
+              <div style="margin-top:12px; font-size:12px; color:#444;">${footer}</div>
+            </body>
+          </html>
+        `);
+        win.document.close();
+        win.focus();
+        win.print();
+    };
 
-        if (!term) return base;
-        return base.filter(opt =>
-            String(opt.label || "").toLowerCase().includes(term) ||
-            String(opt.value || "").toLowerCase().includes(term)
-        );
-    }, [batches, batchSearchTerm, colors, outputForm.color_id]);
+    const buildMovementQrData = (movement) => {
+        const materialName = movement?.color?.ruler?.material?.material_name || pvcMaterial?.material_name || "PVC";
+        const rulerName = movement?.color?.ruler?.ruler_name || "";
+        const colorCode = movement?.color?.color_code || "";
+        const width = movement?.width || FIXED_WIDTH;
+        const thickness = movement?.thickness || "";
+        const length = movement?.length || "";
+        const batchNumber = movement?.batch?.batch_number || "";
+        return [materialName, rulerName, colorCode, width, thickness, length, batchNumber].join("|");
+    };
 
-    // Load data
+    const buildMovementQrFooter = (movement) => {
+        return [
+            `اللون: ${movement?.color?.color_name || "-"}`,
+            `الكود: ${movement?.color?.color_code || "-"}`,
+            `العرض: ${movement?.width || FIXED_WIDTH}`,
+            `السماكة: ${movement?.thickness || "-"}`,
+            `الطول: ${movement?.length || "-"}`,
+            `الطبخة: ${movement?.batch?.batch_number || "-"}`
+        ].join(" | ");
+    };
+
     const loadOrders = async () => {
         try {
             setLoadingOrders(true);
-            const response = await warehouseApi.getWarehouseOrders({
-                type: ProductionType.warehouse
-            });
+            const response = await warehouseApi.getWarehouseOrders({ type: ProductionType.warehouse });
             const data = getApiData(response, response?.data ?? response);
-            const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
-            setOrders(list);
+            setOrders(Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []));
         } catch (error) {
-            console.error('Error loading orders:', error);
+            console.error(error);
             toast.error("فشل في تحميل الطلبات");
         } finally {
             setLoadingOrders(false);
@@ -163,1076 +228,519 @@ export default function WarehouseKeeper() {
         try {
             setLoadingMovements(true);
             const response = await warehouseApi.getWarehouseMovements();
-            if (response.success) {
-                setMovements(response.data.movements || []);
-            }
+            setMovements(response?.data?.movements || []);
         } catch (error) {
-            console.error('Error loading movements:', error);
-            toast.error("فشل في تحميل حركات المستودع");
+            console.error(error);
+            toast.error("فشل في تحميل المخرجات");
         } finally {
             setLoadingMovements(false);
         }
     };
 
-    const extractArray = (response, possibleKeys = []) => {
-        const data = getApiData(response, response);
-        if (Array.isArray(data)) return data;
-        for (const key of possibleKeys) {
-            if (Array.isArray(data?.[key])) return data[key];
-            if (Array.isArray(response?.[key])) return response[key];
+    const loadConstants = useCallback(async (materialId) => {
+        if (!materialId) return;
+        try {
+            const [lengthRes, thicknessRes] = await Promise.all([
+                constantApi.getConstantValuesByMaterial(materialId, "height"),
+                constantApi.getConstantValuesByMaterial(materialId, "thickness")
+            ]);
+            const lengths = getApiData(lengthRes, []) || [];
+            const thicknesses = getApiData(thicknessRes, []) || [];
+            const defaultLength = lengths.find((v) => v.isDefault) || lengths[0];
+            const defaultThickness = thicknesses.find((v) => v.isDefault) || thicknesses[0];
+            setLengthValues(lengths);
+            setThicknessValues(thicknesses);
+            setOutputForm((prev) => ({
+                ...prev,
+                material_id: String(materialId),
+                width: FIXED_WIDTH,
+                destination: prev.destination || MovementDestination.slitting,
+                length: prev.length || (defaultLength ? String(defaultLength.value) : ""),
+                thickness: prev.thickness || (defaultThickness ? String(defaultThickness.value) : "")
+            }));
+        } catch (error) {
+            console.error(error);
+            toast.error("فشل في تحميل ثوابت الطول أو السماكة");
         }
-        return [];
-    };
-
-    const loadInitialData = async () => {
-        const results = await Promise.allSettled([
-            colorApi.getColors(),
-            batchApi.getBatches(),
-            materialApi.getMaterials(),
-            rulerApi.getRulers()
-        ]);
-
-        const [colorRes, batchRes, materialRes, rulerRes] = results.map(r => (r.status === "fulfilled" ? r.value : null));
-
-        setColors(extractArray(colorRes, ["colors", "data"]) || []);
-        setBatches(extractArray(batchRes, ["batches", "data"]) || []);
-        setMaterials(extractArray(materialRes, ["materials", "data"]) || []);
-        setRulers(extractArray(rulerRes, ["rulers", "data"]) || []);
-
-        if (results.some(r => r.status === "rejected")) {
-            console.error("Error loading colors/batches/materials/rulers for warehouse:", results);
-            toast.error("فشل في تحميل بيانات الصفحة (الألوان/الطبخات/المواد/المساطر)");
-        }
-    };
-
-    const parseQrData = (raw) => {
-        const parts = String(raw || "").split("|").map(p => String(p ?? "").trim());
-        if (parts.length < 6) return null;
-
-        const [
-            material_name,
-            ruler_name,
-            color_code,
-            width,
-            thickness,
-            quantity,
-            batch_number,
-            type_label,
-            employee_id
-        ] = parts;
-
-        return {
-            material_name,
-            ruler_name,
-            color_code,
-            width,
-            thickness,
-            quantity,
-            batch_number,
-            type_label,
-            employee_id
-        };
-    };
-
-    const applyQrData = () => {
-        const parsed = parseQrData(qrInput);
-        if (!parsed) {
-            toast.error("تنسيق QR غير صحيح");
-            return;
-        }
-
-        const normalize = (v) => String(v || "").trim().toLowerCase();
-
-        const materialMatch = materials.find(m => normalize(m.material_name) === normalize(parsed.material_name));
-        const rulerMatch = rulers.find(r => {
-            const sameName = normalize(r.ruler_name) === normalize(parsed.ruler_name);
-            if (!sameName) return false;
-            if (!materialMatch) return true;
-            return String(r.material_id) === String(materialMatch.material_id);
-        });
-        const colorMatch = colors.find(c => {
-            const sameCode = normalize(c.color_code) === normalize(parsed.color_code);
-            if (!sameCode) return false;
-            if (!rulerMatch) return true;
-            return String(c.ruler_id) === String(rulerMatch.ruler_id);
-        });
-        const batchMatch = batches.find(b => normalize(b.batch_number) === normalize(parsed.batch_number));
-
-        setOutputForm(prev => ({
-            ...prev,
-            material_id: materialMatch ? String(materialMatch.material_id) : "",
-            ruler_id: rulerMatch ? String(rulerMatch.ruler_id) : "",
-            color_id: colorMatch ? String(colorMatch.color_id) : "",
-            batch_id: batchMatch ? String(batchMatch.batch_id) : "",
-            length: parsed.quantity || prev.length,
-            width: parsed.width || prev.width,
-            thickness: parsed.thickness || prev.thickness
-        }));
-
-        if (!materialMatch || !rulerMatch || !colorMatch) {
-            toast.error("تعذر مطابقة بيانات QR مع البيانات المتاحة");
-        } else {
-            toast.success("تم تطبيق بيانات QR");
-        }
-
-        setActiveTab("manual");
-    };
+    }, []);
 
     useEffect(() => {
+        const loadRefs = async () => {
+            const results = await Promise.allSettled([
+                colorApi.getColors(),
+                batchApi.getBatches(),
+                materialApi.getMaterials(),
+                rulerApi.getRulers()
+            ]);
+            const [colorRes, batchRes, materialRes, rulerRes] = results.map((r) => r.status === "fulfilled" ? r.value : null);
+            setColors(extractArray(colorRes, ["colors", "data"]));
+            setBatches(extractArray(batchRes, ["batches", "data"]));
+            setMaterials(extractArray(materialRes, ["materials", "data"]));
+            setRulers(extractArray(rulerRes, ["rulers", "data"]));
+        };
+        loadRefs();
         loadOrders();
         loadMovements();
-        loadInitialData();
     }, []);
+
+    useEffect(() => {
+        if (!pvcMaterial) return;
+        const materialId = String(pvcMaterial.material_id);
+        setOutputForm((prev) => ({ ...prev, material_id: materialId, width: FIXED_WIDTH, destination: MovementDestination.slitting }));
+        loadConstants(materialId);
+    }, [pvcMaterial, loadConstants]);
+
+    useEffect(() => {
+        if (outputForm.ruler_id && !availableRulers.some((r) => String(r.ruler_id) === String(outputForm.ruler_id))) {
+            setOutputForm((prev) => ({ ...prev, ruler_id: "", color_id: "" }));
+        }
+    }, [availableRulers, outputForm.ruler_id]);
+
+    useEffect(() => {
+        if (outputForm.color_id && !availableColors.some((c) => String(c.color_id) === String(outputForm.color_id))) {
+            setOutputForm((prev) => ({ ...prev, color_id: "" }));
+        }
+    }, [availableColors, outputForm.color_id]);
 
     useEffect(() => {
         const token = localStorage.getItem("accessToken");
         if (!token) return;
-
         const socket = connectSocket(token);
-
-        const handleOrderNew = (payload) => {
-            console.log("📦 ORDER_NEW received:", payload);
+        const refresh = () => {
             loadOrders();
+            loadMovements();
         };
-
-        const handleOrdersPayload = (payload) => {
-            console.log("📦 WAREHOUSE ORDERS payload:", payload);
-            loadOrders();
-        };
-
-        const handleNotification = (payload) => {
-            console.log("🔔 NOTIFICATION received:", payload);
-            const data = payload?.data ?? payload;
-            
-            // Handle notifications and orders
-            if (data) {
-                // Handle warehouse notifications
-                if (payload.type === "PRODUCTION_ORDER_WAREHOUSE" && data.productionOrderId) {
-                    // Reload orders to get updated data
-                    loadOrders();
-                    
-                    // You can add more specific handling here
-                    console.log("📦 Warehouse notification:", {
-                        orderId: data.productionOrderId,
-                        itemsCount: data.itemsCount,
-                        items: data.items
-                    });
-                }
-                // If notification contains order data, update orders
-                else if (data.production_order_id || data.id) {
-                    loadOrders();
-                }
-                
-            }
-        };
-
-        socket.on("ORDER_NEW", handleOrderNew);
-        socket.on("warehouse:orders", handleOrdersPayload);
-        socket.on("warehouse:order:new", handleOrdersPayload);
-        socket.on("order:new", handleOrdersPayload);
-        socket.on("order:updated", handleOrdersPayload);
-        socket.on("notification", handleNotification);
-
+        ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated", "notification"]
+            .forEach((name) => socket.on(name, refresh));
         return () => {
-            socket.off("ORDER_NEW", handleOrderNew);
-            socket.off("warehouse:orders", handleOrdersPayload);
-            socket.off("warehouse:order:new", handleOrdersPayload);
-            socket.off("order:new", handleOrdersPayload);
-            socket.off("order:updated", handleOrdersPayload);
-            socket.off("notification", handleNotification);
+            ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated", "notification"]
+                .forEach((name) => socket.off(name, refresh));
             disconnectSocket();
         };
     }, []);
 
-    // Handle order selection
+    const parseQrData = (raw) => {
+        const parts = String(raw || "").split("|").map((p) => String(p || "").trim());
+        if (parts.length < 7) return null;
+        const [material_name, ruler_name, color_code, , thickness, quantity, batch_number] = parts;
+        return { material_name, ruler_name, color_code, thickness, quantity, batch_number };
+    };
+
+    const applyQrData = () => {
+        const parsed = parseQrData(qrInput);
+        if (!parsed) return toast.error("تنسيق QR غير صحيح");
+        const normalize = (value) => String(value || "").trim().toLowerCase();
+        const ruler = rulers.find((r) =>
+            normalize(r.ruler_name) === normalize(parsed.ruler_name) &&
+            String(r.material_id) === String(pvcMaterial?.material_id)
+        );
+        const color = colors.find((c) =>
+            normalize(c.color_code) === normalize(parsed.color_code) &&
+            (!ruler || String(c.ruler_id) === String(ruler.ruler_id))
+        );
+        const batch = batches.find((b) => normalize(b.batch_number) === normalize(parsed.batch_number));
+        setOutputForm((prev) => ({
+            ...prev,
+            material_id: pvcMaterial ? String(pvcMaterial.material_id) : prev.material_id,
+            ruler_id: ruler ? String(ruler.ruler_id) : "",
+            color_id: color ? String(color.color_id) : "",
+            batch_id: batch ? String(batch.batch_id) : "",
+            length: lengthValues.find((v) => String(v.value) === String(parsed.quantity)) ? String(parsed.quantity) : prev.length,
+            thickness: thicknessValues.find((v) => String(v.value) === String(parsed.thickness)) ? String(parsed.thickness) : prev.thickness,
+            width: FIXED_WIDTH,
+            destination: MovementDestination.slitting
+        }));
+        setEntryTab("manual");
+        toast.success("تم تطبيق بيانات QR");
+    };
+
     const handleOrderSelect = async (order) => {
         setSelectedOrder(order);
+        setShowOrderDetails(true);
         try {
             setLoadingOrderDetails(true);
             const response = await warehouseApi.getProductionOrderItems(order.production_order_id);
-            if (response.success) {
-                setOrderItems(response.data || []);
-            }
+            const data = getApiData(response, response?.data ?? response);
+            setOrderItems(Array.isArray(data) ? data : []);
         } catch (error) {
-            console.error('Error loading order items:', error);
+            console.error(error);
             toast.error("فشل في تحميل تفاصيل الطلب");
+            setOrderItems([]);
         } finally {
             setLoadingOrderDetails(false);
         }
-        setShowOrderDetails(true);
     };
 
-    // Number pad functions
-    const handleNumberClick = (num) => {
-        const currentValue = outputForm[currentInput] || "";
-        if (currentValue.length < 10) { // Limit input length
-            setOutputForm(prev => ({
-                ...prev,
-                [currentInput]: currentValue + num.toString()
-            }));
-        }
-    };
-
-    const handleDecimalClick = () => {
-        const currentValue = String(outputForm[currentInput] || "");
-        if (currentValue.includes(".") || currentValue.includes(",")) return;
-        setOutputForm(prev => ({
+    const handleApplyOrderToInputs = (item) => {
+        const color = item.color || colors.find((c) => String(c.color_id) === String(item.color_id));
+        const rulerId = item.ruler_id || color?.ruler_id || color?.ruler?.ruler_id;
+        setOutputForm((prev) => ({
             ...prev,
-            [currentInput]: currentValue ? `${currentValue}.` : "0."
+            material_id: pvcMaterial ? String(pvcMaterial.material_id) : prev.material_id,
+            ruler_id: rulerId ? String(rulerId) : "",
+            color_id: item.color_id ? String(item.color_id) : "",
+            batch_id: item.batch_id ? String(item.batch_id) : "",
+            length: "",
+            width: FIXED_WIDTH,
+            thickness: item.thickness ? String(item.thickness) : prev.thickness,
+            destination: item.destination || MovementDestination.slitting,
+            notes: item.notes || ""
         }));
+        setActiveOrderItem(item);
+        setEntryTab("manual");
     };
 
-    const handleBackspace = () => {
-        setOutputForm(prev => ({
-            ...prev,
-            [currentInput]: prev[currentInput].slice(0, -1)
-        }));
+    const updateLocalStatus = (itemId, status) => {
+        setOrders((prev) => prev.map((o) => String(o.production_order_item_id) === String(itemId) ? { ...o, status } : o));
+        setOrderItems((prev) => prev.map((o) => String(o.production_order_item_id) === String(itemId) ? { ...o, status } : o));
     };
 
-    const handleClear = () => {
-        setOutputForm(prev => ({
-            ...prev,
-            [currentInput]: ""
-        }));
-    };
-
-    // Handle output submission
-    const handleOutputSubmit = async () => {
+    const handleCompleteOrderItem = async (item, showToast = true) => {
+        if (!item?.production_order_item_id) return;
         try {
-            // Validate required fields (batch_id is optional)
-            if (!outputForm.material_id || !outputForm.ruler_id || !outputForm.color_id || !outputForm.length ||
-                !outputForm.width || !outputForm.thickness || !outputForm.destination) {
-                toast.error("يرجى اختيار المادة والمسطرة واللون وإدخال جميع الحقول المطلوبة");
-                return;
-            }
-
-            const toNumber = (value) => {
-                if (value === null || value === undefined || value === "") return null;
-                const normalized = String(value).replace(",", ".");
-                const num = Number(normalized);
-                return Number.isNaN(num) ? null : num;
-            };
-
-            // Build payload without sending batch_id when not selected or equals "0"
-            const payload = {
-                color_id: toNumber(outputForm.color_id),
-                length: toNumber(outputForm.length),
-                width: toNumber(outputForm.width),
-                thickness: toNumber(outputForm.thickness),
-                destination: outputForm.destination,
-                notes: outputForm.notes,
-            };
-
-            if (outputForm.batch_id && outputForm.batch_id !== "0") {
-                payload.batch_id = toNumber(outputForm.batch_id);
-            }
-
-            const response = await warehouseApi.createWarehouseMovement(payload);
-            if (response.success) {
-                toast.success("تم إنشاء حركة المستودع بنجاح");
-                setOutputForm({
-                    color_id: "",
-                    batch_id: "",
-                    length: "",
-                    width: "",
-                    thickness: "0.6",
-                    destination: "",
-                    notes: ""
-                });
-                if (activeOrderItem?.production_order_item_id) {
-                    await handleCompleteOrderItem(activeOrderItem, { showToast: false });
-                    setActiveOrderItem(null);
-                }
-                loadMovements(); // Reload movements
-            }
+            await productionApi.updateProductionItemStatus(item.production_order_item_id, ProductionStatus.completed);
+            updateLocalStatus(item.production_order_item_id, ProductionStatus.completed);
+            setOrdersTab("completed");
+            if (activeOrderItem?.production_order_item_id === item.production_order_item_id) setActiveOrderItem(null);
+            if (showToast) toast.success("تم إتمام الطلب ونقله إلى المكتمل");
+            loadOrders();
         } catch (error) {
-            console.error('Error creating warehouse movement:', error);
-            toast.error("فشل في إنشاء حركة المستودع");
-        }
-    };
-
-    const handleApplyOrderToInputs = (orderItem) => {
-        if (!orderItem) return;
-        const colorInfo = orderItem.color || colors.find(c => String(c.color_id) === String(orderItem.color_id));
-        const rulerId = orderItem.ruler_id || colorInfo?.ruler_id || colorInfo?.ruler?.ruler_id;
-        const materialId =
-            orderItem.material_id ||
-            colorInfo?.ruler?.material_id ||
-            colorInfo?.ruler?.material?.material_id ||
-            rulers.find(r => String(r.ruler_id) === String(rulerId))?.material_id;
-
-        setOutputForm(prev => ({
-            ...prev,
-            material_id: materialId ? String(materialId) : prev.material_id,
-            ruler_id: rulerId ? String(rulerId) : prev.ruler_id,
-            color_id: orderItem.color_id ? String(orderItem.color_id) : prev.color_id,
-            batch_id: orderItem.batch_id ? String(orderItem.batch_id) : "",
-            length: orderItem.length ? String(orderItem.length) : "",
-            width: orderItem.width ? String(orderItem.width) : "",
-            thickness: orderItem.thickness ? String(orderItem.thickness) : "",
-            destination: orderItem.destination || "",
-            notes: orderItem.notes || ""
-        }));
-        setActiveOrderItem(orderItem);
-        setActiveTab("manual");
-        setCurrentInput("length");
-    };
-
-    const handleCompleteOrderItem = async (orderItem, options = {}) => {
-        if (!orderItem?.production_order_item_id) return;
-        try {
-            const result = await productionApi.updateProductionItemStatus(
-                orderItem.production_order_item_id,
-                ProductionStatus.completed
-            );
-            if (result?.success === false || result?.error) {
-                throw new Error(result?.message || result?.error || "فشل تحديث حالة الطلب");
-            }
-            if (options.showToast !== false) {
-                toast.success("تم تحديث حالة الطلب إلى مكتمل");
-            }
-            setOrders(prev => (Array.isArray(prev) ? prev.filter(i => String(i.production_order_item_id) !== String(orderItem.production_order_item_id)) : prev));
-            setOrderItems(prev => (Array.isArray(prev) ? prev.filter(i => String(i.production_order_item_id) !== String(orderItem.production_order_item_id)) : prev));
-        } catch (error) {
-            console.error("Error updating order item status:", error);
+            console.error(error);
             toast.error(error?.message || "فشل تحديث حالة الطلب");
         }
     };
 
-    // Format destination label
-    const formatDestination = (destination) => {
-        const labels = {
-            [MovementDestination.slitting]: "التشريح",
-            [MovementDestination.cutting]: "القص",
-            [MovementDestination.production]: "الإنتاج"
-        };
-        return labels[destination] || destination;
+    const requestCompleteOrderItem = (item) => {
+        if (!item?.production_order_item_id) return;
+        setPendingCompleteItem(item);
+        setShowCompleteDialog(true);
     };
 
-    // Format date
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('ar-SA', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+    const handleOutputSubmit = async () => {
+        if (!outputForm.ruler_id || !outputForm.color_id || !outputForm.batch_id || !outputForm.length || !outputForm.thickness || !outputForm.destination) {
+            return toast.error("الطبخة والطول والسماكة وباقي الحقول مطلوبة");
+        }
+        try {
+            const num = (value) => Number(String(value).replace(",", "."));
+            const response = await warehouseApi.createWarehouseMovement({
+                color_id: num(outputForm.color_id),
+                batch_id: num(outputForm.batch_id),
+                length: num(outputForm.length),
+                width: num(FIXED_WIDTH),
+                thickness: num(outputForm.thickness),
+                destination: outputForm.destination,
+                notes: outputForm.notes
+            });
+            const created = response?.data?.movement || response?.data || response?.movement;
+            if (created?.movement_id) setMovements((prev) => [created, ...prev]);
+            setOutputForm((prev) => ({
+                ...BASE_FORM,
+                material_id: pvcMaterial ? String(pvcMaterial.material_id) : "",
+                ruler_id: prev.ruler_id,
+                width: FIXED_WIDTH,
+                destination: MovementDestination.slitting,
+                length: lengthValues.find((v) => v.isDefault)?.value ? String(lengthValues.find((v) => v.isDefault).value) : (lengthValues[0] ? String(lengthValues[0].value) : ""),
+                thickness: thicknessValues.find((v) => v.isDefault)?.value ? String(thicknessValues.find((v) => v.isDefault).value) : (thicknessValues[0] ? String(thicknessValues[0].value) : "")
+            }));
+            toast.success("تم حفظ المخرج بنجاح");
+            loadMovements();
+        } catch (error) {
+            console.error(error);
+            toast.error(error?.message || "فشل في إنشاء حركة المستودع");
+        }
     };
 
-    const orderStatusConfig = {
-        [ProductionStatus.pending]: { label: "قيد الانتظار", className: "bg-yellow-100 text-yellow-800" },
-        [ProductionStatus.preparing]: { label: "قيد التحضير", className: "bg-blue-100 text-blue-800" },
-        [ProductionStatus.completed]: { label: "مكتمل", className: "bg-green-100 text-green-800" },
-        [ProductionStatus.canceled]: { label: "ملغي", className: "bg-red-100 text-red-800" }
-    };
+    const handleNumberClick = (num) => currentInput === "notes" && setOutputForm((prev) => ({ ...prev, notes: `${prev.notes || ""}${num}` }));
+    const handleBackspace = () => currentInput === "notes" && setOutputForm((prev) => ({ ...prev, notes: String(prev.notes || "").slice(0, -1) }));
+    const handleClear = () => currentInput === "notes" && setOutputForm((prev) => ({ ...prev, notes: "" }));
 
-    const getOrderStatusBadge = (status) => {
-        return orderStatusConfig[status] || { label: status || "غير محدد", className: "bg-gray-100 text-gray-700" };
-    };
-
-    const groupedOrders = useMemo(() => {
-        const list = Array.isArray(orders) ? [...orders] : [];
-        list.sort((a, b) => {
-            const aTime = a?.created_at ? new Date(a.created_at).getTime() : 0;
-            const bTime = b?.created_at ? new Date(b.created_at).getTime() : 0;
-            return bTime - aTime;
-        });
-        const groups = {
-            [ProductionStatus.pending]: [],
-            [ProductionStatus.preparing]: [],
-            [ProductionStatus.completed]: [],
-            [ProductionStatus.canceled]: [],
-            unknown: []
-        };
-
-        list.forEach(item => {
-            const key = String(item?.status || "").toLowerCase();
-            if (key === ProductionStatus.completed) return;
-            if (groups[key]) groups[key].push(item);
-            else groups.unknown.push(item);
-        });
-
-        return groups;
-    }, [orders]);
-
-    const orderSections = [
-        { key: ProductionStatus.pending, label: orderStatusConfig[ProductionStatus.pending].label },
-        { key: ProductionStatus.preparing, label: orderStatusConfig[ProductionStatus.preparing].label },
-        { key: ProductionStatus.completed, label: orderStatusConfig[ProductionStatus.completed].label },
-        { key: ProductionStatus.canceled, label: orderStatusConfig[ProductionStatus.canceled].label },
-        { key: "unknown", label: "غير محدد" }
-    ];
+    const renderOrdersTable = (list) => (
+        <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
+            <table className="w-full border-collapse">
+                <thead className="bg-gray-100 sticky top-0 z-20">
+                    <tr>
+                        {["#", "الطول", "الوجهة", "رقم الطبخة", "الحالة", "الإجراءات"].map((h) => (
+                            <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap">{h}</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {loadingOrders ? (
+                        <tr><td colSpan="6" className="p-6"><LoadingState /></td></tr>
+                    ) : list.length === 0 ? (
+                        <tr><td colSpan="6" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
+                    ) : list.map((order, index) => {
+                        const batch = order.batch || batches.find((b) => String(b.batch_id) === String(order.batch_id));
+                        const status = getStatusBadge(order.status);
+                        return (
+                            <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
+                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">#{order.production_order_id}</td>
+                                {/* <td className="px-3 py-2 text-center text-sm whitespace-nowrap">{order.width || FIXED_WIDTH}</td> */}
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.length || "-"}</td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
+                                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
+                                        {formatDestination(order.destination)}
+                                    </span>
+                                </td>
+                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">{order.batch_number || batch?.batch_number || "-"}</td>
+                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap"><span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span></td>
+                                <td className="px-1 py-2 align-middle text-center whitespace-nowrap">
+                                    <div className="flex h-8 items-center justify-center gap-1">
+                                        <button onClick={() => handleOrderSelect(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"><Eye className="w-4 h-4" /></button>
+                                        {ordersTab === "current" && (
+                                            <>
+                                                <button onClick={() => handleApplyOrderToInputs(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"><Hash className="w-4 h-4" /></button>
+                                                <button onClick={() => requestCompleteOrderItem(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50"><Check className="w-4 h-4" /></button>
+                                            </>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
+    );
 
     return (
-        <div className="h-screen overflow-hidden flex flex-col bg-gray-50" dir="rtl">
-            {/* Header - نفس ستايل صفحة الإنتاج */}
+        <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
+            <div className="absolute left-0 bottom-2 z-40">
+                <Button
+                    type="button"
+                    onClick={() => setShowHeader((prev) => !prev)}
+                    className="h-10 w-10 rounded-full border-0 bg-secondary-s text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 hover:bg-primary-f active:scale-95"
+                    title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
+                >
+                    {showHeader ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+                </Button>
+            </div>
+
+            {showHeader && (
             <div className="flex-shrink-0">
                 <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                            <Package className="w-7 h-7" />
-                            <div>
-                                <h1 className="text-2xl font-bold">إدارة المستودع</h1>
-                                <p className="text-sm opacity-90">لوحة حركات المستودع للمستودع فقط</p>
-                            </div>
+                    <div className="flex items-center gap-1">
+                        <Package className="w-7 h-7" />
+                        <div><h1 className="text-2xl font-bold">إدارة المستودع الخام</h1><p className="text-sm opacity-90">لوحة حركات المستودع الخام</p></div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                        <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+                            <div className="text-xs opacity-80">اسم المستخدم</div>
+                            <div className="text-base font-bold">{user?.full_name || user?.username || "-"}</div>
+                        </div>
+                        <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+                            <div className="text-xs opacity-80">الدور</div>
+                            <div className="text-base font-bold">{ROLE_LABELS[user?.role] || user?.role}</div>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <NotificationsBell />
-                        <span className="text-sm">
-                            مرحباً، {user?.full_name}
-                        </span>
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => {
-                                logout();
-                                navigate("/login");
-                            }}
-                            className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                        >
-                            <ArrowRight className="w-4 h-4 ml-2 rotate-180" />
-                            تسجيل الخروج
+                        <Button size="lg" variant="outline" onClick={() => { logout(); navigate("/login"); }} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
+                            <ArrowRight className="w-4 h-4 ml-2 rotate-180" />تسجيل الخروج
                         </Button>
                     </div>
                 </div>
             </div>
+            )}
 
-            {/* Main Content */}
-            <div className="flex-1 min-h-0 flex flex-col gap-4 p-4 overflow-hidden">
-                {/* Top Area - Inputs + Orders */}
-                <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
-                    {/* Current / Completed Orders */}
-                    <Card className="p-4 flex flex-col space-y-4 min-h-0">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                                <Package className="w-5 h-5 text-orange-600" />
-                                طلبات حسب الحالة
-                            </h2>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={loadOrders}
-                                disabled={loadingOrders}
-                            >
-                                <RefreshCw className={`w-4 h-4 ml-2 ${loadingOrders ? 'animate-spin' : ''}`} />
-                                تحديث
-                            </Button>
+            {!showHeader && (
+            <div className="flex-shrink-0 text-stone-50">
+                <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
+                    <div className="min-w-0">
+                        {/* <div className="text-[11px]">اسم المستخدم</div> */}
+                        <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
+                    </div>
+                    <div className="h-10 w-px" />
+                    <div className="min-w-0 text-right">
+                        {/* <div className="text-[11px] ">الدور</div> */}
+                        <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+                    </div>
+                </div>
+            </div>
+            )}
+
+            <div className="flex-1 flex flex-col gap-1 px-4 mt-1 overflow-hidden">
+                <div className={`grid shrink-0 gap-1 ${showHeader ? "grid-cols-3 h-[60%]" : "grid-cols-5 h-[55%]"}`}>
+                    <Card className={`p-4 flex flex-col gap-4 min-h-0 ${showHeader ? "col-span-1" : "col-span-2"}`}>
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2"><Package className="w-5 h-5 text-secondary-s" /><h2 className="text-sm font-bold">{ordersTab === "current" ? "الطلبات الحالية" : "الطلبات المكتملة"}</h2></div>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" className={ordersTab === "current" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setOrdersTab("current")}>الطلبات الحالية</Button>
+                                <Button variant="outline" size="sm" className={ordersTab === "completed" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setOrdersTab("completed")}>المكتملة</Button>
+                                <Button variant="outline" size="sm" onClick={loadOrders} disabled={loadingOrders}><RefreshCw className={`w-4 h-4 ml-2 ${loadingOrders ? "animate-spin" : ""}`} />تحديث</Button>
+                            </div>
                         </div>
-                        <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
-                            {loadingOrders ? (
-                                <div className="flex items-center justify-center h-32">
-                                    <LoadingState />
-                                </div>
-                            ) : orders.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                                    <div className="text-lg font-medium">لا توجد طلبات</div>
-                                    <div className="text-sm">لا توجد طلبات جاهزة للمستودع</div>
-                                </div>
-                            ) : (
-                                <div className="divide-y">
-                                    {orderSections.map(section => {
-                                        const items = groupedOrders[section.key] || [];
-                                        if (items.length === 0) return null;
-                                        return (
-                                            <div key={section.key}>
-                                                <div className="px-3 py-2 bg-gray-50 text-sm font-bold flex items-center justify-between">
-                                                    <span>{section.label}</span>
-                                                    <span className="text-xs text-gray-500">{items.length}</span>
-                                                </div>
-                                                {items.map(order => {
-                                                    const colorInfo = order.color || colors.find(c => String(c.color_id) === String(order.color_id));
-                                                    const batchInfo = order.batch || batches.find(b => String(b.batch_id) === String(order.batch_id));
-                                                    const colorName = order.color_name || colorInfo?.color_name || "-";
-                                                    const colorCode = order.color_code || colorInfo?.color_code || "-";
-                                                    const batchNumber = order.batch_number || order.batch?.batch_number || batchInfo?.batch_number || "-";
-                                                    const statusBadge = getOrderStatusBadge(order.status);
-                                                    const isCompleted = String(order.status || "").toLowerCase() === ProductionStatus.completed;
-                                                    return (
-                                                        <div
-                                                            key={order.production_order_item_id ?? order.production_order_id}
-                                                            className="p-3 hover:bg-gray-50 cursor-pointer"
-                                                            onClick={() => {
-                                                                if (order.production_order_id) {
-                                                                    handleOrderSelect({
-                                                                        production_order_id: order.production_order_id,
-                                                                        color_name: colorName,
-                                                                        color_code: colorCode,
-                                                                        width: order.width,
-                                                                        thickness: order.thickness,
-                                                                        batch_number: batchNumber,
-                                                                        created_at: order.created_at,
-                                                                        status: order.status
-                                                                    });
-                                                                }
-                                                            }}
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <div>
-                                                                    <div className="font-medium">طلب #{order.production_order_id}</div>
-                                                                    <div className="text-sm text-gray-600">
-                                                                        {colorName} ({colorCode})
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-500">
-                                                                        {formatDate(order.created_at)}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="text-left">
-                                                                    <div className="text-sm font-medium">
-                                                                        {order.width} مم × {order.thickness} مم
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-500">
-                                                                        {batchNumber}
-                                                                    </div>
-                                                                    <div className="mt-1">
-                                                                        <span className={`px-2 py-0.5 rounded-full text-xs ${statusBadge.className}`}>
-                                                                            {statusBadge.label}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="mt-2 flex gap-2 justify-end">
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleApplyOrderToInputs(order);
-                                                                            }}
-                                                                        >
-                                                                            إدخال
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            disabled={isCompleted}
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleCompleteOrderItem(order);
-                                                                            }}
-                                                                        >
-                                                                            إتمام
-                                                                        </Button>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
+                        {renderOrdersTable(ordersTab === "current" ? currentOrders : completedOrders)}
                     </Card>
 
-                    {/* Inputs */}
-                    <Card className="p-4 flex flex-col min-h-0">
-                        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <ArrowRight className="w-5 h-5 text-blue-600" />
-                            المدخلات
-                        </h2>
-                        <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
-                            {activeOrderItem && (
-                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-                                    <div className="text-sm">
-                                        <div className="font-bold">تم ربط الإدخال بطلب #{activeOrderItem.production_order_id}</div>
-                                        <div className="text-xs text-gray-600">عنصر #{activeOrderItem.production_order_item_id}</div>
+                    <Card className={`p-4 flex flex-col ${showHeader ? "col-span-2" : "col-span-3"}`}>
+                        <h2 className="text-lg font-bold  flex items-center gap-2"><ArrowRight className="w-5 h-5 text-blue-600" />المدخلات</h2>
+                        <div className="flex-1 overflow-auto pr-1 space-y-2">
+                            {/* {activeOrderItem && <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between"><div className="text-sm"><div className="font-bold">تم ربط الإدخال بطلب #{activeOrderItem.production_order_id}</div><div className="text-xs text-gray-600">عنصر #{activeOrderItem.production_order_item_id}</div></div><Button variant="outline" size="sm" onClick={() => setActiveOrderItem(null)}>إلغاء الربط</Button></div>} */}
+                            <div className="flex gap-2">
+                                <Button variant="outline" className={`flex-1 h-13 ${entryTab === "qr" ? "bg-blue-50 border-blue-300 text-primary-f" : ""}`} onClick={() => setEntryTab("qr")}><Search className="w-4 h-4 ml-2" />QR</Button>
+                                <Button variant="outline" className={`flex-1 h-13 ${entryTab === "manual" ? "bg-blue-50 border-blue-300 text-primary-f" : ""}`} onClick={() => setEntryTab("manual")}><Hash className="w-4 h-4 ml-2" />يدوي</Button>
+                            </div>
+                            {entryTab === "qr" ? (
+                                <div className="space-y-3">
+                                    <div className="text-sm text-gray-600">الصيغة: `material|ruler|color_code|width|thickness|quantity|batch`</div>
+                                    <Input value={qrInput} className={`h-13`} onChange={(e) => setQrInput(e.target.value)} placeholder="material|ruler|color_code|width|thickness|quantity|batch" />
+                                    <Button onClick={applyQrData} className="w-full h-13 bg-primary-f hover:bg-blue-700" disabled={!qrInput.trim()}><Check className="w-5 h-5 ml-2" />تطبيق البيانات</Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-5 gap-1">
+                                        <div><Label className={'mb-1'}>المسطرة</Label><FilterSelect value={outputForm.ruler_id} onChange={(e) => setOutputForm((p) => ({ ...p, ruler_id: e.target.value, color_id: "" }))} options={availableRulers.map((r) => ({ value: String(r.ruler_id), label: r.ruler_name }))} placeholder="اختر المسطرة" disabled={!outputForm.material_id} /></div>
+                                        <div><Label className={'mb-1'}>اللون</Label><FilterSelect value={outputForm.color_id} onChange={(e) => setOutputForm((p) => ({ ...p, color_id: e.target.value }))} options={colorOptions} placeholder={!outputForm.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"} disabled={!outputForm.ruler_id} /></div>
+                                        <div><Label className={'mb-1'}>الطبخة</Label><FilterSelect value={outputForm.batch_id} onChange={(e) => setOutputForm((p) => ({ ...p, batch_id: e.target.value }))} options={batchOptions} placeholder="اختر الطبخة" disabled={!outputForm.material_id} /></div>
+                                        <div><Label className={'mb-1'}>العرض</Label><button type="button" className="w-full rounded-lg border-2 border-secondary-s bg-secondary-s text-white p-3 font-bold shadow-lg">{FIXED_WIDTH}</button></div>
+                                        <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
                                     </div>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setActiveOrderItem(null)}
-                                    >
-                                        إلغاء الربط
-                                    </Button>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <div><Label className={'mb-1'}>الطول</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} options={lengthOptions} placeholder="اختر الطول" disabled={!lengthOptions.length} /></div>
+                                        {/* <div><Label className={'mb-1'}>الوجهة</Label><FilterSelect value={outputForm.destination} onChange={(e) => setOutputForm((p) => ({ ...p, destination: e.target.value }))} options={[{ value: MovementDestination.slitting, label: "التشريح" }, { value: MovementDestination.cutting, label: "القص" }, { value: MovementDestination.production, label: "الإنتاج" }]} placeholder="اختر الوجهة" /></div> */}
+                                    <div className="col-span-2"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
+                                    </div>
+                                    <Button onClick={handleOutputSubmit} className="w-full h-13 bg-green-600 hover:bg-green-700"><Check className="w-5 h-5 ml-2" />حفظ المخرج</Button>
                                 </div>
                             )}
-                            <div>
-                                {/* Input form for manual entry or QR */}
-                                <div className="space-y-4">
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="outline"
-                                            className={`flex-1 ${activeTab === "qr" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
-                                            onClick={() => setActiveTab("qr")}
-                                        >
-                                            <Search className="w-4 h-4 ml-2" />
-                                            QR
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            className={`flex-1 ${activeTab === "manual" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
-                                            onClick={() => setActiveTab("manual")}
-                                        >
-                                            <Hash className="w-4 h-4 ml-2" />
-                                            يدوي
-                                        </Button>
-                                    </div>
-
-                                    {activeTab === "qr" && (
-                                        <div className="space-y-3">
-                                            <div className="text-sm text-gray-600">
-                                                قم بلصق بيانات QR ثم اضغط "تطبيق البيانات"
-                                            </div>
-                                            <Input
-                                                value={qrInput}
-                                                onChange={(e) => setQrInput(e.target.value)}
-                                                placeholder="material|ruler|color_code|width|thickness|quantity|batch|type|employee"
-                                            />
-                                            <Button
-                                                onClick={applyQrData}
-                                                className="w-full bg-blue-600 hover:bg-blue-700"
-                                                disabled={!qrInput.trim()}
-                                            >
-                                                <Check className="w-5 h-5 ml-2" />
-                                                تطبيق البيانات
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                    {activeTab === "manual" && (
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <Label>المادة</Label>
-                                                    <FilterSelect
-                                                        value={outputForm.material_id}
-                                                        onChange={(e) => setOutputForm(prev => ({
-                                                            ...prev,
-                                                            material_id: e.target.value,
-                                                            ruler_id: "",
-                                                            color_id: "",
-                                                            batch_id: ""
-                                                        }))}
-                                                        options={materials.map(m => ({
-                                                            value: String(m.material_id),
-                                                            label: m.material_name
-                                                        }))}
-                                                        placeholder="اختر المادة"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>المسطرة</Label>
-                                                    <FilterSelect
-                                                        value={outputForm.ruler_id}
-                                                        onChange={(e) => setOutputForm(prev => ({
-                                                            ...prev,
-                                                            ruler_id: e.target.value,
-                                                            color_id: "",
-                                                            batch_id: ""
-                                                        }))}
-                                                        options={availableRulers.map(r => ({
-                                                            value: String(r.ruler_id),
-                                                            label: r.ruler_name
-                                                        }))}
-                                                        placeholder={!outputForm.material_id ? "اختر المادة أولاً" : "اختر المسطرة"}
-                                                        disabled={!outputForm.material_id}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>اللون</Label>
-                                                    <FilterSelect
-                                                        value={outputForm.color_id}
-                                                        onChange={(e) => setOutputForm(prev => ({ ...prev, color_id: e.target.value, batch_id: "" }))}
-                                                        options={colorOptions}
-                                                        placeholder={
-                                                            !outputForm.ruler_id
-                                                                ? "اختر المسطرة أولاً"
-                                                                : colorOptions.length === 0
-                                                                    ? "لا توجد ألوان لهذه المسطرة"
-                                                                    : "اختر اللون"
-                                                        }
-                                                        disabled={!outputForm.ruler_id}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>الطبخة (اختياري)</Label>
-                                                    <FilterSelect
-                                                        value={outputForm.batch_id}
-                                                        onChange={(e) => setOutputForm(prev => ({ ...prev, batch_id: e.target.value }))}
-                                                        options={filteredBatchOptions}
-                                                        placeholder={!outputForm.material_id ? "اختر المادة أولاً" : "اختر الطبخة أو اتركها فارغة"}
-                                                        disabled={!outputForm.material_id}
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-3">
-                                                <div>
-                                                    <Label>الطول</Label>
-                                                    <Input
-                                                        value={outputForm.length}
-                                                        onFocus={() => setCurrentInput("length")}
-                                                        readOnly
-                                                        className={`text-center ${currentInput === "length" ? "ring-2 ring-blue-500" : ""}`}
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>العرض</Label>
-                                                    <Input
-                                                        value={outputForm.width}
-                                                        onFocus={() => setCurrentInput("width")}
-                                                        readOnly
-                                                        className={`text-center ${currentInput === "width" ? "ring-2 ring-blue-500" : ""}`}
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>السماكة</Label>
-                                                    <Input
-                                                        value={outputForm.thickness}
-                                                        onFocus={() => setCurrentInput("thickness")}
-                                                        readOnly
-                                                        className={`text-center ${currentInput === "thickness" ? "ring-2 ring-blue-500" : ""}`}
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <Label>الوجهة</Label>
-                                                <FilterSelect
-                                                    value={outputForm.destination}
-                                                    onChange={(e) => setOutputForm(prev => ({ ...prev, destination: e.target.value }))}
-                                                    options={[
-                                                        { value: MovementDestination.slitting, label: "التشريح" },
-                                                        { value: MovementDestination.cutting, label: "القص" },
-                                                        { value: MovementDestination.production, label: "الإنتاج" }
-                                                    ]}
-                                                    placeholder="اختر الوجهة"
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label>ملاحظات</Label>
-                                                <Input
-                                                    value={outputForm.notes}
-                                                    onChange={(e) => setOutputForm(prev => ({ ...prev, notes: e.target.value }))}
-                                                    placeholder="ملاحظات اختيارية"
-                                                />
-                                            </div>
-                                            <Button
-                                                onClick={handleOutputSubmit}
-                                                className="w-full bg-green-600 hover:bg-green-700"
-                                                disabled={!outputForm.color_id || !outputForm.length || !outputForm.width || !outputForm.thickness || !outputForm.destination}
-                                            >
-                                                <Check className="w-5 h-5 ml-2" />
-                                                حفظ
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
                         </div>
                     </Card>
                 </div>
 
-                {/* Bottom Area - Outputs (full width) + Number Pad on the right */}
-                <div className="flex gap-4 flex-1 min-h-0 flex-row-reverse">
-                    {/* Number Pad - fixed width on the left */}
-                    <Card className="p-4 w-[260px] flex-shrink-0 self-stretch flex flex-col">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <Calculator className="w-5 h-5 text-green-600" />
-                            لوحة الأرقام
-                        </h3>
-                        <div className="grid grid-cols-3 gap-2 flex-1 content-start overflow-auto">
-                            {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(num => (
-                                <Button
-                                    key={num}
-                                    variant="outline"
-                                    className="h-12 text-lg font-bold"
-                                    onClick={() => handleNumberClick(num)}
-                                >
-                                    {num}
-                                </Button>
-                            ))}
-                            <Button
-                                variant="outline"
-                                className="h-12 text-lg"
-                                onClick={handleClear}
-                            >
-                                <X className="w-4 h-4" />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="h-12 text-lg font-bold"
-                                onClick={() => handleNumberClick(0)}
-                            >
-                                0
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="h-12 text-lg"
-                                onClick={handleDecimalClick}
-                            >
-                                ,
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="h-12 text-lg"
-                                onClick={handleBackspace}
-                            >
-                                <ArrowRight className="w-4 h-4" />
-                            </Button>
-                        </div>
-                    </Card>
-                    {/* Outputs Table - takes remaining width */}
-                    <Card className="p-4 flex flex-col flex-1 space-y-4 min-h-0">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                                <Package className="w-5 h-5 text-purple-600" />
-                                جدول المخرجات
-                            </h3>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={loadMovements}
-                                disabled={loadingMovements}
-                            >
-                                <RefreshCw className={`w-4 h-4 ml-2 ${loadingMovements ? 'animate-spin' : ''}`} />
-                                تحديث
-                            </Button>
-                        </div>
+                <div className="flex gap-1 flex-1 min-h-0 flex-row-reverse">
+                    
+
+                    <Card className="p-4 pb-0 flex flex-col flex-1  min-h-0">
+                        {/* <div className="flex items-center justify-between"><h3 className="text-lg font-bold flex items-center gap-2"><Package className="w-5 h-5 text-purple-600" />جدول المخرجات</h3><Button variant="outline" size="sm" onClick={loadMovements} disabled={loadingMovements}><RefreshCw className={`w-4 h-4 ml-2 ${loadingMovements ? "animate-spin" : ""}`} />تحديث</Button></div> */}
                         <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
-                            {loadingMovements ? (
-                                <div className="flex items-center justify-center h-32">
-                                    <LoadingState />
-                                </div>
-                            ) : movements.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                                    <div className="text-lg font-medium">لا توجد مخرجات</div>
-                                    <div className="text-sm">لم يتم تسجيل أي حركات مستودع بعد</div>
-                                </div>
-                            ) : (
-                                <div className="divide-y">
-                                    {movements.map(movement => (
-                                        <div key={movement.movement_id} className="p-3">
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div>
-                                                    <div className="font-medium flex items-center gap-2">
-                                                        حركة #{movement.movement_id}
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setSelectedMovement(movement);
-                                                                setShowMovementDetails(true);
-                                                            }}
-                                                        >
-                                                            <Eye className="w-4 h-4 ml-2" />
-                                                            تفاصيل
-                                                        </Button>
-                                                    </div>
-                                                    <div className="text-sm text-gray-600">
-                                                        {movement.color?.color_name} ({movement.color?.color_code})
-                                                    </div>
-                                                    <div className="text-xs text-gray-500">
-                                                        {formatDate(movement.created_at)}
-                                                    </div>
-                                                </div>
-                                                <div className="text-left">
-                                                    <div className="text-sm font-medium">
-                                                        {movement.length} م × {movement.width} مم × {movement.thickness} مم
-                                                    </div>
-                                                    <div className="text-xs text-gray-500">
-                                                        {formatDestination(movement.destination)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                            <table className="min-w-[1100px] w-full table-fixed border-collapse">
+                                <thead className="bg-gray-100 sticky top-0 z-20"><tr>{["#", "اللون", "الطبخة", "الطول", "العرض", "السماكة", "الوجهة", "المستخدم", "التوقيت", "الملاحظات", "QR", "تفاصيل"].map((h) => <th key={h} className="p-2 text-center border-b text-sm">{h}</th>)}</tr></thead>
+                                <tbody>
+                                    {loadingMovements ? <tr><td colSpan="12" className="p-6"><LoadingState /></td></tr> : sortedMovements.length === 0 ? <tr><td colSpan="12" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد مخرجات</td></tr> : sortedMovements.map((m) => (
+                                        <tr key={m.movement_id} className="border-b hover:bg-gray-50">
+                                            <td className="p-2 text-center text-sm">#{m.movement_id}</td>
+                                            <td className="p-2 text-center text-sm">{m.color?.color_name || "-"} ({m.color?.color_code || "-"})</td>
+                                            <td className="p-2 text-center text-sm">{m.batch?.batch_number || "-"}</td>
+                                            <td className="p-2 text-center text-sm">{m.length || "-"}</td>
+                                            <td className="p-2 text-center text-sm">{m.width || FIXED_WIDTH}</td>
+                                            <td className="p-2 text-center text-sm">{m.thickness || "-"}</td>
+                                            <td className="p-2 text-center text-sm">{formatDestination(m.destination)}</td>
+                                            <td className="p-2 text-center text-sm">{m.user?.full_name || m.user?.username || "-"}</td>
+                                            <td className="p-2 text-center text-sm">{formatDate(m.created_at)}</td>
+                                            <td className="p-2 text-center text-sm max-w-[140px] truncate" title={m.notes || "-"}>{m.notes || "-"}</td>
+                                            <td className="p-2 text-center">
+                                                <button
+                                                    onClick={() => {
+                                                        const qrData = buildMovementQrData(m);
+                                                        const qrFooter = buildMovementQrFooter(m);
+                                                        printQr(getQrUrl(qrData), `QR - مخرج #${m.movement_id}`, qrFooter);
+                                                    }}
+                                                    className="text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg"
+                                                    title="طباعة QR"
+                                                >
+                                                    <Printer className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                            <td className="p-2 text-center"><button onClick={() => { setSelectedMovement(m); setShowMovementDetails(true); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg"><Eye className="w-4 h-4" /></button></td>
+                                        </tr>
                                     ))}
-                                </div>
-                            )}
+                                </tbody>
+                            </table>
                         </div>
                     </Card>
 
+                    <Card className="p-4 pb-0 w-[260px] flex-shrink-0 self-stretch flex flex-col">
+                        {/* <h3 className="text-lg font-bold flex items-center gap-2"><Calculator className="w-5 text-green-600" />لوحة الأرقام</h3> */}
+                        <div className="grid grid-cols-3 gap-2 flex-1 content-start overflow-auto">
+                            {[9, 8, 7, 6, 5, 4, 3, 2, 1].map((n) => <Button key={n} variant="outline" className="h-12 text-lg font-bold" onClick={() => handleNumberClick(n)}>{n}</Button>)}
+                            <Button variant="outline" className="h-12 text-lg" onClick={handleClear}><X className="w-4 h-4" /></Button>
+                            <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleNumberClick(0)}>0</Button>
+                            <Button variant="outline" className="h-12 text-lg" onClick={handleBackspace}><ArrowRight className="w-4 h-4" /></Button>
+                        </div>
+                    </Card>
                 </div>
             </div>
 
-            {/* Order Details Dialog */}
-            <StyledDialog
-                isOpen={showOrderDetails}
-                onOpenChange={setShowOrderDetails}
-                title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ''}`}
-                contentClassName="max-w-4xl w-full"
-                onCancel={() => setShowOrderDetails(false)}
-                onConfirm={() => setShowOrderDetails(false)}
-                confirmLabel="إغلاق"
-                showCancel={false}
-            >
+            <StyledDialog isOpen={showOrderDetails} onOpenChange={setShowOrderDetails} title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`} contentClassName="max-w-7xl w-full" onCancel={() => setShowOrderDetails(false)} onConfirm={() => setShowOrderDetails(false)} confirmLabel="إغلاق" showCancel={false}>
                 {selectedOrder && (
-                    <div className="space-y-4">
-                        {/* Order Info */}
-                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                            <h3 className="font-bold text-blue-700 mb-3">معلومات الطلب</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <div>
-                                    <Label className="text-xs text-gray-500">رقم الطلب</Label>
-                                    <div className="font-bold">#{selectedOrder.production_order_id}</div>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-gray-500">اللون</Label>
-                                    <div className="font-bold">{selectedOrder.color_name} ({selectedOrder.color_code})</div>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-gray-500">الأبعاد</Label>
-                                    <div className="font-bold">{selectedOrder.width} × {selectedOrder.thickness} مم</div>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-gray-500">الطبخة</Label>
-                                    <div className="font-bold">{selectedOrder.batch_number}</div>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-gray-500">التاريخ</Label>
-                                    <div className="font-bold">{formatDate(selectedOrder.created_at)}</div>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-gray-500">الحالة</Label>
-                                    <div className="font-bold">
-                                        <span className={`px-2 py-1 rounded-full text-xs ${getOrderStatusBadge(selectedOrder.status).className}`}>
-                                            {getOrderStatusBadge(selectedOrder.status).label}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                    <div className="space-y-4 w-full">
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
+                            <div><span className="text-gray-500">التاريخ:</span> <span className="font-bold">{formatDate(selectedOrder.created_at)}</span></div>
+                            <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
+                            <div><span className="text-gray-500">الوجهة:</span> <span className="font-bold">{formatDestination(selectedOrder.destination)}</span></div>
+                            <div><span className="text-gray-500">العرض:</span> <span className="font-bold">{selectedOrder.width || FIXED_WIDTH}</span></div>
+                            <div><span className="text-gray-500">الطول:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
+                            <div><span className="text-gray-500">السماكة:</span> <span className="font-bold">{selectedOrder.thickness || "-"}</span></div>
+                            <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{formatTypeItem(selectedOrder.type_item || selectedOrder.type)}</span></div>
+                            <div><span className="text-gray-500">المصدر:</span> <span className="font-bold">{formatSource(selectedOrder.source || "warehouse")}</span></div>
+                            <div><span className="text-gray-500">الطبخة:</span> <span className="font-bold">{selectedOrder.batch_number || selectedOrder.batch?.batch_number || "-"}</span></div>
+                            <div className="md:col-span-2"><span className="text-gray-500">اللون:</span> <span className="font-bold">{selectedOrder.color_name || selectedOrder.color?.color_name || "-"} ({selectedOrder.color_code || selectedOrder.color?.color_code || "-"})</span></div>
+                            <div className="md:col-span-2"><span className="text-gray-500">الملاحظات:</span> <span className="font-bold">{selectedOrder.notes || "-"}</span></div>
                         </div>
-
-                        {/* Order Items */}
-                        {loadingOrderDetails ? (
-                            <div className="flex justify-center py-8">
-                                <LoadingState />
-                            </div>
-                        ) : orderItems.length > 0 ? (
-                            <div>
-                                <h4 className="font-bold mb-3">عناصر الطلب</h4>
-                                <div className="border rounded-lg">
-                                    <table className="w-full text-sm table-fixed">
-                                        <thead className="bg-gray-100">
-                                            <tr>
-                                                <th className="p-2 text-center">العرض</th>
-                                                <th className="p-2 text-center">الكمية</th>
-                                                <th className="p-2 text-center">النوع</th>
-                                                <th className="p-2 text-center">المصدر</th>
-                                                <th className="p-2 text-center">الوجهة</th>
-                                                <th className="p-2 text-center">الحالة</th>
-                                                <th className="p-2 text-center">إجراءات</th>
+                        {loadingOrderDetails ? <LoadingState /> : (
+                            <div className="border rounded-lg overflow-hidden">
+                                <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
+                                    <thead className="bg-gray-100"><tr>{["#", "العرض", "الطول", "النوع", "السماكة", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>)}</tr></thead>
+                                    <tbody>
+                                        {orderItems.length === 0 ? <tr><td colSpan="10" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr> : orderItems.map((item, index) => (
+                                            <tr key={item.production_order_item_id || index} className="border-t">
+                                                <td className="p-2 text-center">#{item.production_order_item_id || index + 1}</td>
+                                                <td className="p-2 text-center">{item.width || FIXED_WIDTH}</td>
+                                                <td className="p-2 text-center">{item.length || "-"}</td>
+                                                <td className="p-2 text-center">{formatTypeItem(item.type_item || item.type)}</td>
+                                                <td className="p-2 text-center">{item.thickness || "-"}</td>
+                                                <td className="p-2 text-center break-words">{formatSource(item.source)}</td>
+                                                <td className="p-2 text-center">{formatDestination(item.destination)}</td>
+                                                <td className="p-2 text-center"><span className={`px-2 py-1 rounded-lg text-xs ${getStatusBadge(item.status).className}`}>{getStatusBadge(item.status).label}</span></td>
+                                                <td className="p-2 text-center">{item.notes || "-"}</td>
+                                                <td className="p-2 text-center"><div className="flex items-center justify-center gap-2"><Button variant="outline" size="sm" onClick={() => handleApplyOrderToInputs(item)}>إدخال</Button><Button variant="outline" size="sm" disabled={String(item.status || "").toLowerCase() === ProductionStatus.completed} onClick={() => requestCompleteOrderItem(item)}>إتمام</Button></div></td>
                                             </tr>
-                                        </thead>
-                                        <tbody>
-                                            {orderItems.map((item, index) => (
-                                                <tr key={index} className="border-t">
-                                                    <td className="p-2 text-center">{item.width}</td>
-                                                    <td className="p-2 text-center">{item.length}</td>
-                                                    <td className="p-2 text-center">{item.type}</td>
-                                                    <td className="p-2 text-center">{item.source}</td>
-                                                    <td className="p-2 text-center">{item.destination}</td>
-                                                    <td className="p-2 text-center">
-                                                        <span className={`px-2 py-0.5 rounded-full text-xs ${getOrderStatusBadge(item.status).className}`}>
-                                                            {getOrderStatusBadge(item.status).label}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-2 text-center">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => handleApplyOrderToInputs(item)}
-                                                            >
-                                                                إدخال
-                                                            </Button>
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                disabled={String(item.status || "").toLowerCase() === ProductionStatus.completed}
-                                                                onClick={() => handleCompleteOrderItem(item)}
-                                                            >
-                                                                إتمام
-                                                            </Button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="text-center py-8 text-gray-500">
-                                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                                <div>لا توجد عناصر لهذا الطلب</div>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
                     </div>
                 )}
             </StyledDialog>
 
-            {/* Movement Details Dialog */}
+            <StyledDialog isOpen={showMovementDetails} onOpenChange={(open) => { setShowMovementDetails(open); if (!open) setSelectedMovement(null); }} title={`تفاصيل الحركة ${selectedMovement?.movement_id ? `#${selectedMovement.movement_id}` : ""}`} contentClassName="max-w-3xl w-full" onCancel={() => setShowMovementDetails(false)} onConfirm={() => setShowMovementDetails(false)} confirmLabel="إغلاق" showCancel={false}>
+                {selectedMovement && <div className="space-y-3 text-sm"><div><span className="text-gray-500">اللون:</span> <span className="font-medium">{selectedMovement.color?.color_name || "-"}</span></div><div><span className="text-gray-500">المسطرة:</span> <span className="font-medium">{selectedMovement.color?.ruler?.ruler_name || "-"}</span></div><div><span className="text-gray-500">المادة:</span> <span className="font-medium">{selectedMovement.color?.ruler?.material?.material_name || pvcMaterial?.material_name || "PVC"}</span></div><div><span className="text-gray-500">الطبخة:</span> <span className="font-medium">{selectedMovement.batch?.batch_number || "-"}</span></div><div><span className="text-gray-500">الأبعاد:</span> <span className="font-medium">{selectedMovement.length || "-"} × {selectedMovement.width || FIXED_WIDTH} × {selectedMovement.thickness || "-"}</span></div><div><span className="text-gray-500">الوجهة:</span> <span className="font-medium">{formatDestination(selectedMovement.destination)}</span></div><div><span className="text-gray-500">الملاحظات:</span> <span className="font-medium">{selectedMovement.notes || "-"}</span></div></div>}
+            </StyledDialog>
+
             <StyledDialog
-                isOpen={showMovementDetails}
+                isOpen={showCompleteDialog}
                 onOpenChange={(open) => {
-                    setShowMovementDetails(open);
-                    if (!open) setSelectedMovement(null);
+                    setShowCompleteDialog(open);
+                    if (!open) setPendingCompleteItem(null);
                 }}
-                title={`تفاصيل الحركة ${selectedMovement?.movement_id ? `#${selectedMovement.movement_id}` : ""}`}
-                contentClassName="max-w-3xl w-full"
-                onCancel={() => setShowMovementDetails(false)}
-                onConfirm={() => setShowMovementDetails(false)}
-                confirmLabel="إغلاق"
-                showCancel={false}
+                title="تأكيد إتمام العملية"
+                contentClassName="max-w-md w-full"
+                onCancel={() => {
+                    setShowCompleteDialog(false);
+                    setPendingCompleteItem(null);
+                }}
+                onConfirm={async () => {
+                    if (pendingCompleteItem) {
+                        await handleCompleteOrderItem(pendingCompleteItem);
+                    }
+                    setShowCompleteDialog(false);
+                    setPendingCompleteItem(null);
+                }}
+                confirmLabel="تأكيد"
+                cancelLabel="إلغاء"
             >
-                {selectedMovement && (
-                    <div className="space-y-4">
-                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                            <h3 className="font-bold text-purple-700 mb-3">معلومات الحركة</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <div>
-                                    <Label className="text-xs text-gray-500">رقم الحركة</Label>
-                                    <div className="font-bold">#{selectedMovement.movement_id}</div>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-gray-500">الوجهة</Label>
-                                    <div className="font-bold">{formatDestination(selectedMovement.destination)}</div>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-gray-500">التاريخ</Label>
-                                    <div className="font-bold">{formatDate(selectedMovement.created_at)}</div>
-                                </div>
-                                <div>
-                                    <Label className="text-xs text-gray-500">الأبعاد</Label>
-                                    <div className="font-bold">
-                                        {selectedMovement.length ?? "-"} م × {selectedMovement.width ?? "-"} مم × {selectedMovement.thickness ?? "-"} مم
-                                    </div>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <Label className="text-xs text-gray-500">ملاحظات</Label>
-                                    <div className="font-bold break-words">{selectedMovement.notes || "-"}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="border rounded-lg p-4 bg-white">
-                                <h4 className="font-bold mb-3">اللون</h4>
-                                <div className="space-y-2 text-sm">
-                                    <div><span className="text-gray-500">الاسم:</span> <span className="font-medium">{selectedMovement.color?.color_name || "-"}</span></div>
-                                    <div><span className="text-gray-500">الكود:</span> <span className="font-medium">{selectedMovement.color?.color_code || "-"}</span></div>
-                                    <div><span className="text-gray-500">المسطرة:</span> <span className="font-medium">{selectedMovement.color?.ruler?.ruler_name || "-"}</span></div>
-                                    <div><span className="text-gray-500">المادة:</span> <span className="font-medium">{selectedMovement.color?.ruler?.material?.material_name || "-"}</span></div>
-                                </div>
-                            </div>
-
-                            <div className="border rounded-lg p-4 bg-white">
-                                <h4 className="font-bold mb-3">الطبخة والمستخدم</h4>
-                                <div className="space-y-2 text-sm">
-                                    <div><span className="text-gray-500">رقم الطبخة:</span> <span className="font-medium">{selectedMovement.batch?.batch_number || "-"}</span></div>
-                                    <div><span className="text-gray-500">ملاحظات الطبخة:</span> <span className="font-medium">{selectedMovement.batch?.notes || "-"}</span></div>
-                                    <div><span className="text-gray-500">المستخدم:</span> <span className="font-medium">{selectedMovement.user?.full_name || selectedMovement.user?.username || "-"}</span></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                <div className="text-sm text-gray-700">
+                    هل تريد إتمام الطلب
+                    {" "}
+                    <span className="font-bold">
+                        #{pendingCompleteItem?.production_order_id || pendingCompleteItem?.production_order_item_id || ""}
+                    </span>
+                    {" "}
+                    ونقله إلى المكتمل؟
+                </div>
             </StyledDialog>
         </div>
     );

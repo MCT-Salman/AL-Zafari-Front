@@ -76,40 +76,50 @@
 
 
 // src/components/Layout/Header.jsx
-import { Menu } from "lucide-react";
+import { Menu, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLayout } from "./LayoutContext";
 import { cn } from "@/lib/utils";
 
 const Header = ({ children, className }) => {
-  const { collapsed, setMobileMenuOpen } = useLayout();
+  const { collapsed, setCollapsed, setMobileMenuOpen } = useLayout();
 
   return (
     <header 
       className={cn(
-        "h-20 fixed top-0 left-0 right-0 z-30 bg-primary-f border-b-2 border-secondary-f flex items-center justify-between px-4 sm:px-6 transition-all duration-300",
+        "h-20 fixed top-0 left-0 right-0 z-30 bg-primary-f border-b-2 border-secondary-f transition-all duration-300",
         // Desktop handling: adjust width based on sidebar
         "md:mr-64", 
         collapsed && "md:mr-20",
         className
       )}
     >
-      <div className="flex items-center gap-4">
-        {/* Mobile Toggle */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          aria-label="فتح القائمة الجانبية"
-          className="md:hidden text-text-strong hover:bg-secondary-f" 
-          onClick={() => setMobileMenuOpen(true)}
-        >
-          <Menu className="w-6 h-6 text-primary-s " />
-        </Button>
-      </div>
+      <div className="flex h-full items-center justify-between gap-3 px-3 sm:px-5">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={collapsed ? "إظهار القائمة الجانبية" : "إخفاء القائمة الجانبية"}
+            className="hidden md:flex h-11 w-11 rounded-none border-l border-secondary-f/35 text-primary-s hover:bg-secondary-f/15"
+            onClick={() => setCollapsed((prev) => !prev)}
+          >
+            {collapsed ? <PanelRightOpen className="w-5 h-5" /> : <PanelRightClose className="w-5 h-5" />}
+          </Button>
 
-      {/* Content injected from parent */}
-      <div className="flex items-center gap-3 w-full justify-end">
-        {children}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            aria-label="فتح القائمة الجانبية"
+            className="md:hidden h-11 w-11 rounded-none border-l border-secondary-f/35 text-text-strong hover:bg-secondary-f/15" 
+            onClick={() => setMobileMenuOpen(true)}
+          >
+            <Menu className="w-6 h-6 text-primary-s " />
+          </Button>
+        </div>
+
+        <div className="flex min-w-0 flex-1 items-center justify-end">
+          {children}
+        </div>
       </div>
     </header>
   );

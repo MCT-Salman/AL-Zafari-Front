@@ -1396,7 +1396,7 @@ export default function SimpleOrderCreation() {
 
         const lines = [
             { label: "رقم الطلب", value: order?.order_id ?? "-" },
-            { label: "التاريخ", value: order?.created_at ? new Date(order.created_at).toLocaleString("ar-SY") : "-" },
+            { label: "التاريخ", value: order?.created_at ? new Date(order.created_at).toLocaleString("en-US") : "-" },
             { label: "المادة", value: material?.material_name || item.material_name || "-" },
             { label: "المسطرة", value: ruler?.ruler_name || item.ruler_name || "-" },
             { label: "اللون", value: color?.color_name || item.color_name || "-" },
