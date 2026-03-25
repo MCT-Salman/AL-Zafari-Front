@@ -12,6 +12,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import FilterSelect from "../../components/common/FilterSelect";
+import StyledDialog from "../../components/common/StyledDialog";
 import LoadingState from "../../components/common/LoadingState";
 import NotificationsBell from "../../components/common/NotificationsBell";
 import { toast } from "react-hot-toast";
@@ -22,9 +23,28 @@ import {
   X,
   RefreshCw,
   Hash,
-  Search
+  Search,
+  ChevronUp,
+  ChevronDown,
+  Eye,
+  Check,
+  AlertCircle,
+  Printer
 } from "lucide-react";
 import { ProductionStatus, ProductionType, TypeItem, UserRole } from "../../types/enums";
+
+const ROLE_LABELS = {
+  [UserRole.admin]: "مدير النظام",
+  [UserRole.accountant]: "محاسب",
+  [UserRole.cashier]: "كاشير",
+  [UserRole.sales]: "مبيعات",
+  [UserRole.production_manager]: "مدير الإنتاج",
+  [UserRole.Warehouse_Keeper]: "أمين المستودع",
+  [UserRole.Warehouse_Products]: "أمين مستودع المنتجات",
+  [UserRole.Dissection_Technician]: "فني التشريح",
+  [UserRole.Cutting_Technician]: "فني القص",
+  [UserRole.Gluing_Technician]: "فني اللصق"
+};
 
 export default function CuttingManager() {
   const navigate = useNavigate();
@@ -69,6 +89,15 @@ export default function CuttingManager() {
   ]);
 
   const [currentInput, setCurrentInput] = useState("input_length");
+  const [showHeader, setShowHeader] = useState(true);
+  const [ordersTab, setOrdersTab] = useState("current");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
+  const [orderItems, setOrderItems] = useState([]);
+  const [pendingCompleteItem, setPendingCompleteItem] = useState(null);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+
   const normalizeDecimal = (value) => String(value ?? "").replace(",", ".");
   const toNumber = (value) => {
     const normalized = normalizeDecimal(value);
@@ -369,7 +398,16 @@ export default function CuttingManager() {
 
       if (activeOrderItem?.production_order_item_id) {
         await productionApi.updateProductionItemStatus(activeOrderItem.production_order_item_id, ProductionStatus.completed);
-        setOrders(prev => (Array.isArray(prev) ? prev.filter(o => String(o.production_order_item_id) !== String(activeOrderItem.production_order_item_id)) : prev));
+        // Update the order status in local state instead of removing it
+        setOrders(prev => 
+          Array.isArray(prev) 
+            ? prev.map(o => 
+                  String(o.production_order_item_id) === String(activeOrderItem.production_order_item_id) 
+                    ? { ...o, status: ProductionStatus.completed }
+                    : o
+                )
+            : prev
+        );
       }
 
       setOutputForm({ notes: "" });
@@ -393,36 +431,208 @@ export default function CuttingManager() {
     });
   };
 
+  const formatDestination = (destination) => {
+    const destMap = {
+      "slitting": "التشريح",
+      "cutting": "القص",
+      "gluing": "اللصق",
+      "production": "الإنتاج",
+      "warehouse": "المستودع"
+    };
+    return destMap[destination] || destination || "-";
+  };
+
+  const handleOrderSelect = async (order) => {
+    setSelectedOrder(order);
+    setShowOrderDetails(true);
+    try {
+      setLoadingOrderDetails(true);
+      // Load order items if needed
+      // For cutting, we can use the order data directly or load additional details
+      setOrderItems([order]); // For now, use the order itself
+    } catch (error) {
+      console.error("Error loading order details:", error);
+      toast.error("فشل في تحميل تفاصيل الطلب");
+      setOrderItems([]);
+    } finally {
+      setLoadingOrderDetails(false);
+    }
+  };
+
+  const requestCompleteOrderItem = (order) => {
+    if (!order?.production_order_item_id) return;
+    setPendingCompleteItem(order);
+    setShowCompleteDialog(true);
+  };
+
+  const handleCompleteOrderItem = async () => {
+    if (!pendingCompleteItem?.production_order_item_id) return;
+    
+    try {
+      await productionApi.updateProductionItemStatus(pendingCompleteItem.production_order_item_id, ProductionStatus.completed);
+      
+      // Update local state to reflect the change
+      setOrders(prev => 
+        Array.isArray(prev) 
+          ? prev.map(o => 
+                String(o.production_order_item_id) === String(pendingCompleteItem.production_order_item_id) 
+                  ? { ...o, status: ProductionStatus.completed }
+                  : o
+              )
+          : prev
+      );
+      
+      toast.success(`تم إتمام الطلب #${pendingCompleteItem.production_order_id} بنجاح`);
+      
+      // Close dialogs
+      setShowCompleteDialog(false);
+      setShowOrderDetails(false);
+      setPendingCompleteItem(null);
+    } catch (error) {
+      console.error("Error completing order:", error);
+      toast.error("فشل في إتمام الطلب");
+    }
+  };
+
+  const renderOrdersTable = (list) => (
+    <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
+      <table className="w-full border-collapse">
+        <thead className="bg-gray-100 sticky top-0 z-20">
+          <tr>
+            {["#", "العرض", "اللون", "الطبخة", "الطول", "النوع", "المصدر", "الوجهة", "الحالة", "الإجراءات"].map((h) => (
+              <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {loadingOrders ? (
+            <tr><td colSpan="10" className="p-6"><LoadingState /></td></tr>
+          ) : list.length === 0 ? (
+            <tr><td colSpan="10" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
+          ) : list.map((order, index) => {
+            const colorInfo = colors.find(c => String(c.color_id) === String(order.color_id));
+            const batchInfo = batches.find(b => String(b.batch_id) === String(order.batch_id));
+            const status = getStatusBadge(order.status);
+            return (
+              <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
+                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">#{order.production_order_id}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.width || "-"}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
+                  <div className="text-xs">
+                    <div>{colorInfo?.color_name || "-"}</div>
+                    <div className="text-gray-500">({colorInfo?.color_code || "-"})</div>
+                  </div>
+                </td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{batchInfo?.batch_number || "-"}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.length || "-"}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-gray-50 px-2.5 py-1 font-medium text-gray-700">
+                    {order.type_item === TypeItem.Machine ? "مكنة" : order.type_item === TypeItem.Presser ? "كوي" : order.type_item || "-"}
+                  </span>
+                </td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
+                    {formatDestination(order.source)}
+                  </span>
+                </td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
+                    {formatDestination(order.destination)}
+                  </span>
+                </td>
+                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">
+                  <span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span>
+                </td>
+                <td className="px-1 py-2 align-middle text-center whitespace-nowrap">
+                  <div className="flex h-8 items-center justify-center gap-1">
+                    <button 
+                      onClick={() => handleOrderSelect(order)} 
+                      className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50" 
+                      title="عرض تفاصيل الطلب"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    {ordersTab === "current" && (
+                      <>
+                        <button 
+                          onClick={() => handleApplyOrderToInputs(order)} 
+                          className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50" 
+                          title="تطبيق البيانات على الإدخال"
+                        >
+                          <Hash className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => requestCompleteOrderItem(order)} 
+                          className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50" 
+                          title="إتمام الطلب"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-gray-50" dir="rtl">
-      {/* Header */}
+    <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
+      <div className="absolute left-0 bottom-2 z-40">
+        <Button
+          type="button"
+          onClick={() => setShowHeader((prev) => !prev)}
+          className="h-10 w-10 rounded-full border-0 bg-secondary-s text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 hover:bg-primary-f active:scale-95"
+          title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
+        >
+          {showHeader ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+        </Button>
+      </div>
+
+      {showHeader && (
       <div className="flex-shrink-0">
         <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
             <Package className="w-7 h-7" />
-            <div>
-              <h1 className="text-2xl font-bold">إدارة القص</h1>
-              <p className="text-sm opacity-90">لوحة عمليات القص</p>
+            <div><h1 className="text-2xl font-bold">إدارة القص</h1><p className="text-sm opacity-90">لوحة عمليات القص</p></div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+              <div className="text-xs opacity-80">اسم المستخدم</div>
+              <div className="text-base font-bold">{user?.full_name || user?.username || "-"}</div>
+            </div>
+            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+              <div className="text-xs opacity-80">الدور</div>
+              <div className="text-base font-bold">{ROLE_LABELS[user?.role] || user?.role}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <NotificationsBell />
-            <span className="text-sm">مرحباً، {user?.full_name}</span>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => {
-                logout();
-                navigate("/login");
-              }}
-              className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-            >
-              <ArrowRight className="w-4 h-4 ml-2 rotate-180" />
-              تسجيل الخروج
+            <Button size="lg" variant="outline" onClick={() => { logout(); navigate("/login"); }} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
+              <ArrowRight className="w-4 h-4 ml-2 rotate-180" />تسجيل الخروج
             </Button>
           </div>
         </div>
       </div>
+      )}
+
+      {!showHeader && (
+      <div className="flex-shrink-0 text-stone-50">
+        <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
+          </div>
+          <div className="h-10 w-px" />
+          <div className="min-w-0 text-right">
+            <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+          </div>
+        </div>
+      </div>
+      )}
 
       {/* Main */}
       <div className="flex-1 flex flex-col gap-4 p-4 overflow-hidden">
@@ -739,74 +949,37 @@ export default function CuttingManager() {
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Package className="w-5 h-5 text-orange-600" />
-                جدول المدخلات
+                الطلبات
               </h2>
-              <Button variant="outline" size="sm" onClick={loadOrders} disabled={loadingOrders}>
-                <RefreshCw className={`w-4 h-4 ml-2 ${loadingOrders ? "animate-spin" : ""}`} />
-                تحديث
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant={ordersTab === "current" ? "default" : "outline"}
+                  size="sm" 
+                  className={ordersTab === "current" ? "bg-blue-50 border-blue-300 text-blue-700" : "text-blue-600 border-blue-200 hover:bg-blue-50"} 
+                  onClick={() => setOrdersTab("current")}
+                >
+                  قيد الانتظار
+                </Button>
+                <Button 
+                  variant={ordersTab === "completed" ? "default" : "outline"}
+                  size="sm" 
+                  className={ordersTab === "completed" ? "bg-green-50 border-green-300 text-green-700" : "text-green-600 border-green-200 hover:bg-green-50"} 
+                  onClick={() => setOrdersTab("completed")}
+                >
+                  المكتملة
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={loadOrders} 
+                  disabled={loadingOrders}
+                >
+                  <RefreshCw className={`w-4 h-4 ml-2 ${loadingOrders ? "animate-spin" : ""}`} />
+                  تحديث
+                </Button>
+              </div>
             </div>
-            <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
-              {loadingOrders ? (
-                <div className="flex items-center justify-center h-32">
-                  <LoadingState />
-                </div>
-              ) : orders.filter(o => String(o.status || "").toLowerCase() === ProductionStatus.pending).length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <div className="text-lg font-medium">لا توجد طلبات</div>
-                  <div className="text-sm">لا توجد طلبات للقص</div>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  <div className="p-2 bg-gray-50 text-xs font-bold grid grid-cols-9 gap-2">
-                    <div>#</div>
-                    <div>العرض</div>
-                    <div>اللون</div>
-                    <div>الطبخة</div>
-                    <div>الطول</div>
-                    <div>النوع</div>
-                    <div>المصدر</div>
-                    <div>الوجهة</div>
-                    <div>الحالة</div>
-                  </div>
-                  {orders
-                    .filter(order => String(order.status || "").toLowerCase() === ProductionStatus.pending)
-                    .map(order => {
-                    const colorInfo = colors.find(c => String(c.color_id) === String(order.color_id));
-                    const colorName = colorInfo?.color_name || "-";
-                    const colorCode = colorInfo?.color_code || "-";
-                    const batchNumber = batches.find(b => String(b.batch_id) === String(order.batch_id))?.batch_number || "-";
-                    const statusBadge = getStatusBadge(order.status);
-                    return (
-                      <div key={order.production_order_item_id} className="p-3 hover:bg-gray-50">
-                        <div className="grid grid-cols-9 gap-2 text-xs">
-                          <div className="font-bold">#{order.production_order_id}</div>
-                          <div>{order.width}</div>
-                          <div>{colorName} ({colorCode})</div>
-                          <div>{batchNumber}</div>
-                          <div>{order.length}</div>
-                          <div>{order.type_item}</div>
-                          <div>{order.source}</div>
-                          <div>{order.destination}</div>
-                          <div>
-                            <span className={`px-2 py-0.5 rounded-full ${statusBadge.className}`}>
-                              {statusBadge.label}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between mt-2">
-                          <div className="text-xs text-gray-500">{order.notes || "-"}</div>
-                          <Button size="sm" variant="outline" onClick={() => handleApplyOrderToInputs(order)}>
-                            إدخال
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {renderOrdersTable(ordersTab === "current" ? orders.filter(o => String(o.status || "").toLowerCase() === ProductionStatus.pending) : orders.filter(o => String(o.status || "").toLowerCase() === ProductionStatus.completed))}
           </Card>
         </div>
 
@@ -814,16 +987,7 @@ export default function CuttingManager() {
         <div className="flex gap-4 flex-1 min-h-0 flex-row-reverse">
           {/* Outputs Table */}
           <Card className="p-4 flex flex-col flex-1 space-y-4 min-h-0">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Package className="w-5 h-5 text-purple-600" />
-                جدول المخرجات
-              </h3>
-              <Button variant="outline" size="sm" onClick={loadProcesses} disabled={loadingProcesses}>
-                <RefreshCw className={`w-4 h-4 ml-2 ${loadingProcesses ? "animate-spin" : ""}`} />
-                تحديث
-              </Button>
-            </div>
+            
             <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
               {loadingProcesses ? (
                 <div className="flex items-center justify-center h-32">
@@ -837,7 +1001,8 @@ export default function CuttingManager() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  <div className="p-2 bg-gray-50 text-xs font-bold grid grid-cols-10 gap-2">
+                  <div className="p-2 bg-gray-50 text-xs font-bold grid grid-cols-12 gap-2">
+                    <div>#</div>
                     <div>العرض</div>
                     <div>اللون</div>
                     <div>الطبخة</div>
@@ -848,6 +1013,7 @@ export default function CuttingManager() {
                     <div>المستخدم</div>
                     <div>التوقيت</div>
                     <div>الملاحظات</div>
+                    <div>QR</div>
                   </div>
                   {processes.map(proc => {
                     const colorInfo = proc.color || colors.find(c => String(c.color_id) === String(proc.color_id));
@@ -856,17 +1022,32 @@ export default function CuttingManager() {
                     const batchNumber = proc.batch?.batch_number || batches.find(b => String(b.batch_id) === String(proc.batch_id))?.batch_number || "-";
                     return (
                       <div key={proc.process_id} className="p-3">
-                        <div className="grid grid-cols-10 gap-2 text-xs">
+                        <div className="grid grid-cols-12 gap-2 text-xs">
+                          <div>#{proc.process_id}</div>
                           <div>{proc.input_width}</div>
                           <div>{colorName} ({colorCode})</div>
                           <div>{batchNumber}</div>
                           <div>{proc.input_length}</div>
                           <div>{proc.type_item === TypeItem.Presser ? "كوي" : "مكنة"}</div>
                           <div>{proc.output_length}</div>
-                          <div>{proc.destination}</div>
+                          <div>{formatDestination(proc.destination)}</div>
                           <div>{proc.user?.full_name || proc.user?.username || "-"}</div>
                           <div>{formatDate(proc.created_at)}</div>
                           <div>{proc.notes || "-"}</div>
+                          <div>
+                            <button
+                              onClick={() => {
+                                const qrData = buildOutputQrData(proc.output_length);
+                                const footer = buildOutputQrFooter(proc.output_length);
+                                const url = getQrUrl(qrData);
+                                printQr(url, `QR - قص #${proc.process_id}`, footer);
+                              }}
+                              className="text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg"
+                              title="طباعة QR"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -878,12 +1059,9 @@ export default function CuttingManager() {
 
           {/* Number Pad */}
           <Card className="p-4 w-[260px] flex-shrink-0 self-stretch flex flex-col">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-green-600" />
-              لوحة الأرقام
-            </h3>
+            
             <div className="grid grid-cols-3 gap-2 flex-1 content-start overflow-auto">
-              {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(num => (
+              {[9, 8, 7, 6, 5, 4, 3, 2, 1].map(num => (
                 <Button
                   key={num}
                   variant="outline"
@@ -909,6 +1087,131 @@ export default function CuttingManager() {
           </Card>
         </div>
       </div>
+
+      <StyledDialog isOpen={showOrderDetails} onOpenChange={setShowOrderDetails} title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`} contentClassName="max-w-7xl w-full" onCancel={() => setShowOrderDetails(false)} onConfirm={() => setShowOrderDetails(false)} confirmLabel="إغلاق" showCancel={false}>
+        {selectedOrder && (
+          <div className="space-y-4 w-full">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
+              <div><span className="text-gray-500">العرض:</span> <span className="font-bold">{selectedOrder.width || "-"}</span></div>
+              <div><span className="text-gray-500">الطول:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
+              <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{selectedOrder.type_item === TypeItem.Machine ? "مكنة" : selectedOrder.type_item === TypeItem.Presser ? "كوي" : selectedOrder.type_item || "-"}</span></div>
+              <div className="md:col-span-2"><span className="text-gray-500">اللون:</span> <span className="font-bold">{colors.find(c => String(c.color_id) === String(selectedOrder.color_id))?.color_name || "-"} ({colors.find(c => String(c.color_id) === String(selectedOrder.color_id))?.color_code || "-"})</span></div>
+              <div className="md:col-span-2"><span className="text-gray-500">الطبخة:</span> <span className="font-bold">{batches.find(b => String(b.batch_id) === String(selectedOrder.batch_id))?.batch_number || "-"}</span></div>
+              <div><span className="text-gray-500">المصدر:</span> <span className="font-bold">{formatDestination(selectedOrder.source)}</span></div>
+              <div><span className="text-gray-500">الوجهة:</span> <span className="font-bold">{formatDestination(selectedOrder.destination)}</span></div>
+              <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
+              <div className="md:col-span-2"><span className="text-gray-500">الملاحظات:</span> <span className="font-bold">{selectedOrder.notes || "-"}</span></div>
+            </div>
+            {loadingOrderDetails ? <LoadingState /> : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      {["#", "العرض", "اللون", "الطبخة", "الطول", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
+                        <th key={h} className="p-2 text-center whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderItems.map((item, index) => {
+                      const colorInfo = colors.find(c => String(c.color_id) === String(item.color_id));
+                      const batchInfo = batches.find(b => String(b.batch_id) === String(item.batch_id));
+                      const status = getStatusBadge(item.status);
+                      return (
+                        <tr key={item.production_order_item_id || index} className="border-b hover:bg-gray-50">
+                          <td className="p-2 text-center">#{item.production_order_id}</td>
+                          <td className="p-2 text-center">{item.width || "-"}</td>
+                          <td className="p-2 text-center">
+                            <div className="text-xs">
+                              <div>{colorInfo?.color_name || "-"}</div>
+                              <div className="text-gray-500">({colorInfo?.color_code || "-"})</div>
+                            </div>
+                          </td>
+                          <td className="p-2 text-center">{batchInfo?.batch_number || "-"}</td>
+                          <td className="p-2 text-center">{item.length || "-"}</td>
+                          <td className="p-2 text-center">
+                            <span className="inline-flex items-center rounded-full bg-gray-50 px-2.5 py-1 font-medium text-gray-700">
+                              {item.type_item === TypeItem.Machine ? "مكنة" : item.type_item === TypeItem.Presser ? "كوي" : item.type_item || "-"}
+                            </span>
+                          </td>
+                          <td className="p-2 text-center">
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
+                              {formatDestination(item.source)}
+                            </span>
+                          </td>
+                          <td className="p-2 text-center">
+                            <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
+                              {formatDestination(item.destination)}
+                            </span>
+                          </td>
+                          <td className="p-2 text-center">
+                            <span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span>
+                          </td>
+                          <td className="p-2 text-center text-xs">{item.notes || "-"}</td>
+                          <td className="p-2 text-center">
+                            <div className="flex h-8 items-center justify-center gap-1">
+                              {ordersTab === "current" && (
+                                <>
+                                  <button 
+                                    onClick={() => {
+                                      handleApplyOrderToInputs(item);
+                                      setShowOrderDetails(false);
+                                    }} 
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50" 
+                                    title="تطبيق على الإدخال"
+                                  >
+                                    <Hash className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      requestCompleteOrderItem(item);
+                                      setShowOrderDetails(false);
+                                    }} 
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50" 
+                                    title="إتمام الطلب"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </StyledDialog>
+
+      <StyledDialog
+        isOpen={showCompleteDialog}
+        onOpenChange={(open) => {
+          setShowCompleteDialog(open);
+          if (!open) setPendingCompleteItem(null);
+        }}
+        title="تأكيد إتمام العملية"
+        contentClassName="max-w-md w-full"
+        onCancel={() => {
+          setShowCompleteDialog(false);
+          setPendingCompleteItem(null);
+        }}
+        onConfirm={handleCompleteOrderItem}
+        confirmLabel="تأكيد"
+        cancelLabel="إلغاء"
+      >
+        <div className="text-center space-y-4">
+          <div className="text-lg font-semibold">
+            هل أنت متأكد من إتمام الطلب #{pendingCompleteItem?.production_order_id}
+            {" "}
+            ونقله إلى المكتملة؟
+          </div>
+        </div>
+      </StyledDialog>
     </div>
   );
 }

@@ -76,6 +76,13 @@ export default function WarehouseKeeper() {
     const [showCompleteDialog, setShowCompleteDialog] = useState(false);
     const [showHeader, setShowHeader] = useState(true);
     const [currentInput, setCurrentInput] = useState("notes");
+    const [selectSearch, setSelectSearch] = useState({
+        ruler: "",
+        color: "",
+        batch: "",
+        thickness: "",
+        length: ""
+    });
 
     useEffect(() => {
         if (!user || user.role !== UserRole.Warehouse_Keeper) {
@@ -400,7 +407,6 @@ export default function WarehouseKeeper() {
         try {
             await productionApi.updateProductionItemStatus(item.production_order_item_id, ProductionStatus.completed);
             updateLocalStatus(item.production_order_item_id, ProductionStatus.completed);
-            setOrdersTab("completed");
             if (activeOrderItem?.production_order_item_id === item.production_order_item_id) setActiveOrderItem(null);
             if (showToast) toast.success("تم إتمام الطلب ونقله إلى المكتمل");
             loadOrders();
@@ -450,9 +456,54 @@ export default function WarehouseKeeper() {
         }
     };
 
-    const handleNumberClick = (num) => currentInput === "notes" && setOutputForm((prev) => ({ ...prev, notes: `${prev.notes || ""}${num}` }));
-    const handleBackspace = () => currentInput === "notes" && setOutputForm((prev) => ({ ...prev, notes: String(prev.notes || "").slice(0, -1) }));
-    const handleClear = () => currentInput === "notes" && setOutputForm((prev) => ({ ...prev, notes: "" }));
+    const appendToActiveInput = (value) => {
+        if (currentInput === "notes") {
+            setOutputForm((prev) => ({ ...prev, notes: `${prev.notes || ""}${value}` }));
+            return;
+        }
+        if (currentInput === "qr") {
+            setQrInput((prev) => `${prev || ""}${value}`);
+            return;
+        }
+        if (currentInput.startsWith("select:")) {
+            const key = currentInput.replace("select:", "");
+            setSelectSearch((prev) => ({ ...prev, [key]: `${prev[key] || ""}${value}` }));
+        }
+    };
+
+    const trimActiveInput = () => {
+        if (currentInput === "notes") {
+            setOutputForm((prev) => ({ ...prev, notes: String(prev.notes || "").slice(0, -1) }));
+            return;
+        }
+        if (currentInput === "qr") {
+            setQrInput((prev) => String(prev || "").slice(0, -1));
+            return;
+        }
+        if (currentInput.startsWith("select:")) {
+            const key = currentInput.replace("select:", "");
+            setSelectSearch((prev) => ({ ...prev, [key]: String(prev[key] || "").slice(0, -1) }));
+        }
+    };
+
+    const clearActiveInput = () => {
+        if (currentInput === "notes") {
+            setOutputForm((prev) => ({ ...prev, notes: "" }));
+            return;
+        }
+        if (currentInput === "qr") {
+            setQrInput("");
+            return;
+        }
+        if (currentInput.startsWith("select:")) {
+            const key = currentInput.replace("select:", "");
+            setSelectSearch((prev) => ({ ...prev, [key]: "" }));
+        }
+    };
+
+    const handleNumberClick = (num) => appendToActiveInput(num);
+    const handleBackspace = () => trimActiveInput();
+    const handleClear = () => clearActiveInput();
 
     const renderOrdersTable = (list) => (
         <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
@@ -563,9 +614,9 @@ export default function WarehouseKeeper() {
                 <div className={`grid shrink-0 gap-1 ${showHeader ? "grid-cols-3 h-[60%]" : "grid-cols-5 h-[55%]"}`}>
                     <Card className={`p-4 flex flex-col gap-4 min-h-0 ${showHeader ? "col-span-1" : "col-span-2"}`}>
                         <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2"><Package className="w-5 h-5 text-secondary-s" /><h2 className="text-sm font-bold">{ordersTab === "current" ? "الطلبات الحالية" : "الطلبات المكتملة"}</h2></div>
+                            <div className="flex items-center gap-2"><Package className="w-5 h-5 text-secondary-s" /><h2 className="text-sm font-bold">الطلبات</h2></div>
                             <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" className={ordersTab === "current" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setOrdersTab("current")}>الطلبات الحالية</Button>
+                                <Button variant="outline" size="sm" className={ordersTab === "current" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setOrdersTab("current")}>قيد الانتظار</Button>
                                 <Button variant="outline" size="sm" className={ordersTab === "completed" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setOrdersTab("completed")}>المكتملة</Button>
                                 <Button variant="outline" size="sm" onClick={loadOrders} disabled={loadingOrders}><RefreshCw className={`w-4 h-4 ml-2 ${loadingOrders ? "animate-spin" : ""}`} />تحديث</Button>
                             </div>
@@ -584,20 +635,20 @@ export default function WarehouseKeeper() {
                             {entryTab === "qr" ? (
                                 <div className="space-y-3">
                                     <div className="text-sm text-gray-600">الصيغة: `material|ruler|color_code|width|thickness|quantity|batch`</div>
-                                    <Input value={qrInput} className={`h-13`} onChange={(e) => setQrInput(e.target.value)} placeholder="material|ruler|color_code|width|thickness|quantity|batch" />
+                                    <Input value={qrInput} className={`h-13`} onChange={(e) => setQrInput(e.target.value)} onFocus={() => setCurrentInput("qr")} placeholder="material|ruler|color_code|width|thickness|quantity|batch" />
                                     <Button onClick={applyQrData} className="w-full h-13 bg-primary-f hover:bg-blue-700" disabled={!qrInput.trim()}><Check className="w-5 h-5 ml-2" />تطبيق البيانات</Button>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-5 gap-1">
-                                        <div><Label className={'mb-1'}>المسطرة</Label><FilterSelect value={outputForm.ruler_id} onChange={(e) => setOutputForm((p) => ({ ...p, ruler_id: e.target.value, color_id: "" }))} options={availableRulers.map((r) => ({ value: String(r.ruler_id), label: r.ruler_name }))} placeholder="اختر المسطرة" disabled={!outputForm.material_id} /></div>
-                                        <div><Label className={'mb-1'}>اللون</Label><FilterSelect value={outputForm.color_id} onChange={(e) => setOutputForm((p) => ({ ...p, color_id: e.target.value }))} options={colorOptions} placeholder={!outputForm.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"} disabled={!outputForm.ruler_id} /></div>
-                                        <div><Label className={'mb-1'}>الطبخة</Label><FilterSelect value={outputForm.batch_id} onChange={(e) => setOutputForm((p) => ({ ...p, batch_id: e.target.value }))} options={batchOptions} placeholder="اختر الطبخة" disabled={!outputForm.material_id} /></div>
+                                        <div><Label className={'mb-1'}>المسطرة</Label><FilterSelect value={outputForm.ruler_id} onChange={(e) => setOutputForm((p) => ({ ...p, ruler_id: e.target.value, color_id: "" }))} searchValue={selectSearch.ruler} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, ruler: value }))} onInputFocus={() => setCurrentInput("select:ruler")} options={availableRulers.map((r) => ({ value: String(r.ruler_id), label: r.ruler_name }))} placeholder="اختر المسطرة" disabled={!outputForm.material_id} /></div>
+                                        <div><Label className={'mb-1'}>اللون</Label><FilterSelect value={outputForm.color_id} onChange={(e) => setOutputForm((p) => ({ ...p, color_id: e.target.value }))} searchValue={selectSearch.color} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, color: value }))} onInputFocus={() => setCurrentInput("select:color")} options={colorOptions} placeholder={!outputForm.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"} disabled={!outputForm.ruler_id} /></div>
+                                        <div><Label className={'mb-1'}>الطبخة</Label><FilterSelect value={outputForm.batch_id} onChange={(e) => setOutputForm((p) => ({ ...p, batch_id: e.target.value }))} searchValue={selectSearch.batch} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, batch: value }))} onInputFocus={() => setCurrentInput("select:batch")} options={batchOptions} placeholder="اختر الطبخة" disabled={!outputForm.material_id} /></div>
                                         <div><Label className={'mb-1'}>العرض</Label><button type="button" className="w-full rounded-lg border-2 border-secondary-s bg-secondary-s text-white p-3 font-bold shadow-lg">{FIXED_WIDTH}</button></div>
-                                        <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
+                                        <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} searchValue={selectSearch.thickness} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, thickness: value }))} onInputFocus={() => setCurrentInput("select:thickness")} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-1">
-                                        <div><Label className={'mb-1'}>الطول</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} options={lengthOptions} placeholder="اختر الطول" disabled={!lengthOptions.length} /></div>
+                                        <div><Label className={'mb-1'}>الطول</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} searchValue={selectSearch.length} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, length: value }))} onInputFocus={() => setCurrentInput("select:length")} options={lengthOptions} placeholder="اختر الطول" disabled={!lengthOptions.length} /></div>
                                         {/* <div><Label className={'mb-1'}>الوجهة</Label><FilterSelect value={outputForm.destination} onChange={(e) => setOutputForm((p) => ({ ...p, destination: e.target.value }))} options={[{ value: MovementDestination.slitting, label: "التشريح" }, { value: MovementDestination.cutting, label: "القص" }, { value: MovementDestination.production, label: "الإنتاج" }]} placeholder="اختر الوجهة" /></div> */}
                                     <div className="col-span-2"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
                                     </div>

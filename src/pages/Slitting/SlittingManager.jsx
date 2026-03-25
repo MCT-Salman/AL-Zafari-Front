@@ -1,4 +1,4 @@
-// src/pages/Slitting/SlittingManager.jsx
+﻿// src/pages/Slitting/SlittingManager.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -12,6 +12,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import FilterSelect from "../../components/common/FilterSelect";
+import StyledDialog from "../../components/common/StyledDialog";
 import LoadingState from "../../components/common/LoadingState";
 import NotificationsBell from "../../components/common/NotificationsBell";
 import { toast } from "react-hot-toast";
@@ -19,13 +20,30 @@ import {
   Package,
   ArrowRight,
   Calculator,
+  AlertCircle,
   Check,
   X,
+  Eye,
   RefreshCw,
   Hash,
-  Search
+  Search,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { ProductionStatus, ProductionType, TypeItem, UserRole } from "../../types/enums";
+
+const ROLE_LABELS = {
+  [UserRole.admin]: "مدير النظام",
+  [UserRole.accountant]: "محاسب",
+  [UserRole.cashier]: "كاشير",
+  [UserRole.sales]: "مبيعات",
+  [UserRole.production_manager]: "مدير الإنتاج",
+  [UserRole.Warehouse_Keeper]: "أمين المستودع",
+  [UserRole.Warehouse_Products]: "أمين مستودع المنتجات",
+  [UserRole.Dissection_Technician]: "فني التشريح",
+  [UserRole.Cutting_Technician]: "فني القص",
+  [UserRole.Gluing_Technician]: "فني اللصق"
+};
 
 export default function SlittingManager() {
   const navigate = useNavigate();
@@ -45,6 +63,14 @@ export default function SlittingManager() {
   const [loadingSlites, setLoadingSlites] = useState(false);
   const [colors, setColors] = useState([]);
   const [batches, setBatches] = useState([]);
+
+  const [pendingCompleteItem, setPendingCompleteItem] = useState(null);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderItems, setOrderItems] = useState([]);
+  const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
 
   const [ioMode, setIoMode] = useState("input"); // input | output
   const [qrInput, setQrInput] = useState("");
@@ -72,6 +98,16 @@ export default function SlittingManager() {
   ]);
 
   const [currentInput, setCurrentInput] = useState("input_length");
+  const [showHeader, setShowHeader] = useState(true);
+  const [ordersTab, setOrdersTab] = useState("current");
+  const [selectSearch, setSelectSearch] = useState({
+    input_width: "",
+    color_id: "",
+    batch_id: "",
+    type_item: "",
+    source: "",
+    destination: ""
+  });
   const normalizeDecimal = (value) => String(value ?? "").replace(",", ".");
   const toNumber = (value) => {
     const normalized = normalizeDecimal(value);
@@ -84,16 +120,7 @@ export default function SlittingManager() {
     return text ? `${text},` : "0,";
   };
 
-  const orderStatusConfig = {
-    [ProductionStatus.pending]: { label: "قيد الانتظار", className: "bg-yellow-100 text-yellow-800" },
-    [ProductionStatus.preparing]: { label: "قيد التحضير", className: "bg-blue-100 text-blue-800" },
-    [ProductionStatus.completed]: { label: "مكتمل", className: "bg-green-100 text-green-800" },
-    [ProductionStatus.canceled]: { label: "ملغي", className: "bg-red-100 text-red-800" }
-  };
-
-  const getStatusBadge = (status) => {
-    return orderStatusConfig[status] || { label: status || "غير محدد", className: "bg-gray-100 text-gray-700" };
-  };
+  const getStatusBadge = (status) => productionApi.getStatusBadge(String(status || "").toLowerCase());
 
   const colorOptions = useMemo(() => {
     return colors.map(c => ({
@@ -108,6 +135,25 @@ export default function SlittingManager() {
       label: b.batch_number || `دفعة ${b.batch_id}`
     }));
   }, [batches]);
+
+  const sortRecordsDesc = (list = []) => {
+    return [...list].sort((a, b) => {
+      const aDate = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b?.created_at ? new Date(b.created_at).getTime() : 0;
+      if (aDate !== bDate) return bDate - aDate;
+      return Number(b?.production_order_item_id || b?.production_order_id || 0) - Number(a?.production_order_item_id || a?.production_order_id || 0);
+    });
+  };
+
+  const currentOrders = useMemo(
+    () => sortRecordsDesc(orders.filter((order) => String(order.status || "").toLowerCase() !== ProductionStatus.completed)),
+    [orders]
+  );
+
+  const completedOrders = useMemo(
+    () => sortRecordsDesc(orders.filter((order) => String(order.status || "").toLowerCase() === ProductionStatus.completed)),
+    [orders]
+  );
 
   const shouldNotify = (key, windowMs = 8000) => {
     const now = Date.now();
@@ -129,6 +175,23 @@ export default function SlittingManager() {
       toast.error("فشل في تحميل الطلبات");
     } finally {
       setLoadingOrders(false);
+    }
+  };
+
+  const handleOrderSelect = async (order) => {
+    setSelectedOrder(order);
+    setShowOrderDetails(true);
+    try {
+      setLoadingOrderDetails(true);
+      const response = await productionApi.getProductionOrderItems(order.production_order_id);
+      const data = response?.data ?? response;
+      setOrderItems(Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []));
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.message || "فشل في تحميل تفاصيل الطلب");
+      setOrderItems([]);
+    } finally {
+      setLoadingOrderDetails(false);
     }
   };
 
@@ -200,21 +263,34 @@ export default function SlittingManager() {
   }, []);
 
   const handleNumberClick = (num) => {
+    const value = String(num);
     if (currentInput === "input_length") {
-      setInputForm(prev => ({ ...prev, input_length: String(prev.input_length || "") + num.toString() }));
+      setInputForm(prev => ({ ...prev, input_length: String(prev.input_length || "") + value }));
       return;
     }
     if (currentInput === "output_length") {
-      setOutputForm(prev => ({ ...prev, output_length: String(prev.output_length || "") + num.toString() }));
+      setOutputForm(prev => ({ ...prev, output_length: String(prev.output_length || "") + value }));
       return;
     }
     if (currentInput === "output_length_22") {
-      setOutputForm(prev => ({ ...prev, output_length_22: String(prev.output_length_22 || "") + num.toString() }));
+      setOutputForm(prev => ({ ...prev, output_length_22: String(prev.output_length_22 || "") + value }));
       return;
     }
     if (currentInput === "output_length_44") {
-      setOutputForm(prev => ({ ...prev, output_length_44: String(prev.output_length_44 || "") + num.toString() }));
+      setOutputForm(prev => ({ ...prev, output_length_44: String(prev.output_length_44 || "") + value }));
       return;
+    }
+    if (currentInput === "qr") {
+      setQrInput(prev => `${prev || ""}${value}`);
+      return;
+    }
+    if (currentInput === "notes") {
+      setOutputForm(prev => ({ ...prev, notes: `${prev.notes || ""}${value}` }));
+      return;
+    }
+    if (currentInput.startsWith("select:")) {
+      const key = currentInput.replace("select:", "");
+      setSelectSearch(prev => ({ ...prev, [key]: `${prev[key] || ""}${value}` }));
     }
   };
 
@@ -236,6 +312,18 @@ export default function SlittingManager() {
       setOutputForm(prev => ({ ...prev, output_length_44: back(prev.output_length_44) }));
       return;
     }
+    if (currentInput === "qr") {
+      setQrInput(prev => back(prev));
+      return;
+    }
+    if (currentInput === "notes") {
+      setOutputForm(prev => ({ ...prev, notes: back(prev.notes) }));
+      return;
+    }
+    if (currentInput.startsWith("select:")) {
+      const key = currentInput.replace("select:", "");
+      setSelectSearch(prev => ({ ...prev, [key]: back(prev[key]) }));
+    }
   };
 
   const handleClear = () => {
@@ -254,6 +342,18 @@ export default function SlittingManager() {
     if (currentInput === "output_length_44") {
       setOutputForm(prev => ({ ...prev, output_length_44: "" }));
       return;
+    }
+    if (currentInput === "qr") {
+      setQrInput("");
+      return;
+    }
+    if (currentInput === "notes") {
+      setOutputForm(prev => ({ ...prev, notes: "" }));
+      return;
+    }
+    if (currentInput.startsWith("select:")) {
+      const key = currentInput.replace("select:", "");
+      setSelectSearch(prev => ({ ...prev, [key]: "" }));
     }
   };
 
@@ -317,6 +417,25 @@ export default function SlittingManager() {
     }
   };
 
+  const requestCompleteOrderItem = (item) => {
+    if (!item?.production_order_item_id) return;
+    setPendingCompleteItem(item);
+    setShowCompleteDialog(true);
+  };
+
+  const handleCompleteOrderItem = async (item) => {
+    if (!item?.production_order_item_id) return;
+    try {
+      await productionApi.updateProductionItemStatus(item.production_order_item_id, ProductionStatus.completed);
+      toast.success("تم إتمام الطلب ونقله إلى المكتمل");
+      loadOrders();
+      if (activeOrderItem?.production_order_item_id === item.production_order_item_id) setActiveOrderItem(null);
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.message || "فشل تحديث حالة الطلب");
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -327,6 +446,99 @@ export default function SlittingManager() {
       minute: "2-digit"
     });
   };
+
+  const getColorLabel = (colorId) => {
+    const color = colors.find((item) => String(item.color_id) === String(colorId));
+    if (!color) return "-";
+    return `${color.color_name} (${color.color_code || "-"})`;
+  };
+
+  const getBatchLabel = (batchId) => {
+    return batches.find((item) => String(item.batch_id) === String(batchId))?.batch_number || "-";
+  };
+
+  const formatDestination = (value) => ({
+    warehouse: "المستودع",
+    slitting: "التشريح",
+    production: "الإنتاج",
+    cutting: "القص",
+    gluing: "اللصق"
+  }[value] || value || "-");
+
+  const formatTypeItem = (value) => value === TypeItem.Machine ? "مكنة" : value === TypeItem.Presser ? "كوي" : value || "-";
+
+  const renderOrdersTable = (list) => (
+    <div className="flex-1 overflow-auto min-h-0 rounded-lg border bg-white">
+      <table className="w-full border-collapse">
+        <thead className="sticky top-0 z-20 bg-gray-100">
+          <tr>
+            {["#", "اللون", "الطبخة", "الطول", "النوع", "الوجهة", "الحالة", "الإجراءات"].map((header) => (
+              <th key={header} className="px-1 py-2 text-center text-sm whitespace-nowrap border-b">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {loadingOrders ? (
+            <tr><td colSpan="8" className="p-6"><LoadingState /></td></tr>
+          ) : list.length === 0 ? (
+            <tr>
+              <td colSpan="8" className="p-8 text-center text-gray-400">
+                <AlertCircle className="mx-auto mb-2 h-10 w-10 opacity-50" />
+                لا توجد طلبات
+              </td>
+            </tr>
+          ) : list.map((order, index) => {
+            const statusBadge = getStatusBadge(order.status);
+            return (
+              <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">#{order.production_order_id}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{getColorLabel(order.color_id)}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{getBatchLabel(order.batch_id)}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.length || "-"}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{formatTypeItem(order.type_item)}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
+                    {formatDestination(order.destination)}
+                  </span>
+                </td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
+                  <span className={`rounded-lg px-2 py-1 text-xs ${statusBadge.className}`}>{statusBadge.label}</span>
+                </td>
+                <td className="px-1 py-2 text-center align-middle whitespace-nowrap">
+                  <div className="flex h-8 items-center justify-center gap-1">
+                    <button
+                      onClick={() => handleOrderSelect(order)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    {ordersTab === "current" && (
+                      <>
+                        <button
+                          onClick={() => handleApplyOrderToInputs(order)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"
+                        >
+                          <Hash className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => requestCompleteOrderItem(order)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50" dir="rtl">
@@ -368,8 +580,22 @@ export default function SlittingManager() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Package className="w-5 h-5 text-orange-600" />
-                طلبات حسب الحالة
+                طلبات 
               </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setOrdersTab("current")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${ordersTab === "current" ? "bg-orange-100 text-orange-700" : "text-gray-600 hover:bg-gray-100"}`}
+              >
+                قيد الانتظار ({currentOrders.length})
+              </button>
+              <button
+                onClick={() => setOrdersTab("completed")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${ordersTab === "completed" ? "bg-green-100 text-green-700" : "text-gray-600 hover:bg-gray-100"}`}
+              >
+                المكتملة ({completedOrders.length})
+              </button>
+            </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -380,71 +606,8 @@ export default function SlittingManager() {
                 تحديث
               </Button>
             </div>
-            <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
-              {loadingOrders ? (
-                <div className="flex items-center justify-center h-32">
-                  <LoadingState />
-                </div>
-              ) : orders.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <div className="text-lg font-medium">لا توجد طلبات</div>
-                  <div className="text-sm">لا توجد طلبات جاهزة للتشريح</div>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {orders.map(order => {
-                    const colorName = colors.find(c => String(c.color_id) === String(order.color_id))?.color_name || "-";
-                    const batchNumber = batches.find(b => String(b.batch_id) === String(order.batch_id))?.batch_number || "-";
-                    const statusBadge = getStatusBadge(order.status);
-                    return (
-                      <div
-                        key={order.production_order_item_id}
-                        className="p-3 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => handleApplyOrderToInputs(order)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">طلب #{order.production_order_id}</div>
-                            <div className="text-sm text-gray-600">
-                              {colorName}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {formatDate(order.created_at)}
-                            </div>
-                          </div>
-                          <div className="text-left">
-                            <div className="text-sm font-medium">
-                              {order.width} مم
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {batchNumber}
-                            </div>
-                            <div className="mt-1">
-                              <span className={`px-2 py-0.5 rounded-full text-xs ${statusBadge.className}`}>
-                                {statusBadge.label}
-                              </span>
-                            </div>
-                            <div className="mt-2 flex gap-2 justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleApplyOrderToInputs(order);
-                                }}
-                              >
-                                إدخال
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+
+            {renderOrdersTable(ordersTab === "current" ? currentOrders : completedOrders)}
           </Card>
 
           {/* Input/Output Form */}
@@ -597,29 +760,40 @@ export default function SlittingManager() {
                           <Label>ملاحظات</Label>
                           <Input
                             value={inputForm.notes}
-                            onChange={(e) => setInputForm(prev => ({ ...prev, notes: e.target.value }))}
+                            onFocus={() => setCurrentInput("notes")}
                             placeholder="ملاحظات اختيارية"
                           />
                         </div>
-                        <div className="col-span-2">
-                          <Button
-                            className="w-full"
-                            onClick={() => setIoMode("output")}
-                          >
-                            إدخال
-                          </Button>
-                        </div>
                       </div>
+                      <Button
+                        onClick={handleCreateSlite}
+                        className="w-full h-12 bg-blue-600 hover:bg-blue-700"
+                      >
+                        <ArrowRight className="w-5 h-5 ml-2" />
+                        إنشاء عملية التشريح
+                      </Button>
                     </div>
                   )}
                 </div>
               </div>
             </div>
           </Card>
+
         </div>
 
         {/* Bottom - Outputs Table */}
         <div className="flex gap-4">
+          {/* Number Pad */}
+          <Card className="p-4 pb-0 w-[260px] flex-shrink-0 self-stretch flex flex-col">
+            <div className="grid grid-cols-3 gap-2 flex-1 content-start overflow-auto">
+              {[9, 8, 7, 6, 5, 4, 3, 2, 1].map((n) => (
+                <Button key={n} variant="outline" className="h-12 text-lg font-bold" onClick={() => handleNumberClick(n)}>{n}</Button>
+              ))}
+              <Button variant="outline" className="h-12 text-lg" onClick={handleClear}><X className="w-4 h-4" /></Button>
+              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleNumberClick(0)}>0</Button>
+              <Button variant="outline" className="h-12 text-lg" onClick={handleBackspace}><ArrowRight className="w-4 h-4" /></Button>
+            </div>
+          </Card>
           <Card className="p-4 flex flex-col flex-1 space-y-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -684,35 +858,117 @@ export default function SlittingManager() {
             </div>
           </Card>
 
-          {/* Number Pad */}
-          <Card className="p-4 w-[260px] flex-shrink-0">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-green-600" />
-              لوحة الأرقام
-            </h3>
-            <div className="grid grid-cols-3 gap-2">
-              {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(num => (
-                <Button
-                  key={num}
-                  variant="outline"
-                  className="h-12 text-lg font-bold"
-                  onClick={() => handleNumberClick(num)}
-                >
-                  {num}
-                </Button>
-              ))}
-              <Button variant="outline" className="h-12 text-lg" onClick={handleClear}>
-                <X className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleNumberClick(0)}>
-                0
-              </Button>
-              <Button variant="outline" className="h-12 text-lg" onClick={handleBackspace}>
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </Card>
+          
+
         </div>
+
+        <StyledDialog
+          isOpen={showOrderDetails}
+          onOpenChange={(open) => {
+            setShowOrderDetails(open);
+            if (!open) {
+              setSelectedOrder(null);
+              setOrderItems([]);
+            }
+          }}
+          title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`}
+          contentClassName="max-w-6xl w-full"
+          onCancel={() => setShowOrderDetails(false)}
+          onConfirm={() => setShowOrderDetails(false)}
+          confirmLabel="إغلاق"
+          showCancel={false}
+        >
+          {!selectedOrder ? null : (
+            <div className="space-y-4 w-full">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
+                <div><span className="text-gray-500">التاريخ:</span> <span className="font-bold">{formatDate(selectedOrder.created_at)}</span></div>
+                <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
+                <div><span className="text-gray-500">الوجهة:</span> <span className="font-bold">{formatDestination(selectedOrder.destination)}</span></div>
+                <div><span className="text-gray-500">اللون:</span> <span className="font-bold">{getColorLabel(selectedOrder.color_id)}</span></div>
+                <div><span className="text-gray-500">الطبخة:</span> <span className="font-bold">{getBatchLabel(selectedOrder.batch_id)}</span></div>
+                <div><span className="text-gray-500">الطول:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
+                <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{formatTypeItem(selectedOrder.type_item)}</span></div>
+              </div>
+
+              {loadingOrderDetails ? (
+                <LoadingState />
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        {["#", "العرض", "الطول", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
+                          <th key={h} className="p-2 text-center">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orderItems.length === 0 ? (
+                        <tr><td colSpan="9" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr>
+                      ) : orderItems.map((item, index) => (
+                        <tr key={item.production_order_item_id || index} className="border-t">
+                          <td className="p-2 text-center">#{item.production_order_item_id || index + 1}</td>
+                          <td className="p-2 text-center">{item.width || "-"}</td>
+                          <td className="p-2 text-center">{item.length || "-"}</td>
+                          <td className="p-2 text-center">{formatTypeItem(item.type_item || item.type)}</td>
+                          <td className="p-2 text-center">{formatDestination(item.source)}</td>
+                          <td className="p-2 text-center">{formatDestination(item.destination)}</td>
+                          <td className="p-2 text-center"><span className={`px-2 py-1 rounded-lg text-xs ${getStatusBadge(item.status).className}`}>{getStatusBadge(item.status).label}</span></td>
+                          <td className="p-2 text-center">{item.notes || "-"}</td>
+                          <td className="p-2 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <Button variant="outline" size="sm" onClick={() => handleApplyOrderToInputs(item)}>إدخال</Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={String(item.status || "").toLowerCase() === ProductionStatus.completed}
+                                onClick={() => requestCompleteOrderItem(item)}
+                              >
+                                إتمام
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </StyledDialog>
+
+        <StyledDialog
+          isOpen={showCompleteDialog}
+          onOpenChange={(open) => {
+            setShowCompleteDialog(open);
+            if (!open) setPendingCompleteItem(null);
+          }}
+          title="تأكيد إتمام العملية"
+          contentClassName="max-w-md w-full"
+          onCancel={() => {
+            setShowCompleteDialog(false);
+            setPendingCompleteItem(null);
+          }}
+          onConfirm={async () => {
+            if (pendingCompleteItem) {
+              await handleCompleteOrderItem(pendingCompleteItem);
+            }
+            setShowCompleteDialog(false);
+            setPendingCompleteItem(null);
+          }}
+          confirmLabel="تأكيد"
+          cancelLabel="إلغاء"
+        >
+          <div className="text-sm text-gray-700">
+            هل تريد إتمام الطلب{" "}
+            <span className="font-bold">
+              #{pendingCompleteItem?.production_order_id || pendingCompleteItem?.production_order_item_id || ""}
+            </span>
+            {" "}ونقله إلى المكتمل؟
+          </div>
+        </StyledDialog>
       </div>
     </div>
   );
