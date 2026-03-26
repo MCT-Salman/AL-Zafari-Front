@@ -74,8 +74,9 @@ export default function CuttingManager() {
     input_width: "",
     color_id: "",
     batch_id: "",
+    thickness: "0.6",
     input_length: "",
-    type_item: "",
+    type_item: TypeItem.Machine,
     source: "slitting",
     destination: "gluing",
     notes: ""
@@ -89,6 +90,11 @@ export default function CuttingManager() {
   ]);
 
   const [currentInput, setCurrentInput] = useState("input_length");
+  const [selectSearch, setSelectSearch] = useState({
+    input_width: "",
+    color_id: "",
+    batch_id: ""
+  });
   const [showHeader, setShowHeader] = useState(true);
   const [ordersTab, setOrdersTab] = useState("current");
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -108,6 +114,28 @@ export default function CuttingManager() {
     const text = String(value || "");
     if (text.includes(".") || text.includes(",")) return text;
     return text ? `${text},` : "0,";
+  };
+  const formatLengthValue = (value) => {
+    const rounded = Number(Number(value).toFixed(3));
+    return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+  };
+  const splitLengthIntoFifties = (value) => {
+    const total = toNumber(value);
+    if (!Number.isFinite(total) || total <= 0) return [];
+
+    const parts = [];
+    let remaining = total;
+
+    while (remaining > 50) {
+      parts.push("50");
+      remaining = Number((remaining - 50).toFixed(3));
+    }
+
+    if (remaining > 0) {
+      parts.push(formatLengthValue(remaining));
+    }
+
+    return parts;
   };
 
   const orderStatusConfig = {
@@ -134,6 +162,44 @@ export default function CuttingManager() {
       label: b.batch_number || `دفعة ${b.batch_id}`
     }));
   }, [batches]);
+
+  const selectedColorInfo = useMemo(
+    () => colors.find((color) => String(color.color_id) === String(inputForm.color_id)),
+    [colors, inputForm.color_id]
+  );
+
+  const selectedThickness = useMemo(() => (
+    inputForm.thickness ||
+    activeOrderItem?.thickness ||
+    selectedColorInfo?.thickness ||
+    "0.6"
+  ), [activeOrderItem?.thickness, inputForm.thickness, selectedColorInfo?.thickness]);
+
+  useEffect(() => {
+    const generatedLengths = splitLengthIntoFifties(inputForm.input_length);
+
+    setOutputItems((prev) => {
+      if (generatedLengths.length === 0) {
+        return [{ id: 1, length: "", qrUrl: "", qrData: "", qrFooter: "" }];
+      }
+
+      return generatedLengths.map((length, index) => ({
+        id: prev[index]?.id ?? `generated-${index}`,
+        length,
+        qrUrl: "",
+        qrData: "",
+        qrFooter: ""
+      }));
+    });
+  }, [inputForm.input_length]);
+
+  useEffect(() => {
+    setInputForm((prev) => {
+      const nextThickness = String(activeOrderItem?.thickness ?? selectedColorInfo?.thickness ?? "0.6");
+      if (prev.thickness || prev.thickness === nextThickness) return prev;
+      return { ...prev, thickness: nextThickness };
+    });
+  }, [activeOrderItem?.thickness, selectedColorInfo?.thickness]);
 
   const shouldNotify = (key, windowMs = 8000) => {
     const now = Date.now();
@@ -230,13 +296,21 @@ export default function CuttingManager() {
       setInputForm(prev => ({ ...prev, input_length: String(prev.input_length || "") + num.toString() }));
       return;
     }
-    if (currentInput.startsWith("output_length:")) {
-      const id = currentInput.split(":")[1];
-      setOutputItems(prev => prev.map(item => (
-        String(item.id) === String(id)
-          ? { ...item, length: String(item.length || "") + num.toString() }
-          : item
-      )));
+    if (currentInput === "thickness") {
+      setInputForm(prev => ({ ...prev, thickness: String(prev.thickness || "") + num.toString() }));
+      return;
+    }
+    if (currentInput === "input_notes") {
+      setInputForm(prev => ({ ...prev, notes: `${prev.notes || ""}${num}` }));
+      return;
+    }
+    if (currentInput === "output_notes") {
+      setOutputForm(prev => ({ ...prev, notes: `${prev.notes || ""}${num}` }));
+      return;
+    }
+    if (currentInput.startsWith("select:")) {
+      const key = currentInput.split(":")[1];
+      setSelectSearch(prev => ({ ...prev, [key]: `${prev[key] || ""}${num}` }));
     }
   };
   const handleDecimalClick = () => {
@@ -244,13 +318,16 @@ export default function CuttingManager() {
       setInputForm(prev => ({ ...prev, input_length: appendDecimal(prev.input_length) }));
       return;
     }
-    if (currentInput.startsWith("output_length:")) {
-      const id = currentInput.split(":")[1];
-      setOutputItems(prev => prev.map(item => (
-        String(item.id) === String(id)
-          ? { ...item, length: appendDecimal(item.length) }
-          : item
-      )));
+    if (currentInput === "thickness") {
+      setInputForm(prev => ({ ...prev, thickness: appendDecimal(prev.thickness) }));
+      return;
+    }
+    if (currentInput === "input_notes") {
+      setInputForm(prev => ({ ...prev, notes: `${prev.notes || ""},` }));
+      return;
+    }
+    if (currentInput === "output_notes") {
+      setOutputForm(prev => ({ ...prev, notes: `${prev.notes || ""},` }));
     }
   };
 
@@ -260,13 +337,21 @@ export default function CuttingManager() {
       setInputForm(prev => ({ ...prev, input_length: back(prev.input_length) }));
       return;
     }
-    if (currentInput.startsWith("output_length:")) {
-      const id = currentInput.split(":")[1];
-      setOutputItems(prev => prev.map(item => (
-        String(item.id) === String(id)
-          ? { ...item, length: back(item.length) }
-          : item
-      )));
+    if (currentInput === "thickness") {
+      setInputForm(prev => ({ ...prev, thickness: back(prev.thickness) }));
+      return;
+    }
+    if (currentInput === "input_notes") {
+      setInputForm(prev => ({ ...prev, notes: back(prev.notes) }));
+      return;
+    }
+    if (currentInput === "output_notes") {
+      setOutputForm(prev => ({ ...prev, notes: back(prev.notes) }));
+      return;
+    }
+    if (currentInput.startsWith("select:")) {
+      const key = currentInput.split(":")[1];
+      setSelectSearch(prev => ({ ...prev, [key]: back(prev[key]) }));
     }
   };
 
@@ -275,18 +360,26 @@ export default function CuttingManager() {
       setInputForm(prev => ({ ...prev, input_length: "" }));
       return;
     }
-    if (currentInput.startsWith("output_length:")) {
-      const id = currentInput.split(":")[1];
-      setOutputItems(prev => prev.map(item => (
-        String(item.id) === String(id)
-          ? { ...item, length: "" }
-          : item
-      )));
+    if (currentInput === "thickness") {
+      setInputForm(prev => ({ ...prev, thickness: "" }));
+      return;
+    }
+    if (currentInput === "input_notes") {
+      setInputForm(prev => ({ ...prev, notes: "" }));
+      return;
+    }
+    if (currentInput === "output_notes") {
+      setOutputForm(prev => ({ ...prev, notes: "" }));
+      return;
+    }
+    if (currentInput.startsWith("select:")) {
+      const key = currentInput.split(":")[1];
+      setSelectSearch(prev => ({ ...prev, [key]: "" }));
     }
   };
 
   const buildOutputQrData = (lengthValue) => {
-    const colorInfo = colors.find(c => String(c.color_id) === String(inputForm.color_id));
+    const colorInfo = selectedColorInfo;
     const batchInfo = batches.find(b => String(b.batch_id) === String(inputForm.batch_id));
     const rulerName = colorInfo?.ruler?.ruler_name || "";
     const typeLabel = inputForm.type_item === TypeItem.Presser ? "كوي" : "مكنة";
@@ -295,7 +388,7 @@ export default function CuttingManager() {
       rulerName,
       colorInfo?.color_code || "",
       inputForm.input_width || "",
-      colorInfo?.thickness || "",
+      selectedThickness || "",
       batchInfo?.batch_number || "",
       typeLabel,
       user?.user_id ?? user?.id ?? user?.employee_id ?? "",
@@ -305,12 +398,13 @@ export default function CuttingManager() {
   };
 
   const buildOutputQrFooter = (lengthValue) => {
-    const colorInfo = colors.find(c => String(c.color_id) === String(inputForm.color_id));
+    const colorInfo = selectedColorInfo;
     const batchInfo = batches.find(b => String(b.batch_id) === String(inputForm.batch_id));
     const rulerName = colorInfo?.ruler?.ruler_name || "-";
     const colorCode = colorInfo?.color_code || "-";
     const typeLabel = inputForm.type_item === TypeItem.Presser ? "كوي" : "مكنة";
     return [
+      `السماكة: ${selectedThickness || "-"}`,
       `المسطرة: ${rulerName}`,
       `كود اللون: ${colorCode}`,
       `العرض: ${inputForm.input_width || "-"}`,
@@ -352,10 +446,11 @@ export default function CuttingManager() {
       input_width: item.width ? String(item.width) : "",
       color_id: item.color_id ? String(item.color_id) : "",
       batch_id: item.batch_id ? String(item.batch_id) : "",
+      thickness: item.thickness ? String(item.thickness) : "",
       input_length: item.length ? String(item.length) : "",
-      type_item: item.type_item || "",
-      source: item.source || "slitting",
-      destination: item.destination || "gluing",
+      type_item: item.type_item || TypeItem.Machine,
+      source: "slitting",
+      destination: "gluing",
       notes: item.notes || ""
     }));
     setIoMode("output");
@@ -363,7 +458,7 @@ export default function CuttingManager() {
 
   const handleCreateProcess = async () => {
     try {
-      if (!inputForm.input_width || !inputForm.color_id || !inputForm.batch_id || !inputForm.input_length || !inputForm.type_item) {
+      if (!inputForm.input_width || !inputForm.color_id || !inputForm.batch_id || !inputForm.input_length) {
         toast.error("يرجى إدخال جميع بيانات الإدخال المطلوبة");
         return;
       }
@@ -377,13 +472,14 @@ export default function CuttingManager() {
       const payload = {
         color_id: Number(inputForm.color_id),
         batch_id: Number(inputForm.batch_id),
-        type_item: inputForm.type_item,
+        type_item: inputForm.type_item || TypeItem.Machine,
+        thickness: toNumber(selectedThickness),
         input_length: toNumber(inputForm.input_length),
         output_length: normalizedLengths.join(" - "),
         input_width: toNumber(inputForm.input_width),
         type: "cutting",
-        source: inputForm.source,
-        destination: inputForm.destination,
+        source: "slitting",
+        destination: "gluing",
         notes: outputForm.notes || inputForm.notes
       };
 
@@ -684,7 +780,7 @@ export default function CuttingManager() {
                     <Input
                       value={qrInput}
                       onChange={(e) => setQrInput(e.target.value)}
-                      placeholder="width|color_id|batch_id|length|type_item|source|destination"
+                      placeholder="width|color_id|batch_id|thickness|length"
                     />
                     <Button
                       className="w-full"
@@ -700,23 +796,25 @@ export default function CuttingManager() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label>العرض</Label>
-                      <div className="flex gap-2 mt-2">
-                        <label className={`flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer ${inputForm.input_width === "22" ? "border-blue-500 bg-blue-50" : "border-gray-300"}`}>
-                          <input
-                            type="checkbox"
-                            checked={inputForm.input_width === "22"}
-                            onChange={() => setInputForm(prev => ({ ...prev, input_width: prev.input_width === "22" ? "" : "22" }))}
-                          />
-                          22
-                        </label>
-                        <label className={`flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer ${inputForm.input_width === "44" ? "border-blue-500 bg-blue-50" : "border-gray-300"}`}>
-                          <input
-                            type="checkbox"
-                            checked={inputForm.input_width === "44"}
-                            onChange={() => setInputForm(prev => ({ ...prev, input_width: prev.input_width === "44" ? "" : "44" }))}
-                          />
-                          44
-                        </label>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        {["22", "44"].map((width) => (
+                          <button
+                            key={width}
+                            type="button"
+                            onClick={() => setInputForm(prev => ({ ...prev, input_width: width }))}
+                            className={`
+                              rounded-xl border-2 text-base font-medium
+                              transition-all hover:scale-[1.02] active:scale-[0.98]
+                              flex items-center justify-center p-3
+                              ${inputForm.input_width === width
+                                ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+                                : "border-gray-300 bg-white hover:border-secondary-s"
+                              }
+                            `}
+                          >
+                            {width}
+                          </button>
+                        ))}
                       </div>
                     </div>
                     <div>
@@ -724,6 +822,9 @@ export default function CuttingManager() {
                       <FilterSelect
                         value={inputForm.color_id}
                         onChange={(e) => setInputForm(prev => ({ ...prev, color_id: e.target.value }))}
+                        searchValue={selectSearch.color_id}
+                        onSearchValueChange={(value) => setSelectSearch(prev => ({ ...prev, color_id: value }))}
+                        onInputFocus={() => setCurrentInput("select:color_id")}
                         options={colorOptions}
                         placeholder="اختر اللون"
                       />
@@ -733,6 +834,9 @@ export default function CuttingManager() {
                       <FilterSelect
                         value={inputForm.batch_id}
                         onChange={(e) => setInputForm(prev => ({ ...prev, batch_id: e.target.value }))}
+                        searchValue={selectSearch.batch_id}
+                        onSearchValueChange={(value) => setSelectSearch(prev => ({ ...prev, batch_id: value }))}
+                        onInputFocus={() => setCurrentInput("select:batch_id")}
                         options={batchOptions}
                         placeholder="اختر الطبخة"
                       />
@@ -741,53 +845,28 @@ export default function CuttingManager() {
                       <Label>الطول</Label>
                       <Input
                         value={inputForm.input_length}
+                        onChange={(e) => setInputForm(prev => ({ ...prev, input_length: e.target.value }))}
                         onFocus={() => setCurrentInput("input_length")}
-                        readOnly
                         className={`text-center ${currentInput === "input_length" ? "ring-2 ring-blue-500" : ""}`}
                         placeholder="0"
                       />
                     </div>
                     <div>
-                      <Label>النوع</Label>
-                      <FilterSelect
-                        value={inputForm.type_item}
-                        onChange={(e) => setInputForm(prev => ({ ...prev, type_item: e.target.value }))}
-                        options={[
-                          { value: TypeItem.Machine, label: "مكنة" },
-                          { value: TypeItem.Presser, label: "كوي" }
-                        ]}
-                        placeholder="اختر النوع"
+                      <Label>السماكة</Label>
+                      <Input
+                        value={inputForm.thickness}
+                        onChange={(e) => setInputForm(prev => ({ ...prev, thickness: e.target.value }))}
+                        onFocus={() => setCurrentInput("thickness")}
+                        className={`text-center ${currentInput === "thickness" ? "ring-2 ring-blue-500" : ""}`}
+                        placeholder="-"
                       />
                     </div>
-                    <div>
-                      <Label>المصدر</Label>
-                      <FilterSelect
-                        value={inputForm.source}
-                        onChange={(e) => setInputForm(prev => ({ ...prev, source: e.target.value }))}
-                        options={[
-                          { value: "slitting", label: "التشريح" },
-                          { value: "cutting", label: "القص" }
-                        ]}
-                        placeholder="المصدر"
-                      />
-                    </div>
-                    <div>
-                      <Label>الوجهة</Label>
-                      <FilterSelect
-                        value={inputForm.destination}
-                        onChange={(e) => setInputForm(prev => ({ ...prev, destination: e.target.value }))}
-                        options={[
-                          { value: "gluing", label: "اللصق" },
-                          { value: "production", label: "الإنتاج" }
-                        ]}
-                        placeholder="الوجهة"
-                      />
-                    </div>
-                    <div className="col-span-2">
+                    <div >
                       <Label>ملاحظات</Label>
                       <Input
                         value={inputForm.notes}
                         onChange={(e) => setInputForm(prev => ({ ...prev, notes: e.target.value }))}
+                        onFocus={() => setCurrentInput("input_notes")}
                         placeholder="ملاحظات اختيارية"
                       />
                     </div>
@@ -813,6 +892,7 @@ export default function CuttingManager() {
                         <th className="p-2 text-center">اللون</th>
                         <th className="p-2 text-center">الطبخة</th>
                         <th className="p-2 text-center">السماكة</th>
+                        <th className="p-2 text-center">الطول المدخل</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -825,7 +905,8 @@ export default function CuttingManager() {
                         <td className="p-2 text-center">
                           {batches.find(b => String(b.batch_id) === String(inputForm.batch_id))?.batch_number || "-"}
                         </td>
-                        <td className="p-2 text-center">-</td>
+                        <td className="p-2 text-center">{selectedThickness || "-"}</td>
+                        <td className="p-2 text-center">{inputForm.input_length || "-"}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -842,17 +923,11 @@ export default function CuttingManager() {
                       <div key={item.id} className="flex gap-2 items-center">
                         <Input
                           value={item.length}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setOutputItems(prev => prev.map(it => (
-                              it.id === item.id ? { ...it, length: value } : it
-                            )));
-                          }}
-                          onFocus={() => setCurrentInput(`output_length:${item.id}`)}
-                          className={`text-center ${currentInput === `output_length:${item.id}` ? "ring-2 ring-blue-500" : ""}`}
-                          placeholder="مثال: 50"
+                          readOnly
+                          className="text-center bg-gray-50"
+                          placeholder=""
                         />
-                        <Button
+                        {/* <Button
                           variant="outline"
                           onClick={() => {
                             const qrData = buildOutputQrData(item.length);
@@ -868,17 +943,21 @@ export default function CuttingManager() {
                           }}
                         >
                           QR
-                        </Button>
+                        </Button> */}
                         <Button
                           variant="outline"
                           onClick={() => {
-                            setOutputItems(prev => [
-                              ...prev,
-                              { id: Date.now(), length: "", qrUrl: "", qrData: "" }
-                            ]);
+                            if (!item.length) {
+                              toast.error("أدخل طولًا أولاً");
+                              return;
+                            }
+                            const qrData = buildOutputQrData(item.length);
+                            const footer = buildOutputQrFooter(item.length);
+                            const url = getQrUrl(qrData);
+                            printQr(url, `QR - قص (${item.length})`, footer);
                           }}
                         >
-                          +
+                         QR
                         </Button>
                       </div>
                     ))}
@@ -890,6 +969,7 @@ export default function CuttingManager() {
                   <Input
                     value={outputForm.notes}
                     onChange={(e) => setOutputForm(prev => ({ ...prev, notes: e.target.value }))}
+                    onFocus={() => setCurrentInput("output_notes")}
                     placeholder="ملاحظات الإخراج"
                   />
                 </div>
@@ -899,7 +979,7 @@ export default function CuttingManager() {
                     <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleCreateProcess}>
                       إخراج
                     </Button>
-                    <Button
+                    {/* <Button
                       variant="outline"
                       className="flex-1"
                       onClick={() => {
@@ -917,27 +997,8 @@ export default function CuttingManager() {
                         }}
                     >
                       طباعة كل QR
-                    </Button>
+                    </Button> */}
                   </div>
-                  {outputItems.some(i => i.qrUrl) && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {outputItems.filter(i => i.qrUrl).map(item => (
-                        <div key={item.id} className="border rounded-lg p-2 bg-white">
-                          <div className="text-xs text-gray-600 mb-1">طول: {item.length}</div>
-                          <img src={item.qrUrl} alt="qr" className="h-20 w-20 border rounded" />
-                          <div className="text-[11px] text-gray-500 mt-1">{item.qrFooter || item.qrData.replace(/\|/g, " | ")}</div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2 w-full"
-                            onClick={() => printQr(item.qrUrl, `QR - قص (${item.length})`, item.qrFooter || item.qrData.replace(/\|/g, " | "))}
-                          >
-                            طباعة
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             )}
