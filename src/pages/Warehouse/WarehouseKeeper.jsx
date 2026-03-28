@@ -654,7 +654,7 @@ export default function WarehouseKeeper() {
 
     return (
         <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
-             <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[6%]" : "top-[2%]"}`}>
+             <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[7%]" : "top-[2%]"}`}>
 
         <Button
 
@@ -755,7 +755,7 @@ export default function WarehouseKeeper() {
                                         <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} searchValue={selectSearch.thickness} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, thickness: value }))} onInputFocus={() => setCurrentInput("select:thickness")} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-1">
-                                        <div><Label className={'mb-1'}>الطول</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} searchValue={selectSearch.length} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, length: value }))} onInputFocus={() => setCurrentInput("select:length")} options={lengthOptions} placeholder="اختر الطول" disabled={!lengthOptions.length} /></div>
+                                        <div><Label className={'mb-1'}>الكمية</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} searchValue={selectSearch.length} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, length: value }))} onInputFocus={() => setCurrentInput("select:length")} options={lengthOptions} placeholder="اختر الطول" disabled={!lengthOptions.length} /></div>
                                         {/* <div><Label className={'mb-1'}>الوجهة</Label><FilterSelect value={outputForm.destination} onChange={(e) => setOutputForm((p) => ({ ...p, destination: e.target.value }))} options={[{ value: MovementDestination.slitting, label: "التشريح" }, { value: MovementDestination.cutting, label: "القص" }, { value: MovementDestination.production, label: "الإنتاج" }]} placeholder="اختر الوجهة" /></div> */}
                                     <div className="col-span-2"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
                                     </div>

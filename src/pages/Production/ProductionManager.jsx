@@ -972,7 +972,7 @@ export default function ProductionManager() {
                                     }`}
                             >
                                 <History className="w-5 h-5 ml-2" />
-                                سجل طلبات الإنتاج
+                                سجل  الإنتاج
                             </Button>
                             <Button
                                 size="lg"
