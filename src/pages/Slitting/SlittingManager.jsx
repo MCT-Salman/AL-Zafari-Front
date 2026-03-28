@@ -24,6 +24,7 @@ import {
   Check,
   X,
   Eye,
+  Printer,
   RefreshCw,
   Hash,
   Search,
@@ -467,6 +468,74 @@ export default function SlittingManager() {
 
   const formatTypeItem = (value) => value === TypeItem.Machine ? "مكنة" : value === TypeItem.Presser ? "كوي" : value || "-";
 
+  const parseQrInput = (text) => {
+    const raw = String(text || "").trim();
+    if (!raw) return null;
+    const parts = raw.split("|").map((p) => String(p ?? "").trim());
+    if (parts.length < 4) return null;
+    const [width, colorId, batchId, length, typeItem, source, destination] = parts;
+    if (!width || !colorId || !batchId || !length) return null;
+    return {
+      input_width: width,
+      color_id: colorId,
+      batch_id: batchId,
+      input_length: length,
+      type_item: typeItem || "",
+      source: source || "warehouse",
+      destination: destination || "slitting",
+    };
+  };
+
+  const getQrUrl = (data) =>
+    `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(data)}`;
+
+  const buildSliteQrData = (slite) => {
+    const colorInfo = colors.find((c) => String(c.color_id) === String(slite?.color_id));
+    const batchInfo = batches.find((b) => String(b.batch_id) === String(slite?.batch_id));
+    return [
+      slite?.input_width || "",
+      colorInfo?.color_code || "",
+      batchInfo?.batch_number || "",
+      slite?.input_length || "",
+      slite?.output_length_22 || "",
+      slite?.output_length_44 || "",
+      slite?.slite_id || "",
+    ].join("|");
+  };
+
+  const buildSliteQrFooter = (slite) => {
+    const colorInfo = colors.find((c) => String(c.color_id) === String(slite?.color_id));
+    const batchInfo = batches.find((b) => String(b.batch_id) === String(slite?.batch_id));
+    return [
+      `اللون: ${colorInfo?.color_name || "-"}`,
+      `كود اللون: ${colorInfo?.color_code || "-"}`,
+      `العرض: ${slite?.input_width || "-"}`,
+      `الطبخة: ${batchInfo?.batch_number || "-"}`,
+      `الطول المدخل: ${slite?.input_length || "-"}`,
+      `1x22: ${slite?.output_length_22 ?? "-"}`,
+      `1x44: ${slite?.output_length_44 ?? "-"}`,
+    ].join(" | ");
+  };
+
+  const printQr = (url, title = "QR", footer = "") => {
+    if (!url) return;
+    const win = window.open("", "_blank", "width=420,height=520");
+    if (!win) return;
+    win.document.write(`
+      <html dir="rtl">
+        <head><title>${title}</title></head>
+        <body style="font-family: Tahoma, Arial, sans-serif; text-align:center; padding:16px;">
+          <h3>${title}</h3>
+          <img src="${url}" style="width:240px;height:240px;border:1px solid #ddd;border-radius:8px;" />
+          <div style="margin-top:12px; font-size:12px; color:#444;">${footer}</div>
+        </body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
   const renderOrdersTable = (list) => (
     <div className="flex-1 overflow-auto min-h-0 rounded-lg border bg-white">
       <table className="w-full border-collapse">
@@ -666,7 +735,25 @@ export default function SlittingManager() {
                         placeholder="width|color_id|batch_id|length|type_item|source|destination"
                       />
                       <Button
-                        onClick={() => toast.success("تم تطبيق بيانات QR")}
+                        onClick={() => {
+                          const parsed = parseQrInput(qrInput);
+                          if (!parsed) {
+                            toast.error("صيغة QR غير صحيحة");
+                            return;
+                          }
+                          setInputForm((prev) => ({
+                            ...prev,
+                            input_width: parsed.input_width,
+                            color_id: parsed.color_id,
+                            batch_id: parsed.batch_id,
+                            input_length: parsed.input_length,
+                            type_item: parsed.type_item || prev.type_item,
+                            source: parsed.source || prev.source,
+                            destination: parsed.destination || prev.destination,
+                          }));
+                          setIoMode("output");
+                          toast.success("تم تطبيق بيانات QR");
+                        }}
                         className="w-full bg-blue-600 hover:bg-blue-700"
                         disabled={!qrInput.trim()}
                       >
@@ -849,7 +936,22 @@ export default function SlittingManager() {
                         <div>{slite.output_length_44 || "-"}</div>
                         <div>{slite.user?.full_name || slite.user?.username || "-"}</div>
                         <div>{formatDate(slite.created_at)}</div>
-                        <div>{slite.notes || "-"}</div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate">{slite.notes || "-"}</span>
+                          <button
+                            onClick={() => {
+                              const qrData = buildSliteQrData(slite);
+                              const qrFooter = buildSliteQrFooter(slite);
+                              const url = getQrUrl(qrData);
+                              printQr(url, `QR - تشريح #${slite.slite_id}`, qrFooter);
+                            }}
+                            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg p-1.5 text-violet-700 hover:bg-violet-50"
+                            title="طباعة QR"
+                            type="button"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

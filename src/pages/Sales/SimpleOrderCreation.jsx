@@ -1836,7 +1836,7 @@ export default function SimpleOrderCreation() {
                                         {thicknessValues.length > 1 ? (
                                             <FilterSelect
                                                 value={formData.thickness ? String(formData.thickness) : ""}
-                                                onChange={(value) => handleFieldChange("thickness", value)}
+                                                onChange={(e) => handleFieldChange("thickness", e.target.value)}
                                                 options={thicknessOptions}
                                                 placeholder="اختر السماكة"
                                                 className="w-full text-sm"
