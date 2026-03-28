@@ -1809,7 +1809,7 @@ export default function ProductionManager() {
                                         <th className="p-2 text-center border-b">أنواع الإنتاج</th>
                                         <th className="p-2 text-center border-b">المصدر</th>
                                         <th className="p-2 text-center border-b">الوجهة</th>
-                                        <th className="p-2 text-center border-b">المرحلة التالية</th>
+                                        {/* <th className="p-2 text-center border-b">المرحلة التالية</th> */}
                                         <th className="p-2 text-center border-b">حالة العنصر</th>
                                         <th className="p-2 text-center border-b">اللون</th>
                                         <th className="p-2 text-center border-b">الطبخة</th>
@@ -1886,7 +1886,7 @@ export default function ProductionManager() {
                                                         }
                                                     })()}
                                                 </td>
-                                                <td className="p-2 text-center">
+                                                {/* <td className="p-2 text-center">
                                                     {destination ? (
                                                         <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                                                             {(() => {
@@ -1898,7 +1898,7 @@ export default function ProductionManager() {
                                                             })()}
                                                         </span>
                                                     ) : '-'}
-                                                </td>
+                                                </td> */}
                                                 <td className="p-2 text-center">
                                                     {willCreateMultipleItems ? (
                                                         <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium" title="سيتم إنشاء عنصر منفصل لكل نوع إنتاج">
@@ -2023,7 +2023,7 @@ export default function ProductionManager() {
                                                 <th className="p-2 text-center">النوع</th>
                                                 <th className="p-2 text-center">المصدر</th>
                                                 <th className="p-2 text-center">الوجهة</th>
-                                                <th className="p-2 text-center">المرحلة التالية</th>
+                                                {/* <th className="p-2 text-center">المرحلة التالية</th> */}
                                                 <th className="p-2 text-center">الحالة</th>
                                             </tr>
                                         </thead>
