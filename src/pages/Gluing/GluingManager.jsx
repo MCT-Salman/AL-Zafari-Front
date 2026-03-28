@@ -1192,7 +1192,7 @@ export default function GluingManager() {
 
           onClick={() => setShowHeader((prev) => !prev)}
 
-          className="h-10 w-10 rounded-full border-2 border-t-secondary-f border-l-secondary-f border-r-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105  active:scale-95"
+          className="h-10 w-10 rounded-full border-2 border-t-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105  active:scale-95"
 
           title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
 
