@@ -72,21 +72,21 @@ import { ProductionStatus, ProductionType, TypeItem, UserRole } from "../../type
 
 const ROLE_LABELS = {
 
-    [UserRole.admin]: "مدير النظام",
+  [UserRole.admin]: "مدير النظام",
 
-    [UserRole.accountant]: "محاسب",
+  [UserRole.accountant]: "محاسب",
 
-    [UserRole.cashier]: "كاشير",
+  [UserRole.cashier]: "كاشير",
 
-    [UserRole.Production_Technician]: "فني إنتاج",
+  [UserRole.Production_Technician]: "فني إنتاج",
 
-    [UserRole.Cutting_Technician]: "فني قص",
+  [UserRole.Cutting_Technician]: "فني قص",
 
-    [UserRole.Slitting_Technician]: "فني تشريح",
+  [UserRole.Slitting_Technician]: "فني تشريح",
 
-    [UserRole.Gluing_Technician]: "فني تغرية",
+  [UserRole.Gluing_Technician]: "فني تغرية",
 
-    [UserRole.Warehouse_Keeper]: "أمين المستودع",
+  [UserRole.Warehouse_Keeper]: "أمين المستودع",
 
 };
 
@@ -802,13 +802,13 @@ export default function GluingManager() {
 
             ? prev.map((o) =>
 
-                String(o.production_order_item_id) === String(activeOrderItem.production_order_item_id)
+              String(o.production_order_item_id) === String(activeOrderItem.production_order_item_id)
 
-                  ? { ...o, status: ProductionStatus.completed }
+                ? { ...o, status: ProductionStatus.completed }
 
-                  : o
+                : o
 
-              )
+            )
 
             : prev
 
@@ -1040,13 +1040,13 @@ export default function GluingManager() {
 
           ? prev.map((o) =>
 
-              String(o.production_order_item_id) === String(pendingCompleteItem.production_order_item_id)
+            String(o.production_order_item_id) === String(pendingCompleteItem.production_order_item_id)
 
-                ? { ...o, status: ProductionStatus.completed }
+              ? { ...o, status: ProductionStatus.completed }
 
-                : o
+              : o
 
-            )
+          )
 
           : prev
 
@@ -1184,7 +1184,7 @@ export default function GluingManager() {
 
       {/* Header Toggle Button */}
 
-      <div className="absolute left-0 bottom-2 z-40">
+      <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[6%]" : "top-[2%]"}`}>
 
         <Button
 
@@ -1192,7 +1192,7 @@ export default function GluingManager() {
 
           onClick={() => setShowHeader((prev) => !prev)}
 
-          className="h-10 w-10 rounded-full border-0 bg-secondary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 hover:bg-primary-f active:scale-95"
+          className="h-10 w-10 rounded-full border-2 border-t-secondary-f border-l-secondary-f border-r-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105  active:scale-95"
 
           title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
 
@@ -1210,53 +1210,53 @@ export default function GluingManager() {
 
       {showHeader && (
 
-      <div className="flex-shrink-0">
+        <div className="flex-shrink-0">
 
-        <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
+          <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
 
-          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
 
-            <Package className="w-7 h-7" />
+              <Package className="w-7 h-7" />
 
-            <div>
+              <div>
 
-              <h1 className="text-2xl font-bold">إدارة التغرية</h1>
+                <h1 className="text-2xl font-bold">إدارة التغرية</h1>
 
-              <p className="text-sm opacity-90">لوحة عمليات التغرية</p>
+                <p className="text-sm opacity-90">لوحة عمليات التغرية</p>
+
+              </div>
+
+            </div>
+
+            <div className="flex items-center gap-2">
+
+              <NotificationsBell />
+
+              <span className="text-sm">مرحباً، {user?.full_name}</span>
+
+              <Button
+
+                size="lg"
+
+                variant="outline"
+
+                onClick={() => setShowLogoutDialog(true)}
+
+                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+
+              >
+
+                <ArrowRight className="w-4 h-4 ml-2 rotate-180" />
+
+                تسجيل الخروج
+
+              </Button>
 
             </div>
 
           </div>
 
-          <div className="flex items-center gap-2">
-
-            <NotificationsBell />
-
-            <span className="text-sm">مرحباً، {user?.full_name}</span>
-
-            <Button
-
-              size="lg"
-
-              variant="outline"
-
-              onClick={() => setShowLogoutDialog(true)}
-
-              className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-
-            >
-
-              <ArrowRight className="w-4 h-4 ml-2 rotate-180" />
-
-              تسجيل الخروج
-
-            </Button>
-
-          </div>
-
         </div>
-
-      </div>
 
       )}
 
@@ -1264,27 +1264,27 @@ export default function GluingManager() {
 
       {!showHeader && (
 
-      <div className="flex-shrink-0 text-stone-50">
+        <div className="flex-shrink-0 text-stone-50">
 
-        <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
+          <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
 
-          <div className="min-w-0">
+            <div className="min-w-0">
 
-            <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
+              <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
 
-          </div>
+            </div>
 
-          <div className="h-10 w-px" />
+            <div className="h-10 w-px" />
 
-          <div className="min-w-0 text-right">
+            <div className="min-w-0 text-right">
 
-            <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+              <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+
+            </div>
 
           </div>
 
         </div>
-
-      </div>
 
       )}
 
@@ -1506,17 +1506,17 @@ export default function GluingManager() {
 
                     <Label>طول الإخراج</Label>
 
-                    <Input 
+                    <Input
 
-                      value={outputForm.output_length} 
+                      value={outputForm.output_length}
 
                       onChange={(e) => setOutputForm(prev => ({ ...prev, output_length: e.target.value }))}
 
-                      onFocus={() => setCurrentInput("output_length")} 
+                      onFocus={() => setCurrentInput("output_length")}
 
-                      className={`text-center ${currentInput === "output_length" ? "ring-2 ring-blue-500" : ""}`} 
+                      className={`text-center ${currentInput === "output_length" ? "ring-2 ring-blue-500" : ""}`}
 
-                      placeholder="0" 
+                      placeholder="0"
 
                     />
 
@@ -1656,7 +1656,7 @@ export default function GluingManager() {
 
                   </div>
 
-                  
+
 
                   <table className="w-full">
 
@@ -2106,7 +2106,7 @@ export default function GluingManager() {
 
         <div className="text-sm text-gray-700">
 
-          هل تريد حذف عملية التغرية 
+          هل تريد حذف عملية التغرية
 
           <span className="font-bold"> #{pendingDeleteProcess?.process_id || ""}</span>؟
 
@@ -2194,7 +2194,7 @@ export default function GluingManager() {
 
         <div className="text-sm text-gray-700">
 
-          هل تريد حذف 
+          هل تريد حذف
 
           <span className="font-bold"> {selectedProcesses.size} </span>
 

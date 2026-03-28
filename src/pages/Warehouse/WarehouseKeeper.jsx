@@ -654,16 +654,25 @@ export default function WarehouseKeeper() {
 
     return (
         <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
-            <div className="absolute left-0 bottom-2 z-40">
-                <Button
-                    type="button"
-                    onClick={() => setShowHeader((prev) => !prev)}
-                    className="h-10 w-10 rounded-full border-0 bg-secondary-s text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 hover:bg-primary-f active:scale-95"
-                    title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
-                >
-                    {showHeader ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
-                </Button>
-            </div>
+             <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[6%]" : "top-[2%]"}`}>
+
+        <Button
+
+          type="button"
+
+          onClick={() => setShowHeader((prev) => !prev)}
+
+          className="h-10 w-10 rounded-full border-2 border-t-secondary-f border-l-secondary-f border-r-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105  active:scale-95"
+
+          title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
+
+        >
+
+          {showHeader ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+
+        </Button>
+
+      </div>
 
             {showHeader && (
             <div className="flex-shrink-0">
@@ -674,11 +683,11 @@ export default function WarehouseKeeper() {
                     </div>
                     <div className="flex flex-wrap items-center gap-1">
                         <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-                            <div className="text-xs opacity-80">اسم المستخدم</div>
+                            {/* <div className="text-xs opacity-80">اسم المستخدم</div> */}
                             <div className="text-base font-bold">{user?.full_name || user?.username || "-"}</div>
                         </div>
                         <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-                            <div className="text-xs opacity-80">الدور</div>
+                            {/* <div className="text-xs opacity-80">الدور</div> */}
                             <div className="text-base font-bold">{ROLE_LABELS[user?.role] || user?.role}</div>
                         </div>
                     </div>
