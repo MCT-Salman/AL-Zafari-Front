@@ -770,7 +770,7 @@ export default function CuttingManager() {
 
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
-       <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[6%]" : "top-[2%]"}`}>
+       <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[7.5%]" : "top-[2%]"}`}>
 
         <Button
 
