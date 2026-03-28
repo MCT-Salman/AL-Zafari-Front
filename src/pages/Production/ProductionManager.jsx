@@ -150,6 +150,11 @@ export default function ProductionManager() {
         { value: ProductionStatus.canceled, label: "ملغي" }
     ];
 
+    const DESTINATION_OPTIONS = [
+        { value: "slitting", label: "التشريح" },
+        { value: "production", label: "الإنتاج" }
+    ];
+
     const SOURCE_OPTIONS = [
         { value: "production", label: "إنتاج" },
         { value: "warehouse", label: "مستودع" }
@@ -164,7 +169,8 @@ export default function ProductionManager() {
         type_item: "",
         thickness: "0.6",
         notes: "",
-        source: "production" // استبدال status بـ source
+        source: "production", // للمستودع والأنواع الأخرى
+        destination: "slitting" // للمستودع فقط
     });
 
     // Production Items State
@@ -174,7 +180,11 @@ export default function ProductionManager() {
     const [currentItem, setCurrentItem] = useState({
         width: "",
         length: "", // هذه تمثل الكمية (height في الـ API)
-        production_types: [] // افتراضي فارغ
+        production_types: [], // افتراضي فارغ
+        source: "production", // للمستودع والأنواع الأخرى
+        destination: "slitting", // للمستودع فقط
+        color_id: "",
+        notes: ""
     });
     const [activeField, setActiveField] = useState("length");
 
@@ -187,6 +197,9 @@ export default function ProductionManager() {
             }));
         }
     }, [currentItem?.production_types]);
+
+    // Helper function to check if warehouse is selected
+    const isWarehouseSelected = currentItem.production_types?.includes(ProductionType.warehouse);
 
     // Load initial data
     useEffect(() => {
@@ -329,7 +342,7 @@ export default function ProductionManager() {
                                 type_item: firstItem.type_item || '-',
                                 thickness: firstItem.thickness || '-',
                                 width: firstItem.width || '-',
-                                batch_number: firstItem.batch?.batch_number || '-',
+                                batch_number: firstItem.batch?.batch_number || firstItem.batch_number || firstItem.batch_id || '-',
                                 material_name: firstItem.color?.ruler?.material?.material_name || '-',
                                 ruler_type: firstItem.color?.ruler?.ruler_name || '-'
                             };
@@ -474,6 +487,11 @@ export default function ProductionManager() {
                 if (value === "warehouse") {
                     setCurrentItem(prev => ({ ...prev, width: "66" }));
                 }
+            } else if (field === "destination") {
+                // عند تغيير الوجهة، إعادة تعيين العرض إذا كان slitting
+                if (value === "slitting") {
+                    setCurrentItem(prev => ({ ...prev, width: "66" }));
+                }
             }
 
             return newData;
@@ -529,6 +547,7 @@ export default function ProductionManager() {
                 order.color_code?.toLowerCase().includes(term) ||
                 order.batch?.batch_number?.toLowerCase().includes(term) ||
                 order.batch_number?.toLowerCase().includes(term) ||
+                order.batch_id?.toString().toLowerCase().includes(term) ||
                 order.status?.toLowerCase().includes(term) ||
                 order.material_name?.toLowerCase().includes(term) ||
                 order.ruler_type?.toLowerCase().includes(term) ||
@@ -593,7 +612,7 @@ export default function ProductionManager() {
                 color: `${order.color_name || "-"} (${order.color_code || "-"})`,
                 type_item: formatTypeItem(order.type_item),
                 thickness: order.thickness ?? "-",
-                batch: order.batch_number || order.batch?.batch_number || "-",
+                batch: order.batch_number || order.batch?.batch_number || order.batch_id || "-",
                 status: statusBadge?.label || "-",
                 notes: order.notes || "",
             };
@@ -646,7 +665,11 @@ export default function ProductionManager() {
             id: Date.now(),
             width: currentItem.width,
             length: currentItem.length, // هذه تمثل الكمية (height)
-            production_types: currentItem.production_types
+            production_types: currentItem.production_types,
+            source: currentItem.source,
+            destination: currentItem.destination,
+            color_id: currentItem.color_id,
+            notes: currentItem.notes
         };
 
         if (editingItemId) {
@@ -665,7 +688,9 @@ export default function ProductionManager() {
         setCurrentItem({
             width: "",
             length: "",
-            production_types: []
+            production_types: [],
+            color_id: "",
+            notes: ""
         });
     };
 
@@ -673,7 +698,11 @@ export default function ProductionManager() {
         setCurrentItem({
             width: item.width,
             length: item.length,
-            production_types: item.production_types
+            production_types: item.production_types,
+            source: item.source || "production",
+            destination: item.destination || "slitting",
+            color_id: item.color_id || "",
+            notes: item.notes || ""
         });
         setEditingItemId(item.id);
         // Show preview when editing
@@ -686,7 +715,9 @@ export default function ProductionManager() {
             setCurrentItem({
                 width: "",
                 length: "",
-                production_types: []
+                production_types: [],
+                color_id: "",
+                notes: ""
             });
         }
         setProductionItems(prev => prev.filter(item => item.id !== id));
@@ -700,7 +731,9 @@ export default function ProductionManager() {
             setCurrentItem({
                 width: "",
                 length: "",
-                production_types: []
+                production_types: [],
+                color_id: "",
+                notes: ""
             });
             toast.success("تم مسح جميع العناصر");
         }
@@ -711,7 +744,9 @@ export default function ProductionManager() {
         setCurrentItem({
             width: "",
             length: "",
-            production_types: []
+            production_types: [],
+            color_id: "",
+            notes: ""
         });
     };
 
@@ -721,8 +756,15 @@ export default function ProductionManager() {
             return;
         }
 
-        if (!formData.material_id || !formData.ruler_id || !formData.color_id) {
-            toast.error("يرجى اختيار المادة والمسطرة واللون ");
+        if (!formData.material_id || !formData.ruler_id) {
+            toast.error("يرجى اختيار المادة والمسطرة");
+            return;
+        }
+
+        // Check if all items have colors
+        const itemsWithoutColor = productionItems.filter(item => !item.color_id);
+        if (itemsWithoutColor.length > 0) {
+            toast.error("يرجى اختيار اللون لجميع العناصر");
             return;
         }
         if (isSelectedMaterialPvc && !formData.type_item) {
@@ -737,7 +779,7 @@ export default function ProductionManager() {
             // length في الواجهة تمثل الكمية (height) في الـ API
             const items = productionItems.map(item => {
                 const payload = {
-                    color_id: Number(formData.color_id),
+                    color_id: Number(item.color_id || formData.color_id),
                     type_item: formData.type_item,
                     thickness: Number(formData.thickness),
                     production_types: item.production_types,
@@ -751,14 +793,22 @@ export default function ProductionManager() {
                     payload.batch_id = Number(rawBatchId);
                 }
 
+                // إضافة source إذا كانت هناك قيمة
+                if (item.source && item.source !== "") {
+                    payload.source = item.source;
+                }
+
+                // إضافة destination إذا كانت هناك قيمة
+                if (item.destination && item.destination !== "") {
+                    payload.destination = item.destination;
+                }
+
                 return payload;
             });
 
             const orderData = {
                 notes: formData.notes || "",
                 status: ProductionStatus.pending, // الحفاظ على الحالة كما هي
-                source: formData.source, // إضافة المصدر
-                production_types: formData.source === "warehouse" ? [ProductionType.warehouse] : (items[0]?.production_types || []),
                 items: items
             };
 
@@ -1204,9 +1254,9 @@ export default function ProductionManager() {
                                 <div className="p-3 border-b-2 border-dashed border-gray-300">
                                     <Label className="font-bold text-sm mb-2 block">اللون</Label>
                                     <FilterSelect
-                                        value={formData.color_id}
+                                        value={currentItem.color_id}
                                         onChange={(e) => {
-                                            handleFieldChange("color_id", e.target.value);
+                                            setCurrentItem(prev => ({ ...prev, color_id: e.target.value }));
                                             setActiveTextTarget(null);
                                         }}
                                         searchValue={colorSearchCode}
@@ -1281,13 +1331,27 @@ export default function ProductionManager() {
 
 
                                     <div>
-                                        <Label className="font-bold text-sm mb-1 block">المصدر</Label>
-                                        <FilterSelect
-                                            value={formData.source}
-                                            onChange={(e) => handleFieldChange("source", e.target.value)}
-                                            options={SOURCE_OPTIONS.map(s => ({ value: s.value, label: s.label }))}
-                                            className="w-full text-sm"
-                                        />
+                                        {isWarehouseSelected ? (
+                                            <>
+                                                <Label className="font-bold text-sm mb-1 block">الوجهة</Label>
+                                                <FilterSelect
+                                                    value={currentItem.destination}
+                                                    onChange={(e) => setCurrentItem(prev => ({ ...prev, destination: e.target.value }))}
+                                                    options={DESTINATION_OPTIONS.map(s => ({ value: s.value, label: s.label }))}
+                                                    className="w-full text-sm"
+                                                />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Label className="font-bold text-sm mb-1 block">المصدر</Label>
+                                                <FilterSelect
+                                                    value={currentItem.source}
+                                                    onChange={(e) => setCurrentItem(prev => ({ ...prev, source: e.target.value }))}
+                                                    options={SOURCE_OPTIONS.map(s => ({ value: s.value, label: s.label }))}
+                                                    className="w-full text-sm"
+                                                />
+                                            </>
+                                        )}
                                     </div>
 
 
@@ -1295,8 +1359,8 @@ export default function ProductionManager() {
                                 <div>
                                     <Label className="font-bold text-sm mb-1 block">ملاحظات</Label>
                                     <Input
-                                        value={formData.notes}
-                                        onChange={(e) => handleFieldChange("notes", e.target.value)}
+                                        value={currentItem.notes}
+                                        onChange={(e) => setCurrentItem(prev => ({ ...prev, notes: e.target.value }))}
                                         placeholder="ملاحظات إضافية..."
                                         className="h-10 text-sm"
                                     />
@@ -1416,6 +1480,7 @@ export default function ProductionManager() {
                                                 <th className="p-1 text-center border-b w-20">أنواع الإنتاج</th>
                                                 <th className="p-1 text-center border-b w-20">اللون</th>
                                                 <th className="p-1 text-center border-b w-20">المصدر</th>
+                                                <th className="p-1 text-center border-b w-20">الوجهة</th>
                                                 <th className="p-1 text-center border-b w-20">الإجراءات</th>
                                             </tr>
                                         </thead>
@@ -1440,11 +1505,27 @@ export default function ProductionManager() {
                                                             })}
                                                         </div>
                                                     </td>
-                                                    <td className="p-1 text-center text-sm font-mono">{colors.find(c => String(c.color_id) === String(formData.color_id))?.color_code || '-'}</td>
+                                                    <td className="p-1 text-center text-sm font-mono">{colors.find(c => String(c.color_id) === String(item.color_id || formData.color_id))?.color_code || '-'}</td>
                                                     <td className="p-1 text-center text-sm">
                                                         {(() => {
-                                                            const sourceOption = SOURCE_OPTIONS.find(s => s.value === formData.source);
-                                                            return sourceOption?.label || '-';
+                                                            const isItemWarehouse = item.production_types?.includes(ProductionType.warehouse);
+                                                            if (isItemWarehouse) {
+                                                                return '-';
+                                                            } else {
+                                                                const sourceOption = SOURCE_OPTIONS.find(s => s.value === (item.source || formData.source));
+                                                                return sourceOption?.label || '-';
+                                                            }
+                                                        })()}
+                                                    </td>
+                                                    <td className="p-1 text-center text-sm">
+                                                        {(() => {
+                                                            const isItemWarehouse = item.production_types?.includes(ProductionType.warehouse);
+                                                            if (isItemWarehouse) {
+                                                                const destinationOption = DESTINATION_OPTIONS.find(s => s.value === (item.destination || formData.destination));
+                                                                return destinationOption?.label || '-';
+                                                            } else {
+                                                                return '-';
+                                                            }
                                                         })()}
                                                     </td>
                                                     <td className="p-1 text-center">
@@ -1475,7 +1556,7 @@ export default function ProductionManager() {
                                 <div className="p-2 pt-1 flex justify-end">
                                     <Button
                                         onClick={() => setShowPreview(true)}
-                                        disabled={loading || productionItems.length === 0 || !formData.color_id}
+                                        disabled={loading || productionItems.length === 0 || productionItems.some(item => !item.color_id)}
                                         className="h-12 text-base px-6 bg-secondary-s hover:brightness-110 text-white font-bold"
                                     >
                                         {loading ? (
@@ -1707,83 +1788,10 @@ export default function ProductionManager() {
                 cancelLabel="إلغاء"
                 confirmVariant="default"
                 isLoading={loading}
-                contentClassName="w-screen max-w-[100vw] h-screen max-h-screen p-4"
+                contentClassName="w-screen max-w-[100vw] max-h-screen max-h-screen p-4"
             >
                 <div className="space-y-4">
-                    {/* معلومات أساسية موسعة */}
-                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                        <h3 className="font-bold text-blue-700 mb-2 text-sm flex items-center">
-                            <ShoppingCart className="w-4 h-4 ml-1" />
-                            معلومات الطلب الأساسية
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            <div className="bg-white p-2 rounded-lg shadow-sm">
-                                <div className="text-xs text-gray-500">المادة</div>
-                                <div className="font-bold text-sm">
-                                    {selectedMaterial?.material_name || materials.find(m => String(m.material_id) === String(formData.material_id))?.material_name || '-'}
-                                </div>
-                            </div>
-                            <div className="bg-white p-2 rounded-lg shadow-sm">
-                                <div className="text-xs text-gray-500">المسطرة</div>
-                                <div className="font-bold text-sm">
-                                    {rulers.find(r => String(r.ruler_id) === String(formData.ruler_id))?.ruler_name || '-'}
-                                </div>
-                            </div>
-                            <div className="bg-white p-2 rounded-lg shadow-sm">
-                                <div className="text-xs text-gray-500">اللون</div>
-                                <div className="font-bold text-sm flex items-center gap-1">
-                                    {(() => {
-                                        const selectedColor = colors.find(c => String(c.color_id) === String(formData.color_id));
-                                        return selectedColor ? (
-                                            <>
-                                                {selectedColor.imageUrl && (
-                                                    <img
-                                                        src={selectedColor.imageUrl.startsWith('http') ? selectedColor.imageUrl : `${API_BASE_URL}${selectedColor.imageUrl}`}
-                                                        alt={selectedColor.color_name}
-                                                        className="w-6 h-6 rounded-full object-cover border"
-                                                    />
-                                                )}
-                                                <span>{selectedColor.color_name} ({selectedColor.color_code})</span>
-                                            </>
-                                        ) : '-'
-                                    })()}
-                                </div>
-                            </div>
-                            <div className="bg-white p-2 rounded-lg shadow-sm">
-                                <div className="text-xs text-gray-500">رقم الطبخة</div>
-                                <div className="font-bold text-sm">
-                                    {batches.find(b => String(b.batch_id) === String(formData.batch_id))?.batch_number || '-'}
-                                </div>
-                            </div>
-                            <div className="bg-white p-2 rounded-lg shadow-sm">
-                                <div className="text-xs text-gray-500">النوع</div>
-                                <div className="font-bold text-sm">
-                                    {formatTypeItem(formData.type_item)}
-                                </div>
-                            </div>
-                            <div className="bg-white p-2 rounded-lg shadow-sm">
-                                <div className="text-xs text-gray-500">السماكة</div>
-                                <div className="font-bold text-sm">{formData.thickness} مم</div>
-                            </div>
-                            {/* <div className="bg-white p-2 rounded-lg shadow-sm">
-                    <div className="text-xs text-gray-500">الحالة</div>
-                    <div className="font-bold text-sm">
-                        <span className={`px-2 py-1 rounded-lg text-xs ${(() => {
-                            const badge = productionApi.getStatusBadge(formData.status);
-                            return badge.className;
-                        })()}`}>
-                            {STATUS_OPTIONS.find(s => s.value === formData.status)?.label || formData.status}
-                        </span>
-                    </div>
-                </div> */}
-                            <div className="bg-white p-2 rounded-lg shadow-sm col-span-2">
-                                <div className="text-xs text-gray-500">ملاحظات</div>
-                                <div className="font-bold text-sm truncate" title={formData.notes}>
-                                    {formData.notes || 'لا توجد ملاحظات'}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
 
                     {/* عناصر الإنتاج مع تفاصيل موسعة */}
                     <div className="bg-green-50 p-3 rounded-lg border border-green-200">
@@ -1801,7 +1809,11 @@ export default function ProductionManager() {
                                         <th className="p-2 text-center border-b">أنواع الإنتاج</th>
                                         <th className="p-2 text-center border-b">المصدر</th>
                                         <th className="p-2 text-center border-b">الوجهة</th>
+                                        <th className="p-2 text-center border-b">المرحلة التالية</th>
                                         <th className="p-2 text-center border-b">حالة العنصر</th>
+                                        <th className="p-2 text-center border-b">اللون</th>
+                                        <th className="p-2 text-center border-b">الطبخة</th>
+                                        <th className="p-2 text-center border-b">الملاحظات</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1846,12 +1858,32 @@ export default function ProductionManager() {
                                                 </td>
                                                 <td className="p-2 text-center">
                                                     {(() => {
-                                                        const sourceOption = SOURCE_OPTIONS.find(s => s.value === formData.source);
-                                                        return sourceOption ? (
-                                                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                                                {sourceOption.label}
-                                                            </span>
-                                                        ) : '-';
+                                                        const isItemWarehouse = item.production_types?.includes(ProductionType.warehouse);
+                                                        if (isItemWarehouse) {
+                                                            return '-';
+                                                        } else {
+                                                            const sourceOption = SOURCE_OPTIONS.find(s => s.value === (item.source || formData.source));
+                                                            return sourceOption ? (
+                                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                                                                    {sourceOption.label}
+                                                                </span>
+                                                            ) : '-';
+                                                        }
+                                                    })()}
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    {(() => {
+                                                        const isItemWarehouse = item.production_types?.includes(ProductionType.warehouse);
+                                                        if (isItemWarehouse) {
+                                                            const destinationOption = DESTINATION_OPTIONS.find(s => s.value === (item.destination || formData.destination));
+                                                            return destinationOption ? (
+                                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                                                                    {destinationOption.label}
+                                                                </span>
+                                                            ) : '-';
+                                                        } else {
+                                                            return '-';
+                                                        }
                                                     })()}
                                                 </td>
                                                 <td className="p-2 text-center">
@@ -1878,12 +1910,38 @@ export default function ProductionManager() {
                                                         </span>
                                                     )}
                                                 </td>
+                                                <td className="p-2 text-center">
+                                                    {(() => {
+                                                        const colorOption = colorOptions.find(c => String(c.value) === String(item.color_id));
+                                                        return colorOption ? (
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                {colorOption.imageUrl && (
+                                                                    <img
+                                                                        src={colorOption.imageUrl}
+                                                                        alt={colorOption.label}
+                                                                        className="w-4 h-4 rounded border border-gray-300"
+                                                                    />
+                                                                )}
+                                                                <span className="text-xs">{colorOption.label}</span>
+                                                            </div>
+                                                        ) : '-';
+                                                    })()}
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    {(() => {
+                                                        const batchOption = batchOptions.find(b => String(b.value) === String(formData.batch_id));
+                                                        return batchOption ? batchOption.label : '-';
+                                                    })()}
+                                                </td>
+                                                <td className="p-2 text-center text-xs max-w-[100px] truncate" title={item.notes}>
+                                                    {item.notes || '-'}
+                                                </td>
                                             </tr>
                                         );
                                     })}
                                     {productionItems.length === 0 && (
                                         <tr>
-                                            <td colSpan="7" className="p-8 text-center text-gray-400">
+                                            <td colSpan="11" className="p-8 text-center text-gray-400">
                                                 <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                 لا توجد عناصر مضافة
                                             </td>
@@ -1893,74 +1951,7 @@ export default function ProductionManager() {
                             </table>
                         </div>
 
-                        {/* ملخص الكميات */}
-                        {productionItems.length > 0 && (
-                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                <div className="bg-white p-2 rounded-lg shadow-sm">
-                                    <div className="text-xs text-gray-500">إجمالي العناصر</div>
-                                    <div className="font-bold text-lg">{productionItems.length}</div>
-                                </div>
-                                <div className="bg-white p-2 rounded-lg shadow-sm">
-                                    <div className="text-xs text-gray-500">إجمالي الكمية</div>
-                                    <div className="font-bold text-lg">
-                                        {productionItems.reduce((sum, item) => sum + (Number(item.length) || 0), 0)}
-                                    </div>
-                                </div>
-                                <div className="bg-white p-2 rounded-lg shadow-sm">
-                                    <div className="text-xs text-gray-500">متوسط العرض</div>
-                                    <div className="font-bold text-lg">
-                                        {productionItems.length > 0
-                                            ? (productionItems.reduce((sum, item) => sum + (Number(item.width) || 0), 0) / productionItems.length).toFixed(1)
-                                            : 0}
-                                    </div>
-                                </div>
-                                <div className="bg-white p-2 rounded-lg shadow-sm">
-                                    <div className="text-xs text-gray-500">أنواع الإنتاج الفريدة</div>
-                                    <div className="font-bold text-lg">
-                                        {new Set(productionItems.flatMap(item => item.production_types || [])).size}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* معلومات إضافية */}
-                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <h3 className="font-bold text-gray-700 mb-2 text-sm flex items-center">
-                            <AlertCircle className="w-4 h-4 ml-1" />
-                            ملخص الطلب
-                        </h3>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div>
-                                <span className="text-gray-500">عدد العناصر في الطلب:</span>
-                                <span className="mr-2 font-bold">{productionItems.length}</span>
-                            </div>
-                            <div>
-                                <span className="text-gray-500">إجمالي القطع:</span>
-                                <span className="mr-2 font-bold">
-                                    {productionItems.reduce((sum, item) => sum + (Number(item.length) || 0), 0)}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-gray-500">أنواع الإنتاج المستخدمة:</span>
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                    {Array.from(new Set(productionItems.flatMap(item => item.production_types || []))).map(type => {
-                                        const typeInfo = PRODUCTION_TYPES.find(t => t.value === type);
-                                        return (
-                                            <span key={type} className="bg-gray-200 px-2 py-0.5 rounded-full text-xs">
-                                                {typeInfo?.label || type}
-                                            </span>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                            <div>
-                                <span className="text-gray-500">عدد مراحل الإنتاج:</span>
-                                <span className="mr-2 font-bold">
-                                    {Math.max(...productionItems.map(item => (item.production_types || []).length), 0)}
-                                </span>
-                            </div>
-                        </div>
+                
                     </div>
                 </div>
             </StyledDialog>
@@ -2023,14 +2014,16 @@ export default function ProductionManager() {
                             <div>
                                 <h4 className="font-bold text-sm mb-2">عناصر الإنتاج</h4>
                                 <div className="border rounded-lg overflow-x-auto">
-                                    <table className="min-w-[600px] w-full text-sm">
+                                    <table className="min-w-[700px] w-full text-sm">
                                         <thead className="bg-gray-100">
                                             <tr>
                                                 <th className="p-2 text-center">العرض</th>
                                                 <th className="p-2 text-center">الكمية</th>
+                                                <th className="p-2 text-center">رقم الطبخة</th>
                                                 <th className="p-2 text-center">النوع</th>
                                                 <th className="p-2 text-center">المصدر</th>
                                                 <th className="p-2 text-center">الوجهة</th>
+                                                <th className="p-2 text-center">المرحلة التالية</th>
                                                 <th className="p-2 text-center">الحالة</th>
                                             </tr>
                                         </thead>
@@ -2039,6 +2032,7 @@ export default function ProductionManager() {
                                                 <tr key={index} className="border-t">
                                                     <td className="p-2 text-center">{item.width}</td>
                                                     <td className="p-2 text-center">{item.length}</td>
+                                                    <td className="p-2 text-center">{item.batch?.batch_number || item.batch_number || item.batch_id || '-'}</td>
                                                     <td className="p-2 text-center">
                                                         {productionApi.getProductionTypeLabel(item.type)}
                                                     </td>

@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Calculator,
   X,
+  Trash,
   RefreshCw,
   Hash,
   Search,
@@ -97,6 +98,12 @@ export default function CuttingManager() {
   });
   const [showHeader, setShowHeader] = useState(true);
   const [ordersTab, setOrdersTab] = useState("current");
+  const [pendingProcess, setPendingProcess] = useState(null);
+  const [showProcessConfirmDialog, setShowProcessConfirmDialog] = useState(false);
+  const [pendingDeleteProcess, setPendingDeleteProcess] = useState(null);
+  const [showDeleteProcessDialog, setShowDeleteProcessDialog] = useState(false);
+  const [selectedProcesses, setSelectedProcesses] = useState(new Set());
+  const [showMultiDeleteDialog, setShowMultiDeleteDialog] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
@@ -132,7 +139,15 @@ export default function CuttingManager() {
     }
 
     if (remaining > 0) {
-      parts.push(formatLengthValue(remaining));
+      // If the last piece is less than 50, combine it with the previous one
+      if (remaining < 50 && parts.length > 0) {
+        const lastIndex = parts.length - 1;
+        const previousValue = toNumber(parts[lastIndex]);
+        const combinedValue = previousValue + remaining;
+        parts[lastIndex] = formatLengthValue(combinedValue);
+      } else {
+        parts.push(formatLengthValue(remaining));
+      }
     }
 
     return parts;
@@ -456,7 +471,7 @@ export default function CuttingManager() {
     setIoMode("output");
   };
 
-  const handleCreateProcess = async () => {
+  const handleCreateProcess = () => {
     try {
       if (!inputForm.input_width || !inputForm.color_id || !inputForm.batch_id || !inputForm.input_length) {
         toast.error("يرجى إدخال جميع بيانات الإدخال المطلوبة");
@@ -469,6 +484,7 @@ export default function CuttingManager() {
         return;
       }
 
+      // Prepare payload for confirmation dialog
       const payload = {
         color_id: Number(inputForm.color_id),
         batch_id: Number(inputForm.batch_id),
@@ -483,7 +499,18 @@ export default function CuttingManager() {
         notes: outputForm.notes || inputForm.notes
       };
 
-      const response = await productionProcessApi.createProcess(payload);
+      // Set pending process data and show confirmation dialog
+      setPendingProcess(payload);
+      setShowProcessConfirmDialog(true);
+    } catch (error) {
+      console.error(error);
+      toast.error("فشل في إعداد بيانات القص");
+    }
+  };
+
+  const confirmCreateProcess = async () => {
+    try {
+      const response = await productionProcessApi.createProcess(pendingProcess);
       if (response?.success === false || response?.error) {
         throw new Error(response?.message || response?.error || "فشل في الإخراج");
       }
@@ -494,25 +521,90 @@ export default function CuttingManager() {
 
       if (activeOrderItem?.production_order_item_id) {
         await productionApi.updateProductionItemStatus(activeOrderItem.production_order_item_id, ProductionStatus.completed);
-        // Update the order status in local state instead of removing it
-        setOrders(prev => 
-          Array.isArray(prev) 
-            ? prev.map(o => 
-                  String(o.production_order_item_id) === String(activeOrderItem.production_order_item_id) 
-                    ? { ...o, status: ProductionStatus.completed }
-                    : o
-                )
-            : prev
-        );
       }
 
+      // Reset forms
+      setInputForm({
+        input_width: "",
+        color_id: "",
+        batch_id: "",
+        thickness: "0.6",
+        input_length: "",
+        type_item: TypeItem.Machine,
+        source: "slitting",
+        destination: "gluing",
+        notes: ""
+      });
       setOutputForm({ notes: "" });
       setOutputItems([{ id: 1, length: "", qrUrl: "", qrData: "" }]);
       setActiveOrderItem(null);
       setIoMode("input");
+      setShowProcessConfirmDialog(false);
+      setPendingProcess(null);
     } catch (error) {
-      console.error("Error creating cutting process:", error);
+      console.error(error);
       toast.error(error?.message || "فشل في إنشاء عملية القص");
+    }
+  };
+
+  const requestDeleteProcess = (process) => {
+    setPendingDeleteProcess(process);
+    setShowDeleteProcessDialog(true);
+  };
+
+  const confirmDeleteProcess = async () => {
+    if (!pendingDeleteProcess?.process_id) return;
+    try {
+      await productionProcessApi.deleteProcess(pendingDeleteProcess.process_id);
+      setProcesses((prev) => prev.filter((p) => p.process_id !== pendingDeleteProcess.process_id));
+      toast.success("تم حذف عملية القص بنجاح");
+      setShowDeleteProcessDialog(false);
+      setPendingDeleteProcess(null);
+    } catch (error) {
+      console.error(error);
+      toast.error("فشل في حذف عملية القص");
+    }
+  };
+
+  const toggleProcessSelection = (processId) => {
+    setSelectedProcesses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(processId)) {
+        newSet.delete(processId);
+      } else {
+        newSet.add(processId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleAllProcessesSelection = () => {
+    if (selectedProcesses.size === processes.length) {
+      setSelectedProcesses(new Set());
+    } else {
+      setSelectedProcesses(new Set(processes.map(p => p.process_id)));
+    }
+  };
+
+  const requestMultiDeleteProcesses = () => {
+    if (selectedProcesses.size === 0) {
+      toast.error("يرجى تحديد عملية واحدة على الأقل");
+      return;
+    }
+    setShowMultiDeleteDialog(true);
+  };
+
+  const confirmMultiDeleteProcesses = async () => {
+    try {
+      const ids = Array.from(selectedProcesses);
+      await productionProcessApi.deleteProcesses(ids);
+      setProcesses((prev) => prev.filter((p) => !selectedProcesses.has(p.process_id)));
+      toast.success(`تم حذف ${ids.length} عملية قص بنجاح`);
+      setSelectedProcesses(new Set());
+      setShowMultiDeleteDialog(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("فشل في حذف عمليات القص");
     }
   };
 
@@ -1061,58 +1153,106 @@ export default function CuttingManager() {
                   <div className="text-sm">لم يتم تسجيل عمليات القص بعد</div>
                 </div>
               ) : (
-                <div className="divide-y">
-                  <div className="p-2 bg-gray-50 text-xs font-bold grid grid-cols-12 gap-2">
-                    <div>#</div>
-                    <div>العرض</div>
-                    <div>اللون</div>
-                    <div>الطبخة</div>
-                    <div>الطول</div>
-                    <div>النوع</div>
-                    <div>الطول المخرج</div>
-                    <div>الوجهة</div>
-                    <div>المستخدم</div>
-                    <div>التوقيت</div>
-                    <div>الملاحظات</div>
-                    <div>QR</div>
+                <div>
+                  {/* Multi-select controls */}
+                  <div className="p-2 bg-gray-100 border-b flex items-center justify-between sticky top-0 z-10">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedProcesses.size === processes.length && processes.length > 0}
+                        onChange={toggleAllProcessesSelection}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-600">
+                        تحديد الكل ({selectedProcesses.size}/{processes.length})
+                      </span>
+                    </div>
+                    {selectedProcesses.size > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={requestMultiDeleteProcesses}
+                        className="text-xs"
+                      >
+                        <Trash className="w-3 h-3 ml-1" />
+                        حذف المحدد ({selectedProcesses.size})
+                      </Button>
+                    )}
                   </div>
-                  {processes.map(proc => {
-                    const colorInfo = proc.color || colors.find(c => String(c.color_id) === String(proc.color_id));
-                    const colorName = colorInfo?.color_name || "-";
-                    const colorCode = colorInfo?.color_code || "-";
-                    const batchNumber = proc.batch?.batch_number || batches.find(b => String(b.batch_id) === String(proc.batch_id))?.batch_number || "-";
-                    return (
-                      <div key={proc.process_id} className="p-3">
-                        <div className="grid grid-cols-12 gap-2 text-xs">
-                          <div>#{proc.process_id}</div>
-                          <div>{proc.input_width}</div>
-                          <div>{colorName} ({colorCode})</div>
-                          <div>{batchNumber}</div>
-                          <div>{proc.input_length}</div>
-                          <div>{proc.type_item === TypeItem.Presser ? "كوي" : "مكنة"}</div>
-                          <div>{proc.output_length}</div>
-                          <div>{formatDestination(proc.destination)}</div>
-                          <div>{proc.user?.full_name || proc.user?.username || "-"}</div>
-                          <div>{formatDate(proc.created_at)}</div>
-                          <div>{proc.notes || "-"}</div>
-                          <div>
-                            <button
-                              onClick={() => {
-                                const qrData = buildOutputQrData(proc.output_length);
-                                const footer = buildOutputQrFooter(proc.output_length);
-                                const url = getQrUrl(qrData);
-                                printQr(url, `QR - قص #${proc.process_id}`, footer);
-                              }}
-                              className="text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg"
-                              title="طباعة QR"
-                            >
-                              <Printer className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-8 z-10">
+                      <tr className="text-xs font-bold">
+                        <th className="p-2 text-center border-b"></th>
+                        <th className="p-2 text-center border-b">#</th>
+                        <th className="p-2 text-center border-b">العرض</th>
+                        <th className="p-2 text-center border-b">اللون</th>
+                        <th className="p-2 text-center border-b">الطبخة</th>
+                        <th className="p-2 text-center border-b">الطول</th>
+                        <th className="p-2 text-center border-b">النوع</th>
+                        <th className="p-2 text-center border-b">الطول المخرج</th>
+                        <th className="p-2 text-center border-b">الوجهة</th>
+                        <th className="p-2 text-center border-b">المستخدم</th>
+                        <th className="p-2 text-center border-b">التوقيت</th>
+                        <th className="p-2 text-center border-b">ملاحظات</th>
+                        <th className="p-2 text-center border-b">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {processes.map(proc => {
+                        const colorInfo = proc.color || colors.find(c => String(c.color_id) === String(proc.color_id));
+                        const colorName = colorInfo?.color_name || "-";
+                        const colorCode = colorInfo?.color_code || "-";
+                        const batchNumber = proc.batch?.batch_number || batches.find(b => String(b.batch_id) === String(proc.batch_id))?.batch_number || "-";
+                        return (
+                          <tr key={proc.process_id} className={`text-xs border-b ${selectedProcesses.has(proc.process_id) ? 'bg-blue-50' : ''} hover:bg-gray-50`}>
+                            <td className="p-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedProcesses.has(proc.process_id)}
+                                onChange={() => toggleProcessSelection(proc.process_id)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="p-2 text-center">#{proc.process_id}</td>
+                            <td className="p-2 text-center">{proc.input_width}</td>
+                            <td className="p-2 text-center">{colorName} ({colorCode})</td>
+                            <td className="p-2 text-center">{batchNumber}</td>
+                            <td className="p-2 text-center">{proc.input_length}</td>
+                            <td className="p-2 text-center">{proc.type_item === TypeItem.Presser ? "كوي" : "مكنة"}</td>
+                            <td className="p-2 text-center">{proc.output_length}</td>
+                            <td className="p-2 text-center">{formatDestination(proc.destination)}</td>
+                            <td className="p-2 text-center">{proc.user?.full_name || proc.user?.username || "-"}</td>
+                            <td className="p-2 text-center">{formatDate(proc.created_at)}</td>
+                            <td className="p-2 text-center">{proc.notes || "-"}</td>
+                            <td className="p-2 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => {
+                                    const qrData = buildOutputQrData(proc.output_length);
+                                    const footer = buildOutputQrFooter(proc.output_length);
+                                    const url = getQrUrl(qrData);
+                                    printQr(url, `QR - قص #${proc.process_id}`, footer);
+                                  }}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-700 hover:bg-emerald-50"
+                                  title="طباعة QR"
+                                >
+                                  <Printer className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => requestDeleteProcess(proc)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-red-600 hover:bg-red-50"
+                                  title="حذف عملية القص"
+                                >
+                                  <Trash className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
@@ -1270,6 +1410,156 @@ export default function CuttingManager() {
             هل أنت متأكد من إتمام الطلب #{pendingCompleteItem?.production_order_id}
             {" "}
             ونقله إلى المكتملة؟
+          </div>
+        </div>
+      </StyledDialog>
+
+      <StyledDialog
+        isOpen={showProcessConfirmDialog}
+        onOpenChange={(open) => {
+          setShowProcessConfirmDialog(open);
+          if (!open) setPendingProcess(null);
+        }}
+        title="تأكيد عملية القص"
+        contentClassName="max-w-2xl w-full"
+        onCancel={() => {
+          setShowProcessConfirmDialog(false);
+          setPendingProcess(null);
+        }}
+        onConfirm={confirmCreateProcess}
+        confirmLabel="تأكيد العملية"
+        cancelLabel="إلغاء"
+      >
+        <div className="text-sm text-gray-700">
+          هل تريد تنفيذ عملية القص؟
+          <div className="mt-4">
+            <table className="w-full border-collapse border border-gray-200 rounded-lg overflow-hidden">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">العرض</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول المدخل</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">السماكة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول المخرج</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المصدر</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="hover:bg-gray-50">
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.input_width || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.input_length || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.thickness || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                    {(() => {
+                      const color = colors.find(c => String(c.color_id) === String(pendingProcess?.color_id));
+                      return color ? `${color.color_name} (${color.color_code})` : "-";
+                    })()}
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                    {(() => {
+                      const batch = batches.find(b => String(b.batch_id) === String(pendingProcess?.batch_id));
+                      return batch ? batch.batch_number : "-";
+                    })()}
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm font-bold text-blue-600">
+                    {outputItems.map(item => item.length).filter(length => length).join(', ') || '-'}
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                      التشريح
+                    </span>
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                    <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                      اللصق
+                    </span>
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.notes || "-"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </StyledDialog>
+
+      <StyledDialog
+        isOpen={showDeleteProcessDialog}
+        onOpenChange={(open) => {
+          setShowDeleteProcessDialog(open);
+          if (!open) setPendingDeleteProcess(null);
+        }}
+        title="تأكيد حذف عملية القص"
+        contentClassName="max-w-md w-full"
+        onCancel={() => {
+          setShowDeleteProcessDialog(false);
+          setPendingDeleteProcess(null);
+        }}
+        onConfirm={confirmDeleteProcess}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        confirmVariant="destructive"
+      >
+        <div className="text-sm text-gray-700">
+          هل تريد حذف عملية القص 
+          <span className="font-bold"> #{pendingDeleteProcess?.process_id || ""}</span>؟
+          <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div><span className="font-medium">العرض:</span> {pendingDeleteProcess?.input_width || "-"}</div>
+              <div><span className="font-medium">الطول:</span> {pendingDeleteProcess?.input_length || "-"}</div>
+              <div><span className="font-medium">السماكة:</span> {pendingDeleteProcess?.thickness || "-"}</div>
+              <div><span className="font-medium">اللون:</span> {(() => {
+                const color = colors.find(c => String(c.color_id) === String(pendingDeleteProcess?.color_id));
+                return color ? `${color.color_name} (${color.color_code})` : "-";
+              })()}</div>
+              <div><span className="font-medium">الطبخة:</span> {(() => {
+                const batch = batches.find(b => String(b.batch_id) === String(pendingDeleteProcess?.batch_id));
+                return batch ? batch.batch_number : "-";
+              })()}</div>
+              <div><span className="font-medium">المصدر:</span> التشريح</div>
+              <div><span className="font-medium">الوجهة:</span> اللصق</div>
+              <div><span className="font-medium">الملاحظات:</span> {pendingDeleteProcess?.notes || "-"}</div>
+            </div>
+          </div>
+          <div className="mt-3 text-red-600 text-xs font-medium">
+            ⚠️ هذا الإجراء لا يمكن التراجع عنه
+          </div>
+        </div>
+      </StyledDialog>
+
+      <StyledDialog
+        isOpen={showMultiDeleteDialog}
+        onOpenChange={(open) => {
+          setShowMultiDeleteDialog(open);
+          if (!open) setSelectedProcesses(new Set());
+        }}
+        title="تأكيد حذف عمليات القص"
+        contentClassName="max-w-md w-full"
+        onCancel={() => {
+          setShowMultiDeleteDialog(false);
+          setSelectedProcesses(new Set());
+        }}
+        onConfirm={confirmMultiDeleteProcesses}
+        confirmLabel="حذف الكل"
+        cancelLabel="إلغاء"
+        confirmVariant="destructive"
+      >
+        <div className="text-sm text-gray-700">
+          هل تريد حذف 
+          <span className="font-bold"> {selectedProcesses.size} </span>
+          عملية قص؟
+          <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="text-xs text-red-600 font-medium">
+              ⚠️ سيتم حذف جميع العمليات المحددة دفعة واحدة
+            </div>
+            <div className="mt-2 text-xs text-gray-600">
+              العناصر التي سيتم حذفها: #{Array.from(selectedProcesses).join(', #')}
+            </div>
+          </div>
+          <div className="mt-3 text-red-600 text-xs font-medium">
+            ⚠️ هذا الإجراء لا يمكن التراجع عنه
           </div>
         </div>
       </StyledDialog>

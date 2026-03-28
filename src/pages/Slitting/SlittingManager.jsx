@@ -1,5 +1,5 @@
 ﻿// src/pages/Slitting/SlittingManager.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { sliteApi } from "../../api/sliteApi";
@@ -20,16 +20,17 @@ import {
   Package,
   ArrowRight,
   Calculator,
+  X,
   AlertCircle,
   Check,
-  X,
   Eye,
   Printer,
   RefreshCw,
   Hash,
   Search,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Trash
 } from "lucide-react";
 import { ProductionStatus, ProductionType, TypeItem, UserRole } from "../../types/enums";
 
@@ -49,6 +50,7 @@ const ROLE_LABELS = {
 export default function SlittingManager() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const notificationDedupRef = useRef(new Map());
 
   useEffect(() => {
@@ -67,6 +69,12 @@ export default function SlittingManager() {
 
   const [pendingCompleteItem, setPendingCompleteItem] = useState(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [pendingSlite, setPendingSlite] = useState(null);
+  const [showSliteConfirmDialog, setShowSliteConfirmDialog] = useState(false);
+  const [pendingDeleteSlite, setPendingDeleteSlite] = useState(null);
+  const [showDeleteSliteDialog, setShowDeleteSliteDialog] = useState(false);
+  const [selectedSlites, setSelectedSlites] = useState(new Set());
+  const [showMultiDeleteDialog, setShowMultiDeleteDialog] = useState(false);
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderItems, setOrderItems] = useState([]);
@@ -78,7 +86,7 @@ export default function SlittingManager() {
   const [activeOrderItem, setActiveOrderItem] = useState(null);
 
   const [inputForm, setInputForm] = useState({
-    input_width: "",
+    input_width: "66",
     color_id: "",
     batch_id: "",
     input_length: "",
@@ -92,15 +100,18 @@ export default function SlittingManager() {
     output_length: "",
     output_length_22: "",
     output_length_44: "",
-    notes: ""
+    notes: "",
+    calculationMode: "" // "22x3" or "44x1-22x1"
   });
+  const [selectedOutputPattern, setSelectedOutputPattern] = useState(""); // "22x3" or "44x1-22x1"
   const [outputItems, setOutputItems] = useState([
     { id: 1, length: "", qrUrl: "", qrData: "" }
   ]);
 
-  const [currentInput, setCurrentInput] = useState("input_length");
   const [showHeader, setShowHeader] = useState(true);
+  const [currentInput, setCurrentInput] = useState("input_length");
   const [ordersTab, setOrdersTab] = useState("current");
+  const [expandedSlites, setExpandedSlites] = useState(new Set()); // For managing expanded rows
   const [selectSearch, setSelectSearch] = useState({
     input_width: "",
     color_id: "",
@@ -109,6 +120,76 @@ export default function SlittingManager() {
     source: "",
     destination: ""
   });
+  const toggleSliteDetails = (sliteId) => {
+    setExpandedSlites(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sliteId)) {
+        newSet.delete(sliteId);
+      } else {
+        newSet.add(sliteId);
+      }
+      return newSet;
+    });
+  };
+
+  const translateTypeItem = (value) => {
+    const translations = {
+      "Presser": "كوي",
+      "Machine": "مكنة",
+      "كوي": "Presser",
+      "مكنة": "Machine"
+    };
+    return translations[value] || value;
+  };
+
+  const translateSource = (value) => {
+    const translations = {
+      "warehouse": "المستودع",
+      "slitting": "التشريح",
+      "production": "الإنتاج",
+      "cutting": "القص",
+      "gluing": "اللصق",
+      "المستودع": "warehouse",
+      "التشريح": "slitting",
+      "الإنتاج": "production",
+      "القص": "cutting",
+      "اللصق": "gluing"
+    };
+    return translations[value] || value;
+  };
+
+  const handleCalculationModeSelect = (mode) => {
+    setSelectedOutputPattern(mode);
+    setOutputForm(prev => {
+      const newForm = { ...prev, calculationMode: mode };
+
+      if (mode === "22x3") {
+        // Set default values for 22*3 calculation
+        newForm.output_length_22 = "100";
+        newForm.output_length_44 = "";
+        // Set output_length string format
+        newForm.output_length = "3x22";
+      } else if (mode === "44x1-22x1") {
+        // Set default values for 44*1-22*1 calculation
+        newForm.output_length_22 = "100";
+        newForm.output_length_44 = "100";
+        // Set output_length string format
+        newForm.output_length = "1x44, 1x22";
+      }
+
+      return newForm;
+    });
+  };
+
+  const calculateOutputLength = (inputLength, outputLength22, outputLength44, calculationMode) => {
+    if (calculationMode === "22x3") {
+      return "3x22";
+    } else if (calculationMode === "44x1-22x1") {
+      return "1x44, 1x22";
+    }
+    return "0";
+  };
+
   const normalizeDecimal = (value) => String(value ?? "").replace(",", ".");
   const toNumber = (value) => {
     const normalized = normalizeDecimal(value);
@@ -228,6 +309,16 @@ export default function SlittingManager() {
     loadOrders();
     loadSlites();
   }, []);
+
+  useEffect(() => {
+    const calculatedLength = calculateOutputLength(
+      inputForm.input_length,
+      outputForm.output_length_22,
+      outputForm.output_length_44,
+      outputForm.calculationMode
+    );
+    setOutputForm(prev => ({ ...prev, output_length: calculatedLength }));
+  }, [inputForm.input_length, outputForm.output_length_22, outputForm.output_length_44, outputForm.calculationMode]);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -375,28 +466,45 @@ export default function SlittingManager() {
     setIoMode("output");
   };
 
-  const handleCreateSlite = async () => {
+  const handleCreateSlite = () => {
     try {
-      if (!inputForm.input_width || !inputForm.color_id || !inputForm.batch_id || !inputForm.input_length || !inputForm.type_item) {
+      if (!inputForm.input_width || !inputForm.color_id || !inputForm.batch_id || !inputForm.input_length) {
         toast.error("يرجى إدخال جميع بيانات الإدخال المطلوبة");
         return;
       }
 
+      if (!outputForm.calculationMode) {
+        toast.error("يرجى اختيار طريقة حساب الطول الخارجي");
+        return;
+      }
+
+      // Prepare payload for confirmation dialog
       const payload = {
         color_id: Number(inputForm.color_id),
         batch_id: Number(inputForm.batch_id),
-        type_item: inputForm.type_item,
+        type_item: "Presser", // Default value since we removed the field
         input_length: Number(inputForm.input_length),
-        output_length: String(outputForm.output_length ?? ""),
+        output_length: outputForm.output_length, // String format: "3x22" or "1x44, 1x22"
         input_width: Number(inputForm.input_width),
-        output_length_22: Number(outputForm.output_length_22 || 0),
-        output_length_44: Number(outputForm.output_length_44 || 0),
-        source: inputForm.source,
-        destination: inputForm.destination,
+        output_length_22: outputForm.calculationMode === "22x3" ? 300 : 100, // 100 or 300 as required
+        ...(outputForm.calculationMode === "44x1-22x1" && { output_length_44: 100 }), // Only send for 44x1-22x1 mode
+        source: "warehouse", // Default value since we removed the field
+        destination: "slitting", // Default value since we removed the field
         notes: outputForm.notes || inputForm.notes
       };
 
-      const response = await sliteApi.createSlite(payload);
+      // Set pending slite data and show confirmation dialog
+      setPendingSlite(payload);
+      setShowSliteConfirmDialog(true);
+    } catch (error) {
+      console.error(error);
+      toast.error("فشل في إعداد بيانات التشريح");
+    }
+  };
+
+  const confirmCreateSlite = async () => {
+    try {
+      const response = await sliteApi.createSlite(pendingSlite);
       if (response?.success === false || response?.error) {
         throw new Error(response?.message || response?.error || "فشل في الإخراج");
       }
@@ -409,12 +517,90 @@ export default function SlittingManager() {
         await productionApi.updateProductionItemStatus(activeOrderItem.production_order_item_id, ProductionStatus.completed);
       }
 
-      setOutputForm({ output_length: "", output_length_22: "", output_length_44: "", notes: "" });
+      // Reset forms
+      setInputForm({
+        input_width: "66",
+        color_id: "",
+        batch_id: "",
+        input_length: "",
+        type_item: "",
+        source: "warehouse",
+        destination: "slitting",
+        notes: ""
+      });
+      setOutputForm({
+        calculationMode: "",
+        output_length: "",
+        notes: ""
+      });
       setActiveOrderItem(null);
       setIoMode("input");
+      setShowSliteConfirmDialog(false);
+      setPendingSlite(null);
     } catch (error) {
-      console.error("Error creating slite:", error);
+      console.error(error);
       toast.error(error?.message || "فشل في إنشاء عملية التشريح");
+    }
+  };
+
+  const requestDeleteSlite = (slite) => {
+    setPendingDeleteSlite(slite);
+    setShowDeleteSliteDialog(true);
+  };
+
+  const confirmDeleteSlite = async () => {
+    if (!pendingDeleteSlite?.slite_id) return;
+    try {
+      await sliteApi.deleteSlite(pendingDeleteSlite.slite_id);
+      setSlites((prev) => prev.filter((s) => s.slite_id !== pendingDeleteSlite.slite_id));
+      toast.success("تم حذف عملية التشريح بنجاح");
+      setShowDeleteSliteDialog(false);
+      setPendingDeleteSlite(null);
+    } catch (error) {
+      console.error(error);
+      toast.error("فشل في حذف عملية التشريح");
+    }
+  };
+
+  const toggleSliteSelection = (sliteId) => {
+    setSelectedSlites(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sliteId)) {
+        newSet.delete(sliteId);
+      } else {
+        newSet.add(sliteId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleAllSlitesSelection = () => {
+    if (selectedSlites.size === slites.length) {
+      setSelectedSlites(new Set());
+    } else {
+      setSelectedSlites(new Set(slites.map(s => s.slite_id)));
+    }
+  };
+
+  const requestMultiDeleteSlites = () => {
+    if (selectedSlites.size === 0) {
+      toast.error("يرجى تحديد عملية واحدة على الأقل");
+      return;
+    }
+    setShowMultiDeleteDialog(true);
+  };
+
+  const confirmMultiDeleteSlites = async () => {
+    try {
+      const ids = Array.from(selectedSlites);
+      await sliteApi.deleteSlites(ids);
+      setSlites((prev) => prev.filter((s) => !selectedSlites.has(s.slite_id)));
+      toast.success(`تم حذف ${ids.length} عملية تشريح بنجاح`);
+      setSelectedSlites(new Set());
+      setShowMultiDeleteDialog(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("فشل في حذف عمليات التشريح");
     }
   };
 
@@ -610,8 +796,21 @@ export default function SlittingManager() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50" dir="rtl">
+    <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
+      {/* Header Toggle Button */}
+      <div className="absolute left-0 bottom-2 z-40">
+        <Button
+          type="button"
+          onClick={() => setShowHeader((prev) => !prev)}
+          className="h-10 w-10 rounded-full border-0 bg-secondary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 hover:bg-primary-f active:scale-95"
+          title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
+        >
+          {showHeader ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+        </Button>
+      </div>
+
       {/* Header */}
+      {showHeader && (
       <div className="flex-shrink-0">
         <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
           <div className="flex items-center gap-3">
@@ -627,10 +826,7 @@ export default function SlittingManager() {
             <Button
               size="lg"
               variant="outline"
-              onClick={() => {
-                logout();
-                navigate("/login");
-              }}
+              onClick={() => setShowLogoutDialog(true)}
               className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
             >
               <ArrowRight className="w-4 h-4 ml-2 rotate-180" />
@@ -639,48 +835,28 @@ export default function SlittingManager() {
           </div>
         </div>
       </div>
+      )}
+
+      {!showHeader && (
+      <div className="flex-shrink-0 text-stone-50">
+        <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
+          </div>
+          <div className="h-10 w-px" />
+          <div className="min-w-0 text-right">
+            <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+          </div>
+        </div>
+      </div>
+      )}
 
       {/* Main */}
-      <div className="flex-1 min-h-0 flex flex-col gap-4 p-4 overflow-hidden">
-        {/* Top Area - Inputs + Orders */}
+      <div className="flex-1 flex flex-col gap-4 p-4 overflow-hidden">
+        {/* Upper */}
         <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
-          {/* Orders Table */}
-          <Card className="p-4 flex flex-col space-y-4 min-h-0">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Package className="w-5 h-5 text-orange-600" />
-                طلبات 
-              </h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setOrdersTab("current")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${ordersTab === "current" ? "bg-orange-100 text-orange-700" : "text-gray-600 hover:bg-gray-100"}`}
-              >
-                قيد الانتظار ({currentOrders.length})
-              </button>
-              <button
-                onClick={() => setOrdersTab("completed")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${ordersTab === "completed" ? "bg-green-100 text-green-700" : "text-gray-600 hover:bg-gray-100"}`}
-              >
-                المكتملة ({completedOrders.length})
-              </button>
-            </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadOrders}
-                disabled={loadingOrders}
-              >
-                <RefreshCw className={`w-4 h-4 ml-2 ${loadingOrders ? 'animate-spin' : ''}`} />
-                تحديث
-              </Button>
-            </div>
-
-            {renderOrdersTable(ordersTab === "current" ? currentOrders : completedOrders)}
-          </Card>
-
-          {/* Input/Output Form */}
-          <Card className="p-4 flex flex-col min-h-0">
+          {/* Left Upper - Input/Output Form */}
+          <Card className="p-4 flex flex-col order-2 min-h-0">
             <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
               <ArrowRight className="w-5 h-5 text-blue-600" />
               المدخلات
@@ -768,16 +944,26 @@ export default function SlittingManager() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label>العرض</Label>
-                          <FilterSelect
-                            value={inputForm.input_width}
-                            onChange={(e) => setInputForm(prev => ({ ...prev, input_width: e.target.value }))}
-                            options={[
-                              { value: "22", label: "22" },
-                              { value: "44", label: "44" },
-                              { value: "66", label: "66" }
-                            ]}
-                            placeholder="اختر العرض"
-                          />
+                          <div className="grid grid-cols-3 gap-2 mt-2">
+                            {["22", "44", "66"].map((width) => (
+                              <button
+                                key={width}
+                                type="button"
+                                onClick={() => setInputForm(prev => ({ ...prev, input_width: width }))}
+                                className={`
+                                  rounded-xl border-2 text-base font-medium
+                                  transition-all hover:scale-[1.02] active:scale-[0.98]
+                                  flex items-center justify-center p-3
+                                  ${inputForm.input_width === width
+                                    ? "border-secondary-f bg-secondary-f text-white shadow-lg"
+                                    : "border-gray-300 bg-white hover:border-secondary-f"
+                                  }
+                                `}
+                              >
+                                {width}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                         <div>
                           <Label>اللون</Label>
@@ -807,41 +993,53 @@ export default function SlittingManager() {
                             placeholder="0"
                           />
                         </div>
-                        <div>
-                          <Label>النوع</Label>
-                          <FilterSelect
-                            value={inputForm.type_item}
-                            onChange={(e) => setInputForm(prev => ({ ...prev, type_item: e.target.value }))}
-                            options={[
-                              { value: TypeItem.Machine, label: "مكنة" },
-                              { value: TypeItem.Presser, label: "كوي" }
-                            ]}
-                            placeholder="اختر النوع"
-                          />
-                        </div>
-                        <div>
-                          <Label>المصدر</Label>
-                          <FilterSelect
-                            value={inputForm.source}
-                            onChange={(e) => setInputForm(prev => ({ ...prev, source: e.target.value }))}
-                            options={[
-                              { value: "warehouse", label: "المستودع" },
-                              { value: "slitting", label: "التشريح" }
-                            ]}
-                            placeholder="المصدر"
-                          />
-                        </div>
-                        <div>
-                          <Label>الوجهة</Label>
-                          <FilterSelect
-                            value={inputForm.destination}
-                            onChange={(e) => setInputForm(prev => ({ ...prev, destination: e.target.value }))}
-                            options={[
-                              { value: "slitting", label: "التشريح" },
-                              { value: "production", label: "الإنتاج" }
-                            ]}
-                            placeholder="الوجهة"
-                          />
+                        <div className="col-span-2">
+                          <Label>الطول الخارجي</Label>
+                          <div className="space-y-3">
+                            {/* <div className="text-sm text-gray-600 mb-2">اختر نمط التوزيع:</div> */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <Button
+                                type="button"
+                                variant={selectedOutputPattern === "22x3" ? "default" : "outline"}
+                                className={`h-16 p-4 flex flex-col items-center justify-center ${selectedOutputPattern === "22x3"
+                                    ? "bg-blue-600 text-white border-blue-600"
+                                    : "border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                                  }`}
+                                onClick={() => handleCalculationModeSelect("22x3")}
+                              >
+                                <div className="text-lg font-bold">22 × 3</div>
+                                {/* <div className="text-xs opacity-80">3 قطع من 22 سم</div> */}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={selectedOutputPattern === "44x1-22x1" ? "default" : "outline"}
+                                className={`h-16 p-4 flex flex-col items-center justify-center ${selectedOutputPattern === "44x1-22x1"
+                                    ? "bg-blue-600 text-white border-blue-600"
+                                    : "border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                                  }`}
+                                onClick={() => handleCalculationModeSelect("44x1-22x1")}
+                              >
+                                <div className="text-lg font-bold">44 × 1 - 22 × 1</div>
+                                {/* <div className="text-xs opacity-80">1 قطعة 44 سم + 1 قطعة 22 سم</div> */}
+                              </Button>
+                            </div>
+                            {/* {selectedOutputPattern && (
+                              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="text-sm text-blue-800">
+                                  <div className="font-bold mb-1">النمط المحدد:</div>
+                                  {selectedOutputPattern === "22x3" ? (
+                                    <div>
+                                      <span className="font-bold">3x22</span> - سيتم إرسال: output_length_22 = 300
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <span className="font-bold">1x44, 1x22</span> - سيتم إرسال: output_length_22 = 100, output_length_44 = 100
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )} */}
+                          </div>
                         </div>
                         <div className="col-span-2">
                           <Label>ملاحظات</Label>
@@ -866,23 +1064,48 @@ export default function SlittingManager() {
             </div>
           </Card>
 
+          {/* Right Upper - Orders Table */}
+          <Card className="p-4 flex flex-col space-y-4 order-1 min-h-0">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Package className="w-5 h-5 text-orange-600" />
+                طلبات
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setOrdersTab("current")}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${ordersTab === "current" ? "bg-orange-100 text-orange-700" : "text-gray-600 hover:bg-gray-100"}`}
+                >
+                  قيد الانتظار ({currentOrders.length})
+                </button>
+                <button
+                  onClick={() => setOrdersTab("completed")}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${ordersTab === "completed" ? "bg-green-100 text-green-700" : "text-gray-600 hover:bg-gray-100"}`}
+                >
+                  المكتملة ({completedOrders.length})
+                </button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadOrders}
+                  disabled={loadingOrders}
+                >
+                  <RefreshCw className={`w-4 h-4 ml-2 ${loadingOrders ? 'animate-spin' : ''}`} />
+                  تحديث
+                </Button>
+              </div>
+            </div>
+
+            {renderOrdersTable(ordersTab === "current" ? currentOrders : completedOrders)}
+          </Card>
         </div>
 
-        {/* Bottom - Outputs Table */}
-        <div className="flex gap-4">
-          {/* Number Pad */}
-          <Card className="p-4 pb-0 w-[260px] flex-shrink-0 self-stretch flex flex-col">
-            <div className="grid grid-cols-3 gap-2 flex-1 content-start overflow-auto">
-              {[9, 8, 7, 6, 5, 4, 3, 2, 1].map((n) => (
-                <Button key={n} variant="outline" className="h-12 text-lg font-bold" onClick={() => handleNumberClick(n)}>{n}</Button>
-              ))}
-              <Button variant="outline" className="h-12 text-lg" onClick={handleClear}><X className="w-4 h-4" /></Button>
-              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleNumberClick(0)}>0</Button>
-              <Button variant="outline" className="h-12 text-lg" onClick={handleBackspace}><ArrowRight className="w-4 h-4" /></Button>
-            </div>
-          </Card>
-          <Card className="p-4 flex flex-col flex-1 space-y-4">
-            <div className="flex items-center justify-between mb-2">
+        {/* Bottom */}
+        <div className="flex gap-4 flex-1 min-h-0 flex-row-reverse">
+
+          {/* Outputs Table */}
+          <Card className="p-4 flex flex-col flex-1 space-y-4 min-h-0">
+            {/* <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Package className="w-5 h-5 text-purple-600" />
                 جدول المخرجات
@@ -891,8 +1114,8 @@ export default function SlittingManager() {
                 <RefreshCw className={`w-4 h-4 ml-2 ${loadingSlites ? "animate-spin" : ""}`} />
                 تحديث
               </Button>
-            </div>
-            <div className="flex-1 min-h-[200px] overflow-auto border rounded-lg bg-white">
+            </div> */}
+            <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
               {loadingSlites ? (
                 <div className="flex items-center justify-center h-32">
                   <LoadingState />
@@ -905,66 +1128,214 @@ export default function SlittingManager() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  <div className="p-2 bg-gray-50 text-xs font-bold grid grid-cols-12 gap-2">
-                    <div>العرض</div>
-                    <div>اللون</div>
-                    <div>رقم الطبخة</div>
-                    <div>الطول</div>
-                    <div>النوع</div>
-                    <div>المصدر</div>
-                    <div>الوجهة</div>
-                    <div>1x22</div>
-                    <div>1x44</div>
-                    <div>المستخدم</div>
-                    <div>التوقيت</div>
-                    <div>ملاحظات</div>
-                  </div>
-                  {slites.map(slite => (
-                    <div key={slite.slite_id} className="p-3">
-                      <div className="grid grid-cols-12 gap-2 text-xs">
-                        <div>{slite.input_width}</div>
-                        <div>
-                          {colors.find(c => String(c.color_id) === String(slite.color_id))?.color_name || "-"}{" "}
-                          ({colors.find(c => String(c.color_id) === String(slite.color_id))?.color_code || "-"})
-                        </div>
-                        <div>{batches.find(b => String(b.batch_id) === String(slite.batch_id))?.batch_number || "-"}</div>
-                        <div>{slite.input_length}</div>
-                        <div>{slite.type_item}</div>
-                        <div>{slite.source}</div>
-                        <div>{slite.destination}</div>
-                        <div>{slite.output_length_22 || "-"}</div>
-                        <div>{slite.output_length_44 || "-"}</div>
-                        <div>{slite.user?.full_name || slite.user?.username || "-"}</div>
-                        <div>{formatDate(slite.created_at)}</div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate">{slite.notes || "-"}</span>
-                          <button
-                            onClick={() => {
-                              const qrData = buildSliteQrData(slite);
-                              const qrFooter = buildSliteQrFooter(slite);
-                              const url = getQrUrl(qrData);
-                              printQr(url, `QR - تشريح #${slite.slite_id}`, qrFooter);
-                            }}
-                            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg p-1.5 text-violet-700 hover:bg-violet-50"
-                            title="طباعة QR"
-                            type="button"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
+                  {/* Multi-select controls */}
+                  <div className="p-2 bg-gray-100 border-b flex items-center justify-between sticky top-0 z-10">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedSlites.size === slites.length && slites.length > 0}
+                        onChange={toggleAllSlitesSelection}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-gray-600">
+                        تحديد الكل ({selectedSlites.size}/{slites.length})
+                      </span>
                     </div>
-                  ))}
+                    {selectedSlites.size > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={requestMultiDeleteSlites}
+                        className="text-xs"
+                      >
+                        <Trash className="w-3 h-3 ml-1" />
+                        حذف المحدد ({selectedSlites.size})
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-8 z-10">
+                      <tr className="text-xs font-bold">
+                        <th className="p-2 text-center border-b"></th>
+                        <th className="p-2 text-center border-b">#</th>
+                        <th className="p-2 text-center border-b">العرض</th>
+                        <th className="p-2 text-center border-b">اللون</th>
+                        <th className="p-2 text-center border-b">رقم الطبخة</th>
+                        <th className="p-2 text-center border-b">الطول</th>
+                        <th className="p-2 text-center border-b">الطول الخارجي</th>
+                        <th className="p-2 text-center border-b">النوع</th>
+                        <th className="p-2 text-center border-b">المصدر</th>
+                        <th className="p-2 text-center border-b">الوجهة</th>
+                        <th className="p-2 text-center border-b">1x22</th>
+                        <th className="p-2 text-center border-b">1x44</th>
+                        <th className="p-2 text-center border-b">المستخدم</th>
+                        <th className="p-2 text-center border-b">التوقيت</th>
+                        <th className="p-2 text-center border-b">ملاحظات</th>
+                        <th className="p-2 text-center border-b">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {slites.map(slite => {
+                        const isExpanded = expandedSlites.has(slite.slite_id);
+                        return (
+                          <React.Fragment key={slite.slite_id}>
+                            <tr className={`text-xs border-b ${selectedSlites.has(slite.slite_id) ? 'bg-blue-50' : ''} hover:bg-gray-50`}>
+                              <td className="p-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSlites.has(slite.slite_id)}
+                                  onChange={() => toggleSliteSelection(slite.slite_id)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                              </td>
+                              <td className="p-2 text-center">#{slite.slite_id}</td>
+                              <td className="p-2 text-center">{slite.input_width}</td>
+                              <td className="p-2 text-center">
+                                {colors.find(c => String(c.color_id) === String(slite.color_id))?.color_name || "-"}{" "}
+                                ({colors.find(c => String(c.color_id) === String(slite.color_id))?.color_code || "-"})
+                              </td>
+                              <td className="p-2 text-center">{batches.find(b => String(b.batch_id) === String(slite.batch_id))?.batch_number || "-"}</td>
+                              <td className="p-2 text-center">{slite.input_length}</td>
+                              <td className="p-2 text-center">{slite.output_length || "-"}</td>
+                              <td className="p-2 text-center">{translateTypeItem(slite.type_item)}</td>
+                              <td className="p-2 text-center">{translateSource(slite.source)}</td>
+                              <td className="p-2 text-center">{translateSource(slite.destination)}</td>
+                              <td className="p-2 text-center">{slite.output_length_22 || "-"}</td>
+                              <td className="p-2 text-center">{slite.output_length_44 || "-"}</td>
+                              <td className="p-2 text-center">{slite.user?.full_name || slite.user?.username || "-"}</td>
+                              <td className="p-2 text-center">{formatDate(slite.created_at)}</td>
+                              <td className="p-2 text-center">{slite.notes || "-"}</td>
+                              <td className="p-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    onClick={() => {
+                                      const qrData = buildSliteQrData(slite);
+                                      const qrFooter = buildSliteQrFooter(slite);
+                                      const url = getQrUrl(qrData);
+                                      printQr(url, `QR - تشريح #${slite.slite_id}`, qrFooter);
+                                    }}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-violet-700 hover:bg-violet-50"
+                                    title="طباعة QR"
+                                    type="button"
+                                  >
+                                    <Printer className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => toggleSliteDetails(slite.slite_id)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"
+                                    title={isExpanded ? "إخفاء التفاصيل" : "عرض التفاصيل"}
+                                    type="button"
+                                  >
+                                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  </button>
+                                  <button
+                                    onClick={() => requestDeleteSlite(slite)}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-red-600 hover:bg-red-50"
+                                    title="حذف التشريح"
+                                    type="button"
+                                  >
+                                    <Trash className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                            
+                            {/* Expanded Details Row */}
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan="16" className="p-0">
+                                  <div className="p-4 bg-gray-50 border-b">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                      <div>
+                                        <span className="font-semibold text-gray-600">العرض:</span>
+                                        <span className="ml-2">{slite.input_width} سم</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">الطول المدخل:</span>
+                                        <span className="ml-2">{slite.input_length} سم</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">الطول الخارجي:</span>
+                                        <span className="ml-2">{slite.output_length || "-"}</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">النوع:</span>
+                                        <span className="ml-2">{translateTypeItem(slite.type_item)} ({slite.type_item})</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">المصدر:</span>
+                                        <span className="ml-2">{translateSource(slite.source)} ({slite.source})</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">الوجهة:</span>
+                                        <span className="ml-2">{translateSource(slite.destination)} ({slite.destination})</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">اللون:</span>
+                                        <span className="ml-2">
+                                          {colors.find(c => String(c.color_id) === String(slite.color_id))?.color_name || "-"}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">كود اللون:</span>
+                                        <span className="ml-2">
+                                          {colors.find(c => String(c.color_id) === String(slite.color_id))?.color_code || "-"}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">الطبخة:</span>
+                                        <span className="ml-2">
+                                          {batches.find(b => String(b.batch_id) === String(slite.batch_id))?.batch_number || "-"}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">1x22:</span>
+                                        <span className="ml-2">{slite.output_length_22 || "-"}</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">1x44:</span>
+                                        <span className="ml-2">{slite.output_length_44 || "-"}</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-semibold text-gray-600">المستخدم:</span>
+                                        <span className="ml-2">{slite.user?.full_name || slite.user?.username || "-"}</span>
+                                      </div>
+                                      <div className="col-span-2 md:col-span-3">
+                                        <span className="font-semibold text-gray-600">ملاحظات:</span>
+                                        <span className="ml-2">{slite.notes || "لا توجد ملاحظات"}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
           </Card>
-
           
+          {/* Number Pad */}
+          <Card className="p-4 pb-0 w-[260px] flex-shrink-0 self-stretch flex flex-col">
+            <div className="grid grid-cols-3 gap-2 flex-1 content-start overflow-auto">
+              {[9, 8, 7, 6, 5, 4, 3, 2, 1].map((n) => (
+                <Button key={n} variant="outline" className="h-12 text-lg font-bold" onClick={() => handleNumberClick(n)}>{n}</Button>
+              ))}
+              <Button variant="outline" className="h-12 text-lg" onClick={handleClear}><X className="w-4 h-4" /></Button>
+              <Button variant="outline" className="h-12 text-lg font-bold" onClick={() => handleNumberClick(0)}>0</Button>
+              <Button variant="outline" className="h-12 text-lg" onClick={handleBackspace}><ArrowRight className="w-4 h-4" /></Button>
+            </div>
+          </Card>
 
         </div>
+      </div>
 
-        <StyledDialog
+      <StyledDialog
           isOpen={showOrderDetails}
           onOpenChange={(open) => {
             setShowOrderDetails(open);
@@ -997,21 +1368,23 @@ export default function SlittingManager() {
                 <LoadingState />
               ) : (
                 <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
-                    <thead className="bg-gray-100">
+                  <table className="w-full table-auto border-collapse">
+                    <thead className="bg-gray-100 sticky top-0 z-20">
                       <tr>
-                        {["#", "العرض", "الطول", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
-                          <th key={h} className="p-2 text-center">{h}</th>
+                        {["#", "العرض", "اللون", "الطبخة", "الطول", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
+                          <th key={h} className="p-2 text-center border-b text-sm">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {orderItems.length === 0 ? (
-                        <tr><td colSpan="9" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr>
+                        <tr><td colSpan="11" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr>
                       ) : orderItems.map((item, index) => (
                         <tr key={item.production_order_item_id || index} className="border-t">
                           <td className="p-2 text-center">#{item.production_order_item_id || index + 1}</td>
                           <td className="p-2 text-center">{item.width || "-"}</td>
+                          <td className="p-2 text-center">{getColorLabel(item.color_id)}</td>
+                          <td className="p-2 text-center">{getBatchLabel(item.batch_id)}</td>
                           <td className="p-2 text-center">{item.length || "-"}</td>
                           <td className="p-2 text-center">{formatTypeItem(item.type_item || item.type)}</td>
                           <td className="p-2 text-center">{formatDestination(item.source)}</td>
@@ -1067,11 +1440,161 @@ export default function SlittingManager() {
             هل تريد إتمام الطلب{" "}
             <span className="font-bold">
               #{pendingCompleteItem?.production_order_id || pendingCompleteItem?.production_order_item_id || ""}
-            </span>
-            {" "}ونقله إلى المكتمل؟
+            </span>{" "}
+            ونقله إلى المكتمل؟
           </div>
         </StyledDialog>
-      </div>
+
+        <StyledDialog
+          isOpen={showSliteConfirmDialog}
+          onOpenChange={(open) => {
+            setShowSliteConfirmDialog(open);
+            if (!open) setPendingSlite(null);
+          }}
+          title="تأكيد عملية التشريح"
+          contentClassName="max-w-2xl w-full"
+          onCancel={() => {
+            setShowSliteConfirmDialog(false);
+            setPendingSlite(null);
+          }}
+          onConfirm={confirmCreateSlite}
+          confirmLabel="تأكيد العملية"
+          cancelLabel="إلغاء"
+        >
+          <div className="text-sm text-gray-700">
+            هل تريد تنفيذ عملية التشريح؟
+            <div className="mt-4">
+              <table className="w-full border-collapse border border-gray-200 rounded-lg overflow-hidden">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">عرض المدخل</th>
+                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول المدخل</th>
+                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول الخارجي</th>
+                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
+                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
+                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
+                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="hover:bg-gray-50">
+                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_width || "-"}</td>
+                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_length || "-"}</td>
+                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.output_length || "-"}</td>
+                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                      {(() => {
+                        const color = colors.find(c => String(c.color_id) === String(pendingSlite?.color_id));
+                        return color ? `${color.color_name} (${color.color_code})` : "-";
+                      })()}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                      {(() => {
+                        const batch = batches.find(b => String(b.batch_id) === String(pendingSlite?.batch_id));
+                        return batch ? batch.batch_number : "-";
+                      })()}
+                    </td>
+                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                        التشريح
+                      </span>
+                    </td>
+                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.notes || "-"}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </StyledDialog>
+
+      <StyledDialog
+        isOpen={showDeleteSliteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteSliteDialog(open);
+          if (!open) setPendingDeleteSlite(null);
+        }}
+        title="تأكيد حذف عملية التشريح"
+        contentClassName="max-w-md w-full"
+        onCancel={() => {
+          setShowDeleteSliteDialog(false);
+          setPendingDeleteSlite(null);
+        }}
+        onConfirm={confirmDeleteSlite}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        confirmVariant="destructive"
+      >
+        <div className="text-sm text-gray-700">
+          هل تريد حذف عملية التشريح 
+          <span className="font-bold"> #{pendingDeleteSlite?.slite_id || ""}</span>؟
+          <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div><span className="font-medium">العرض:</span> {pendingDeleteSlite?.input_width || "-"}</div>
+              <div><span className="font-medium">الطول:</span> {pendingDeleteSlite?.input_length || "-"}</div>
+              <div><span className="font-medium">اللون:</span> {(() => {
+                const color = colors.find(c => String(c.color_id) === String(pendingDeleteSlite?.color_id));
+                return color ? `${color.color_name} (${color.color_code})` : "-";
+              })()}</div>
+              <div><span className="font-medium">الطبخة:</span> {(() => {
+                const batch = batches.find(b => String(b.batch_id) === String(pendingDeleteSlite?.batch_id));
+                return batch ? batch.batch_number : "-";
+              })()}</div>
+            </div>
+          </div>
+          <div className="mt-3 text-red-600 text-xs font-medium">
+            ⚠️ هذا الإجراء لا يمكن التراجع عنه
+          </div>
+        </div>
+      </StyledDialog>
+
+      <StyledDialog
+        isOpen={showMultiDeleteDialog}
+        onOpenChange={(open) => {
+          setShowMultiDeleteDialog(open);
+          if (!open) setSelectedSlites(new Set());
+        }}
+        title="تأكيد حذف عمليات التشريح"
+        contentClassName="max-w-md w-full"
+        onCancel={() => {
+          setShowMultiDeleteDialog(false);
+          setSelectedSlites(new Set());
+        }}
+        onConfirm={confirmMultiDeleteSlites}
+        confirmLabel="حذف الكل"
+        cancelLabel="إلغاء"
+        confirmVariant="destructive"
+      >
+        <div className="text-sm text-gray-700">
+          هل تريد حذف 
+          <span className="font-bold"> {selectedSlites.size} </span>
+          عملية تشريح؟
+          <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="text-xs text-red-600 font-medium">
+              ⚠️ سيتم حذف جميع العمليات المحددة دفعة واحدة
+            </div>
+            <div className="mt-2 text-xs text-gray-600">
+              العناصر التي سيتم حذفها: #{Array.from(selectedSlites).join(', #')}
+            </div>
+          </div>
+          <div className="mt-3 text-red-600 text-xs font-medium">
+            ⚠️ هذا الإجراء لا يمكن التراجع عنه
+          </div>
+        </div>
+      </StyledDialog>
+
+      {/* Logout confirmation dialog */}
+      <StyledDialog
+        isOpen={showLogoutDialog}
+        onOpenChange={setShowLogoutDialog}
+        title="تسجيل الخروج"
+        onCancel={() => setShowLogoutDialog(false)}
+        onConfirm={() => {
+          logout();
+          navigate("/login");
+        }}
+        confirmLabel="تسجيل الخروج"
+        cancelLabel="إلغاء"
+        confirmVariant="destructive"
+      />
     </div>
   );
 }

@@ -822,32 +822,18 @@ export default function ProductionRecords() {
 
             {/* Logout Dialog */}
             <StyledDialog
-                open={showLogoutDialog}
+                isOpen={showLogoutDialog}
                 onOpenChange={setShowLogoutDialog}
-                title="تأكيد تسجيل الخروج"
-                className="max-w-md"
-            >
-                <div className="space-y-4">
-                    <p className="text-gray-600">هل أنت متأكد من أنك تريد تسجيل الخروج؟</p>
-                    <div className="flex justify-end gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowLogoutDialog(false)}
-                        >
-                            إلغاء
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                logout();
-                                navigate('/login');
-                            }}
-                            className="bg-red-500 hover:bg-red-600 text-white"
-                        >
-                            تسجيل الخروج
-                        </Button>
-                    </div>
-                </div>
-            </StyledDialog>
+                title="تسجيل الخروج"
+                onCancel={() => setShowLogoutDialog(false)}
+                onConfirm={() => {
+                    logout();
+                    navigate('/login');
+                }}
+                confirmLabel="تسجيل الخروج"
+                cancelLabel="إلغاء"
+                confirmVariant="destructive"
+            />
         </div>
     );
 }

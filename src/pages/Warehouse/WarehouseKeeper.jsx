@@ -19,7 +19,7 @@ import NotificationsBell from "../../components/common/NotificationsBell";
 import { getApiData } from "../../utils/api";
 import { connectSocket, disconnectSocket } from "../../lib/socket";
 import { toast } from "react-hot-toast";
-import { Package, ArrowRight, Calculator, Eye, Check, X, AlertCircle, Search, RefreshCw, Hash, Printer, ChevronUp, ChevronDown } from "lucide-react";
+import { Package, ArrowRight, Calculator, Eye, Check, X, AlertCircle, Search, RefreshCw, Hash, Printer, ChevronUp, ChevronDown, Trash } from "lucide-react";
 import { MovementDestination, ProductionStatus, ProductionType, TypeItem, UserRole } from "../../types/enums";
 
 const FIXED_WIDTH = "66";
@@ -51,6 +51,7 @@ const BASE_FORM = {
 export default function WarehouseKeeper() {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
+    const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [entryTab, setEntryTab] = useState("manual");
     const [ordersTab, setOrdersTab] = useState("current");
     const [orders, setOrders] = useState([]);
@@ -74,6 +75,12 @@ export default function WarehouseKeeper() {
     const [showMovementDetails, setShowMovementDetails] = useState(false);
     const [pendingCompleteItem, setPendingCompleteItem] = useState(null);
     const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+    const [pendingOutput, setPendingOutput] = useState(null);
+    const [showOutputConfirmDialog, setShowOutputConfirmDialog] = useState(false);
+    const [pendingDeleteMovement, setPendingDeleteMovement] = useState(null);
+    const [showDeleteMovementDialog, setShowDeleteMovementDialog] = useState(false);
+    const [selectedMovements, setSelectedMovements] = useState(new Set());
+    const [showMultiDeleteDialog, setShowMultiDeleteDialog] = useState(false);
     const [showHeader, setShowHeader] = useState(true);
     const [currentInput, setCurrentInput] = useState("notes");
     const [selectSearch, setSelectSearch] = useState({
@@ -155,12 +162,17 @@ export default function WarehouseKeeper() {
     const formatDate = (date) => date ? new Date(date).toLocaleDateString("en-US", {
         year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"
     }) : "-";
-    const formatDestination = (value) => ({
-        [MovementDestination.slitting]: "التشريح",
-        [MovementDestination.cutting]: "القص",
-        [MovementDestination.production]: "الإنتاج",
-        [MovementDestination.gluing]: "اللصق"
-    }[value] || value || "-");
+    const formatDestination = (value) => {
+        if (!value) return "-";
+        const destinationMap = {
+            'slitting': "التشريح",
+            'cutting': "القص", 
+            'production': "الإنتاج",
+            'gluing': "اللصق"
+        };
+        return destinationMap[String(value)] || String(value) || "-";
+    };
+
     const formatSource = (value) => ({
         warehouse: "المستودع",
         slitting: "التشريح",
@@ -422,20 +434,26 @@ export default function WarehouseKeeper() {
         setShowCompleteDialog(true);
     };
 
-    const handleOutputSubmit = async () => {
+    const handleOutputSubmit = () => {
         if (!outputForm.ruler_id || !outputForm.color_id || !outputForm.batch_id || !outputForm.length || !outputForm.thickness || !outputForm.destination) {
             return toast.error("الطبخة والطول والسماكة وباقي الحقول مطلوبة");
         }
+        // Set pending output data and show confirmation dialog
+        setPendingOutput({...outputForm});
+        setShowOutputConfirmDialog(true);
+    };
+
+    const confirmOutputSubmit = async () => {
         try {
             const num = (value) => Number(String(value).replace(",", "."));
             const response = await warehouseApi.createWarehouseMovement({
-                color_id: num(outputForm.color_id),
-                batch_id: num(outputForm.batch_id),
-                length: num(outputForm.length),
+                color_id: num(pendingOutput.color_id),
+                batch_id: num(pendingOutput.batch_id),
+                length: num(pendingOutput.length),
                 width: num(FIXED_WIDTH),
-                thickness: num(outputForm.thickness),
-                destination: outputForm.destination,
-                notes: outputForm.notes
+                thickness: num(pendingOutput.thickness),
+                destination: pendingOutput.destination,
+                notes: pendingOutput.notes
             });
             const created = response?.data?.movement || response?.data || response?.movement;
             if (created?.movement_id) setMovements((prev) => [created, ...prev]);
@@ -450,9 +468,72 @@ export default function WarehouseKeeper() {
             }));
             toast.success("تم حفظ المخرج بنجاح");
             loadMovements();
+            setShowOutputConfirmDialog(false);
+            setPendingOutput(null);
         } catch (error) {
             console.error(error);
-            toast.error(error?.message || "فشل في إنشاء حركة المستودع");
+            toast.error("فشل في حفظ المخرج");
+        }
+    };
+
+    const requestDeleteMovement = (movement) => {
+        setPendingDeleteMovement(movement);
+        setShowDeleteMovementDialog(true);
+    };
+
+    const confirmDeleteMovement = async () => {
+        if (!pendingDeleteMovement?.movement_id) return;
+        try {
+            await warehouseApi.deleteWarehouseMovement(pendingDeleteMovement.movement_id);
+            setMovements((prev) => prev.filter((m) => m.movement_id !== pendingDeleteMovement.movement_id));
+            toast.success("تم حذف المخرج بنجاح");
+            setShowDeleteMovementDialog(false);
+            setPendingDeleteMovement(null);
+        } catch (error) {
+            console.error(error);
+            toast.error("فشل في حذف المخرج");
+        }
+    };
+
+    const toggleMovementSelection = (movementId) => {
+        setSelectedMovements(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(movementId)) {
+                newSet.delete(movementId);
+            } else {
+                newSet.add(movementId);
+            }
+            return newSet;
+        });
+    };
+
+    const toggleAllMovementsSelection = () => {
+        if (selectedMovements.size === movements.length) {
+            setSelectedMovements(new Set());
+        } else {
+            setSelectedMovements(new Set(movements.map(m => m.movement_id)));
+        }
+    };
+
+    const requestMultiDeleteMovements = () => {
+        if (selectedMovements.size === 0) {
+            toast.error("يرجى تحديد مخرج واحد على الأقل");
+            return;
+        }
+        setShowMultiDeleteDialog(true);
+    };
+
+    const confirmMultiDeleteMovements = async () => {
+        try {
+            const ids = Array.from(selectedMovements);
+            await warehouseApi.deleteWarehouseMovements(ids);
+            setMovements((prev) => prev.filter((m) => !selectedMovements.has(m.movement_id)));
+            toast.success(`تم حذف ${ids.length} مخرج بنجاح`);
+            setSelectedMovements(new Set());
+            setShowMultiDeleteDialog(false);
+        } catch (error) {
+            console.error(error);
+            toast.error("فشل في حذف المخرجات");
         }
     };
 
@@ -510,28 +591,45 @@ export default function WarehouseKeeper() {
             <table className="w-full border-collapse">
                 <thead className="bg-gray-100 sticky top-0 z-20">
                     <tr>
-                        {["#", "الطول", "الوجهة", "رقم الطبخة", "الحالة", "الإجراءات"].map((h) => (
+                        {["#", "الطول", "اللون", "الوجهة", "رقم الطبخة", "الحالة", "الإجراءات"].map((h) => (
                             <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap">{h}</th>
                         ))}
                     </tr>
                 </thead>
                 <tbody>
                     {loadingOrders ? (
-                        <tr><td colSpan="6" className="p-6"><LoadingState /></td></tr>
+                        <tr><td colSpan="7" className="p-6"><LoadingState /></td></tr>
                     ) : list.length === 0 ? (
-                        <tr><td colSpan="6" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
+                        <tr><td colSpan="7" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
                     ) : list.map((order, index) => {
                         const batch = order.batch || batches.find((b) => String(b.batch_id) === String(order.batch_id));
                         const status = getStatusBadge(order.status);
+                        const color = order.color || colors.find((c) => String(c.color_id) === String(order.color_id));
                         return (
                             <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
                                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">#{order.production_order_id}</td>
                                 {/* <td className="px-3 py-2 text-center text-sm whitespace-nowrap">{order.width || FIXED_WIDTH}</td> */}
                                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.length || "-"}</td>
                                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
-                                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
-                                        {formatDestination(order.destination)}
-                                    </span>
+                                    {color ? (
+                                        <div className="flex items-center justify-center gap-1">
+                                            {color.imageUrl && (
+                                                <img
+                                                    src={color.imageUrl.startsWith("http") ? color.imageUrl : `${API_BASE_URL}${color.imageUrl}`}
+                                                    alt={color.color_name}
+                                                    className="w-4 h-4 rounded border border-gray-300"
+                                                />
+                                            )}
+                                            <span className="text-xs">{color.color_name} ({color.color_code})</span>
+                                        </div>
+                                    ) : '-'}
+                                </td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
+                                    <div className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 px-3 py-1.5 shadow-sm">
+                                        <span className="font-medium text-blue-700">
+                                            {formatDestination(order.destination)}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">{order.batch_number || batch?.batch_number || "-"}</td>
                                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap"><span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span></td>
@@ -586,7 +684,7 @@ export default function WarehouseKeeper() {
                     </div>
                     <div className="flex items-center gap-2">
                         <NotificationsBell />
-                        <Button size="lg" variant="outline" onClick={() => { logout(); navigate("/login"); }} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
+                        <Button size="lg" variant="outline" onClick={() => setShowLogoutDialog(true)} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
                             <ArrowRight className="w-4 h-4 ml-2 rotate-180" />تسجيل الخروج
                         </Button>
                     </div>
@@ -665,11 +763,45 @@ export default function WarehouseKeeper() {
                     <Card className="p-4 pb-0 flex flex-col flex-1  min-h-0">
                         {/* <div className="flex items-center justify-between"><h3 className="text-lg font-bold flex items-center gap-2"><Package className="w-5 h-5 text-purple-600" />جدول المخرجات</h3><Button variant="outline" size="sm" onClick={loadMovements} disabled={loadingMovements}><RefreshCw className={`w-4 h-4 ml-2 ${loadingMovements ? "animate-spin" : ""}`} />تحديث</Button></div> */}
                         <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
+                            {/* Multi-select controls */}
+                            <div className="p-2 bg-gray-100 border-b flex items-center justify-between sticky top-0 z-10">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedMovements.size === movements.length && movements.length > 0}
+                                        onChange={toggleAllMovementsSelection}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span className="text-xs text-gray-600">
+                                        تحديد الكل ({selectedMovements.size}/{movements.length})
+                                    </span>
+                                </div>
+                                {selectedMovements.size > 0 && (
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={requestMultiDeleteMovements}
+                                        className="text-xs"
+                                    >
+                                        <Trash className="w-3 h-3 ml-1" />
+                                        حذف المحدد ({selectedMovements.size})
+                                    </Button>
+                                )}
+                            </div>
+                            
                             <table className="min-w-[1100px] w-full table-fixed border-collapse">
-                                <thead className="bg-gray-100 sticky top-0 z-20"><tr>{["#", "اللون", "الطبخة", "الطول", "العرض", "السماكة", "الوجهة", "المستخدم", "التوقيت", "الملاحظات", "QR", "تفاصيل"].map((h) => <th key={h} className="p-2 text-center border-b text-sm">{h}</th>)}</tr></thead>
+                                <thead className="bg-gray-100 sticky top-8 z-10"><tr>{["", "#", "اللون", "الطبخة", "الطول", "العرض", "السماكة", "الوجهة", "المستخدم", "التوقيت", "الملاحظات", "إجراءات"].map((h) => <th key={h} className="p-2 text-center border-b text-sm">{h}</th>)}</tr></thead>
                                 <tbody>
-                                    {loadingMovements ? <tr><td colSpan="12" className="p-6"><LoadingState /></td></tr> : sortedMovements.length === 0 ? <tr><td colSpan="12" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد مخرجات</td></tr> : sortedMovements.map((m) => (
-                                        <tr key={m.movement_id} className="border-b hover:bg-gray-50">
+                                    {loadingMovements ? <tr><td colSpan="13" className="p-6"><LoadingState /></td></tr> : sortedMovements.length === 0 ? <tr><td colSpan="13" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد مخرجات</td></tr> : sortedMovements.map((m) => (
+                                        <tr key={m.movement_id} className={`border-b hover:bg-gray-50 ${selectedMovements.has(m.movement_id) ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}>
+                                            <td className="p-2 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedMovements.has(m.movement_id)}
+                                                    onChange={() => toggleMovementSelection(m.movement_id)}
+                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                            </td>
                                             <td className="p-2 text-center text-sm">#{m.movement_id}</td>
                                             <td className="p-2 text-center text-sm">{m.color?.color_name || "-"} ({m.color?.color_code || "-"})</td>
                                             <td className="p-2 text-center text-sm">{m.batch?.batch_number || "-"}</td>
@@ -681,19 +813,28 @@ export default function WarehouseKeeper() {
                                             <td className="p-2 text-center text-sm">{formatDate(m.created_at)}</td>
                                             <td className="p-2 text-center text-sm max-w-[140px] truncate" title={m.notes || "-"}>{m.notes || "-"}</td>
                                             <td className="p-2 text-center">
-                                                <button
-                                                    onClick={() => {
-                                                        const qrData = buildMovementQrData(m);
-                                                        const qrFooter = buildMovementQrFooter(m);
-                                                        printQr(getQrUrl(qrData), `QR - مخرج #${m.movement_id}`, qrFooter);
-                                                    }}
-                                                    className="text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg"
-                                                    title="طباعة QR"
-                                                >
-                                                    <Printer className="w-4 h-4" />
-                                                </button>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            const qrData = buildMovementQrData(m);
+                                                            const qrFooter = buildMovementQrFooter(m);
+                                                            printQr(getQrUrl(qrData), `QR - مخرج #${m.movement_id}`, qrFooter);
+                                                        }}
+                                                        className="text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg"
+                                                        title="طباعة QR"
+                                                    >
+                                                        <Printer className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => { setSelectedMovement(m); setShowMovementDetails(true); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg"><Eye className="w-4 h-4" /></button>
+                                                    <button
+                                                        onClick={() => requestDeleteMovement(m)}
+                                                        className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
+                                                        title="حذف المخرج"
+                                                    >
+                                                        <Trash className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </td>
-                                            <td className="p-2 text-center"><button onClick={() => { setSelectedMovement(m); setShowMovementDetails(true); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg"><Eye className="w-4 h-4" /></button></td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -733,22 +874,22 @@ export default function WarehouseKeeper() {
                         {loadingOrderDetails ? <LoadingState /> : (
                             <div className="border rounded-lg overflow-hidden">
                                 <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
-                                    <thead className="bg-gray-100"><tr>{["#", "العرض", "الطول", "النوع", "السماكة", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>)}</tr></thead>
+                                    <thead className="bg-gray-100"><tr>{["#", "العرض", "الطول", "السماكة", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>)}</tr></thead>
                                     <tbody>
-                                        {orderItems.length === 0 ? <tr><td colSpan="10" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr> : orderItems.map((item, index) => (
+                                        {orderItems.length === 0 ? <tr><td colSpan="8" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr> : orderItems.map((item, index) => {
+                                            return (
                                             <tr key={item.production_order_item_id || index} className="border-t">
                                                 <td className="p-2 text-center">#{item.production_order_item_id || index + 1}</td>
                                                 <td className="p-2 text-center">{item.width || FIXED_WIDTH}</td>
                                                 <td className="p-2 text-center">{item.length || "-"}</td>
-                                                <td className="p-2 text-center">{formatTypeItem(item.type_item || item.type)}</td>
                                                 <td className="p-2 text-center">{item.thickness || "-"}</td>
-                                                <td className="p-2 text-center break-words">{formatSource(item.source)}</td>
                                                 <td className="p-2 text-center">{formatDestination(item.destination)}</td>
                                                 <td className="p-2 text-center"><span className={`px-2 py-1 rounded-lg text-xs ${getStatusBadge(item.status).className}`}>{getStatusBadge(item.status).label}</span></td>
                                                 <td className="p-2 text-center">{item.notes || "-"}</td>
                                                 <td className="p-2 text-center"><div className="flex items-center justify-center gap-2"><Button variant="outline" size="sm" onClick={() => handleApplyOrderToInputs(item)}>إدخال</Button><Button variant="outline" size="sm" disabled={String(item.status || "").toLowerCase() === ProductionStatus.completed} onClick={() => requestCompleteOrderItem(item)}>إتمام</Button></div></td>
                                             </tr>
-                                        ))}
+                                        );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -793,6 +934,161 @@ export default function WarehouseKeeper() {
                     ونقله إلى المكتمل؟
                 </div>
             </StyledDialog>
+
+            <StyledDialog
+                isOpen={showOutputConfirmDialog}
+                onOpenChange={(open) => {
+                    setShowOutputConfirmDialog(open);
+                    if (!open) setPendingOutput(null);
+                }}
+                title="تأكيد حفظ المخرج"
+                contentClassName="max-w-2xl w-full"
+                onCancel={() => {
+                    setShowOutputConfirmDialog(false);
+                    setPendingOutput(null);
+                }}
+                onConfirm={confirmOutputSubmit}
+                confirmLabel="تأكيد الحفظ"
+                cancelLabel="إلغاء"
+            >
+                <div className="text-sm text-gray-700">
+                    هل تريد حفظ هذا المخرج؟
+                    <div className="mt-4">
+                        <table className="w-full border-collapse border border-gray-200 rounded-lg overflow-hidden">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">العرض</th>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول</th>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">السماكة</th>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المسطرة</th>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="hover:bg-gray-50">
+                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{FIXED_WIDTH}</td>
+                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingOutput?.length || "-"}</td>
+                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingOutput?.thickness || "-"}</td>
+                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                                        {(() => {
+                                            const color = colors.find(c => String(c.color_id) === String(pendingOutput?.color_id));
+                                            return color ? `${color.color_name} (${color.color_code})` : "-";
+                                        })()}
+                                    </td>
+                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                                        {(() => {
+                                            const batch = batches.find(b => String(b.batch_id) === String(pendingOutput?.batch_id));
+                                            return batch ? batch.batch_number : "-";
+                                        })()}
+                                    </td>
+                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                                        {(() => {
+                                            const ruler = rulers.find(r => String(r.ruler_id) === String(pendingOutput?.ruler_id));
+                                            return ruler ? ruler.ruler_name : "-";
+                                        })()}
+                                    </td>
+                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                                            {formatDestination(pendingOutput?.destination)}
+                                        </span>
+                                    </td>
+                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingOutput?.notes || "-"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </StyledDialog>
+
+            <StyledDialog
+                isOpen={showDeleteMovementDialog}
+                onOpenChange={(open) => {
+                    setShowDeleteMovementDialog(open);
+                    if (!open) setPendingDeleteMovement(null);
+                }}
+                title="تأكيد حذف المخرج"
+                contentClassName="max-w-md w-full"
+                onCancel={() => {
+                    setShowDeleteMovementDialog(false);
+                    setPendingDeleteMovement(null);
+                }}
+                onConfirm={confirmDeleteMovement}
+                confirmLabel="حذف"
+                cancelLabel="إلغاء"
+                confirmVariant="destructive"
+            >
+                <div className="text-sm text-gray-700">
+                    هل تريد حذف المخرج 
+                    <span className="font-bold"> #{pendingDeleteMovement?.movement_id || ""}</span>؟
+                    <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div><span className="font-medium">اللون:</span> {(() => {
+                                const color = pendingDeleteMovement?.color;
+                                return color ? `${color.color_name} (${color.color_code})` : "-";
+                            })()}</div>
+                            <div><span className="font-medium">الطبخة:</span> {pendingDeleteMovement?.batch?.batch_number || "-"}</div>
+                            <div><span className="font-medium">الطول:</span> {pendingDeleteMovement?.length || "-"}</div>
+                            <div><span className="font-medium">الوجهة:</span> {formatDestination(pendingDeleteMovement?.destination)}</div>
+                        </div>
+                    </div>
+                    <div className="mt-3 text-red-600 text-xs font-medium">
+                        ⚠️ هذا الإجراء لا يمكن التراجع عنه
+                    </div>
+                </div>
+            </StyledDialog>
+
+            <StyledDialog
+                isOpen={showMultiDeleteDialog}
+                onOpenChange={(open) => {
+                    setShowMultiDeleteDialog(open);
+                    if (!open) setSelectedMovements(new Set());
+                }}
+                title="تأكيد حذف المخرجات"
+                contentClassName="max-w-md w-full"
+                onCancel={() => {
+                    setShowMultiDeleteDialog(false);
+                    setSelectedMovements(new Set());
+                }}
+                onConfirm={confirmMultiDeleteMovements}
+                confirmLabel="حذف الكل"
+                cancelLabel="إلغاء"
+                confirmVariant="destructive"
+            >
+                <div className="text-sm text-gray-700">
+                    هل تريد حذف 
+                    <span className="font-bold"> {selectedMovements.size} </span>
+                    مخرج؟
+                    <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                        <div className="text-xs text-red-600 font-medium">
+                            ⚠️ سيتم حذف جميع المخرجات المحددة دفعة واحدة
+                        </div>
+                        <div className="mt-2 text-xs text-gray-600">
+                            العناصر التي سيتم حذفها: #{Array.from(selectedMovements).join(', #')}
+                        </div>
+                    </div>
+                    <div className="mt-3 text-red-600 text-xs font-medium">
+                        ⚠️ هذا الإجراء لا يمكن التراجع عنه
+                    </div>
+                </div>
+            </StyledDialog>
+
+            {/* Logout confirmation dialog */}
+            <StyledDialog
+                isOpen={showLogoutDialog}
+                onOpenChange={setShowLogoutDialog}
+                title="تسجيل الخروج"
+                onCancel={() => setShowLogoutDialog(false)}
+                onConfirm={() => {
+                    logout();
+                    navigate("/login");
+                }}
+                confirmLabel="تسجيل الخروج"
+                cancelLabel="إلغاء"
+                confirmVariant="destructive"
+            />
         </div>
     );
 }

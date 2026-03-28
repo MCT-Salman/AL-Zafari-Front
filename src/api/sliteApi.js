@@ -75,6 +75,27 @@ class SliteApi {
     }
   }
 
+  async deleteSlite(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/slite/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("accessToken")}`
+        }
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to delete slite");
+      }
+      return data;
+    } catch (error) {
+      console.error("Error deleting slite:", error);
+      throw error;
+    }
+  }
+
   async deleteSlites(ids = []) {
     try {
       const response = await fetch(`${API_BASE_URL}/slite/all`, {

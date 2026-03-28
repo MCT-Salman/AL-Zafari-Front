@@ -114,6 +114,30 @@ class WarehouseApi {
     }
   }
 
+  // Delete single warehouse movement
+  async deleteWarehouseMovement(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/warehouse-movement/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to delete warehouse movement');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error deleting warehouse movement:', error);
+      throw error;
+    }
+  }
+
   // Delete warehouse movements
   async deleteWarehouseMovements(ids) {
     try {

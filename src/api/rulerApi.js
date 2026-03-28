@@ -49,6 +49,15 @@ export const rulerApi = {
     }
   },
 
+  getRulersByMaterial: async (materialId) => {
+    try {
+      const response = await axiosInstance.get(`/ruler/material/${materialId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'حدث خطأ في جلب مساطر المادة' };
+    }
+  },
+
   // Helper functions
   getRulerType: (ruler) => {
     return ruler?.ruler_type || 'غير محدد';

@@ -59,7 +59,7 @@ const formatPricingByForExport = (value) => {
       return "66 مم";
     case "isByBlanck":
     case "blanck":
-      return "لوح";
+      return "قطعة";
     default:
       return "غير محدد";
   }
@@ -315,12 +315,21 @@ export default function PriceColor() {
     { value: "Presser", label: "كوي" },
   ];
 
-  const pricingOptions = [
-    { value: "isByMeter22", label: "22 مم" },
-    { value: "isByMeter44", label: "44 مم" },
-    { value: "isByMeter66", label: "66 مم" },
-    { value: "isByBlanck", label: "لوح" },
-  ];
+  // Dynamic pricing options based on material type
+  const dynamicPricingOptions = useMemo(() => {
+    const baseOptions = [
+      { value: "isByMeter22", label: "22 مم" },
+      { value: "isByMeter44", label: "44 مم" },
+      { value: "isByMeter66", label: "66 مم" },
+    ];
+    
+    // Add "قطعة" option only if material is not PVC
+    if (!isSelectedMaterialPvc) {
+      baseOptions.push({ value: "isByBlanck", label: "قطعة" });
+    }
+    
+    return baseOptions;
+  }, [isSelectedMaterialPvc]);
 
   const getLabel = (options, value) => {
     // Check both standard value and legacy 'blanck'
@@ -487,7 +496,7 @@ export default function PriceColor() {
       const rulerName = priceColorApi.getRulerName(priceColor);
       const materialName = priceColorApi.getMaterialName(priceColor);
 
-      const pricingLabel = getLabel(pricingOptions, priceColor.price_color_By);
+      const pricingLabel = getLabel(dynamicPricingOptions, priceColor.price_color_By);
       const typeLabel = getLabel(typeItemOptions, priceColor.type_item);
 
       const matchesSearch =
@@ -707,7 +716,7 @@ export default function PriceColor() {
                       <TableHead>النوع</TableHead>
                       <TableHead>طريقة التسعير</TableHead>
                       <TableHead sortable sortKey="price_per_meter">
-                        السعر بالمتر/لوح {showUsdPrice && "($)"}
+                        السعر بالمتر/قطعة {showUsdPrice && "($)"}
                       </TableHead>
                       <TableHead>الملاحظات</TableHead>
                       <TableHead>الإجراءات</TableHead>
@@ -747,7 +756,7 @@ export default function PriceColor() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm">{getLabel(pricingOptions, priceColor.price_color_By)}</span>
+                          <span className="text-sm">{getLabel(dynamicPricingOptions, priceColor.price_color_By)}</span>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="bg-green-50 text-green-800 font-bold">
@@ -839,8 +848,8 @@ export default function PriceColor() {
               ...(priceColorApi.getMaterialName(selectedItem || {}).toLowerCase().includes("pvc")
                 ? [{ key: "type_item", label: "النوع", formatValue: (key, value) => getLabel(typeItemOptions, value) }]
                 : []),
-              { key: "price_color_By", label: "طريقة التسعير", formatValue: (key, value) => getLabel(pricingOptions, value) },
-              { key: "price_per_meter", label: `السعر بالمتر/لوح ${showUsdPrice ? "($)" : ""}`, formatValue: (key, value) => showUsdPrice ? `${value} $` : value },
+              { key: "price_color_By", label: "طريقة التسعير", formatValue: (key, value) => getLabel(dynamicPricingOptions, value) },
+              { key: "price_per_meter", label: `السعر بالمتر/قطعة ${showUsdPrice ? "($)" : ""}`, formatValue: (key, value) => showUsdPrice ? `${value} $` : value },
               { key: "notes", label: "الملاحظات" },
             ]
             : []
@@ -920,7 +929,7 @@ export default function PriceColor() {
                 <FilterSelect
                   value={formData.price_color_By || ""}
                   onChange={(e) => setFormData({ ...formData, price_color_By: e.target.value })}
-                  options={pricingOptions}
+                  options={dynamicPricingOptions}
                   placeholder="اختر الطريقة"
                 />
               </div>
@@ -928,7 +937,7 @@ export default function PriceColor() {
 
             <div className="space-y-2">
               <Label>
-                السعر بالمتر/لوح {showUsdPrice && "($)"} <span className="text-red-500">*</span>
+                السعر بالمتر/قطعة {showUsdPrice && "($)"} <span className="text-red-500">*</span>
               </Label>
               <Input
                 type="number"

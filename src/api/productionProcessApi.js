@@ -94,6 +94,26 @@ class ProductionProcessApi {
     }
   }
 
+  async deleteProcess(id) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/production-process/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("accessToken")}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to delete process");
+      }
+      return data;
+    } catch (error) {
+      console.error("Error deleting process:", error);
+      throw error;
+    }
+  }
+
   async deleteProcesses(ids = []) {
     try {
       const response = await fetch(`${API_BASE_URL}/production-process/all`, {

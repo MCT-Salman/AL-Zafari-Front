@@ -141,7 +141,6 @@ export default function Login() {
       
       // الدوال والبيانات
       onSubmit={handleLoginSubmit}
-      onForgotPassword={() => navigate("/forgot-password")}
       error={error}
       
       // تخصيصات إضافية (اختياري)
