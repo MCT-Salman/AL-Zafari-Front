@@ -599,27 +599,9 @@ export default function GluingManager() {
   };
 
   const buildProcessQrFooter = (proc) => {
-
-    const colorInfo = proc.color || colors.find((c) => String(c.color_id) === String(proc.color_id));
-
-    const batchInfo = proc.batch || batches.find((b) => String(b.batch_id) === String(proc.batch_id));
-
     return [
-
-      `اللون: ${colorInfo?.color_name || "-"}`,
-
-      `كود اللون: ${colorInfo?.color_code || "-"}`,
-
-      `العرض: ${proc.input_width || "-"}`,
-
-      `الطبخة: ${batchInfo?.batch_number || "-"}`,
-
-      `الطول المدخل: ${proc.input_length || "-"}`,
-
-      `الطول المخرج: ${proc.output_length || "-"}`
-
+      `${proc.color?.color_code || "-"}|${proc.type_item === "Presser" ? "كوي" : "مكنة"}|${proc.batch?.batch_number || "-"}|${proc.output_length || "-"}`
     ].join(" | ");
-
   };
 
 
@@ -646,11 +628,9 @@ export default function GluingManager() {
 
         <body style="font-family: Tahoma, Arial, sans-serif; text-align:center; padding:16px;">
 
-          <h3>${title}</h3>
+          <div style="margin-bottom:12px; font-size:12px; color:#444;">${footer}</div>
 
           <img src="${url}" style="width:240px;height:240px;border:1px solid #ddd;border-radius:8px;" />
-
-          <div style="margin-top:12px; font-size:12px; color:#444;">${footer}</div>
 
         </body>
 
@@ -716,7 +696,7 @@ export default function GluingManager() {
 
       if (!outputForm.output_length) {
 
-        toast.error("يرجى إدخال الطول المخرج");
+        toast.error("يرجى إدخال الكمية المخرج");
 
         return;
 
@@ -1082,7 +1062,7 @@ export default function GluingManager() {
 
           <tr>
 
-            {["#", "العرض", "اللون", "الطبخة", "الطول", "النوع", "المصدر", "الوجهة", "الحالة", "الإجراءات"].map((h) => (
+            {["#", "اللون", "العرض", "الكمية", "النوع", "الطبخة", "السماكة", "الوجهة", "المصدر", "الحالة", "المستخدم", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
 
               <th key={h} className="p-2 text-center border-b text-sm">{h}</th>
 
@@ -1096,11 +1076,11 @@ export default function GluingManager() {
 
           {loadingOrders ? (
 
-            <tr><td colSpan="10" className="p-6"><LoadingState /></td></tr>
+            <tr><td colSpan="15" className="p-6"><LoadingState /></td></tr>
 
           ) : list.length === 0 ? (
 
-            <tr><td colSpan="10" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
+            <tr><td colSpan="15" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
 
           ) : list.map((order, index) => {
 
@@ -1109,47 +1089,46 @@ export default function GluingManager() {
             const batchInfo = batches.find((b) => String(b.batch_id) === String(order.batch_id));
 
             const statusBadge = getStatusBadge(order.status);
-
             return (
-
               <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
-
-                <td className="px-1 py-2 text-center text-sm">#{order.production_order_id || index + 1}</td>
-
-                <td className="px-1 py-2 text-center text-sm">{order.width || "-"}</td>
-
-                <td className="px-1 py-2 text-center text-sm">{colorInfo?.color_name || "-"} ({colorInfo?.color_code || "-"})</td>
-
-                <td className="px-1 py-2 text-center text-sm">{batchInfo?.batch_number || "-"}</td>
-
-                <td className="px-1 py-2 text-center text-sm">{order.length || "-"}</td>
-
-                <td className="px-1 py-2 text-center text-sm">{order.type_item === TypeItem.Presser ? "كوي" : "مكنة"}</td>
-
-                <td className="px-1 py-2 text-center text-sm">{formatDestination(order.source)}</td>
-
-                <td className="px-1 py-2 text-center text-sm">{formatDestination(order.destination)}</td>
-
-                <td className="px-1 py-2 text-center text-sm">
-
-                  <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${statusBadge.className}`}>
-
-                    {statusBadge.label}
-
-                  </span>
-
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">#{order.production_order_id}</td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">
+                  <div className="text-xs">
+                    <div>{order.color?.color_name || "-"}</div>
+                    <div className="text-gray-500">({order.color?.color_code || "-"})</div>
+                  </div>
                 </td>
-
-                <td className="px-1 py-2 text-center">
-
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">{order.width || "-"}</td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">{order.length || "-"}</td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-gray-50 px-2.5 py-1 font-medium text-gray-700">
+                    {order.type_item === TypeItem.Presser ? "كوي" : "مكنة"}
+                  </span>
+                </td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">{order.batch?.batch_number || "-"}</td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">{order.thickness || "-"}</td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-1 font-medium text-purple-700">
+                    {formatDestination(order.destination)}
+                  </span>
+                </td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
+                    {formatDestination(order.source)}
+                  </span>
+                </td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">
+                  <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>{statusBadge.label}</span>
+                </td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">{user?.full_name || "-"}</td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">{formatDate(order.created_at)}</td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">{order.notes || "-"}</td>
+                <td className="p-2 text-center align-middle text-sm whitespace-nowrap">
                   <div className="flex h-8 items-center justify-center gap-1">
-
                     <button onClick={() => handleOrderSelect(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50" title="عرض التفاصيل"><Eye className="w-4 h-4" /></button>
 
                     {String(order.status || "").toLowerCase() === ProductionStatus.pending && (
-
                       <>
-
                         <button onClick={() => handleApplyOrderToInputs(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50" title="إدخال"><Hash className="w-4 h-4" /></button>
 
                         <button onClick={() => requestCompleteOrderItem(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50" title="إتمام الطلب"><Check className="w-4 h-4" /></button>
@@ -1416,7 +1395,7 @@ export default function GluingManager() {
 
                       <div>
 
-                        <Label>الطول</Label>
+                        <Label>الكمية</Label>
 
                         <Input value={inputForm.input_length} onFocus={() => setCurrentInput("input_length")} readOnly className={`text-center py-6 ${currentInput === "input_length" ? "ring-2 ring-blue-500" : ""}`} placeholder="0" />
 
@@ -1464,7 +1443,7 @@ export default function GluingManager() {
 
                           {/* <th className="p-2 text-center">السماكة</th> */}
 
-                          <th className="p-2 text-center">الطول المدخل</th>
+                          <th className="p-2 text-center">الكمية المدخل</th>
 
                         </tr>
 
@@ -1674,9 +1653,9 @@ export default function GluingManager() {
 
                         <th className="p-2 text-center border-b">الطبخة</th>
 
-                        <th className="p-2 text-center border-b">الطول المدخل</th>
+                        <th className="p-2 text-center border-b">الكمية المدخل</th>
 
-                        <th className="p-2 text-center border-b">الطول المخرج</th>
+                        <th className="p-2 text-center border-b">الكمية المخرج</th>
 
                         <th className="p-2 text-center border-b">الهدر</th>
 
@@ -1848,7 +1827,7 @@ export default function GluingManager() {
 
                   <tr>
 
-                    <th className="p-2 text-center">العرض</th><th className="p-2 text-center">اللون</th><th className="p-2 text-center">الطبخة</th><th className="p-2 text-center">الطول</th><th className="p-2 text-center">النوع</th><th className="p-2 text-center">المصدر</th><th className="p-2 text-center">الوجهة</th><th className="p-2 text-center">ملاحظات </th>
+                    <th className="p-2 text-center">العرض</th><th className="p-2 text-center">اللون</th><th className="p-2 text-center">الطبخة</th><th className="p-2 text-center">الكمية</th><th className="p-2 text-center">النوع</th><th className="p-2 text-center">المصدر</th><th className="p-2 text-center">الوجهة</th><th className="p-2 text-center">ملاحظات </th>
 
                   </tr>
 
@@ -1986,9 +1965,9 @@ export default function GluingManager() {
 
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">العرض</th>
 
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول المدخل</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المدخل</th>
 
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول المخرج</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المخرج</th>
 
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
 
@@ -2116,9 +2095,9 @@ export default function GluingManager() {
 
               <div><span className="font-medium">العرض:</span> {pendingDeleteProcess?.input_width || "-"}</div>
 
-              <div><span className="font-medium">الطول المدخل:</span> {pendingDeleteProcess?.input_length || "-"}</div>
+              <div><span className="font-medium">الكمية المدخل:</span> {pendingDeleteProcess?.input_length || "-"}</div>
 
-              <div><span className="font-medium">الطول المخرج:</span> {pendingDeleteProcess?.output_length || "-"}</div>
+              <div><span className="font-medium">الكمية المخرج:</span> {pendingDeleteProcess?.output_length || "-"}</div>
 
               <div><span className="font-medium">اللون:</span> {(() => {
 

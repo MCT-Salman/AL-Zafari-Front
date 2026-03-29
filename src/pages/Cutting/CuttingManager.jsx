@@ -412,20 +412,21 @@ export default function CuttingManager() {
     return values.join("|");
   };
 
-  const buildOutputQrFooter = (lengthValue) => {
+  const buildOutputQrFooter = (lengthValue, process = null) => {
+    // If process object is provided (from processes table), use its data
+    if (process) {
+      return [
+        `${process.color?.color_code || "-"}|${process.type_item === "Presser" ? "كوي" : "مكنة"}|${process.batch?.batch_number || "-"}|${lengthValue || "-"}`
+      ].join(" | ");
+    }
+    
+    // Otherwise use input form data (from manual input)
     const colorInfo = selectedColorInfo;
     const batchInfo = batches.find(b => String(b.batch_id) === String(inputForm.batch_id));
-    const rulerName = colorInfo?.ruler?.ruler_name || "-";
     const colorCode = colorInfo?.color_code || "-";
     const typeLabel = inputForm.type_item === TypeItem.Presser ? "كوي" : "مكنة";
     return [
-      `السماكة: ${selectedThickness || "-"}`,
-      `المسطرة: ${rulerName}`,
-      `كود اللون: ${colorCode}`,
-      `العرض: ${inputForm.input_width || "-"}`,
-      `الطبخة: ${batchInfo?.batch_number || "-"}`,
-      `النوع: ${typeLabel}`,
-      `الطول: ${lengthValue || "-"}`
+      `${colorCode}|${typeLabel}|${batchInfo?.batch_number || "-"}|${lengthValue || "-"}`
     ].join(" | ");
   };
 
@@ -442,9 +443,8 @@ export default function CuttingManager() {
       <html dir="rtl">
         <head><title>${title}</title></head>
         <body style="font-family: Tahoma, Arial, sans-serif; text-align:center; padding:16px;">
-          <h3>${title}</h3>
+          <div style="margin-bottom:12px; font-size:12px; color:#444;">${footer}</div>
           <img src="${url}" style="width:240px;height:240px;border:1px solid #ddd;border-radius:8px;" />
-          <div style="margin-top:12px; font-size:12px; color:#444;">${footer}</div>
         </body>
       </html>
     `);
@@ -687,16 +687,16 @@ export default function CuttingManager() {
       <table className="w-full border-collapse">
         <thead className="bg-gray-100 sticky top-0 z-20">
           <tr>
-            {["#", "العرض", "اللون", "الطبخة", "الطول", "النوع", "المصدر", "الوجهة", "الحالة", "الإجراءات"].map((h) => (
+            {["#", "اللون", "العرض", "الكمية", "النوع", "الطبخة", "السماكة", "الوجهة", "المصدر", "الحالة", "المستخدم", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
               <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {loadingOrders ? (
-            <tr><td colSpan="10" className="p-6"><LoadingState /></td></tr>
+            <tr><td colSpan="15" className="p-6"><LoadingState /></td></tr>
           ) : list.length === 0 ? (
-            <tr><td colSpan="10" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
+            <tr><td colSpan="15" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
           ) : list.map((order, index) => {
             const colorInfo = colors.find(c => String(c.color_id) === String(order.color_id));
             const batchInfo = batches.find(b => String(b.batch_id) === String(order.batch_id));
@@ -704,18 +704,24 @@ export default function CuttingManager() {
             return (
               <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">#{order.production_order_id}</td>
-                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.width || "-"}</td>
                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
                   <div className="text-xs">
                     <div>{colorInfo?.color_name || "-"}</div>
                     <div className="text-gray-500">({colorInfo?.color_code || "-"})</div>
                   </div>
                 </td>
-                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{batchInfo?.batch_number || "-"}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.width || "-"}</td>
                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.length || "-"}</td>
                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
                   <span className="inline-flex items-center rounded-full bg-gray-50 px-2.5 py-1 font-medium text-gray-700">
                     {order.type_item === TypeItem.Machine ? "مكنة" : order.type_item === TypeItem.Presser ? "كوي" : order.type_item || "-"}
+                  </span>
+                </td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{batchInfo?.batch_number || "-"}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.thickness || "-"}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
+                    {formatDestination(order.destination)}
                   </span>
                 </td>
                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
@@ -723,14 +729,12 @@ export default function CuttingManager() {
                     {formatDestination(order.source)}
                   </span>
                 </td>
-                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
-                  <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
-                    {formatDestination(order.destination)}
-                  </span>
-                </td>
                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">
                   <span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span>
                 </td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{user?.full_name || "-"}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{formatDate(order.created_at)}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.notes || "-"}</td>
                 <td className="px-1 py-2 align-middle text-center whitespace-nowrap">
                   <div className="flex h-8 items-center justify-center gap-1">
                     <button 
@@ -943,7 +947,7 @@ export default function CuttingManager() {
                       />
                     </div>
                     <div>
-                      <Label>الطول</Label>
+                      <Label>الكمية</Label>
                       <Input
                         value={inputForm.input_length}
                         onChange={(e) => setInputForm(prev => ({ ...prev, input_length: e.target.value }))}
@@ -993,7 +997,7 @@ export default function CuttingManager() {
                         <th className="p-2 text-center">اللون</th>
                         <th className="p-2 text-center">الطبخة</th>
                         <th className="p-2 text-center">السماكة</th>
-                        <th className="p-2 text-center">الطول المدخل</th>
+                        <th className="p-2 text-center">الكمية المدخل</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1019,7 +1023,7 @@ export default function CuttingManager() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>الطول المخرج</Label>
+                    <Label>الكمية المخرج</Label>
                     {outputItems.map((item) => (
                       <div key={item.id} className="flex gap-2 items-center">
                         <Input
@@ -1197,9 +1201,9 @@ export default function CuttingManager() {
                         <th className="p-2 text-center border-b">العرض</th>
                         <th className="p-2 text-center border-b">اللون</th>
                         <th className="p-2 text-center border-b">الطبخة</th>
-                        <th className="p-2 text-center border-b">الطول</th>
+                        <th className="p-2 text-center border-b">الكمية</th>
                         <th className="p-2 text-center border-b">النوع</th>
-                        <th className="p-2 text-center border-b">الطول المخرج</th>
+                        <th className="p-2 text-center border-b">الكمية المخرج</th>
                         <th className="p-2 text-center border-b">الوجهة</th>
                         <th className="p-2 text-center border-b">المستخدم</th>
                         <th className="p-2 text-center border-b">التوقيت</th>
@@ -1239,7 +1243,7 @@ export default function CuttingManager() {
                                 <button
                                   onClick={() => {
                                     const qrData = buildOutputQrData(proc.output_length);
-                                    const footer = buildOutputQrFooter(proc.output_length);
+                                    const footer = buildOutputQrFooter(proc.output_length, proc);
                                     const url = getQrUrl(qrData);
                                     printQr(url, `QR - قص #${proc.process_id}`, footer);
                                   }}
@@ -1304,7 +1308,7 @@ export default function CuttingManager() {
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
               <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
               <div><span className="text-gray-500">العرض:</span> <span className="font-bold">{selectedOrder.width || "-"}</span></div>
-              <div><span className="text-gray-500">الطول:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
+              <div><span className="text-gray-500">الكمية:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
               <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{selectedOrder.type_item === TypeItem.Machine ? "مكنة" : selectedOrder.type_item === TypeItem.Presser ? "كوي" : selectedOrder.type_item || "-"}</span></div>
               <div className="md:col-span-2"><span className="text-gray-500">اللون:</span> <span className="font-bold">{colors.find(c => String(c.color_id) === String(selectedOrder.color_id))?.color_name || "-"} ({colors.find(c => String(c.color_id) === String(selectedOrder.color_id))?.color_code || "-"})</span></div>
               <div className="md:col-span-2"><span className="text-gray-500">الطبخة:</span> <span className="font-bold">{batches.find(b => String(b.batch_id) === String(selectedOrder.batch_id))?.batch_number || "-"}</span></div>
@@ -1318,7 +1322,7 @@ export default function CuttingManager() {
                 <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
                   <thead className="bg-gray-100">
                     <tr>
-                      {["#", "العرض", "اللون", "الطبخة", "الطول", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
+                      {["#", "العرض", "اللون", "الطبخة", "الكمية", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
                         <th key={h} className="p-2 text-center whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -1446,11 +1450,11 @@ export default function CuttingManager() {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">العرض</th>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول المدخل</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المدخل</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">السماكة</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول المخرج</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المخرج</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المصدر</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
@@ -1517,7 +1521,7 @@ export default function CuttingManager() {
           <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div><span className="font-medium">العرض:</span> {pendingDeleteProcess?.input_width || "-"}</div>
-              <div><span className="font-medium">الطول:</span> {pendingDeleteProcess?.input_length || "-"}</div>
+              <div><span className="font-medium">الكمية:</span> {pendingDeleteProcess?.input_length || "-"}</div>
               <div><span className="font-medium">السماكة:</span> {pendingDeleteProcess?.thickness || "-"}</div>
               <div><span className="font-medium">اللون:</span> {(() => {
                 const color = colors.find(c => String(c.color_id) === String(pendingDeleteProcess?.color_id));

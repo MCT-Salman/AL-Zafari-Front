@@ -474,7 +474,7 @@ export default function SlittingManager() {
       }
 
       if (!outputForm.calculationMode) {
-        toast.error("يرجى اختيار طريقة حساب الطول الخارجي");
+        toast.error("يرجى اختيار طريقة حساب الكمية الخارجية");
         return;
       }
 
@@ -690,16 +690,8 @@ export default function SlittingManager() {
   };
 
   const buildSliteQrFooter = (slite) => {
-    const colorInfo = colors.find((c) => String(c.color_id) === String(slite?.color_id));
-    const batchInfo = batches.find((b) => String(b.batch_id) === String(slite?.batch_id));
     return [
-      `اللون: ${colorInfo?.color_name || "-"}`,
-      `كود اللون: ${colorInfo?.color_code || "-"}`,
-      `العرض: ${slite?.input_width || "-"}`,
-      `الطبخة: ${batchInfo?.batch_number || "-"}`,
-      `الطول المدخل: ${slite?.input_length || "-"}`,
-      `1x22: ${slite?.output_length_22 ?? "-"}`,
-      `1x44: ${slite?.output_length_44 ?? "-"}`,
+      `${slite?.color?.color_code || "-"}|${slite?.type_item === "Presser" ? "كوي" : "مكنة"}|${slite?.batch?.batch_number || "-"}|${slite?.input_length || "-"}`
     ].join(" | ");
   };
 
@@ -711,9 +703,8 @@ export default function SlittingManager() {
       <html dir="rtl">
         <head><title>${title}</title></head>
         <body style="font-family: Tahoma, Arial, sans-serif; text-align:center; padding:16px;">
-          <h3>${title}</h3>
+          <div style="margin-bottom:12px; font-size:12px; color:#444;">${footer}</div>
           <img src="${url}" style="width:240px;height:240px;border:1px solid #ddd;border-radius:8px;" />
-          <div style="margin-top:12px; font-size:12px; color:#444;">${footer}</div>
         </body>
       </html>
     `);
@@ -727,7 +718,7 @@ export default function SlittingManager() {
       <table className="w-full border-collapse">
         <thead className="sticky top-0 z-20 bg-gray-100">
           <tr>
-            {["#", "اللون", "الطبخة", "الطول", "النوع", "الوجهة", "الحالة", "الإجراءات"].map((header) => (
+            {["#", "اللون", "العرض", "الكمية", "النوع", "الطبخة", "السماكة", "الوجهة", "المصدر", "الحالة", "المستخدم", "التوقيت", "الملاحظات", "الإجراءات"].map((header) => (
               <th key={header} className="px-1 py-2 text-center text-sm whitespace-nowrap border-b">
                 {header}
               </th>
@@ -736,10 +727,10 @@ export default function SlittingManager() {
         </thead>
         <tbody>
           {loadingOrders ? (
-            <tr><td colSpan="8" className="p-6"><LoadingState /></td></tr>
+            <tr><td colSpan="15" className="p-6"><LoadingState /></td></tr>
           ) : list.length === 0 ? (
             <tr>
-              <td colSpan="8" className="p-8 text-center text-gray-400">
+              <td colSpan="14" className="p-8 text-center text-gray-400">
                 <AlertCircle className="mx-auto mb-2 h-10 w-10 opacity-50" />
                 لا توجد طلبات
               </td>
@@ -749,18 +740,37 @@ export default function SlittingManager() {
             return (
               <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">#{order.production_order_id}</td>
-                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{getColorLabel(order.color_id)}</td>
-                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{getBatchLabel(order.batch_id)}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
+                  <div className="text-xs">
+                    <div>{order.color?.color_name || "-"}</div>
+                    <div className="text-gray-500">({order.color?.color_code || "-"})</div>
+                  </div>
+                </td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.width || "-"}</td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.length || "-"}</td>
-                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{formatTypeItem(order.type_item)}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-gray-50 px-2.5 py-1 font-medium text-gray-700">
+                    {formatTypeItem(order.type_item)}
+                  </span>
+                </td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.batch?.batch_number || "-"}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.thickness || "-"}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
+                    {formatDestination(order.destination)}
+                  </span>
+                </td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
                   <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
-                    {formatDestination(order.destination)}
+                    {formatDestination(order.source)}
                   </span>
                 </td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
                   <span className={`rounded-lg px-2 py-1 text-xs ${statusBadge.className}`}>{statusBadge.label}</span>
                 </td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{user?.full_name || "-"}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{formatDate(order.created_at)}</td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.notes || "-"}</td>
                 <td className="px-1 py-2 text-center align-middle whitespace-nowrap">
                   <div className="flex h-8 items-center justify-center gap-1">
                     <button
@@ -993,7 +1003,7 @@ export default function SlittingManager() {
                           />
                         </div>
                         <div>
-                          <Label>الطول</Label>
+                          <Label>الكمية</Label>
                           <Input
                             value={inputForm.input_length}
                             onFocus={() => setCurrentInput("input_length")}
@@ -1003,7 +1013,7 @@ export default function SlittingManager() {
                           />
                         </div>
                         <div className="col-span-2">
-                          <Label>الطول الخارجي</Label>
+                          <Label>الكمية الخارجية</Label>
                           <div className="space-y-3">
                             {/* <div className="text-sm text-gray-600 mb-2">اختر نمط التوزيع:</div> */}
                             <div className="grid grid-cols-2 gap-3">
@@ -1171,8 +1181,8 @@ export default function SlittingManager() {
                         <th className="p-2 text-center border-b">العرض</th>
                         <th className="p-2 text-center border-b">اللون</th>
                         <th className="p-2 text-center border-b">رقم الطبخة</th>
-                        <th className="p-2 text-center border-b">الطول</th>
-                        <th className="p-2 text-center border-b">الطول الخارجي</th>
+                        <th className="p-2 text-center border-b">الكمية</th>
+                        <th className="p-2 text-center border-b">الكمية الخارجية</th>
                         <th className="p-2 text-center border-b">النوع</th>
                         <th className="p-2 text-center border-b">المصدر</th>
                         <th className="p-2 text-center border-b">الوجهة</th>
@@ -1261,11 +1271,11 @@ export default function SlittingManager() {
                                         <span className="ml-2">{slite.input_width} سم</span>
                                       </div>
                                       <div>
-                                        <span className="font-semibold text-gray-600">الطول المدخل:</span>
+                                        <span className="font-semibold text-gray-600">الكمية المدخل:</span>
                                         <span className="ml-2">{slite.input_length} سم</span>
                                       </div>
                                       <div>
-                                        <span className="font-semibold text-gray-600">الطول الخارجي:</span>
+                                        <span className="font-semibold text-gray-600">الكمية الخارجية:</span>
                                         <span className="ml-2">{slite.output_length || "-"}</span>
                                       </div>
                                       <div>
@@ -1369,7 +1379,7 @@ export default function SlittingManager() {
                 <div><span className="text-gray-500">الوجهة:</span> <span className="font-bold">{formatDestination(selectedOrder.destination)}</span></div>
                 <div><span className="text-gray-500">اللون:</span> <span className="font-bold">{getColorLabel(selectedOrder.color_id)}</span></div>
                 <div><span className="text-gray-500">الطبخة:</span> <span className="font-bold">{getBatchLabel(selectedOrder.batch_id)}</span></div>
-                <div><span className="text-gray-500">الطول:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
+                <div><span className="text-gray-500">الكمية:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
                 <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{formatTypeItem(selectedOrder.type_item)}</span></div>
               </div>
 
@@ -1380,7 +1390,7 @@ export default function SlittingManager() {
                   <table className="w-full table-auto border-collapse">
                     <thead className="bg-gray-100 sticky top-0 z-20">
                       <tr>
-                        {["#", "العرض", "اللون", "الطبخة", "الطول", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
+                        {["#", "العرض", "اللون", "الطبخة", "الكمية", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
                           <th key={h} className="p-2 text-center border-b text-sm">{h}</th>
                         ))}
                       </tr>
@@ -1477,8 +1487,8 @@ export default function SlittingManager() {
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">عرض المدخل</th>
-                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول المدخل</th>
-                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول الخارجي</th>
+                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المدخل</th>
+                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية الخارجي</th>
                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
@@ -1538,7 +1548,7 @@ export default function SlittingManager() {
           <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div><span className="font-medium">العرض:</span> {pendingDeleteSlite?.input_width || "-"}</div>
-              <div><span className="font-medium">الطول:</span> {pendingDeleteSlite?.input_length || "-"}</div>
+              <div><span className="font-medium">الكمية:</span> {pendingDeleteSlite?.input_length || "-"}</div>
               <div><span className="font-medium">اللون:</span> {(() => {
                 const color = colors.find(c => String(c.color_id) === String(pendingDeleteSlite?.color_id));
                 return color ? `${color.color_name} (${color.color_code})` : "-";

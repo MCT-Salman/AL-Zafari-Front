@@ -196,9 +196,8 @@ export default function WarehouseKeeper() {
           <html dir="rtl">
             <head><title>${title}</title></head>
             <body style="font-family: Tahoma, Arial, sans-serif; text-align:center; padding:16px;">
-              <h3>${title}</h3>
+              <div style="margin-bottom:12px; font-size:12px; color:#444;">${footer}</div>
               <img src="${url}" style="width:240px;height:240px;border:1px solid #ddd;border-radius:8px;" />
-              <div style="margin-top:12px; font-size:12px; color:#444;">${footer}</div>
             </body>
           </html>
         `);
@@ -220,12 +219,7 @@ export default function WarehouseKeeper() {
 
     const buildMovementQrFooter = (movement) => {
         return [
-            `اللون: ${movement?.color?.color_name || "-"}`,
-            `الكود: ${movement?.color?.color_code || "-"}`,
-            `العرض: ${movement?.width || FIXED_WIDTH}`,
-            `السماكة: ${movement?.thickness || "-"}`,
-            `الطول: ${movement?.length || "-"}`,
-            `الطبخة: ${movement?.batch?.batch_number || "-"}`
+            `${movement?.color?.color_code || "-"}|${movement?.type_item === "Presser" ? "كوي" : "مكنة"}|${movement?.batch?.batch_number || "-"}|${movement?.length || "-"}`
         ].join(" | ");
     };
 
@@ -279,7 +273,7 @@ export default function WarehouseKeeper() {
             }));
         } catch (error) {
             console.error(error);
-            toast.error("فشل في تحميل ثوابت الطول أو السماكة");
+            toast.error("فشل في تحميل ثوابت الكمية أو السماكة");
         }
     }, []);
 
@@ -436,7 +430,7 @@ export default function WarehouseKeeper() {
 
     const handleOutputSubmit = () => {
         if (!outputForm.ruler_id || !outputForm.color_id || !outputForm.batch_id || !outputForm.length || !outputForm.thickness || !outputForm.destination) {
-            return toast.error("الطبخة والطول والسماكة وباقي الحقول مطلوبة");
+            return toast.error("الطبخة والكمية والسماكة وباقي الحقول مطلوبة");
         }
         // Set pending output data and show confirmation dialog
         setPendingOutput({...outputForm});
@@ -591,16 +585,16 @@ export default function WarehouseKeeper() {
             <table className="w-full border-collapse">
                 <thead className="bg-gray-100 sticky top-0 z-20">
                     <tr>
-                        {["#", "الطول", "اللون", "الوجهة", "رقم الطبخة", "الحالة", "الإجراءات"].map((h) => (
+                        {["#", "المادة", "اللون", "العرض", "الكمية", "النوع", "الطبخة", "السماكة", "الوجهة", "المصدر", "الحالة", "المستخدم", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
                             <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap">{h}</th>
                         ))}
                     </tr>
                 </thead>
                 <tbody>
                     {loadingOrders ? (
-                        <tr><td colSpan="7" className="p-6"><LoadingState /></td></tr>
+                        <tr><td colSpan="15" className="p-6"><LoadingState /></td></tr>
                     ) : list.length === 0 ? (
-                        <tr><td colSpan="7" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
+                        <tr><td colSpan="15" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
                     ) : list.map((order, index) => {
                         const batch = order.batch || batches.find((b) => String(b.batch_id) === String(order.batch_id));
                         const status = getStatusBadge(order.status);
@@ -608,8 +602,7 @@ export default function WarehouseKeeper() {
                         return (
                             <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
                                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">#{order.production_order_id}</td>
-                                {/* <td className="px-3 py-2 text-center text-sm whitespace-nowrap">{order.width || FIXED_WIDTH}</td> */}
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.length || "-"}</td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{pvcMaterial?.material_name || "-"}</td>
                                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
                                     {color ? (
                                         <div className="flex items-center justify-center gap-1">
@@ -624,6 +617,11 @@ export default function WarehouseKeeper() {
                                         </div>
                                     ) : '-'}
                                 </td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.width || FIXED_WIDTH}</td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.length || "-"}</td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{formatTypeItem(order.type_item)}</td>
+                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">{order.batch_number || batch?.batch_number || "-"}</td>
+                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">{order.thickness || "-"}</td>
                                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
                                     <div className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 px-3 py-1.5 shadow-sm">
                                         <span className="font-medium text-blue-700">
@@ -631,8 +629,11 @@ export default function WarehouseKeeper() {
                                         </span>
                                     </div>
                                 </td>
-                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">{order.batch_number || batch?.batch_number || "-"}</td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{formatSource(order.source)}</td>
                                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap"><span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span></td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{user?.full_name || "-"}</td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{formatDate(order.created_at)}</td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.notes || "-"}</td>
                                 <td className="px-1 py-2 align-middle text-center whitespace-nowrap">
                                     <div className="flex h-8 items-center justify-center gap-1">
                                         <button onClick={() => handleOrderSelect(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"><Eye className="w-4 h-4" /></button>
@@ -755,7 +756,7 @@ export default function WarehouseKeeper() {
                                         <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} searchValue={selectSearch.thickness} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, thickness: value }))} onInputFocus={() => setCurrentInput("select:thickness")} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-1">
-                                        <div><Label className={'mb-1'}>الكمية</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} searchValue={selectSearch.length} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, length: value }))} onInputFocus={() => setCurrentInput("select:length")} options={lengthOptions} placeholder="اختر الطول" disabled={!lengthOptions.length} /></div>
+                                        <div><Label className={'mb-1'}>الكمية</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} searchValue={selectSearch.length} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, length: value }))} onInputFocus={() => setCurrentInput("select:length")} options={lengthOptions} placeholder="اختر الكمية" disabled={!lengthOptions.length} /></div>
                                         {/* <div><Label className={'mb-1'}>الوجهة</Label><FilterSelect value={outputForm.destination} onChange={(e) => setOutputForm((p) => ({ ...p, destination: e.target.value }))} options={[{ value: MovementDestination.slitting, label: "التشريح" }, { value: MovementDestination.cutting, label: "القص" }, { value: MovementDestination.production, label: "الإنتاج" }]} placeholder="اختر الوجهة" /></div> */}
                                     <div className="col-span-2"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
                                     </div>
@@ -799,7 +800,7 @@ export default function WarehouseKeeper() {
                             </div>
                             
                             <table className="min-w-[1100px] w-full table-fixed border-collapse">
-                                <thead className="bg-gray-100 sticky top-8 z-10"><tr>{["", "#", "اللون", "الطبخة", "الطول", "العرض", "السماكة", "الوجهة", "المستخدم", "التوقيت", "الملاحظات", "إجراءات"].map((h) => <th key={h} className="p-2 text-center border-b text-sm">{h}</th>)}</tr></thead>
+                                <thead className="bg-gray-100 sticky top-8 z-10"><tr>{["", "#", "اللون", "الطبخة", "الكمية", "العرض", "السماكة", "الوجهة", "المستخدم", "التوقيت", "الملاحظات", "إجراءات"].map((h) => <th key={h} className="p-2 text-center border-b text-sm">{h}</th>)}</tr></thead>
                                 <tbody>
                                     {loadingMovements ? <tr><td colSpan="13" className="p-6"><LoadingState /></td></tr> : sortedMovements.length === 0 ? <tr><td colSpan="13" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد مخرجات</td></tr> : sortedMovements.map((m) => (
                                         <tr key={m.movement_id} className={`border-b hover:bg-gray-50 ${selectedMovements.has(m.movement_id) ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}>
@@ -872,7 +873,7 @@ export default function WarehouseKeeper() {
                             <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
                             <div><span className="text-gray-500">الوجهة:</span> <span className="font-bold">{formatDestination(selectedOrder.destination)}</span></div>
                             <div><span className="text-gray-500">العرض:</span> <span className="font-bold">{selectedOrder.width || FIXED_WIDTH}</span></div>
-                            <div><span className="text-gray-500">الطول:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
+                            <div><span className="text-gray-500">الكمية:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
                             <div><span className="text-gray-500">السماكة:</span> <span className="font-bold">{selectedOrder.thickness || "-"}</span></div>
                             <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{formatTypeItem(selectedOrder.type_item || selectedOrder.type)}</span></div>
                             <div><span className="text-gray-500">المصدر:</span> <span className="font-bold">{formatSource(selectedOrder.source || "warehouse")}</span></div>
@@ -883,7 +884,7 @@ export default function WarehouseKeeper() {
                         {loadingOrderDetails ? <LoadingState /> : (
                             <div className="border rounded-lg overflow-hidden">
                                 <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
-                                    <thead className="bg-gray-100"><tr>{["#", "العرض", "الطول", "السماكة", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>)}</tr></thead>
+                                    <thead className="bg-gray-100"><tr>{["#", "العرض", "الكمية", "السماكة", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>)}</tr></thead>
                                     <tbody>
                                         {orderItems.length === 0 ? <tr><td colSpan="8" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr> : orderItems.map((item, index) => {
                                             return (
@@ -967,7 +968,7 @@ export default function WarehouseKeeper() {
                             <thead className="bg-gray-100">
                                 <tr>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">العرض</th>
-                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطول</th>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">السماكة</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
@@ -1039,7 +1040,7 @@ export default function WarehouseKeeper() {
                                 return color ? `${color.color_name} (${color.color_code})` : "-";
                             })()}</div>
                             <div><span className="font-medium">الطبخة:</span> {pendingDeleteMovement?.batch?.batch_number || "-"}</div>
-                            <div><span className="font-medium">الطول:</span> {pendingDeleteMovement?.length || "-"}</div>
+                            <div><span className="font-medium">الكمية:</span> {pendingDeleteMovement?.length || "-"}</div>
                             <div><span className="font-medium">الوجهة:</span> {formatDestination(pendingDeleteMovement?.destination)}</div>
                         </div>
                     </div>
