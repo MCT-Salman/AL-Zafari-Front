@@ -774,7 +774,7 @@ export default function CuttingManager() {
 
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
-       <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[7.5%]" : "top-[2%]"}`}>
+       <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[8.5%]" : "top-[2%]"}`}>
 
         <Button
 
@@ -1305,7 +1305,7 @@ export default function CuttingManager() {
       <StyledDialog isOpen={showOrderDetails} onOpenChange={setShowOrderDetails} title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`} contentClassName="max-w-7xl w-full" onCancel={() => setShowOrderDetails(false)} onConfirm={() => setShowOrderDetails(false)} confirmLabel="إغلاق" showCancel={false}>
         {selectedOrder && (
           <div className="space-y-4 w-full">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
               <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
               <div><span className="text-gray-500">العرض:</span> <span className="font-bold">{selectedOrder.width || "-"}</span></div>
               <div><span className="text-gray-500">الكمية:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
@@ -1316,7 +1316,7 @@ export default function CuttingManager() {
               <div><span className="text-gray-500">الوجهة:</span> <span className="font-bold">{formatDestination(selectedOrder.destination)}</span></div>
               <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
               <div className="md:col-span-2"><span className="text-gray-500">الملاحظات:</span> <span className="font-bold">{selectedOrder.notes || "-"}</span></div>
-            </div>
+            </div> */}
             {loadingOrderDetails ? <LoadingState /> : (
               <div className="border rounded-lg overflow-hidden">
                 <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">

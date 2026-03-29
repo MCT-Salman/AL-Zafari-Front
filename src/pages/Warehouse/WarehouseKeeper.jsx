@@ -130,15 +130,25 @@ export default function WarehouseKeeper() {
             return bId - aId;
         });
     }, []);
+    const sortRecordsAsc = useCallback((list) => {
+        return [...list].sort((a, b) => {
+            const aDate = a?.created_at ? new Date(a.created_at).getTime() : 0;
+            const bDate = b?.created_at ? new Date(b.created_at).getTime() : 0;
+            if (aDate !== bDate) return aDate - bDate;
+            const aId = Number(a?.production_order_item_id || a?.production_order_id || 0);
+            const bId = Number(b?.production_order_item_id || b?.production_order_id || 0);
+            return aId - bId;
+        });
+    }, []);
     const currentOrders = useMemo(
-        () => sortRecordsDesc(orders.filter((o) => String(o.status || "").toLowerCase() !== ProductionStatus.completed)),
-        [orders, sortRecordsDesc]
+        () => sortRecordsAsc(orders.filter((o) => String(o.status || "").toLowerCase() !== ProductionStatus.completed)),
+        [orders, sortRecordsAsc]
     );
     const completedOrders = useMemo(
-        () => sortRecordsDesc(orders.filter((o) => String(o.status || "").toLowerCase() === ProductionStatus.completed)),
-        [orders, sortRecordsDesc]
+        () => sortRecordsAsc(orders.filter((o) => String(o.status || "").toLowerCase() === ProductionStatus.completed)),
+        [orders, sortRecordsAsc]
     );
-    const sortedMovements = useMemo(() => sortRecordsDesc(movements), [movements, sortRecordsDesc]);
+    const sortedMovements = useMemo(() => sortRecordsAsc(movements), [movements, sortRecordsAsc]);
     const colorOptions = useMemo(() => availableColors.map((c) => {
         const rawImage = c.imageUrl || c.image_url || c.color_image || null;
         const imageUrl = rawImage ? (rawImage.startsWith("http") ? rawImage : `${API_BASE_URL}${rawImage}`) : null;
@@ -655,7 +665,7 @@ export default function WarehouseKeeper() {
 
     return (
         <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
-             <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[7.5%]" : "top-[2%]"}`}>
+             <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[8.5%]" : "top-[2%]"}`}>
 
         <Button
 
@@ -867,7 +877,7 @@ export default function WarehouseKeeper() {
             <StyledDialog isOpen={showOrderDetails} onOpenChange={setShowOrderDetails} title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`} contentClassName="max-w-7xl w-full" onCancel={() => setShowOrderDetails(false)} onConfirm={() => setShowOrderDetails(false)} confirmLabel="إغلاق" showCancel={false}>
                 {selectedOrder && (
                     <div className="space-y-4 w-full">
-                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {/* <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
                             <div><span className="text-gray-500">التاريخ:</span> <span className="font-bold">{formatDate(selectedOrder.created_at)}</span></div>
                             <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
@@ -880,7 +890,7 @@ export default function WarehouseKeeper() {
                             <div><span className="text-gray-500">الطبخة:</span> <span className="font-bold">{selectedOrder.batch_number || selectedOrder.batch?.batch_number || "-"}</span></div>
                             <div className="md:col-span-2"><span className="text-gray-500">اللون:</span> <span className="font-bold">{selectedOrder.color_name || selectedOrder.color?.color_name || "-"} ({selectedOrder.color_code || selectedOrder.color?.color_code || "-"})</span></div>
                             <div className="md:col-span-2"><span className="text-gray-500">الملاحظات:</span> <span className="font-bold">{selectedOrder.notes || "-"}</span></div>
-                        </div>
+                        </div> */}
                         {loadingOrderDetails ? <LoadingState /> : (
                             <div className="border rounded-lg overflow-hidden">
                                 <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">

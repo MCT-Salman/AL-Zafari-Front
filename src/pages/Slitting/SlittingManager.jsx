@@ -218,22 +218,22 @@ export default function SlittingManager() {
     }));
   }, [batches]);
 
-  const sortRecordsDesc = (list = []) => {
+  const sortRecordsAsc = (list = []) => {
     return [...list].sort((a, b) => {
       const aDate = a?.created_at ? new Date(a.created_at).getTime() : 0;
       const bDate = b?.created_at ? new Date(b.created_at).getTime() : 0;
-      if (aDate !== bDate) return bDate - aDate;
-      return Number(b?.production_order_item_id || b?.production_order_id || 0) - Number(a?.production_order_item_id || a?.production_order_id || 0);
+      if (aDate !== bDate) return aDate - bDate;
+      return Number(a?.production_order_item_id || a?.production_order_id || 0) - Number(b?.production_order_item_id || b?.production_order_id || 0);
     });
   };
 
   const currentOrders = useMemo(
-    () => sortRecordsDesc(orders.filter((order) => String(order.status || "").toLowerCase() !== ProductionStatus.completed)),
+    () => sortRecordsAsc(orders.filter((order) => String(order.status || "").toLowerCase() !== ProductionStatus.completed)),
     [orders]
   );
 
   const completedOrders = useMemo(
-    () => sortRecordsDesc(orders.filter((order) => String(order.status || "").toLowerCase() === ProductionStatus.completed)),
+    () => sortRecordsAsc(orders.filter((order) => String(order.status || "").toLowerCase() === ProductionStatus.completed)),
     [orders]
   );
 
@@ -808,7 +808,7 @@ export default function SlittingManager() {
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
       {/* Header Toggle Button */}
-       <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[7.5%]" : "top-[2%]"}`}>
+       <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[8.5%]" : "top-[2%]"}`}>
 
         <Button
 
@@ -1372,7 +1372,7 @@ export default function SlittingManager() {
         >
           {!selectedOrder ? null : (
             <div className="space-y-4 w-full">
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
                 <div><span className="text-gray-500">التاريخ:</span> <span className="font-bold">{formatDate(selectedOrder.created_at)}</span></div>
                 <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
@@ -1381,7 +1381,7 @@ export default function SlittingManager() {
                 <div><span className="text-gray-500">الطبخة:</span> <span className="font-bold">{getBatchLabel(selectedOrder.batch_id)}</span></div>
                 <div><span className="text-gray-500">الكمية:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
                 <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{formatTypeItem(selectedOrder.type_item)}</span></div>
-              </div>
+              </div> */}
 
               {loadingOrderDetails ? (
                 <LoadingState />

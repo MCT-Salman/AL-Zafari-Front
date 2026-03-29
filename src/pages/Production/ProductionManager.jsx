@@ -128,9 +128,9 @@ export default function ProductionManager() {
     // Production Types
     const PRODUCTION_TYPES = [
         { value: ProductionType.warehouse, label: "مستودع", icon: Package },
-        { value: ProductionType.slitting, label: "تقطيع", icon: Scissors },
+        { value: ProductionType.slitting, label: "تشريح", icon: Scissors },
         { value: ProductionType.cutting, label: "قص", icon: Scissors },
-        { value: ProductionType.gluing, label: "لصق", icon: Droplet },
+        { value: ProductionType.gluing, label: "تغرية", icon: Droplet },
     ];
 
     const TYPE_ITEM_OPTIONS = [

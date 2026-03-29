@@ -250,6 +250,25 @@ export default function GluingManager() {
 
   };
 
+  const sortRecordsAsc = (list = []) => {
+    return [...list].sort((a, b) => {
+      const aDate = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b?.created_at ? new Date(b.created_at).getTime() : 0;
+      if (aDate !== bDate) return aDate - bDate;
+      return Number(a?.production_order_item_id || a?.production_order_id || 0) - Number(b?.production_order_item_id || b?.production_order_id || 0);
+    });
+  };
+
+  const currentOrders = useMemo(
+    () => sortRecordsAsc(orders.filter((o) => String(o.status || "").toLowerCase() === ProductionStatus.pending)),
+    [orders]
+  );
+
+  const completedOrders = useMemo(
+    () => sortRecordsAsc(orders.filter((o) => String(o.status || "").toLowerCase() === ProductionStatus.completed)),
+    [orders]
+  );
+
 
 
   const colorOptions = useMemo(() => {
@@ -1163,7 +1182,7 @@ export default function GluingManager() {
 
       {/* Header Toggle Button */}
 
-      <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[7.5%]" : "top-[2%]"}`}>
+      <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[8.5%]" : "top-[2%]"}`}>
 
         <Button
 
@@ -1543,7 +1562,7 @@ export default function GluingManager() {
 
             </div>
 
-            {renderOrdersTable(ordersTab === "current" ? orders.filter(o => String(o.status || "").toLowerCase() === ProductionStatus.pending) : orders.filter(o => String(o.status || "").toLowerCase() === ProductionStatus.completed))}
+            {renderOrdersTable(ordersTab === "current" ? currentOrders : completedOrders)}
 
           </Card>
 
