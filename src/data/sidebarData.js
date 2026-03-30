@@ -10,6 +10,7 @@ export const sideData = [
     { id: 2, title: 'الملف الشخصي', link: '/profile', role: 'admin', logo: User },
     { id: 5, title: 'الزبائن', link: '/customers', logo: User, role: 'sales' },
     { id: 6, title: 'الطلبات', link: '/orders', logo: ShoppingCart, role: 'sales' },
+    { id: 15, title: 'مجهز الطلبات', link: '/order-preparer', logo: ShoppingCart, role: 'sales' },
     { id: 10, title: 'مدير الإنتاج', link: '/production', logo: User, role: 'production_manager' },
     { id: 13, title: 'إدارة المستودع', link: '/warehouse', logo: Package, role: 'Warehouse_Keeper' },
     { id: 11, title: 'إدارة الفواتير', link: '/invoice', logo: User, role: 'sales' },

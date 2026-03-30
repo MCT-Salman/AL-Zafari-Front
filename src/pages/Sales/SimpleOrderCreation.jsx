@@ -1,8 +1,9 @@
-// src\pages\Sales\SimpleOrderCreation.jsx
+﻿// src\pages\Sales\SimpleOrderCreation.jsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "../../components/common/DashboardHeader";
 import { orderApi } from "../../api/orderApi";
+import { salesApi } from "../../api/salesApi";
 import { customerApi } from "../../api/customerApi";
 import { materialApi } from "../../api/materialApi";
 import { rulerApi } from "../../api/rulerApi";
@@ -55,7 +56,7 @@ import ColorsReadOnly from "./ColorsReadOnly";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
 
-export default function SimpleOrderCreation() {
+export default function SimpleOrderCreation({ variant = "orders" }) {
     const navigate = useNavigate();
     const { logout, user } = useAuth();
     const [viewMode, setViewMode] = useState("create"); // create | history | colors
@@ -126,10 +127,11 @@ export default function SimpleOrderCreation() {
 
     // Filtered orders for display
     const filteredOrders = useMemo(() => {
-        return orders.filter(order => {
+        const safeOrders = Array.isArray(orders) ? orders : [];
+        return safeOrders.filter(order => {
             const term = String(historySearchTerm || "").toLowerCase().trim();
             const matchesSearch = !term || (
-                String(order.order_id || "").toLowerCase().includes(term) ||
+                String(getOrderId(order) || "").toLowerCase().includes(term) ||
                 String(order.customer_name || "").toLowerCase().includes(term) ||
                 String(order.phone || "").toLowerCase().includes(term) ||
                 (order.customer?.name && String(order.customer.name).toLowerCase().includes(term)) ||
@@ -178,6 +180,15 @@ export default function SimpleOrderCreation() {
         batchNumber: "",
         footerText: ""
     });
+    const [orderQrPreview, setOrderQrPreview] = useState({
+        open: false,
+        qrUrl: "",
+        qrData: "",
+        itemsCount: 0,
+        totalQuantity: 0,
+        footerText: ""
+    });
+
     const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
 
     // QR Generation Dialog State with quantity editing
@@ -189,6 +200,33 @@ export default function SimpleOrderCreation() {
         qrData: ""
     });
     const [savingQrQuantity, setSavingQrQuantity] = useState(false);
+
+    const isOrderPreparer = variant === "order-preparer";
+    const isOrdersPage = variant === "orders";
+    const showOrderSwitch = isOrdersPage || isOrderPreparer;
+
+    const ordersApi = isOrderPreparer
+        ? {
+            getOrders: salesApi.getSalesOrders,
+            getOrderById: salesApi.getSalesOrderById,
+            createOrder: salesApi.createSalesOrder,
+            updateOrder: salesApi.updateSalesOrder,
+            updateOrderStatus: (id, status) => salesApi.updateSalesOrder(id, { status }),
+            updateOrderItem: (_orderId, itemId, itemData) => salesApi.updateSalesOrderItem(itemId, itemData),
+            deleteMultipleOrders: salesApi.deleteMultipleSalesOrders,
+            getOrderStatus: salesApi.getSalesOrderStatus,
+            getFormattedDate: salesApi.getFormattedDate,
+            getStatusBadge: salesApi.getStatusBadge,
+            getSalesUserName: salesApi.getIssuedBy,
+            getCustomerName: orderApi.getCustomerName,
+            getCustomerPhone: orderApi.getCustomerPhone,
+            getCustomerCity: orderApi.getCustomerCity,
+            getCustomerAddress: orderApi.getCustomerAddress,
+            formatCustomerInfo: orderApi.formatCustomerInfo,
+            calculateOrderTotal: orderApi.calculateOrderTotal,
+            formatCurrency: orderApi.formatCurrency
+        }
+        : orderApi;
 
     const isQrQuantityChanged = useMemo(() => {
         const current = String(qrGenDialog.quantity ?? "");
@@ -219,17 +257,18 @@ export default function SimpleOrderCreation() {
     });
 
     // Helper functions from orderApi
-    const getOrderStatus = (order) => orderApi.getOrderStatus(order);
-    const getFormattedDate = (order) => orderApi.getFormattedDate(order);
-    const formatCurrency = (amount) => orderApi.formatCurrency(amount);
-    const getStatusBadge = (status) => orderApi.getStatusBadge(status);
-    const getSalesUserName = (order) => orderApi.getSalesUserName(order);
-    const getCustomerName = (order) => orderApi.getCustomerName(order);
-    const getCustomerPhone = (order) => orderApi.getCustomerPhone(order);
-    const getCustomerCity = (order) => orderApi.getCustomerCity(order);
-    const getCustomerAddress = (order) => orderApi.getCustomerAddress(order);
-    const formatCustomerInfo = (order) => orderApi.formatCustomerInfo(order);
-    const calculateOrderTotal = (items) => orderApi.calculateOrderTotal(items);
+    const getOrderStatus = (order) => ordersApi.getOrderStatus(order);
+    const getFormattedDate = (order) => ordersApi.getFormattedDate(order);
+    const formatCurrency = (amount) => ordersApi.formatCurrency(amount);
+    const getStatusBadge = (status) => ordersApi.getStatusBadge(status);
+    const getSalesUserName = (order) => ordersApi.getSalesUserName(order);
+    const getCustomerName = (order) => ordersApi.getCustomerName(order);
+    const getCustomerPhone = (order) => ordersApi.getCustomerPhone(order);
+    const getCustomerCity = (order) => ordersApi.getCustomerCity(order);
+    const getCustomerAddress = (order) => ordersApi.getCustomerAddress(order);
+    const formatCustomerInfo = (order) => ordersApi.formatCustomerInfo(order);
+    const calculateOrderTotal = (items) => ordersApi.calculateOrderTotal(items);
+    const getOrderId = (order) => order?.order_id ?? order?.Sales_order_id ?? order?.sales_order_id ?? order?.id ?? null;
 
     const TYPE_OPTIONS = [
         { value: TypeItem.Machine, label: "مكنة" },
@@ -264,12 +303,12 @@ export default function SimpleOrderCreation() {
     };
 
     const handleUpdateOrderStatus = async (nextStatus) => {
-        if (!orderDetails?.order_id) return;
+        if (!getOrderId(orderDetails)) return;
         try {
             setUpdatingOrderStatus(true);
-            await orderApi.updateOrderStatus(orderDetails.order_id, nextStatus);
+            await ordersApi.updateOrderStatus(getOrderId(orderDetails), nextStatus);
             setOrderDetails((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-            setOrders((prev) => prev.map((o) => (o.order_id === orderDetails.order_id ? { ...o, status: nextStatus } : o)));
+            setOrders((prev) => prev.map((o) => (getOrderId(o) === getOrderId(orderDetails) ? { ...o, status: nextStatus } : o)));
             toast.success("تم تحديث الحالة");
         } catch (error) {
             toast.error("فشل في تحديث الحالة");
@@ -283,9 +322,9 @@ export default function SimpleOrderCreation() {
     }, [orderItems]);
 
     const getStatusLabel = (status) => {
-        switch(status) {
+        switch (status) {
             case OrderStatus.pending:
-                return "معلق";
+                return "قيد الانتظار";
             case OrderStatus.preparing:
                 return "قيد التحضير";
             case OrderStatus.completed:
@@ -380,7 +419,7 @@ export default function SimpleOrderCreation() {
             const response = await constantApi.getConstantValuesByMaterial(materialId, 'width');
             const widthData = getApiData(response, []);
             setWidthValues(widthData);
-            
+
             // Set default width if isDefault is true
             const defaultWidth = widthData.find(w => w.isDefault);
             if (defaultWidth) {
@@ -404,7 +443,7 @@ export default function SimpleOrderCreation() {
             const response = await constantApi.getConstantValuesByMaterial(materialId, 'thickness');
             const thicknessData = getApiData(response, []);
             setThicknessValues(thicknessData);
-            
+
             // Set default thickness if isDefault is true
             const defaultThickness = thicknessData.find(t => t.isDefault);
             if (defaultThickness) {
@@ -425,8 +464,10 @@ export default function SimpleOrderCreation() {
     const loadOrders = async () => {
         try {
             setOrdersLoading(true);
-            const response = await orderApi.getOrders();
-            setOrders(getApiData(response, []) || []);
+            const response = await ordersApi.getOrders();
+            const data = getApiData(response, []) || [];
+            const nextOrders = Array.isArray(data) ? data : (Array.isArray(data?.orders) ? data.orders : []);
+            setOrders(nextOrders);
         } catch (error) {
             // console.error("Error loading orders:", error);
             toast.error("فشل في تحميل الطلبات");
@@ -441,7 +482,7 @@ export default function SimpleOrderCreation() {
             return;
         }
         const exportRows = orders.map((order) => ({
-            order_id: order.order_id ? `#${order.order_id}` : "بدون طلب",
+            order_id: getOrderId(order) ? `#${getOrderId(order)}` : "بدون طلب",
             date: getFormattedDate(order),
             items: order.count_items ?? order.items?.length ?? 0,
             sales: getSalesUserName(order) || "-",
@@ -457,6 +498,65 @@ export default function SimpleOrderCreation() {
         return `https://api.qrserver.com/v1/create-qr-code/?size=88x88&data=${encoded}`;
     };
 
+    const getOrderQrUrl = (data) => {
+        const encoded = encodeURIComponent(String(data || ""));
+        return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encoded}`;
+    };
+
+    const buildOrderQrData = (items) => {
+        const orderId = editingOrderId ?? "-";
+        const customerName = customerOption === "existing"
+            ? (selectedCustomer?.name ?? "-")
+            : customerOption === "new"
+                ? (newCustomer?.name ?? "-")
+                : "-";
+        const customerPhone = customerOption === "existing"
+            ? (selectedCustomer?.phone ?? "-")
+            : customerOption === "new"
+                ? (newCustomer?.phone ?? "-")
+                : "-";
+        const customerCity = customerOption === "existing"
+            ? (selectedCustomer?.city ?? "-")
+            : customerOption === "new"
+                ? (newCustomer?.city ?? "-")
+                : "-";
+        const customerAddress = customerOption === "existing"
+            ? (selectedCustomer?.address ?? "-")
+            : customerOption === "new"
+                ? (newCustomer?.address ?? "-")
+                : "-";
+
+        const itemsText = (items || []).map((item, index) => {
+            const typeLabel = formatTypeItemString(item.type_item);
+            return [
+                `#${index + 1}`,
+                `المادة:${item.material_name ?? "-"}`,
+                `النوع:${typeLabel || "-"}`,
+                `المسطرة:${item.ruler_name ?? "-"}`,
+                `اللون:${item.color_name ?? "-"}`,
+                `كود اللون:${item.color_code ?? "-"}`,
+                `العرض:${item.width ?? "-"}`,
+                `الطول:${item.length ?? 100}`,
+                `السماكة:${item.thickness ?? "-"}`,
+                `الكمية:${item.quantity ?? "-"}`,
+                `الطبخة:${item.batch_number ?? "-"}`,
+                `ملاحظات:${item.notes ?? "-"}`
+            ].join("|");
+        }).join("\n");
+
+        return [
+            `رقم الطلب:${orderId}`,
+            `الزبون:${customerName}`,
+            `هاتف الزبون:${customerPhone}`,
+            `المدينة:${customerCity}`,
+            `العنوان:${customerAddress}`,
+            `عدد العناصر:${orderItems.length}`,
+            `إجمالي الكمية:${totalPreviewQuantity} م`,
+            "العناصر:",
+            itemsText || "-"
+        ].join("\n");
+    };
+
     const buildItemQrData = (item) => {
         console.log("Debug - buildItemQrData item:", item);
         console.log("Debug - item.employee_id:", item.employee_id);
@@ -465,7 +565,7 @@ export default function SimpleOrderCreation() {
         console.log("Debug - user.user_id:", user?.user_id);
         console.log("Debug - user.id:", user?.id);
         console.log("Debug - user.employee_id:", user?.employee_id);
-        
+
         const typeLabel = formatTypeItemString(item?.type_item);
 
         const values = [
@@ -473,6 +573,7 @@ export default function SimpleOrderCreation() {
             item?.ruler_name ?? item?.ruler_type ?? item?.rulerType ?? item?.ruler?.ruler_name ?? item?.ruler?.ruler_type ?? "",
             item?.color_code ?? item?.color_code ?? "",
             item?.width ?? "",
+            item?.length ?? 100,
             item?.thickness ?? "",
             item?.quantity ?? "",
             item?.batch_number ?? "",
@@ -490,15 +591,16 @@ export default function SimpleOrderCreation() {
         const ruler = meta.ruler_name || meta.ruler_type || meta.rulerType || meta.ruler?.ruler_name || meta.ruler?.ruler_type || "";
         const colorCode = meta.color_code || meta.colorCode || "";
         const width = meta.width || "";
+        const length = meta.length ?? 100;
         const thickness = meta.thickness || "";
         const quantity = meta.quantity || "";
         const batch = meta.batch_number || meta.batchNumber || "";
         const typeLabel = meta.type_label || meta.typeLabel || "";
         const employeeId = meta.employeeId || meta.employee_id || user?.user_id || user?.id || user?.employee_id || "";
-        
-        // Build footer with same order as QR data: material|ruler|color_code|width|thickness|quantity|batch|type|employeeId
-        const footer = [material, ruler, colorCode, width, thickness, quantity, batch, typeLabel, employeeId].filter(v => v !== "").join("|");
-        
+
+        // Build footer with same order as QR data: material|ruler|color_code|width|length|thickness|quantity|batch|type|employeeId
+        const footer = [material, ruler, colorCode, width, length, thickness, quantity, batch, typeLabel, employeeId].filter(v => v !== "").join("|");
+
         setQrPreview({
             open: true,
             url,
@@ -507,6 +609,7 @@ export default function SimpleOrderCreation() {
             ruler,
             colorCode,
             width,
+            length,
             thickness,
             quantity,
             batchNumber: batch,
@@ -521,7 +624,7 @@ export default function SimpleOrderCreation() {
         const itemWithQty = { ...item, quantity: initialQty };
         const qrData = buildItemQrData(itemWithQty);
         const qrUrl = getQrUrl(qrData);
-        
+
         setQrGenDialog({
             open: true,
             item: item,
@@ -547,7 +650,7 @@ export default function SimpleOrderCreation() {
 
     const applyQrGenQuantity = async () => {
         const targetId = qrGenDialog.item?.id;
-        const orderId = qrGenDialog.item?.order_id;
+        const orderId = qrGenDialog.item?.order_id ?? qrGenDialog.item?.sales_order_id ?? qrGenDialog.item?.Sales_order_id ?? qrGenDialog.item?.salesOrder?.sales_order_id ?? getOrderId(orderDetails);
         const orderItemId = qrGenDialog.item?.order_item_id;
         if (targetId == null || !orderId || !orderItemId) {
             toast.error("لا يمكن حفظ الكمية");
@@ -561,9 +664,19 @@ export default function SimpleOrderCreation() {
                 toast.error("الكمية غير صالحة");
                 return;
             }
-            await orderApi.updateOrderItem(orderId, orderItemId, {
-                quantity: quantityValue
-            });
+            const itemPayload = {
+                type_item: qrGenDialog.item?.type_item ?? "",
+                color_id: qrGenDialog.item?.color_id ?? qrGenDialog.item?.color?.color_id ?? null,
+                batch_id: qrGenDialog.item?.batch_id ?? qrGenDialog.item?.batch?.batch_id ?? null,
+                width: Number(qrGenDialog.item?.width) || 0,
+                length: Number(qrGenDialog.item?.length ?? 100),
+                thickness: Number(qrGenDialog.item?.thickness) || 0,
+                quantity: quantityValue,
+                status: qrGenDialog.item?.status ?? OrderStatus.pending,
+                notes: qrGenDialog.item?.notes ?? ""
+            };
+
+            await ordersApi.updateOrderItem(orderId, orderItemId, itemPayload);
 
             setOrderDetails(prev => {
                 if (!prev?.items) return prev;
@@ -618,9 +731,9 @@ export default function SimpleOrderCreation() {
 
         try {
             setLoading(true);
-            
+
             const formattedPhone = formatPhoneNumber(newCustomer.phone);
-            
+
             const customerData = {
                 name: newCustomer.name,
                 phone: formattedPhone,
@@ -632,20 +745,20 @@ export default function SimpleOrderCreation() {
             };
 
             // console.log("Creating customer with data:", customerData);
-            
+
             const response = await customerApi.createCustomer(customerData);
             const createdCustomer = getApiData(response, {});
-            
+
             if (createdCustomer) {
                 toast.success("تم إنشاء الزبون بنجاح");
                 setCustomers(prev => [...prev, createdCustomer]);
                 setSelectedCustomer(createdCustomer);
                 setCustomerOption("existing");
-                setNewCustomer({ 
-                    name: "", 
-                    phone: "", 
+                setNewCustomer({
+                    name: "",
+                    phone: "",
                     customer_type: CustomerType.customer,
-                    city: "", 
+                    city: "",
                     address: "",
                     is_active: true,
                     notes: ""
@@ -729,9 +842,9 @@ export default function SimpleOrderCreation() {
                 String(pc.color_id) === String(color.color_id) &&
                 (!isSelectedMaterialPvc || pc.type_item === formData.type_item) &&
                 (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
-                 pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
-                 pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
-                 pc.price_color_By === PriceColorBy.isByBlanck)
+                    pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
+                    pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
+                    pc.price_color_By === PriceColorBy.isByBlanck)
             );
         });
     }, [formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, isSelectedMaterialPvc, colors, priceColors]);
@@ -764,9 +877,9 @@ export default function SimpleOrderCreation() {
             String(pc.color_id) === String(formData.color_id) &&
             (!isSelectedMaterialPvc || pc.type_item === formData.type_item) &&
             (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
-             pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
-             pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
-             pc.price_color_By === PriceColorBy.isByBlanck)
+                pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
+                pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
+                pc.price_color_By === PriceColorBy.isByBlanck)
         );
     }, [formData.color_id, formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, isSelectedMaterialPvc, priceColors]);
 
@@ -788,9 +901,9 @@ export default function SimpleOrderCreation() {
             String(pc.color_id) === String(colorId) &&
             (!isSelectedMaterialPvc || pc.type_item === formData.type_item) &&
             (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
-             pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
-             pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
-             pc.price_color_By === PriceColorBy.isByBlanck)
+                pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
+                pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
+                pc.price_color_By === PriceColorBy.isByBlanck)
         );
         return { priced: isPriced, label: isPriced ? "" : " (غير مسعر)" };
     };
@@ -902,6 +1015,7 @@ export default function SimpleOrderCreation() {
             color_id: formData.color_id,
             batch_id: formData.batch_id,
             width: formData.width,
+            length: 100,
             thickness: formData.thickness,
             quantity: formData.quantity,
             notes: formData.notes,
@@ -920,7 +1034,7 @@ export default function SimpleOrderCreation() {
         };
 
         if (editingItemId) {
-            setOrderItems(prev => prev.map(item => 
+            setOrderItems(prev => prev.map(item =>
                 item.id === editingItemId ? newItem : item
             ));
             toast.success("تم تحديث العنصر بنجاح");
@@ -961,6 +1075,24 @@ export default function SimpleOrderCreation() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const handleGenerateOrderQr = () => {
+        if (!orderItems || orderItems.length === 0) {
+            toast.error("لا توجد عناصر لتوليد QR");
+            return;
+        }
+        const qrData = buildOrderQrData(orderItems);
+        const qrUrl = getOrderQrUrl(qrData);
+        const footerText = `عدد العناصر: ${orderItems.length} | إجمالي الكمية: ${totalPreviewQuantity} م`;
+        setOrderQrPreview({
+            open: true,
+            qrUrl,
+            qrData,
+            itemsCount: orderItems.length,
+            totalQuantity: totalPreviewQuantity,
+            footerText
+        });
+    };
+
     const handleEditOrderFromHistory = async (order) => {
         try {
             setLoadingDetails(true);
@@ -972,14 +1104,14 @@ export default function SimpleOrderCreation() {
                 await loadCustomers();
             }
 
-            const response = await orderApi.getOrderById(order.order_id);
+            const response = await ordersApi.getOrderById(getOrderId(order));
             if (!response?.success || !response?.data) {
                 toast.error("فشل في جلب تفاصيل الطلب");
                 return;
             }
 
             const details = response.data;
-            setEditingOrderId(details.order_id);
+            setEditingOrderId(getOrderId(details));
             setViewMode("create");
 
             const customerId = details.customer?.customer_id ?? details.customer_id ?? details.customerId ?? null;
@@ -1001,7 +1133,7 @@ export default function SimpleOrderCreation() {
                 console.log("Debug - employee_id from item:", it.employee_id);
                 console.log("Debug - employee_id from details:", details.employee_id);
                 console.log("Debug - current user:", user?.user_id);
-                
+
                 const rawColorCode = it.color_code ?? it.color?.color_code ?? it.colorCode ?? null;
                 const rawColorName = it.color_name ?? it.color?.color_name ?? it.colorName ?? null;
                 const rawColorId = it.color_id ?? it.color?.color_id ?? it.colorId ?? null;
@@ -1055,6 +1187,7 @@ export default function SimpleOrderCreation() {
                     color_id: resolvedColorId ? String(resolvedColorId) : "",
                     batch_id: rawBatchId ? String(rawBatchId) : "",
                     width: it.width !== undefined && it.width !== null ? String(it.width) : "",
+                    length: it.length !== undefined && it.length !== null ? Number(it.length) : 100,
                     thickness: String(it.thickness ?? ""),
                     quantity: String(it.quantity ?? ""),
                     notes: it.notes || "",
@@ -1085,7 +1218,7 @@ export default function SimpleOrderCreation() {
                 batch_id: "",
             }));
 
-            toast.success(details.order_id ? `تم تحميل الطلب #${details.order_id} للتعديل` : "تم تحميل الطلب للتعديل");
+            toast.success(getOrderId(details) ? `تم تحميل الطلب #${getOrderId(details)} للتعديل` : "تم تحميل الطلب للتعديل");
             window.scrollTo({ top: 0, behavior: "smooth" });
         } catch (error) {
             toast.error("حدث خطأ أثناء تحميل الطلب للتعديل");
@@ -1121,11 +1254,13 @@ export default function SimpleOrderCreation() {
 
         try {
             setLoading(true);
-            
+
             const items = orderItems.map(item => {
+                const lengthValue = Number(item.length ?? 100);
                 const payload = {
                     color_id: Number(item.color_id),
                     width: Number(item.width) || 0,
+                    length: Number.isFinite(lengthValue) ? lengthValue : 100,
                     thickness: Number(item.thickness ?? formData.thickness ?? 0),
                     quantity: Number(item.quantity),
                     notes: item.notes || ""
@@ -1146,13 +1281,13 @@ export default function SimpleOrderCreation() {
             }
 
             if (editingOrderId) {
-                await orderApi.updateOrder(editingOrderId, orderData);
+                await ordersApi.updateOrder(editingOrderId, orderData);
             } else {
-                await orderApi.createOrder(orderData);
+                await ordersApi.createOrder(orderData);
             }
-            
+
             toast.success(editingOrderId ? "تم تحديث الطلب بنجاح" : "تم حفظ الطلب بنجاح");
-            
+
             setOrderItems([]);
             setSelectedCustomer(null);
             setCustomerOption("none");
@@ -1163,7 +1298,7 @@ export default function SimpleOrderCreation() {
             if (viewMode === "history") {
                 loadOrders();
             }
-            
+
         } catch (error) {
             // console.error("Error saving order:", error);
             toast.error("فشل في حفظ الطلب");
@@ -1177,29 +1312,29 @@ export default function SimpleOrderCreation() {
     };
 
     const handleViewOrderDetails = async (order) => {
-    try {
-        setLoadingDetails(true);
-        // استخدم order.order_id لأن order هو من قائمة الطلبات
-        const response = await orderApi.getOrderById(order.order_id);
-        
-        if (response.success && response.data) {
-            // البيانات الكاملة موجودة في response.data
-            setOrderDetails(response.data);
-        } else {
-            toast.error("فشل في جلب تفاصيل الطلب");
+        try {
+            setLoadingDetails(true);
+            // استخدم رقم الطلب من أي حقل متاح حسب الـ API
+            const response = await ordersApi.getOrderById(getOrderId(order));
+
+            if (response.success && response.data) {
+                // البيانات الكاملة موجودة في response.data
+                setOrderDetails(response.data);
+            } else {
+                toast.error("فشل في جلب تفاصيل الطلب");
+            }
+        } catch (error) {
+            console.error("Error fetching order details:", error);
+            toast.error("حدث خطأ في جلب تفاصيل الطلب");
+        } finally {
+            setLoadingDetails(false);
         }
-    } catch (error) {
-        console.error("Error fetching order details:", error);
-        toast.error("حدث خطأ في جلب تفاصيل الطلب");
-    } finally {
-        setLoadingDetails(false);
-    }
-};
+    };
 
     // Multiple delete functions
     const handleSelectOrder = (orderId) => {
-        setSelectedOrders(prev => 
-            prev.includes(orderId) 
+        setSelectedOrders(prev =>
+            prev.includes(orderId)
                 ? prev.filter(id => id !== orderId)
                 : [...prev, orderId]
         );
@@ -1209,7 +1344,7 @@ export default function SimpleOrderCreation() {
         if (selectedOrders.length === filteredOrders.length) {
             setSelectedOrders([]);
         } else {
-            setSelectedOrders(filteredOrders.map(order => order.order_id));
+            setSelectedOrders(filteredOrders.map(order => getOrderId(order)));
         }
     };
 
@@ -1224,13 +1359,13 @@ export default function SimpleOrderCreation() {
     const confirmDeleteSelectedOrders = async () => {
         try {
             setDeletingOrders(true);
-            
+
             // Debug: Log selected orders
             console.log('Selected orders to delete:', selectedOrders);
             console.log('Selected orders types:', selectedOrders.map(id => typeof id));
-            
-            const response = await orderApi.deleteMultipleOrders(selectedOrders);
-            
+
+            const response = await ordersApi.deleteMultipleOrders(selectedOrders);
+
             if (response.success) {
                 toast.success("تم حذف الطلبات بنجاح");
                 await loadOrders();
@@ -1286,8 +1421,8 @@ export default function SimpleOrderCreation() {
         const baseCustomers = Array.isArray(customers) ? customers : [];
         if (!customerSearchTerm) return baseCustomers;
         const term = customerSearchTerm.toLowerCase();
-        return baseCustomers.filter(c => 
-            c.name?.toLowerCase().includes(term) || 
+        return baseCustomers.filter(c =>
+            c.name?.toLowerCase().includes(term) ||
             c.phone?.toLowerCase().includes(term) ||
             c.city?.toLowerCase().includes(term)
         );
@@ -1395,7 +1530,7 @@ export default function SimpleOrderCreation() {
         const batch = batches.find(b => String(b.batch_id) === String(item.batch_id));
 
         const lines = [
-            { label: "رقم الطلب", value: order?.order_id ?? "-" },
+            { label: "رقم الطلب", value: getOrderId(order) ?? "-" },
             { label: "التاريخ", value: order?.created_at ? new Date(order.created_at).toLocaleString("en-US") : "-" },
             { label: "المادة", value: material?.material_name || item.material_name || "-" },
             { label: "المسطرة", value: ruler?.ruler_name || item.ruler_name || "-" },
@@ -1458,47 +1593,48 @@ export default function SimpleOrderCreation() {
                 isHeaderVisible={isHeaderVisible}
                 setIsHeaderVisible={setIsHeaderVisible}
                 leftContent={
-                    <>
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => setViewMode("create")}
-                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
-                                viewMode === "create"
-                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                            }`}
-                        >
-                            <ShoppingCart className="w-5 h-5 ml-2" />
-                            طلب جديد
-                        </Button>
+                    <div className="flex items-center flex-nowrap overflow-x-auto">
+                        {showOrderSwitch && (
+                            <>
+                                <Button
+                                    size="lg"
+                                    variant="outline"
+                                    onClick={() => setViewMode("create")}
+                                    className={`px-4 py-2.5 text-base min-w-[110px] whitespace-nowrap touch-manipulation border-2 ${viewMode === "create"
+                                            ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                            : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                        }`}
+                                >
+                                    {/* <ShoppingCart className="w-5 h-5 ml-2" /> */}
+                                    طلب جديد
+                                </Button>
+                            </>
+                        )}
                         <Button
                             size="lg"
                             variant="outline"
                             onClick={() => setViewMode("history")}
-                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
-                                viewMode === "history"
+                            className={`px-4 py-2.5 text-base min-w-[120px] whitespace-nowrap touch-manipulation border-2 ${viewMode === "history"
                                     ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
                                     : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                            }`}
+                                }`}
                         >
-                            <History className="w-5 h-5 ml-2" />
+                            {/* <History className="w-5 h-5 ml-2" /> */}
                             سجل الطلبات
                         </Button>
                         <Button
                             size="lg"
                             variant="outline"
                             onClick={() => setViewMode("colors")}
-                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${
-                                viewMode === "colors"
+                            className={`px-4 py-2.5 text-base min-w-[140px] whitespace-nowrap touch-manipulation border-2 ${viewMode === "colors"
                                     ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
                                     : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                            }`}
+                                }`}
                         >
-                            <Palette className="w-5 h-5 ml-2" />
+                            {/* <Palette className="w-5 h-5 ml-2" /> */}
                             الشركات المكافئة
                         </Button>
-                    </>
+                    </div>
                 }
             />
 
@@ -1579,7 +1715,7 @@ export default function SimpleOrderCreation() {
                                         <div className="text-xs text-gray-500 mb-0.5">
                                             {numpadMode === "colorSearch" ? "كود اللون" :
                                                 activeField === "quantity" ? "الكمية" :
-                                                activeField === "width" ? "العرض" : "القيمة"}
+                                                    activeField === "width" ? "العرض" : "القيمة"}
                                         </div>
                                         <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
                                             {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
@@ -1822,15 +1958,14 @@ export default function SimpleOrderCreation() {
                                                     setActiveField("quantity");
                                                     setNumpadMode("quantity");
                                                 }}
-                                                className={`h-12 text-lg text-center font-bold flex-1 ${
-                                                    activeField === "quantity" ? "ring-2 ring-blue-400" : ""
-                                                }`}
+                                                className={`h-12 text-lg text-center font-bold flex-1 ${activeField === "quantity" ? "ring-2 ring-blue-400" : ""
+                                                    }`}
                                                 placeholder="0"
                                             />
                                             <span className="text-base font-bold text-gray-600 whitespace-nowrap">متر</span>
                                         </div>
                                     </div>
-                                    
+
                                     <div>
                                         <Label className="font-bold text-sm mb-2 block">السماكة</Label>
                                         {thicknessValues.length > 1 ? (
@@ -1857,7 +1992,7 @@ export default function SimpleOrderCreation() {
                                             </div>
                                         )}
                                     </div>
-                                    
+
                                     <div >
                                         <Label className="font-bold text-sm mb-2 block">رقم الطبخة</Label>
                                         <FilterSelect
@@ -1908,9 +2043,8 @@ export default function SimpleOrderCreation() {
                                     <Button
                                         onClick={addOrUpdateItem}
                                         size="lg"
-                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-14 text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform ${
-                                            editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
-                                        }`}
+                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-14 text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-primary-f hover:bg-secondary-f'
+                                            }`}
                                         disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
                                     >
                                         {editingItemId ? (
@@ -1949,8 +2083,8 @@ export default function SimpleOrderCreation() {
                                                             ? option.value === "none"
                                                                 ? "bg-secondary-s text-white"
                                                                 : option.value === "existing"
-                                                                ? "bg-secondary-f text-white"
-                                                                : "bg-primary-f text-white"
+                                                                    ? "bg-secondary-f text-white"
+                                                                    : "bg-primary-f text-white"
                                                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                                         }
                                                     `}
@@ -1982,7 +2116,7 @@ export default function SimpleOrderCreation() {
                                                         setActiveTextTarget("customer_search");
                                                     }}
                                                     placeholder="اختر الزبون..."
-                                                    className="w-full text-sm" 
+                                                    className="w-full text-sm"
                                                 />
                                             </div>
 
@@ -2003,28 +2137,28 @@ export default function SimpleOrderCreation() {
                                                 type="text"
                                                 placeholder="الاسم *"
                                                 value={newCustomer.name}
-                                                onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                                                onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                                                 className="h-10 text-sm"
                                             />
                                             <Input
                                                 type="text"
                                                 placeholder="رقم الهاتف *"
                                                 value={newCustomer.phone}
-                                                onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                                                onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
                                                 className="h-10 text-sm"
                                             />
                                             <Input
                                                 type="text"
                                                 placeholder="المدينة"
                                                 value={newCustomer.city}
-                                                onChange={(e) => setNewCustomer({...newCustomer, city: e.target.value})}
+                                                onChange={(e) => setNewCustomer({ ...newCustomer, city: e.target.value })}
                                                 className="h-10 text-sm"
                                             />
                                             <Input
                                                 type="text"
                                                 placeholder="العنوان"
                                                 value={newCustomer.address}
-                                                onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})}
+                                                onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
                                                 className="h-10 text-sm"
                                             />
                                             <div className="col-span-2">
@@ -2032,24 +2166,24 @@ export default function SimpleOrderCreation() {
                                                     type="text"
                                                     placeholder="ملاحظات (اختياري)"
                                                     value={newCustomer.notes}
-                                                    onChange={(e) => setNewCustomer({...newCustomer, notes: e.target.value})}
+                                                    onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })}
                                                     className="h-10 text-sm w-full"
                                                 />
                                             </div>
                                         </div>
-                                        
+
                                         {/* معاينة الرقم المنسق */}
                                         {newCustomer.phone && (
                                             <div className="text-xs text-green-600 bg-green-50 p-2 rounded-lg">
                                                 <span className="font-bold">الرقم بعد التنسيق:</span> <span dir="ltr">{formatPhoneNumber(newCustomer.phone)}</span>
                                             </div>
                                         )}
-                                        
+
                                         {/* <div className="flex gap-2 text-xs text-gray-500">
                                             <span className="bg-gray-100 px-2 py-1 rounded">النوع: زبون</span>
                                             <span className="bg-gray-100 px-2 py-1 rounded">نشط: نعم</span>
                                         </div> */}
-                                        
+
                                         <Button
                                             onClick={handleCreateCustomer}
                                             disabled={!newCustomer.name || !newCustomer.phone || loading}
@@ -2101,7 +2235,7 @@ export default function SimpleOrderCreation() {
                                                 <div className="text-sm">{newCustomer.name} - {formatPhoneNumber(newCustomer.phone)}</div>
                                             </div>
                                         )}
-                                        
+
                                         <div className="grid grid-cols-2 gap-3 text-sm">
                                             <div className="bg-gray-50 rounded-lg p-2">
                                                 عدد العناصر: <span className="font-bold">{orderItems.length}</span>
@@ -2110,7 +2244,7 @@ export default function SimpleOrderCreation() {
                                                 إجمالي الكمية: <span className="font-bold">{totalPreviewQuantity} م</span>
                                             </div>
                                         </div>
-                                        
+
                                         <div className="max-h-64 overflow-y-auto border rounded-lg">
                                             <table className="w-full text-sm">
                                                 <thead className="bg-gray-100 sticky top-0">
@@ -2146,7 +2280,7 @@ export default function SimpleOrderCreation() {
                                     </div>
                                 </StyledDialog>
                             )}
-                            
+
                             {/* زر إلغاء التعديل بجانب زر الحفظ */}
                             {/* {editingItemId && (
                                 <div className="flex gap-2 justify-center mt-2">
@@ -2158,15 +2292,25 @@ export default function SimpleOrderCreation() {
                                     </button>
                                 </div>
                             )} */}
-                            
+
                             <Card className="flex flex-col h-full min-h-0 overflow-hidden">
                                 {/* رأس الجدول مع أزرار التحكم */}
                                 <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
                                     <div className="flex items-center gap-2">
                                         <span className="font-bold text-lg">العناصر: {orderItems.length}</span>
+                                        {isOrderPreparer && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={handleGenerateOrderQr}
+                                                className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                                            >
+                                                QR
+                                            </Button>
+                                        )}
                                         {orderItems.length > 0 && (
                                             <>
-                                                
+
                                                 <button
                                                     onClick={clearAllItems}
                                                     className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform flex items-center gap-1"
@@ -2202,7 +2346,7 @@ export default function SimpleOrderCreation() {
                                 </div>
 
                                 {/* الجدول مع التمرير الأفقي والعمودي */}
-                                <div 
+                                <div
                                     ref={tableContainerRef}
                                     className="flex-1 overflow-auto min-h-0"
                                     style={{ direction: 'rtl' }}
@@ -2223,11 +2367,10 @@ export default function SimpleOrderCreation() {
                                         </thead>
                                         <tbody>
                                             {orderItems.map(item => (
-                                                <tr 
-                                                    key={item.id} 
-                                                    className={`border-b hover:bg-gray-50 cursor-pointer transition-colors ${
-                                                        editingItemId === item.id ? 'bg-blue-50 border-blue-300' : ''
-                                                    }`}
+                                                <tr
+                                                    key={item.id}
+                                                    className={`border-b hover:bg-gray-50 cursor-pointer transition-colors ${editingItemId === item.id ? 'bg-blue-50 border-blue-300' : ''
+                                                        }`}
                                                     onClick={() => handleEditItem(item)}
                                                 >
                                                     <td className="p-1 break-words text-sm" title={item.material_name}>
@@ -2288,21 +2431,21 @@ export default function SimpleOrderCreation() {
                                     </table>
                                 </div>
                                 <div className="flex justify-end pt-2">
-                                        <Button
-                                            size="lg"
-                                            onClick={() => setShowPreview(true)}
-                                            disabled={loading || orderItems.length === 0}
-                                            className="h-12 bg-secondary-s hover:brightness-110 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
-                                        >
-                                            {loading ? (
-                                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                            ) : (
-                                                <>
-                                                    <Check className="w-4 h-4 ml-2" />
-                                                    حفظ
-                                                </>
-                                            )}
-                                        </Button>
+                                    <Button
+                                        size="lg"
+                                        onClick={() => setShowPreview(true)}
+                                        disabled={loading || orderItems.length === 0}
+                                        className="h-12 bg-secondary-s hover:brightness-110 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
+                                    >
+                                        {loading ? (
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <>
+                                                <Check className="w-4 h-4 ml-2" />
+                                                حفظ
+                                            </>
+                                        )}
+                                    </Button>
                                 </div>
                             </Card>
                         </div>
@@ -2360,7 +2503,7 @@ export default function SimpleOrderCreation() {
                                 onChange={(e) => setHistoryStatusFilter(e.target.value)}
                                 options={[
                                     { value: "", label: "كل الحالات" },
-                                    { value: "pending", label: "معلق" },
+                                    { value: "pending", label: "قيد الانتظار" },
                                     { value: "completed", label: "مكتمل" },
                                     { value: "cancelled", label: "ملغي" },
                                 ]}
@@ -2404,16 +2547,16 @@ export default function SimpleOrderCreation() {
                                         paginatedOrders.map((order, index) => {
                                             const statusBadge = getStatusBadge(order.status);
                                             return (
-                                                    <tr key={order.order_id} className="border-b hover:bg-gray-50">
-                                                        <td className="p-2 text-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedOrders.includes(order.order_id)}
-                                                                onChange={() => handleSelectOrder(order.order_id)}
-                                                                className="w-4 h-4 text-primary-f border-gray-300 rounded focus:ring-primary-f"
-                                                            />
-                                                        </td>
-                                                        <td className="p-2 font-medium text-sm">#{startIndex + index + 1}</td>
+                                                <tr key={getOrderId(order)} className="border-b hover:bg-gray-50">
+                                                    <td className="p-2 text-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedOrders.includes(getOrderId(order))}
+                                                            onChange={() => handleSelectOrder(getOrderId(order))}
+                                                            className="w-4 h-4 text-primary-f border-gray-300 rounded focus:ring-primary-f"
+                                                        />
+                                                    </td>
+                                                    <td className="p-2 font-medium text-sm">#{startIndex + index + 1}</td>
                                                     <td className="p-2 text-sm">{getFormattedDate(order)}</td>
                                                     <td className="p-2 text-center">
                                                         <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
@@ -2440,7 +2583,7 @@ export default function SimpleOrderCreation() {
                                                         </span>
                                                     </td>
                                                     <td className="p-2 text-center">
-                                                                                <div className="flex items-center justify-center gap-2">
+                                                        <div className="flex items-center justify-center gap-2">
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
@@ -2497,364 +2640,398 @@ export default function SimpleOrderCreation() {
                         </div>
 
                         {/* نافذة تفاصيل الطلب */}
-                      {/* نافذة تفاصيل الطلب */}
-{orderDetails && (
-    <StyledDialog
-        isOpen={Boolean(orderDetails)}
-        onOpenChange={(open) => { if (!open) setOrderDetails(null); }}
-        title={`تفاصيل الطلب ${orderDetails.order_id ? `#${orderDetails.order_id}` : 'بدون طلب'}`}
-        onCancel={() => setOrderDetails(null)}
-        cancelLabel="إغلاق"
-        showFooter={false}
-        className="w-[98vw] max-w-[1800px]"
-    >
-        <div className="space-y-4 p-1">
-            {/* معلومات أساسية للطلب - استخدم orderDetails مباشرة */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div className="bg-gray-50 p-3 rounded-lg border">
-                    <div className="text-xs text-gray-500">رقم الطلب</div>
-                    <div className="font-bold text-base">{orderDetails.order_id ? `#${orderDetails.order_id}` : 'بدون طلب'}</div>
-                </div>
-                
-                <div className="bg-gray-50 p-3 rounded-lg border">
-                    <div className="text-xs text-gray-500">تاريخ الإنشاء</div>
-                    <div className="font-bold text-sm">
-                        {new Date(orderDetails.created_at).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        })}
-                    </div>
-                </div>
-                
-                <div className="bg-gray-50 p-3 rounded-lg border">
-                    <div className="text-xs text-gray-500">الحالة</div>
-                    <div className="mt-1">
-                        <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusBadge(orderDetails.status).className}`}>
-                            {getStatusBadge(orderDetails.status).label}
-                        </span>
-                    </div>
-                </div>
+                        {/* نافذة تفاصيل الطلب */}
+                        {orderDetails && (
+                            <StyledDialog
+                                isOpen={Boolean(orderDetails)}
+                                onOpenChange={(open) => { if (!open) setOrderDetails(null); }}
+                                title={`تفاصيل الطلب ${getOrderId(orderDetails) ? `#${getOrderId(orderDetails)}` : 'بدون طلب'}`}
+                                onCancel={() => setOrderDetails(null)}
+                                cancelLabel="إغلاق"
+                                showFooter={false}
+                                className="w-[98vw] max-w-[1800px]"
+                            >
+                                <div className="space-y-4 p-1">
+                                    {/* معلومات أساسية للطلب - استخدم orderDetails مباشرة */}
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        <div className="bg-gray-50 p-3 rounded-lg border">
+                                            <div className="text-xs text-gray-500">رقم الطلب</div>
+                                            <div className="font-bold text-base">{getOrderId(orderDetails) ? `#${getOrderId(orderDetails)}` : 'بدون طلب'}</div>
+                                        </div>
 
-                <div className="bg-gray-50 p-3 rounded-lg border">
-                    <div className="text-xs text-gray-500">تعديل الحالة</div>
-                    <div className="mt-1">
-                        <FilterSelect
-                            value={orderDetails.status}
-                            onChange={(e) => handleUpdateOrderStatus(e.target.value)}
-                            disabled={updatingOrderStatus}
-                            options={Object.values(OrderStatus).map((s) => ({ value: s, label: getStatusLabel(s) }))}
-                            placeholder="اختر الحالة..."
-                            className="w-full"
-                        />
-                    </div>
-                </div>
-                
-            </div>
+                                        <div className="bg-gray-50 p-3 rounded-lg border">
+                                            <div className="text-xs text-gray-500">تاريخ الإنشاء</div>
+                                            <div className="font-bold text-sm">
+                                                {new Date(orderDetails.created_at).toLocaleDateString('en-US', {
+                                                    year: 'numeric',
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </div>
+                                        </div>
 
-            {/* معلومات الزبون */}
-            {orderDetails.customer && (
-                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-200">
-                    <h4 className="font-bold text-blue-700 mb-2 text-sm flex items-center gap-2">
-                        <span>معلومات الزبون</span>
-                        <span className="text-xs bg-blue-200 px-2 py-0.5 rounded-full">
-                            {orderDetails.customer.customer_type === 'customer' ? 'زبون' : 'مورد'}
-                        </span>
-                    </h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div>
-                            <div className="text-xs text-gray-600">الاسم</div>
-                            <div className="font-medium text-sm">{orderDetails.customer.name}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs text-gray-600">رقم الهاتف</div>
-                            <div className="font-medium text-sm text-right" dir="ltr">{orderDetails.customer.phone}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs text-gray-600">المدينة</div>
-                            <div className="font-medium text-sm">{orderDetails.customer.city || 'غير محدد'}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs text-gray-600">العنوان</div>
-                            <div className="font-medium text-sm">{orderDetails.customer.address || 'غير محدد'}</div>
-                        </div>
-                       
-                    </div>
-                </div>
-            )}
-
-            {/* معلومات مندوب المبيعات */}
-            {orderDetails.sales && (
-                <div className="bg-green-50/50 p-3 rounded-lg border border-green-200">
-                    <h4 className="font-bold text-green-700 mb-2 text-sm">مندوب المبيعات</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <div>
-                            <div className="text-xs text-gray-600">الاسم</div>
-                            <div className="font-medium text-sm">{orderDetails.sales.full_name}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs text-gray-600">اسم المستخدم</div>
-                            <div className="font-medium text-sm">{orderDetails.sales.username}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs text-gray-600">رقم الموظف</div>
-                            <div className="font-medium text-sm">#{orderDetails.sales_user_id}</div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ملاحظات الطلب */}
-            {orderDetails.notes && (
-                <div className="bg-yellow-50/50 p-3 rounded-lg border border-yellow-200">
-                    <h4 className="font-bold text-yellow-700 mb-1 text-sm">ملاحظات الطلب</h4>
-                    <div className="text-sm">{orderDetails.notes}</div>
-                </div>
-            )}
-
-            {/* عناصر الطلب */}
-            {orderDetails.items && orderDetails.items.length > 0 ? (
-                <div>
-                    <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-bold text-base flex items-center gap-2">
-                            <span>عناصر الطلب</span>
-                            <span className="text-xs bg-gray-200 px-2 py-1 rounded-full">
-                                {orderDetails.items.length} عنصر
-                            </span>
-                        </h4>
-                        <div className="text-sm bg-gray-100 px-3 py-1 rounded-lg">
-                            عدد العناصر: <span className="font-bold">{orderDetails.count_items}</span>
-                        </div>
-                    </div>
-
-                    <div className="border rounded-lg overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="max-w-[1200px] w-full text-sm">
-                                <thead className="bg-gray-100">
-                                    <tr>
-                                        <th className="p-3 text-right">#</th>
-                                        <th className="p-3 text-right">المادة</th>
-                                        <th className="p-3 text-center">النوع</th>
-                                        <th className="p-3 text-center">اللون</th>
-                                        <th className="p-3 text-center">المسطرة</th>
-                                        <th className="p-3 text-center">الأبعاد (عرض × سماكة)</th>
-                                        <th className="p-3 text-center">الكمية</th>
-                                        <th className="p-3 text-center">رقم الدفعة</th>
-                                        <th className="p-3 text-center">QR</th>
-                                        <th className="p-3 text-center">طباعة</th>
-                                        <th className="p-3 text-center">ملاحظات</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {orderDetails.items.map((item, index) => {
-                                            const rawColorId = item.color_id ?? item.color?.color_id ?? item.colorId ?? null;
-                                            const resolvedColor = rawColorId
-                                                ? colors.find((c) => String(c.color_id) === String(rawColorId))
-                                                : null;
-                                            const rawRulerId = item.ruler_id ?? item.ruler?.ruler_id ?? item.rulerId ?? resolvedColor?.ruler_id ?? null;
-                                            const resolvedRuler = rawRulerId
-                                                ? rulers.find((r) => String(r.ruler_id) === String(rawRulerId))
-                                                : null;
-                                            const resolvedRulerName = item.ruler_name ?? item.ruler?.ruler_name ?? item.ruler_type ?? resolvedRuler?.ruler_name ?? "-";
-
-                                            const localItem = {
-                                                id: `${orderDetails.order_id}-${index + 1}`,
-                                                order_id: orderDetails.order_id,
-                                                order_item_id: item.order_item_id ?? item.orderItemId ?? item.id ?? null,
-                                                material_name: item.material_name,
-                                                ruler_name: resolvedRulerName,
-                                                color_name: item.color_name,
-                                                color_code: item.color_code,
-                                                width: item.width,
-                                                thickness: item.thickness,
-                                                quantity: item.quantity,
-                                                batch_number: item.batch_number,
-                                                type_item: item.type_item ?? item.order_type ?? item.typeItem ?? null,
-                                            };
-                                            return (
-                                        <tr key={index} className="border-t hover:bg-gray-50">
-                                            <td className="p-3 text-center font-medium">{index + 1}</td>
-                                            <td className="p-3 font-medium">{item.material_name || 'غير محدد'}</td>
-                                            <td className="p-3 text-center">
-                                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                                    item.type_item
-                                                        ? 'bg-purple-100 text-purple-700'
-                                                        : 'bg-gray-100 text-gray-600'
-                                                }`}>
-                                                    {formatTypeItem(item.type_item)}
+                                        <div className="bg-gray-50 p-3 rounded-lg border">
+                                            <div className="text-xs text-gray-500">الحالة</div>
+                                            <div className="mt-1">
+                                                <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusBadge(orderDetails.status).className}`}>
+                                                    {getStatusBadge(orderDetails.status).label}
                                                 </span>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                               <span className="flex flex-col"> {item.color_name || '-'}</span>
-                                                <span className="px-2 py-1 rounded-full text-xs  text-purple-700">{item.color_code || '-'}</span>
-                                            </td>
-                                            <td className="p-3 text-center">{resolvedRulerName}</td>
-                                            <td className="p-3 text-center">
-                                                {item.width || '-'} × {item.thickness || ''}
-                                            </td>
-                                            <td className="p-3 text-center font-bold">{item.quantity} م</td>
-                                            <td className="p-3 text-center font-mono text-xs">{item.batch_number || '-'}</td>
-                                            <td className="p-3 text-center">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => openQrGenDialog(localItem)}
-                                                    className="h-8 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
-                                                >
-                                                    توليد QR
-                                                </Button>
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => printOrderItemReceipt(localItem, orderDetails)}
-                                                    className="h-8 px-2 text-xs bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                                                >
-                                                    <Printer className="w-4 h-4 ml-1" />
-                                                    طباعة
-                                                </Button>
-                                            </td>
-                                            <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
-                                                {item.notes || '-'}
-                                            </td>
-                                        </tr>
-                                            );
-                                        })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                                            </div>
+                                        </div>
 
-                    {/* ملاحظات العناصر المنفصلة */}
-                    {orderDetails.items.some(item => item.notes) && (
-                        <div className="mt-3 space-y-2">
-                            <h5 className="font-bold text-sm text-gray-600">ملاحظات العناصر:</h5>
-                            {orderDetails.items.map((item, index) => (
-                                item.notes && (
-                                    <div key={index} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-sm">
-                                        <span className="font-bold">العنصر {index + 1}:</span> {item.notes}
+                                        <div className="bg-gray-50 p-3 rounded-lg border">
+                                            <div className="text-xs text-gray-500">تعديل الحالة</div>
+                                            <div className="mt-1">
+                                                <FilterSelect
+                                                    value={orderDetails.status}
+                                                    onChange={(e) => handleUpdateOrderStatus(e.target.value)}
+                                                    disabled={updatingOrderStatus}
+                                                    options={Object.values(OrderStatus).map((s) => ({ value: s, label: getStatusLabel(s) }))}
+                                                    placeholder="اختر الحالة..."
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                        </div>
+
                                     </div>
-                                )
-                            ))}
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="text-center py-8 text-gray-400 border rounded-lg">
-                    لا توجد عناصر في هذا الطلب
-                </div>
-            )}
-        </div>
-    </StyledDialog>
-)}
+
+                                    {/* معلومات الزبون */}
+                                    {orderDetails.customer && (
+                                        <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-200">
+                                            <h4 className="font-bold text-blue-700 mb-2 text-sm flex items-center gap-2">
+                                                <span>معلومات الزبون</span>
+                                                <span className="text-xs bg-blue-200 px-2 py-0.5 rounded-full">
+                                                    {orderDetails.customer.customer_type === 'customer' ? 'زبون' : 'مورد'}
+                                                </span>
+                                            </h4>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div>
+                                                    <div className="text-xs text-gray-600">الاسم</div>
+                                                    <div className="font-medium text-sm">{orderDetails.customer.name}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs text-gray-600">رقم الهاتف</div>
+                                                    <div className="font-medium text-sm text-right" dir="ltr">{orderDetails.customer.phone}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs text-gray-600">المدينة</div>
+                                                    <div className="font-medium text-sm">{orderDetails.customer.city || 'غير محدد'}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs text-gray-600">العنوان</div>
+                                                    <div className="font-medium text-sm">{orderDetails.customer.address || 'غير محدد'}</div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* معلومات مندوب المبيعات */}
+                                    {orderDetails.sales && (
+                                        <div className="bg-green-50/50 p-3 rounded-lg border border-green-200">
+                                            <h4 className="font-bold text-green-700 mb-2 text-sm">مندوب المبيعات</h4>
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                                <div>
+                                                    <div className="text-xs text-gray-600">الاسم</div>
+                                                    <div className="font-medium text-sm">{orderDetails.sales.full_name}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs text-gray-600">اسم المستخدم</div>
+                                                    <div className="font-medium text-sm">{orderDetails.sales.username}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs text-gray-600">رقم الموظف</div>
+                                                    <div className="font-medium text-sm">#{orderDetails.sales_user_id}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ملاحظات الطلب */}
+                                    {orderDetails.notes && (
+                                        <div className="bg-yellow-50/50 p-3 rounded-lg border border-yellow-200">
+                                            <h4 className="font-bold text-yellow-700 mb-1 text-sm">ملاحظات الطلب</h4>
+                                            <div className="text-sm">{orderDetails.notes}</div>
+                                        </div>
+                                    )}
+
+                                    {/* عناصر الطلب */}
+                                    {orderDetails.items && orderDetails.items.length > 0 ? (
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h4 className="font-bold text-base flex items-center gap-2">
+                                                    <span>عناصر الطلب</span>
+                                                    <span className="text-xs bg-gray-200 px-2 py-1 rounded-full">
+                                                        {orderDetails.items.length} عنصر
+                                                    </span>
+                                                </h4>
+                                                <div className="text-sm bg-gray-100 px-3 py-1 rounded-lg">
+                                                    عدد العناصر: <span className="font-bold">{orderDetails.count_items}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="border rounded-lg overflow-hidden">
+                                                <div className="overflow-x-auto">
+                                                    <table className="max-w-[1200px] w-full text-sm">
+                                                        <thead className="bg-gray-100">
+                                                            <tr>
+                                                                <th className="p-3 text-right">#</th>
+                                                                <th className="p-3 text-right">المادة</th>
+                                                                <th className="p-3 text-center">النوع</th>
+                                                                <th className="p-3 text-center">اللون</th>
+                                                                <th className="p-3 text-center">المسطرة</th>
+                                                                <th className="p-3 text-center">الأبعاد (عرض × سماكة)</th>
+                                                                <th className="p-3 text-center">الكمية</th>
+                                                                <th className="p-3 text-center">رقم الدفعة</th>
+                                                                <th className="p-3 text-center">QR</th>
+                                                                <th className="p-3 text-center">طباعة</th>
+                                                                <th className="p-3 text-center">ملاحظات</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {orderDetails.items.map((item, index) => {
+                                                                const rawColorId = item.color_id ?? item.color?.color_id ?? item.colorId ?? null;
+                                                                const resolvedColor = rawColorId
+                                                                    ? colors.find((c) => String(c.color_id) === String(rawColorId))
+                                                                    : null;
+                                                                const rawRulerId = item.ruler_id ?? item.ruler?.ruler_id ?? item.rulerId ?? resolvedColor?.ruler_id ?? null;
+                                                                const resolvedRuler = rawRulerId
+                                                                    ? rulers.find((r) => String(r.ruler_id) === String(rawRulerId))
+                                                                    : null;
+                                                                const resolvedRulerName = item.ruler_name ?? item.ruler?.ruler_name ?? item.ruler_type ?? resolvedRuler?.ruler_name ?? "-";
+
+                                                                const localItem = {
+                                                                    id: `${getOrderId(orderDetails)}-${index + 1}`,
+                                                                    order_id: getOrderId(orderDetails),
+                                                                    order_item_id: item.order_item_id ?? item.orderItemId ?? item.id ?? null,
+                                                                    material_name: item.material_name,
+                                                                    ruler_name: resolvedRulerName,
+                                                                    color_name: item.color_name,
+                                                                    color_code: item.color_code,
+                                                                    width: item.width,
+                                                                    thickness: item.thickness,
+                                                                    quantity: item.quantity,
+                                                                    batch_number: item.batch_number,
+                                                                    type_item: item.type_item ?? item.order_type ?? item.typeItem ?? null,
+                                                                };
+                                                                return (
+                                                                    <tr key={index} className="border-t hover:bg-gray-50">
+                                                                        <td className="p-3 text-center font-medium">{index + 1}</td>
+                                                                        <td className="p-3 font-medium">{item.material_name || 'غير محدد'}</td>
+                                                                        <td className="p-3 text-center">
+                                                                            <span className={`px-2 py-1 rounded-full text-xs ${item.type_item
+                                                                                    ? 'bg-purple-100 text-purple-700'
+                                                                                    : 'bg-gray-100 text-gray-600'
+                                                                                }`}>
+                                                                                {formatTypeItem(item.type_item)}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="p-3 text-center">
+                                                                            <span className="flex flex-col"> {item.color_name || '-'}</span>
+                                                                            <span className="px-2 py-1 rounded-full text-xs  text-purple-700">{item.color_code || '-'}</span>
+                                                                        </td>
+                                                                        <td className="p-3 text-center">{resolvedRulerName}</td>
+                                                                        <td className="p-3 text-center">
+                                                                            {item.width || '-'} × {item.thickness || ''}
+                                                                        </td>
+                                                                        <td className="p-3 text-center font-bold">{item.quantity} م</td>
+                                                                        <td className="p-3 text-center font-mono text-xs">{item.batch_number || '-'}</td>
+                                                                        <td className="p-3 text-center">
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={() => openQrGenDialog(localItem)}
+                                                                                className="h-8 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                                                                            >
+                                                                                توليد QR
+                                                                            </Button>
+                                                                        </td>
+                                                                        <td className="p-3 text-center">
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={() => printOrderItemReceipt(localItem, orderDetails)}
+                                                                                className="h-8 px-2 text-xs bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                                                                            >
+                                                                                <Printer className="w-4 h-4 ml-1" />
+                                                                                طباعة
+                                                                            </Button>
+                                                                        </td>
+                                                                        <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
+                                                                            {item.notes || '-'}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+
+                                            {/* ملاحظات العناصر المنفصلة */}
+                                            {orderDetails.items.some(item => item.notes) && (
+                                                <div className="mt-3 space-y-2">
+                                                    <h5 className="font-bold text-sm text-gray-600">ملاحظات العناصر:</h5>
+                                                    {orderDetails.items.map((item, index) => (
+                                                        item.notes && (
+                                                            <div key={index} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-sm">
+                                                                <span className="font-bold">العنصر {index + 1}:</span> {item.notes}
+                                                            </div>
+                                                        )
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 text-gray-400 border rounded-lg">
+                                            لا توجد عناصر في هذا الطلب
+                                        </div>
+                                    )}
+                                </div>
+                            </StyledDialog>
+                        )}
 
                     </Card>
 
-            )} 
+                )}
 
-            <StyledDialog
-                isOpen={qrPreview.open}
-                onOpenChange={(open) => setQrPreview((prev) => ({ ...prev, open }))}
-                title={qrPreview.title || "QR"}
-                onCancel={() => setQrPreview((prev) => ({ ...prev, open: false }))}
-                cancelLabel="إغلاق"
-                showFooter={false}
-            >
-                <div className="space-y-3">
-                    <div className="flex items-center justify-center">
-                        {qrPreview.url ? (
-                            <img src={qrPreview.url} alt="qr" className="h-80 w-80 border rounded" />
-                        ) : null}
+                <StyledDialog
+                    isOpen={qrPreview.open}
+                    onOpenChange={(open) => setQrPreview((prev) => ({ ...prev, open }))}
+                    title={qrPreview.title || "QR"}
+                    onCancel={() => setQrPreview((prev) => ({ ...prev, open: false }))}
+                    cancelLabel="إغلاق"
+                    showFooter={false}
+                >
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-center">
+                            {qrPreview.url ? (
+                                <img src={qrPreview.url} alt="qr" className="h-80 w-80 border rounded" />
+                            ) : null}
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-3 text-lg font-bold" dir="rtl" style={{ textAlign: "right" }}>
+                            {qrPreview.footerText || ""}
+                        </div>
+                        <div className="flex items-center justify-center gap-2">
+                            <Button
+                                size="sm"
+                                className="bg-secondary-s hover:brightness-110 text-white"
+                                onClick={() => printQr(qrPreview.url, qrPreview.title, qrPreview.footerText, 'rtl')}
+                                disabled={!qrPreview.url}
+                            >
+                                طباعة
+                            </Button>
+                        </div>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3 text-lg font-bold" dir="rtl" style={{ textAlign: "right" }}>
-                        {qrPreview.footerText || ""}
-                    </div>
-                    <div className="flex items-center justify-center gap-2">
-                        <Button
-                            size="sm"
-                            className="bg-secondary-s hover:brightness-110 text-white"
-                            onClick={() => printQr(qrPreview.url, qrPreview.title, qrPreview.footerText, 'rtl')}
-                            disabled={!qrPreview.url}
-                        >
-                            طباعة
-                        </Button>
-                    </div>
-                </div>
-            </StyledDialog>
+                </StyledDialog>
 
-            {/* QR Generation Dialog with Quantity Editing */}
-            <StyledDialog
-                isOpen={qrGenDialog.open}
-                onOpenChange={(open) => { if (!open) closeQrGenDialog(); }}
-                title="توليد QR - تعديل الكمية"
-                onCancel={closeQrGenDialog}
-                cancelLabel="إغلاق"
-                showFooter={false}
-            >
-                <div className="space-y-4 p-2">
-                    {/* معلومات العنصر */}
-                    {qrGenDialog.item && (
-                        <div className="bg-gray-50 p-3 rounded-lg border space-y-2">
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                    <span className="text-gray-500">المادة:</span>
-                                    <span className="font-medium mr-1">{qrGenDialog.item.material_name}</span>
-                                </div>
-                                <div>
-                                    <span className="text-gray-500">المسطرة:</span>
-                                    <span className="font-medium mr-1">{qrGenDialog.item.ruler_name}</span>
-                                </div>
-                                <div>
-                                    <span className="text-gray-500">اللون:</span>
-                                    <span className="font-medium mr-1">{qrGenDialog.item.color_name}</span>
-                                </div>
-                                <div>
-                                    <span className="text-gray-500">الكود:</span>
-                                    <span className="font-medium mr-1">{qrGenDialog.item.color_code || '-'}</span>
-                                </div>
+                <StyledDialog
+                    isOpen={orderQrPreview.open}
+                    onOpenChange={(open) => setOrderQrPreview((prev) => ({ ...prev, open }))}
+                    title="QR للطلب"
+                    onCancel={() => setOrderQrPreview((prev) => ({ ...prev, open: false }))}
+                    cancelLabel="إغلاق"
+                    showFooter={false}
+                >
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="bg-gray-50 rounded-lg p-2">
+                                عدد العناصر: <span className="font-bold">{orderQrPreview.itemsCount}</span>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-2">
+                                إجمالي الكمية: <span className="font-bold">{orderQrPreview.totalQuantity} م</span>
                             </div>
                         </div>
-                    )}
-
-                    {/* تعديل الكمية */}
-                    <div className="space-y-2">
-                        <Label className="font-bold">الكمية (متر)</Label>
-                        <div className="flex items-center gap-2">
-                            <Input
-                                type="number"
-                                value={qrGenDialog.quantity}
-                                onChange={(e) => updateQrGenQuantity(e.target.value)}
-                                className="h-12 text-lg font-bold text-center"
-                                placeholder="0"
-                            />
-                            <span className="text-gray-500 font-medium">م</span>
+                        <div className="flex items-center justify-center">
+                            {orderQrPreview.qrUrl ? (
+                                <img src={orderQrPreview.qrUrl} alt="order-qr" className="h-72 w-72 border rounded" />
+                            ) : null}
                         </div>
-                        <Button
-                            size="sm"
-                            className="bg-primary-f hover:bg-secondary-f text-white"
-                            onClick={applyQrGenQuantity}
-                            disabled={!isQrQuantityChanged || savingQrQuantity}
-                        >
-                            {savingQrQuantity ? "جاري الحفظ..." : "حفظ الكمية"}
-                        </Button>
-                        <div className="text-xs text-gray-400">
-                            الكمية الأصلية: {qrGenDialog.item?.quantity} م
+                        <div className="flex items-center justify-center gap-2">
+                            <Button
+                                size="sm"
+                                className="bg-secondary-s hover:brightness-110 text-white"
+                                onClick={() => printQr(orderQrPreview.qrUrl, "QR للطلب", orderQrPreview.footerText, "rtl")}
+                                disabled={!orderQrPreview.qrUrl}
+                            >
+                                طباعة
+                            </Button>
                         </div>
                     </div>
+                </StyledDialog>
 
-                    {/* معاينة QR */}
-                    {qrGenDialog.qrUrl && (
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-center bg-gray-50 p-4 rounded-lg border">
-                                <img 
-                                    src={qrGenDialog.qrUrl} 
-                                    alt="qr" 
-                                    className="h-64 w-64 border rounded shadow-sm" 
+                {/* QR Generation Dialog with Quantity Editing */}
+                <StyledDialog
+                    isOpen={qrGenDialog.open}
+                    onOpenChange={(open) => { if (!open) closeQrGenDialog(); }}
+                    title="توليد QR - تعديل الكمية"
+                    onCancel={closeQrGenDialog}
+                    cancelLabel="إغلاق"
+                    showFooter={false}
+                >
+                    <div className="space-y-4 p-2">
+                        {/* معلومات العنصر */}
+                        {qrGenDialog.item && (
+                            <div className="bg-gray-50 p-3 rounded-lg border space-y-2">
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div>
+                                        <span className="text-gray-500">المادة:</span>
+                                        <span className="font-medium mr-1">{qrGenDialog.item.material_name}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">المسطرة:</span>
+                                        <span className="font-medium mr-1">{qrGenDialog.item.ruler_name}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">اللون:</span>
+                                        <span className="font-medium mr-1">{qrGenDialog.item.color_name}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-500">الكود:</span>
+                                        <span className="font-medium mr-1">{qrGenDialog.item.color_code || '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* تعديل الكمية */}
+                        <div className="space-y-2">
+                            <Label className="font-bold">الكمية (متر)</Label>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    type="number"
+                                    value={qrGenDialog.quantity}
+                                    onChange={(e) => updateQrGenQuantity(e.target.value)}
+                                    className="h-12 text-lg font-bold text-center"
+                                    placeholder="0"
                                 />
+                                <span className="text-gray-500 font-medium">م</span>
                             </div>
+                            <Button
+                                size="sm"
+                                className="bg-primary-f hover:bg-secondary-f text-white"
+                                onClick={applyQrGenQuantity}
+                                disabled={!isQrQuantityChanged || savingQrQuantity}
+                            >
+                                {savingQrQuantity ? "جاري الحفظ..." : "حفظ الكمية"}
+                            </Button>
+                            <div className="text-xs text-gray-400">
+                                الكمية الأصلية: {qrGenDialog.item?.quantity} م
+                            </div>
+                        </div>
+
+                        {/* معاينة QR */}
+                        {qrGenDialog.qrUrl && (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-center bg-gray-50 p-4 rounded-lg border">
+                                    <img
+                                        src={qrGenDialog.qrUrl}
+                                        alt="qr"
+                                        className="h-64 w-64 border rounded shadow-sm"
+                                    />
+                                </div>
                                 <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1 border">
                                     <div>
                                         <span className="font-semibold">كود اللون:</span>{" "}
@@ -2873,73 +3050,73 @@ export default function SimpleOrderCreation() {
                                         <span>{formatTypeItemString(qrGenDialog.item?.type_item)}</span>
                                     </div>
                                 </div>
-                            <div className="flex items-center justify-center gap-2">
-                                <Button
-                                    size="sm"
-                                    className="bg-secondary-s hover:brightness-110 text-white"
-                                    onClick={() => {
-                                        const footer = [
-                                            qrGenDialog.item?.material_name || "",
-                                            qrGenDialog.item?.ruler_name || qrGenDialog.item?.ruler_type || "",
-                                            qrGenDialog.item?.color_code || "",
-                                            qrGenDialog.item?.width || "",
-                                            qrGenDialog.item?.thickness || "",
-                                            qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
-                                            qrGenDialog.item?.batch_number || "",
-                                            formatTypeItemString(qrGenDialog.item?.type_item),
-                                            user?.user_id || user?.id || user?.employee_id || ""
-                                        ].filter(v => v !== "").join("|");
-                                        printQr(qrGenDialog.qrUrl, `QR - ${qrGenDialog.item?.color_name || ''}`, footer, 'rtl');
-                                    }}
-                                >
-                                    طباعة QR
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                        const url = qrGenDialog.qrUrl;
-                                        const title = `QR - ${qrGenDialog.item?.color_name || ''}`;
-                                        openQrPreview(url, title, {
-                                            material_name: qrGenDialog.item?.material_name || "",
-                                            ruler_name: qrGenDialog.item?.ruler_name || qrGenDialog.item?.ruler_type || "",
-                                            color_code: qrGenDialog.item?.color_code || "",
-                                            width: qrGenDialog.item?.width || "",
-                                            thickness: qrGenDialog.item?.thickness || "",
-                                            quantity: qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
-                                            batch_number: qrGenDialog.item?.batch_number || "",
-                                            type_label: formatTypeItemString(qrGenDialog.item?.type_item),
-                                            employeeId: user?.user_id || user?.id || user?.employee_id || ""
-                                        });
-                                        closeQrGenDialog();
-                                    }}
-                                >
-                                    فتح في نافذة منفصلة
-                                </Button>
+                                <div className="flex items-center justify-center gap-2">
+                                    <Button
+                                        size="sm"
+                                        className="bg-secondary-s hover:brightness-110 text-white"
+                                        onClick={() => {
+                                            const footer = [
+                                                qrGenDialog.item?.material_name || "",
+                                                qrGenDialog.item?.ruler_name || qrGenDialog.item?.ruler_type || "",
+                                                qrGenDialog.item?.color_code || "",
+                                                qrGenDialog.item?.width || "",
+                                                qrGenDialog.item?.thickness || "",
+                                                qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
+                                                qrGenDialog.item?.batch_number || "",
+                                                formatTypeItemString(qrGenDialog.item?.type_item),
+                                                user?.user_id || user?.id || user?.employee_id || ""
+                                            ].filter(v => v !== "").join("|");
+                                            printQr(qrGenDialog.qrUrl, `QR - ${qrGenDialog.item?.color_name || ''}`, footer, 'rtl');
+                                        }}
+                                    >
+                                        طباعة QR
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const url = qrGenDialog.qrUrl;
+                                            const title = `QR - ${qrGenDialog.item?.color_name || ''}`;
+                                            openQrPreview(url, title, {
+                                                material_name: qrGenDialog.item?.material_name || "",
+                                                ruler_name: qrGenDialog.item?.ruler_name || qrGenDialog.item?.ruler_type || "",
+                                                color_code: qrGenDialog.item?.color_code || "",
+                                                width: qrGenDialog.item?.width || "",
+                                                thickness: qrGenDialog.item?.thickness || "",
+                                                quantity: qrGenDialog.quantity || qrGenDialog.item?.quantity || "",
+                                                batch_number: qrGenDialog.item?.batch_number || "",
+                                                type_label: formatTypeItemString(qrGenDialog.item?.type_item),
+                                                employeeId: user?.user_id || user?.id || user?.employee_id || ""
+                                            });
+                                            closeQrGenDialog();
+                                        }}
+                                    >
+                                        فتح في نافذة منفصلة
+                                    </Button>
+                                </div>
                             </div>
+                        )}
+
+                        {/* ملاحظات */}
+                        <div className="text-xs text-gray-500 bg-yellow-50 p-2 rounded border border-yellow-200">
+                            <span className="font-bold">ملاحظة:</span> عند تعديل الكمية، سيتم تحديث QR تلقائياً. يمكنك الطباعة أو فتح QR في نافذة منفصلة.
                         </div>
-                    )}
-
-                    {/* ملاحظات */}
-                    <div className="text-xs text-gray-500 bg-yellow-50 p-2 rounded border border-yellow-200">
-                        <span className="font-bold">ملاحظة:</span> عند تعديل الكمية، سيتم تحديث QR تلقائياً. يمكنك الطباعة أو فتح QR في نافذة منفصلة.
                     </div>
-                </div>
-            </StyledDialog>
+                </StyledDialog>
 
-            {/* Delete Confirmation Dialog */}
-            <StyledDialog
-                isOpen={showDeleteDialog}
-                onOpenChange={setShowDeleteDialog}
-                title="تأكيد الحذف"
-                description={`هل أنت متأكد من حذف ${selectedOrders.length} طلب؟ لا يمكن التراجع عن هذا الإجراء. سيتم حذف جميع الطلبات المحددة بشكل نهائي.`}
-                onCancel={() => setShowDeleteDialog(false)}
-                onConfirm={confirmDeleteSelectedOrders}
-                cancelLabel="إلغاء"
-                confirmLabel={deletingOrders ? "جاري الحذف..." : `حذف (${selectedOrders.length})`}
-                isLoading={deletingOrders}
-                confirmVariant="destructive"
-            />
+                {/* Delete Confirmation Dialog */}
+                <StyledDialog
+                    isOpen={showDeleteDialog}
+                    onOpenChange={setShowDeleteDialog}
+                    title="تأكيد الحذف"
+                    description={`هل أنت متأكد من حذف ${selectedOrders.length} طلب؟ لا يمكن التراجع عن هذا الإجراء. سيتم حذف جميع الطلبات المحددة بشكل نهائي.`}
+                    onCancel={() => setShowDeleteDialog(false)}
+                    onConfirm={confirmDeleteSelectedOrders}
+                    cancelLabel="إلغاء"
+                    confirmLabel={deletingOrders ? "جاري الحذف..." : `حذف (${selectedOrders.length})`}
+                    isLoading={deletingOrders}
+                    confirmVariant="destructive"
+                />
             </div>
         </div>
     );

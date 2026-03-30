@@ -21,7 +21,8 @@ const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const ConstantTabs = lazy(() => import("./pages/Constant/ConstantTabs"));
 const CustomerManagement = lazy(() => import("./pages/Sales/CustomerManagement"));
 const OrderManagement = lazy(() => import("./pages/Sales/OrderManagement"));
-const SalesPage = lazy(() => import("./pages/Sales/SalesPage"));
+const OrderPreparer = lazy(() => import("./pages/Sales/OrderPreparer"));
+const SalesPage = lazy(() => import("./pages/Sales/SimpleOrderCreation"));
 const OrderPreparationPage = lazy(() => import("./pages/OrderPreparation/OrderPreparationPage"));
 const InvoiceHistory = lazy(() => import("./pages/Admin/InvoiceHistory"));
 const SalesHome = lazy(() => import("./pages/Sales/SalesHome"));
@@ -118,6 +119,11 @@ const App = () => {
               <Route path="/orders" element={
                 <RoleProtectedRoute allowedRoles="sales">
                   <OrderManagement />
+                </RoleProtectedRoute>
+              } />
+              <Route path="/order-preparer" element={
+                <RoleProtectedRoute allowedRoles="sales">
+                  <OrderPreparer />
                 </RoleProtectedRoute>
               } />
               <Route path="/sales" element={

@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { productionApi } from "../../api/productionApi";
+import { salesApi } from "../../api/salesApi";
 import { colorApi } from "../../api/colorApi";
 import { batchApi } from "../../api/batchApi";
 import { materialApi } from "../../api/materialApi";
@@ -28,7 +29,6 @@ import {
     Eye,
     RotateCcw,
     Check,
-    EyeOff,
     Home,
     LogOut,
     Users,
@@ -47,7 +47,9 @@ import {
     Scissors,
     Droplet,
     Layers,
-    Search
+    Search,
+    ChevronUp,
+    ChevronDown
 } from "lucide-react";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
@@ -58,7 +60,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").r
 
 export default function ProductionManager() {
     const navigate = useNavigate();
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
     const [viewMode, setViewMode] = useState("create");
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -67,6 +69,7 @@ export default function ProductionManager() {
     const [typeFilter, setTypeFilter] = useState("");
     const [widthFilter, setWidthFilter] = useState(""); // فلتر العرض
     const [widthTab, setWidthTab] = useState("all"); // تبويب حسب العرض: all, 22, 44, 66, 88, 110
+    const [historyTab, setHistoryTab] = useState("production"); // production | order-preparer
     const [showPreview, setShowPreview] = useState(false);
     const [editingItemId, setEditingItemId] = useState(null);
     const [editingOrderId, setEditingOrderId] = useState(null);
@@ -85,6 +88,19 @@ export default function ProductionManager() {
     const [statusNotification, setStatusNotification] = useState(null);
     const viewModeRef = useRef(viewMode);
 
+    const ROLE_LABELS = {
+        admin: "مدير النظام",
+        accountant: "محاسب",
+        cashier: "كاشير",
+        sales: "مبيعات",
+        production_manager: "مدير الإنتاج",
+        warehouse_keeper: "أمين المستودع",
+        order_preparer: "مجهز الطلبات",
+        production: "الإنتاج"
+    };
+
+    const getPreparerOrderId = (order) => order?.Sales_order_id ?? order?.sales_order_id ?? order?.id ?? null;
+
     // Pagination states for production orders table
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(20);
@@ -98,6 +114,11 @@ export default function ProductionManager() {
     const [loadingWidths, setLoadingWidths] = useState(false);
     const [productionOrders, setProductionOrders] = useState([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
+    const [preparerOrders, setPreparerOrders] = useState([]);
+    const [loadingPreparerOrders, setLoadingPreparerOrders] = useState(false);
+    const [showPreparerOrderDetails, setShowPreparerOrderDetails] = useState(false);
+    const [selectedPreparerOrder, setSelectedPreparerOrder] = useState(null);
+    const [loadingPreparerDetails, setLoadingPreparerDetails] = useState(false);
 
     const { exportToExcel: exportProductionToExcel, loading: exportingProduction } = useExport({
         sheetName: "طلبات_الإنتاج",
@@ -204,7 +225,10 @@ export default function ProductionManager() {
     // Load initial data
     useEffect(() => {
         loadInitialData();
-        if (viewMode === "history") loadProductionOrders();
+        if (viewMode === "history") {
+            loadProductionOrders();
+            loadPreparerOrders();
+        }
     }, [viewMode]);
 
     const loadInitialData = async () => {
@@ -364,6 +388,20 @@ export default function ProductionManager() {
         }
     };
 
+    const loadPreparerOrders = async () => {
+        try {
+            setLoadingPreparerOrders(true);
+            const response = await salesApi.getSalesOrders();
+            const data = getApiData(response, []) || [];
+            const orders = Array.isArray(data) ? data : (Array.isArray(data?.orders) ? data.orders : []);
+            setPreparerOrders(orders);
+        } catch (error) {
+            toast.error("فشل في تحميل طلبات مجهز الطلبات");
+        } finally {
+            setLoadingPreparerOrders(false);
+        }
+    };
+
     const loadOrderItems = async (orderId) => {
         try {
             const response = await productionApi.getProductionOrderItems(orderId);
@@ -469,6 +507,21 @@ export default function ProductionManager() {
         setShowOrderDetails(true);
     };
 
+    const handleViewPreparerOrder = async (order) => {
+        try {
+            setLoadingPreparerDetails(true);
+            const orderId = getPreparerOrderId(order);
+            const response = orderId ? await salesApi.getSalesOrderById(orderId) : null;
+            const details = response?.data || response?.data?.data || response?.data?.order || response?.data || order;
+            setSelectedPreparerOrder(details);
+            setShowPreparerOrderDetails(true);
+        } catch (error) {
+            toast.error("فشل في جلب تفاصيل طلب مجهز الطلبات");
+        } finally {
+            setLoadingPreparerDetails(false);
+        }
+    };
+
     const handleFieldChange = (field, value) => {
         setFormData(prev => {
             const newData = { ...prev, [field]: value };
@@ -571,16 +624,36 @@ export default function ProductionManager() {
         });
     }, [productionOrders, searchTerm, statusFilter, typeFilter, widthFilter, widthTab]);
 
-    // Pagination logic for production orders table
-    const totalPages = Math.ceil(filteredProductionOrders.length / rowsPerPage);
+    const filteredPreparerOrders = useMemo(() => {
+        const term = searchTerm.toLowerCase();
+        return preparerOrders.filter(order => {
+            const orderId = getPreparerOrderId(order);
+            const issuedBy = order?.issued_by?.full_name || order?.issued_by?.username || "";
+            const matchesSearch = !term || (
+                String(orderId || "").toLowerCase().includes(term) ||
+                String(issuedBy).toLowerCase().includes(term) ||
+                String(order.status || "").toLowerCase().includes(term) ||
+                String(order.notes || "").toLowerCase().includes(term)
+            );
+            const matchesStatus = !statusFilter || String(order.status || "").toLowerCase() === String(statusFilter).toLowerCase();
+            return matchesSearch && matchesStatus;
+        });
+    }, [preparerOrders, searchTerm, statusFilter]);
+
+    // Pagination logic for orders tables
+    const totalPagesProduction = Math.ceil(filteredProductionOrders.length / rowsPerPage);
+    const totalPagesPreparer = Math.ceil(filteredPreparerOrders.length / rowsPerPage);
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
     const paginatedProductionOrders = filteredProductionOrders.slice(startIndex, endIndex);
+    const paginatedPreparerOrders = filteredPreparerOrders.slice(startIndex, endIndex);
+    const activeTotalPages = historyTab === "order-preparer" ? totalPagesPreparer : totalPagesProduction;
+    const activeTotalResults = historyTab === "order-preparer" ? filteredPreparerOrders.length : filteredProductionOrders.length;
 
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, statusFilter, typeFilter, widthFilter, widthTab]);
+    }, [searchTerm, statusFilter, typeFilter, widthFilter, widthTab, historyTab]);
 
     const filteredBatchOptions = useMemo(() => {
         const term = String(batchSearchTerm || "").trim().toLowerCase();
@@ -945,92 +1018,112 @@ export default function ProductionManager() {
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
-            {/* Header */}
+                        {/* Header */}
+            <div className={isHeaderVisible ? "h-[88px]" : "h-[36px]"} />
+
+            <div
+                className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+                    isHeaderVisible ? "top-[60px]" : "top-2"
+                }`}
+            >
+                <Button
+                    type="button"
+                    onClick={() => setIsHeaderVisible((prev) => !prev)}
+                    className="h-10 w-10 rounded-full border-2 border-t-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 active:scale-95"
+                    title={isHeaderVisible ? "إخفاء الهيدر" : "إظهار الهيدر"}
+                >
+                    {isHeaderVisible ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+                </Button>
+            </div>
+
             {isHeaderVisible && (
-                <div className="relative flex-shrink-0">
-                    <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
-                        <div className="flex flex-wrap gap-3">
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setViewMode("create")}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
-                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                    }`}
-                            >
-                                <ShoppingCart className="w-5 h-5 ml-2" />
-                                طلب إنتاج جديد
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setViewMode("history")}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
-                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                    }`}
-                            >
-                                <History className="w-5 h-5 ml-2" />
-                                سجل  الإنتاج
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/production-records")}
-                                className="px-6 py-3 text-base min-w-[140px] touch-manipulation border-2 bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                            >
-                                <Layers className="w-5 h-5 ml-2" />
-                                سجل الإنتاج بالأقسام
-                            </Button>
+                <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-40">
+                    <div className="flex flex-wrap gap-3">
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => setViewMode("create")}
+                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
+                                ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                }`}
+                        >
+                            <ShoppingCart className="w-5 h-5 ml-2" />
+                            طلب إنتاج جديد
+                        </Button>
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => setViewMode("history")}
+                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
+                                ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                }`}
+                        >
+                            <History className="w-5 h-5 ml-2" />
+                            سجل الإنتاج
+                        </Button>
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => navigate("/production-records")}
+                            className="px-6 py-3 text-base min-w-[140px] touch-manipulation border-2 bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                        >
+                            <Layers className="w-5 h-5 ml-2" />
+                            سجل الإنتاج بالأقسام
+                        </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <NotificationsBell />
+                        {/* <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => navigate("/settings")}
+                            className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                        >
+                            <Settings className="w-5 h-5 ml-2" />
+                            الإعدادات
+                        </Button> */}
+                        {/* <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => navigate("/dashboard")}
+                            className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                        >
+                            <Home className="w-5 h-5 ml-2" />
+                            الرئيسية
+                        </Button> */}
+                        {/* <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={handleLogout}
+                            className="px-4 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                        >
+                            <LogOut className="w-5 h-5 ml-2" />
+                            تسجيل الخروج
+                        </Button> */}
+                    </div>
+                </div>
+            )}
+
+            {!isHeaderVisible && (
+                <div className="fixed top-0 left-0 right-0 z-30">
+                    <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-1 shadow-sm backdrop-blur">
+                        <div className="min-w-0">
+                            <div className="truncate text-sm font-bold text-secondary-s">
+                                {user?.full_name || user?.username || "-"}
+                            </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            <NotificationsBell />
-                            {/* <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => navigate("/dashboard")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <Home className="w-5 h-5 ml-2" />
-                                الرئيسية
-                            </Button> */}
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setShowLogoutDialog(true)}
-                                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <LogOut className="w-5 h-5 ml-2" />
-                                تسجيل الخروج
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setIsHeaderVisible(false)}
-                                className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110"
-                            >
-                                <EyeOff className="w-5 h-5" />
-                            </Button>
+                        <div className="h-10 w-px" />
+                        <div className="min-w-0 text-right">
+                            <div className="truncate text-sm font-bold text-secondary-s">
+                                {ROLE_LABELS[user?.role] || user?.role || "-"}
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
-            {!isHeaderVisible && (
-                <div className="absolute top-2 right-2 z-20">
-                    <Button
-                        size="lg"
-                        variant="outline"
-                        onClick={() => setIsHeaderVisible(true)}
-                        className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f hover:bg-secondary-f shadow-lg touch-manipulation"
-                    >
-                        <Eye className="w-5 h-5 ml-2" />
-                        إظهار الهيدر
-                    </Button>
-                </div>
-            )}
-
-            {/* Main Content */}
+{/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
                 {statusNotification && (
                     <div className="mb-3">
@@ -1575,8 +1668,29 @@ export default function ProductionManager() {
                 ) : (
                     /* وضع السجل */
                     <Card className="flex flex-col h-full min-h-0 overflow-hidden p-3">
-                        <div className="flex justify-between items-center mb-2 flex-shrink-0 w-full">
-                            <h2 className="font-bold text-lg">سجل طلبات الإنتاج</h2>
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2 flex-shrink-0 w-full">
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setHistoryTab("production")}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                        historyTab === "production"
+                                            ? "bg-primary-f text-white"
+                                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                                    }`}
+                                >
+                                    سجل طلبات الإنتاج
+                                </button>
+                                <button
+                                    onClick={() => setHistoryTab("order-preparer")}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                        historyTab === "order-preparer"
+                                            ? "bg-primary-f text-white"
+                                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                                    }`}
+                                >
+                                    سجل طلبات مجهز الطلبات
+                                </button>
+                            </div>
                         </div>
 
                         {/* First row - Search and filters */}
@@ -1593,7 +1707,7 @@ export default function ProductionManager() {
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 options={[
                                     { value: "", label: "كل الحالات" },
-                                    { value: "pending", label: "معلق" },
+                                    { value: "pending", label: "قيد الانتظار" },
                                     { value: "preparing", label: "قيد التحضير" },
                                     { value: "in_progress", label: "قيد التنفيذ" },
                                     { value: "completed", label: "مكتمل" },
@@ -1601,16 +1715,18 @@ export default function ProductionManager() {
                                 ]}
                                 className="h-8 text-sm max-w-[250px]"
                             />
-                            <FilterSelect
-                                value={typeFilter}
-                                onChange={(e) => setTypeFilter(e.target.value)}
-                                options={[
-                                    { value: "", label: "كل الأنواع" },
-                                    { value: "machine", label: "مكنة" },
-                                    { value: "presser", label: "كوي" },
-                                ]}
-                                className="h-8 text-sm max-w-[250px]"
-                            />
+                            {historyTab === "production" && (
+                                <FilterSelect
+                                    value={typeFilter}
+                                    onChange={(e) => setTypeFilter(e.target.value)}
+                                    options={[
+                                        { value: "", label: "كل الأنواع" },
+                                        { value: "machine", label: "مكنة" },
+                                        { value: "presser", label: "كوي" },
+                                    ]}
+                                    className="h-8 text-sm max-w-[250px]"
+                                />
+                            )}
 
                         </div>
 
@@ -1618,17 +1734,18 @@ export default function ProductionManager() {
                         <div className="flex justify-end gap-2">
                             <Button
                                 size="sm"
-                                onClick={loadProductionOrders}
+                                onClick={() => (historyTab === "production" ? loadProductionOrders() : loadPreparerOrders())}
                                 className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white"
-                                disabled={loadingOrders}
+                                disabled={historyTab === "production" ? loadingOrders : loadingPreparerOrders}
                             >
-                                {loadingOrders ? (
+                                {(historyTab === "production" ? loadingOrders : loadingPreparerOrders) ? (
                                     <RefreshCw className="w-4 h-4 ml-1 animate-spin" />
                                 ) : (
                                     <RotateCcw className="w-4 h-4 ml-1" />
                                 )}
                                 تحديث
                             </Button>
+                            {historyTab === "production" && (
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -1641,7 +1758,8 @@ export default function ProductionManager() {
                                 <Download className="w-4 h-4 ml-1" />
                                 {exportingProduction ? "جارٍ التصدير..." : "تصدير Excel"}
                             </Button>
-                            <Button
+                        )}
+                            {/* <Button
                                 size="sm"
                                 variant="outline"
                                 className="px-4 py-2 text-sm"
@@ -1652,33 +1770,36 @@ export default function ProductionManager() {
                             >
                                 <Printer className="w-4 h-4 ml-1" />
                                 طباعة
-                            </Button>
+                            </Button> */}
                         </div>
 
                         {/* Width Tabs */}
-                        <div className="flex gap-1 mb-2 flex-wrap">
-                            {[
-                                { value: "all", label: "الكل" },
-                                { value: "22", label: "22" },
-                                { value: "44", label: "44" },
-                                { value: "66", label: "66" },
-                            ].map(tab => (
-                                <button
-                                    key={tab.value}
-                                    onClick={() => setWidthTab(tab.value)}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${widthTab === tab.value
-                                            ? "bg-primary-f text-white"
-                                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                                        }`}
-                                >
-                                    عرض {tab.label}
-                                </button>
-                            ))}
-                        </div>
+                        {historyTab === "production" && (
+                            <div className="flex gap-1 mb-2 flex-wrap">
+                                {[
+                                    { value: "all", label: "الكل" },
+                                    { value: "22", label: "22" },
+                                    { value: "44", label: "44" },
+                                    { value: "66", label: "66" },
+                                ].map(tab => (
+                                    <button
+                                        key={tab.value}
+                                        onClick={() => setWidthTab(tab.value)}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${widthTab === tab.value
+                                                ? "bg-primary-f text-white"
+                                                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                                            }`}
+                                    >
+                                        عرض {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
                         {/* جدول السجل */}
                         <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
-                            <table className="min-w-[1400px] w-full table-fixed border-collapse">
+                            {historyTab === "production" ? (
+                                <table className="min-w-[1400px] w-full table-fixed border-collapse">
                                 <thead className="bg-gray-100 sticky top-0 z-20">
                                     <tr>
                                         <th className="p-2 text-right border-b w-20">#</th>
@@ -1751,15 +1872,73 @@ export default function ProductionManager() {
                                     )}
                                 </tbody>
                             </table>
+                            ) : (
+                                <table className="min-w-[1200px] w-full table-fixed border-collapse">
+                                <thead className="bg-gray-100 sticky top-0 z-20">
+                                    <tr>
+                                        <th className="p-2 text-right border-b w-20">#</th>
+                                        <th className="p-2 text-right border-b w-40">التاريخ</th>
+                                        <th className="p-2 text-right border-b w-40">المنشئ</th>
+                                        <th className="p-2 text-center border-b w-24">العناصر</th>
+                                        <th className="p-2 text-center border-b w-24">الحالة</th>
+                                        <th className="p-2 text-right border-b">الملاحظات</th>
+                                        <th className="p-2 text-center border-b w-32">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loadingPreparerOrders ? (
+                                        <tr>
+                                            <td colSpan="7" className="p-6">
+                                                <LoadingState />
+                                            </td>
+                                        </tr>
+                                    ) : paginatedPreparerOrders.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="7" className="p-8 text-center text-gray-400">
+                                                <AlertCircle className="mx-auto mb-2 h-10 w-10 opacity-50" />
+                                                لا توجد طلبات مجهز الطلبات
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        paginatedPreparerOrders.map((order) => {
+                                            const statusBadge = salesApi.getStatusBadge(order.status);
+                                            return (
+                                                <tr key={getPreparerOrderId(order)} className="border-b hover:bg-gray-50">
+                                                    <td className="p-2 text-sm">{getPreparerOrderId(order)}</td>
+                                                    <td className="p-2 text-sm">{salesApi.getFormattedDate(order)}</td>
+                                                    <td className="p-2 text-sm">{salesApi.getIssuedBy(order) || "-"}</td>
+                                                    <td className="p-2 text-center text-sm">{order.count_items ?? order.items?.length ?? 0}</td>
+                                                    <td className="p-2 text-center">
+                                                        <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
+                                                            {statusBadge.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-2 text-sm">{order.notes || "-"}</td>
+                                                    <td className="p-2 text-center">
+                                                        <button
+                                                            onClick={() => handleViewPreparerOrder(order)}
+                                                            className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg"
+                                                            title="عرض"
+                                                        >
+                                                            <Eye className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                            )}
                         </div>
 
                         {/* Pagination Controls */}
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-gray-50 border-t">
                             <ResultsCounter
                                 currentPage={currentPage}
-                                totalPages={totalPages}
+                                totalPages={activeTotalPages}
                                 rowsPerPage={rowsPerPage}
-                                totalResults={filteredProductionOrders.length}
+                                totalResults={activeTotalResults}
                             />
                             <div className="flex items-center gap-2">
                                 <RowsPerPageSelector
@@ -1768,7 +1947,7 @@ export default function ProductionManager() {
                                 />
                                 <PaginationControls
                                     currentPage={currentPage}
-                                    totalPages={totalPages}
+                                    totalPages={activeTotalPages}
                                     onPageChange={setCurrentPage}
                                 />
                             </div>
@@ -2065,6 +2244,95 @@ export default function ProductionManager() {
                     </div>
                 )}
             </StyledDialog>
+
+            <StyledDialog
+                isOpen={showPreparerOrderDetails}
+                onOpenChange={setShowPreparerOrderDetails}
+                title={`تفاصيل طلب مجهز الطلبات #${getPreparerOrderId(selectedPreparerOrder) || "-"}`}
+                showFooter={false}
+                contentClassName="w-screen max-w-[100vw] max-h-screen p-4"
+            >
+                {loadingPreparerDetails ? (
+                    <div className="p-6">
+                        <LoadingState />
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="bg-gray-50 p-3 rounded-lg">
+                                <div className="text-xs text-gray-500">رقم الطلب</div>
+                                <div className="font-bold text-sm">{getPreparerOrderId(selectedPreparerOrder) || "-"}</div>
+                            </div>
+                            <div className="bg-gray-50 p-3 rounded-lg">
+                                <div className="text-xs text-gray-500">التاريخ</div>
+                                <div className="font-bold text-sm">{selectedPreparerOrder?.created_at ? salesApi.getFormattedDate(selectedPreparerOrder) : "-"}</div>
+                            </div>
+                            <div className="bg-gray-50 p-3 rounded-lg">
+                                <div className="text-xs text-gray-500">المنشئ</div>
+                                <div className="font-bold text-sm">{salesApi.getIssuedBy(selectedPreparerOrder) || "-"}</div>
+                            </div>
+                            <div className="bg-gray-50 p-3 rounded-lg">
+                                <div className="text-xs text-gray-500">الحالة</div>
+                                <div className="font-bold text-sm">
+                                    {(() => {
+                                        const badge = salesApi.getStatusBadge(selectedPreparerOrder?.status);
+                                        return (
+                                            <span className={`px-2 py-1 rounded-lg text-xs ${badge.className}`}>
+                                                {badge.label}
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border rounded-lg bg-white overflow-hidden">
+                            <table className="w-full text-sm table-fixed">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th className="p-2 text-center border-b">#</th>
+                                        <th className="p-2 text-center border-b">المادة</th>
+                                        <th className="p-2 text-center border-b">اللون</th>
+                                        <th className="p-2 text-center border-b">العرض</th>
+                                        <th className="p-2 text-center border-b">السماكة</th>
+                                        <th className="p-2 text-center border-b">الكمية</th>
+                                        <th className="p-2 text-center border-b">الطبخة</th>
+                                        <th className="p-2 text-center border-b">النوع</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(selectedPreparerOrder?.items || []).length === 0 ? (
+                                        <tr>
+                                            <td colSpan="8" className="p-6 text-center text-gray-400">لا توجد عناصر</td>
+                                        </tr>
+                                    ) : (
+                                        (selectedPreparerOrder?.items || []).map((item, idx) => (
+                                            <tr key={idx} className="border-t hover:bg-gray-50">
+                                                <td className="p-2 text-center font-medium">{idx + 1}</td>
+                                                <td className="p-2 text-center">{item.material_name || item.material?.material_name || "-"}</td>
+                                                <td className="p-2 text-center">{item.color_name || item.color?.color_name || "-"}</td>
+                                                <td className="p-2 text-center">{item.width ?? "-"}</td>
+                                                <td className="p-2 text-center">{item.thickness ?? "-"}</td>
+                                                <td className="p-2 text-center">{item.quantity ?? "-"}</td>
+                                                <td className="p-2 text-center">{item.batch_number || item.batch?.batch_number || "-"}</td>
+                                                <td className="p-2 text-center">{item.type_item || "-"}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {selectedPreparerOrder?.notes && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                <div className="text-sm font-bold mb-1">الملاحظات</div>
+                                <div className="text-sm">{selectedPreparerOrder.notes}</div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </StyledDialog>
+
 
             {showDeleteDialog && orderToDelete && (
                 <StyledDialog

@@ -12,6 +12,7 @@ import StyledDialog from "../components/common/StyledDialog";
 import PaginationControls from "../components/common/PaginationControls";
 import ResultsCounter from "../components/common/ResultsCounter";
 import RowsPerPageSelector from "../components/common/RowsPerPageSelector";
+import NotificationsBell from "../components/common/NotificationsBell";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import {
@@ -22,7 +23,6 @@ import {
     Eye,
     RotateCcw,
     Check,
-    EyeOff,
     Home,
     LogOut,
     Users,
@@ -42,7 +42,9 @@ import {
     Droplet,
     Layers,
     Search,
-    Filter
+    Filter,
+    ChevronUp,
+    ChevronDown
 } from "lucide-react";
 import LoadingState from "../components/common/LoadingState";
 import { getApiData } from "../utils/api";
@@ -87,7 +89,7 @@ const PRODUCTION_DEPARTMENTS = [
 
 export default function ProductionRecords() {
     const navigate = useNavigate();
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [activeTab, setActiveTab] = useState(ProductionType.warehouse);
@@ -96,6 +98,17 @@ export default function ProductionRecords() {
     const [widthFilter, setWidthFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(20); // فلتر العرض
+
+    const ROLE_LABELS = {
+        admin: "مدير النظام",
+        accountant: "محاسب",
+        cashier: "كاشير",
+        sales: "مبيعات",
+        production_manager: "مدير الإنتاج",
+        warehouse_keeper: "أمين المستودع",
+        order_preparer: "مجهز الطلبات",
+        production: "الإنتاج"
+    };
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [showItemDetails, setShowItemDetails] = useState(false);
@@ -517,55 +530,96 @@ export default function ProductionRecords() {
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
-            {/* Header */}
+                        {/* Header */}
+            <div className={isHeaderVisible ? "h-[88px]" : "h-[36px]"} />
+
+            <div
+                className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+                    isHeaderVisible ? "top-[60px]" : "top-2"
+                }`}
+            >
+                <Button
+                    type="button"
+                    onClick={() => setIsHeaderVisible((prev) => !prev)}
+                    className="h-10 w-10 rounded-full border-2 border-t-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 active:scale-95"
+                    title={isHeaderVisible ? "إخفاء الهيدر" : "إظهار الهيدر"}
+                >
+                    {isHeaderVisible ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+                </Button>
+            </div>
+
             {isHeaderVisible && (
                 <div className="relative flex-shrink-0">
-                    <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
+                    <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-40">
                         <div className="flex flex-wrap gap-3">
                             <Button
                                 size="lg"
                                 variant="outline"
-                                onClick={() => navigate('/production')}
-                                className="px-6 py-3 text-base min-w-[140px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                                onClick={() => setActiveTab(ProductionType.warehouse)}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeTab === ProductionType.warehouse
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                    }`}
                             >
-                                <Plus className="w-5 h-5 ml-2" />
-                                طلب إنتاج جديد
+                                <Package className="w-5 h-5 ml-2" />
+                                المستودع
                             </Button>
                             <Button
                                 size="lg"
                                 variant="outline"
-                                className="px-6 py-3 text-base min-w-[140px] touch-manipulation border-2 bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                onClick={() => setActiveTab(ProductionType.slitting)}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeTab === ProductionType.slitting
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                    }`}
                             >
-                                <History className="w-5 h-5 ml-2" />
-                                سجل الإنتاج
+                                <Scissors className="w-5 h-5 ml-2" />
+                                التشريح
+                            </Button>
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={() => setActiveTab(ProductionType.cutting)}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeTab === ProductionType.cutting
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                    }`}
+                            >
+                                <Scissors className="w-5 h-5 ml-2" />
+                                القص
+                            </Button>
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                onClick={() => setActiveTab(ProductionType.gluing)}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeTab === ProductionType.gluing
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                    }`}
+                            >
+                                <Droplet className="w-5 h-5 ml-2" />
+                                التغرية
                             </Button>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                            <NotificationsBell />
                             <Button
                                 size="lg"
                                 variant="outline"
-                                onClick={handleRefreshAll}
+                                onClick={() => navigate("/dashboard")}
                                 className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
                             >
-                                <RefreshCw className="w-5 h-5 ml-2" />
-                                تحديث الكل
+                                <Home className="w-5 h-5 ml-2" />
+                                الرئيسية
                             </Button>
                             <Button
                                 size="lg"
                                 variant="outline"
                                 onClick={() => setShowLogoutDialog(true)}
-                                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                                className="px-4 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
                             >
                                 <LogOut className="w-5 h-5 ml-2" />
                                 تسجيل الخروج
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setIsHeaderVisible(false)}
-                                className="px-4 py-3 text-base min-w-[60px] touch-manipulation border-2 bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110"
-                            >
-                                <EyeOff className="w-5 h-5" />
                             </Button>
                         </div>
                     </div>
@@ -573,20 +627,23 @@ export default function ProductionRecords() {
             )}
 
             {!isHeaderVisible && (
-                <div className="absolute top-2 right-2 z-20">
-                    <Button
-                        size="lg"
-                        variant="outline"
-                        onClick={() => setIsHeaderVisible(true)}
-                        className="px-4 py-2 text-base bg-secondary-f text-white border-secondary-f hover:bg-secondary-f shadow-lg touch-manipulation"
-                    >
-                        <Eye className="w-5 h-5 ml-2" />
-                        إظهار الهيدر
-                    </Button>
+                <div className="fixed top-0 left-0 right-0 z-30">
+                    <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-1 shadow-sm backdrop-blur">
+                        <div className="min-w-0">
+                            <div className="truncate text-sm font-bold text-secondary-s">
+                                {user?.full_name || user?.username || "-"}
+                            </div>
+                        </div>
+                        <div className="h-10 w-px" />
+                        <div className="min-w-0 text-right">
+                            <div className="truncate text-sm font-bold text-secondary-s">
+                                {ROLE_LABELS[user?.role] || user?.role || "-"}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
-
-            {/* Main Content */}
+{/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
                 <div className="h-full flex flex-col min-h-0">
                     {/* Department Tabs */}
