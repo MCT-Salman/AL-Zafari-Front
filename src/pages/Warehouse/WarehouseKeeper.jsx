@@ -45,6 +45,7 @@ const BASE_FORM = {
     width: FIXED_WIDTH,
     thickness: "",
     destination: MovementDestination.slitting,
+    carton_count: "",
     notes: ""
 };
 
@@ -450,17 +451,30 @@ export default function WarehouseKeeper() {
     const confirmOutputSubmit = async () => {
         try {
             const num = (value) => Number(String(value).replace(",", "."));
-            const response = await warehouseApi.createWarehouseMovement({
-                color_id: num(pendingOutput.color_id),
-                batch_id: num(pendingOutput.batch_id),
-                length: num(pendingOutput.length),
-                width: num(FIXED_WIDTH),
-                thickness: num(pendingOutput.thickness),
-                destination: pendingOutput.destination,
-                notes: pendingOutput.notes
-            });
-            const created = response?.data?.movement || response?.data || response?.movement;
-            if (created?.movement_id) setMovements((prev) => [created, ...prev]);
+            const cartonCount = num(pendingOutput.carton_count) || 1;
+            
+            // Create multiple records based on carton count
+            const createPromises = [];
+            for (let i = 0; i < cartonCount; i++) {
+                const movementData = {
+                    color_id: num(pendingOutput.color_id),
+                    batch_id: num(pendingOutput.batch_id),
+                    length: num(pendingOutput.length),
+                    width: num(FIXED_WIDTH),
+                    thickness: num(pendingOutput.thickness),
+                    destination: pendingOutput.destination,
+                    notes: pendingOutput.notes ? (cartonCount > 1 ? `${pendingOutput.notes} (كرتون ${i + 1}/${cartonCount})` : pendingOutput.notes) : (cartonCount > 1 ? `كرتون ${i + 1}/${cartonCount}` : "")
+                };
+                createPromises.push(warehouseApi.createWarehouseMovement(movementData));
+            }
+            
+            const responses = await Promise.all(createPromises);
+            const newMovements = responses.map(response => response?.data?.movement || response?.data || response?.movement).filter(Boolean);
+            
+            if (newMovements.length > 0) {
+                setMovements((prev) => [...newMovements, ...prev]);
+            }
+            
             setOutputForm((prev) => ({
                 ...BASE_FORM,
                 material_id: pvcMaterial ? String(pvcMaterial.material_id) : "",
@@ -470,13 +484,14 @@ export default function WarehouseKeeper() {
                 length: lengthValues.find((v) => v.isDefault)?.value ? String(lengthValues.find((v) => v.isDefault).value) : (lengthValues[0] ? String(lengthValues[0].value) : ""),
                 thickness: thicknessValues.find((v) => v.isDefault)?.value ? String(thicknessValues.find((v) => v.isDefault).value) : (thicknessValues[0] ? String(thicknessValues[0].value) : "")
             }));
-            toast.success("تم حفظ المخرج بنجاح");
+            
+            toast.success(`تم حفظ ${newMovements.length} مخرج بنجاح`);
             loadMovements();
             setShowOutputConfirmDialog(false);
             setPendingOutput(null);
         } catch (error) {
             console.error(error);
-            toast.error("فشل في حفظ المخرج");
+            toast.error("فشل في حفظ المخرجات");
         }
     };
 
@@ -546,6 +561,10 @@ export default function WarehouseKeeper() {
             setOutputForm((prev) => ({ ...prev, notes: `${prev.notes || ""}${value}` }));
             return;
         }
+        if (currentInput === "carton_count") {
+            setOutputForm((prev) => ({ ...prev, carton_count: `${prev.carton_count || ""}${value}` }));
+            return;
+        }
         if (currentInput === "qr") {
             setQrInput((prev) => `${prev || ""}${value}`);
             return;
@@ -561,6 +580,10 @@ export default function WarehouseKeeper() {
             setOutputForm((prev) => ({ ...prev, notes: String(prev.notes || "").slice(0, -1) }));
             return;
         }
+        if (currentInput === "carton_count") {
+            setOutputForm((prev) => ({ ...prev, carton_count: String(prev.carton_count || "").slice(0, -1) }));
+            return;
+        }
         if (currentInput === "qr") {
             setQrInput((prev) => String(prev || "").slice(0, -1));
             return;
@@ -574,6 +597,10 @@ export default function WarehouseKeeper() {
     const clearActiveInput = () => {
         if (currentInput === "notes") {
             setOutputForm((prev) => ({ ...prev, notes: "" }));
+            return;
+        }
+        if (currentInput === "carton_count") {
+            setOutputForm((prev) => ({ ...prev, carton_count: "" }));
             return;
         }
         if (currentInput === "qr") {
@@ -767,8 +794,8 @@ export default function WarehouseKeeper() {
                                     </div>
                                     <div className="grid grid-cols-3 gap-1">
                                         <div><Label className={'mb-1'}>الكمية</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} searchValue={selectSearch.length} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, length: value }))} onInputFocus={() => setCurrentInput("select:length")} options={lengthOptions} placeholder="اختر الكمية" disabled={!lengthOptions.length} /></div>
-                                        {/* <div><Label className={'mb-1'}>الوجهة</Label><FilterSelect value={outputForm.destination} onChange={(e) => setOutputForm((p) => ({ ...p, destination: e.target.value }))} options={[{ value: MovementDestination.slitting, label: "التشريح" }, { value: MovementDestination.cutting, label: "القص" }, { value: MovementDestination.production, label: "الإنتاج" }]} placeholder="اختر الوجهة" /></div> */}
-                                    <div className="col-span-2"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
+                                        <div><Label className={'mb-1'}>عدد الكراتين</Label><Input type="number" min="1" className={`h-13`} value={outputForm.carton_count} onChange={(e) => setOutputForm((p) => ({ ...p, carton_count: e.target.value }))} onFocus={() => setCurrentInput("carton_count")} placeholder="عدد الكراتين" /></div>
+                                        <div className="col-span-1"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
                                     </div>
                                     <Button onClick={handleOutputSubmit} className="w-full h-13 bg-green-600 hover:bg-green-700"><Check className="w-5 h-5 ml-2" />حفظ المخرج</Button>
                                 </div>
@@ -973,6 +1000,13 @@ export default function WarehouseKeeper() {
             >
                 <div className="text-sm text-gray-700">
                     هل تريد حفظ هذا المخرج؟
+                    {pendingOutput?.carton_count && Number(pendingOutput.carton_count) > 1 && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                            <span className="text-blue-700 font-medium">
+                                سيتم إنشاء {pendingOutput.carton_count} سجل بنفس المواصفات
+                            </span>
+                        </div>
+                    )}
                     <div className="mt-4">
                         <table className="w-full border-collapse border border-gray-200 rounded-lg overflow-hidden">
                             <thead className="bg-gray-100">
@@ -983,6 +1017,7 @@ export default function WarehouseKeeper() {
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المسطرة</th>
+                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">عدد الكراتين</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
                                 </tr>
@@ -1010,6 +1045,7 @@ export default function WarehouseKeeper() {
                                             return ruler ? ruler.ruler_name : "-";
                                         })()}
                                     </td>
+                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingOutput?.carton_count || "1"}</td>
                                     <td className="border border-gray-200 px-3 py-2 text-center text-sm">
                                         <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
                                             {formatDestination(pendingOutput?.destination)}
