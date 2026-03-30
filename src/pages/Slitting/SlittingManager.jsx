@@ -82,6 +82,7 @@ export default function SlittingManager() {
   const [showOrderDetails, setShowOrderDetails] = useState(false);
 
   const [ioMode, setIoMode] = useState("input"); // input | output
+  const [inputMode, setInputMode] = useState("manual"); // manual | qr
   const [qrInput, setQrInput] = useState("");
   const [activeOrderItem, setActiveOrderItem] = useState(null);
 
@@ -105,7 +106,7 @@ export default function SlittingManager() {
   });
   const [selectedOutputPattern, setSelectedOutputPattern] = useState(""); // "22x3" or "44x1-22x1"
   const [outputItems, setOutputItems] = useState([
-    { id: 1, length: "", qrUrl: "", qrData: "" }
+    { id: 1, width: "", length: "", qrUrl: "", qrData: "", qrFooter: "" }
   ]);
 
   const [showHeader, setShowHeader] = useState(true);
@@ -160,34 +161,20 @@ export default function SlittingManager() {
 
   const handleCalculationModeSelect = (mode) => {
     setSelectedOutputPattern(mode);
-    setOutputForm(prev => {
-      const newForm = { ...prev, calculationMode: mode };
+    setOutputForm((prev) => {
+      const next = { ...prev, calculationMode: mode };
+      const defaultLength = inputForm.input_length || prev.output_length_22 || "100";
 
       if (mode === "22x3") {
-        // Set default values for 22*3 calculation
-        newForm.output_length_22 = "100";
-        newForm.output_length_44 = "";
-        // Set output_length string format
-        newForm.output_length = "3x22";
+        next.output_length_22 = prev.output_length_22 || defaultLength;
+        next.output_length_44 = "";
       } else if (mode === "44x1-22x1") {
-        // Set default values for 44*1-22*1 calculation
-        newForm.output_length_22 = "100";
-        newForm.output_length_44 = "100";
-        // Set output_length string format
-        newForm.output_length = "1x44, 1x22";
+        next.output_length_22 = prev.output_length_22 || defaultLength;
+        next.output_length_44 = prev.output_length_44 || defaultLength;
       }
 
-      return newForm;
+      return next;
     });
-  };
-
-  const calculateOutputLength = (inputLength, outputLength22, outputLength44, calculationMode) => {
-    if (calculationMode === "22x3") {
-      return "3x22";
-    } else if (calculationMode === "44x1-22x1") {
-      return "1x44, 1x22";
-    }
-    return "0";
   };
 
   const normalizeDecimal = (value) => String(value ?? "").replace(",", ".");
@@ -201,6 +188,36 @@ export default function SlittingManager() {
     if (text.includes(".") || text.includes(",")) return text;
     return text ? `${text},` : "0,";
   };
+
+  const outputTotals = useMemo(() => {
+    const length22 = toNumber(outputForm.output_length_22);
+    const length44 = toNumber(outputForm.output_length_44);
+    if (selectedOutputPattern === "22x3") {
+      return {
+        count22: 3,
+        count44: 0,
+        total: length22 * 3,
+        length22,
+        length44: 0
+      };
+    }
+    if (selectedOutputPattern === "44x1-22x1") {
+      return {
+        count22: 1,
+        count44: 1,
+        total: length22 + length44,
+        length22,
+        length44
+      };
+    }
+    return {
+      count22: 0,
+      count44: 0,
+      total: 0,
+      length22,
+      length44
+    };
+  }, [selectedOutputPattern, outputForm.output_length_22, outputForm.output_length_44]);
 
   const getStatusBadge = (status) => productionApi.getStatusBadge(String(status || "").toLowerCase());
 
@@ -311,14 +328,60 @@ export default function SlittingManager() {
   }, []);
 
   useEffect(() => {
-    const calculatedLength = calculateOutputLength(
-      inputForm.input_length,
-      outputForm.output_length_22,
-      outputForm.output_length_44,
-      outputForm.calculationMode
-    );
-    setOutputForm(prev => ({ ...prev, output_length: calculatedLength }));
-  }, [inputForm.input_length, outputForm.output_length_22, outputForm.output_length_44, outputForm.calculationMode]);
+    const outputPattern = selectedOutputPattern === "22x3"
+      ? "3x22"
+      : selectedOutputPattern === "44x1-22x1"
+        ? "1x44, 1x22"
+        : "";
+    setOutputForm((prev) => ({
+      ...prev,
+      calculationMode: selectedOutputPattern,
+      output_length: outputPattern
+    }));
+  }, [selectedOutputPattern]);
+
+  useEffect(() => {
+    const items = [];
+    if (selectedOutputPattern === "22x3") {
+      const length = String(outputForm.output_length_22 || "").trim();
+      for (let i = 0; i < 3; i += 1) {
+        items.push({
+          id: `22-${i + 1}`,
+          width: "22",
+          length,
+          qrUrl: "",
+          qrData: "",
+          qrFooter: ""
+        });
+      }
+    } else if (selectedOutputPattern === "44x1-22x1") {
+      const length44 = String(outputForm.output_length_44 || "").trim();
+      const length22 = String(outputForm.output_length_22 || "").trim();
+      items.push({
+        id: "44-1",
+        width: "44",
+        length: length44,
+        qrUrl: "",
+        qrData: "",
+        qrFooter: ""
+      });
+      items.push({
+        id: "22-1",
+        width: "22",
+        length: length22,
+        qrUrl: "",
+        qrData: "",
+        qrFooter: ""
+      });
+    }
+
+    if (items.length === 0) {
+      setOutputItems([{ id: 1, width: "", length: "", qrUrl: "", qrData: "", qrFooter: "" }]);
+      return;
+    }
+
+    setOutputItems(items);
+  }, [selectedOutputPattern, outputForm.output_length_22, outputForm.output_length_44]);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -376,7 +439,11 @@ export default function SlittingManager() {
       setQrInput(prev => `${prev || ""}${value}`);
       return;
     }
-    if (currentInput === "notes") {
+    if (currentInput === "input_notes") {
+      setInputForm(prev => ({ ...prev, notes: `${prev.notes || ""}${value}` }));
+      return;
+    }
+    if (currentInput === "output_notes") {
       setOutputForm(prev => ({ ...prev, notes: `${prev.notes || ""}${value}` }));
       return;
     }
@@ -408,7 +475,11 @@ export default function SlittingManager() {
       setQrInput(prev => back(prev));
       return;
     }
-    if (currentInput === "notes") {
+    if (currentInput === "input_notes") {
+      setInputForm(prev => ({ ...prev, notes: back(prev.notes) }));
+      return;
+    }
+    if (currentInput === "output_notes") {
       setOutputForm(prev => ({ ...prev, notes: back(prev.notes) }));
       return;
     }
@@ -439,7 +510,11 @@ export default function SlittingManager() {
       setQrInput("");
       return;
     }
-    if (currentInput === "notes") {
+    if (currentInput === "input_notes") {
+      setInputForm(prev => ({ ...prev, notes: "" }));
+      return;
+    }
+    if (currentInput === "output_notes") {
       setOutputForm(prev => ({ ...prev, notes: "" }));
       return;
     }
@@ -477,8 +552,18 @@ export default function SlittingManager() {
         toast.error("يرجى اختيار طريقة حساب الكمية الخارجية");
         return;
       }
+      if (outputForm.calculationMode === "22x3" && !outputForm.output_length_22) {
+        toast.error("يرجى إدخال طول الجزء (22) للكمية الخارجية");
+        return;
+      }
+      if (outputForm.calculationMode === "44x1-22x1" && (!outputForm.output_length_22 || !outputForm.output_length_44)) {
+        toast.error("يرجى إدخال أطوال أجزاء 22 و 44");
+        return;
+      }
 
       // Prepare payload for confirmation dialog
+      const length22 = toNumber(outputForm.output_length_22);
+      const length44 = toNumber(outputForm.output_length_44);
       const payload = {
         color_id: Number(inputForm.color_id),
         batch_id: Number(inputForm.batch_id),
@@ -486,8 +571,8 @@ export default function SlittingManager() {
         input_length: Number(inputForm.input_length),
         output_length: outputForm.output_length, // String format: "3x22" or "1x44, 1x22"
         input_width: Number(inputForm.input_width),
-        output_length_22: outputForm.calculationMode === "22x3" ? 300 : 100, // 100 or 300 as required
-        ...(outputForm.calculationMode === "44x1-22x1" && { output_length_44: 100 }), // Only send for 44x1-22x1 mode
+        output_length_22: outputForm.calculationMode === "22x3" ? length22 * 3 : length22,
+        ...(outputForm.calculationMode === "44x1-22x1" && { output_length_44: length44 }),
         source: "warehouse", // Default value since we removed the field
         destination: "slitting", // Default value since we removed the field
         notes: outputForm.notes || inputForm.notes
@@ -531,8 +616,11 @@ export default function SlittingManager() {
       setOutputForm({
         calculationMode: "",
         output_length: "",
+        output_length_22: "",
+        output_length_44: "",
         notes: ""
       });
+      setSelectedOutputPattern("");
       setActiveOrderItem(null);
       setIoMode("input");
       setShowSliteConfirmDialog(false);
@@ -675,6 +763,30 @@ export default function SlittingManager() {
   const getQrUrl = (data) =>
     `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(data)}`;
 
+  const buildOutputQrData = (item) => {
+    const width = item?.width || "";
+    const length = item?.length || "";
+    const typeItem = "Presser";
+    return [
+      width,
+      inputForm.color_id || "",
+      inputForm.batch_id || "",
+      length,
+      typeItem,
+      "slitting",
+      "cutting"
+    ].join("|");
+  };
+
+  const buildOutputQrFooter = (item) => {
+    const colorInfo = colors.find((c) => String(c.color_id) === String(inputForm.color_id));
+    const batchInfo = batches.find((b) => String(b.batch_id) === String(inputForm.batch_id));
+    const typeLabel = "كوي";
+    return [
+      `${colorInfo?.color_code || "-"}|${typeLabel}|${batchInfo?.batch_number || "-"}|${item?.width || "-"}|${item?.length || "-"}`
+    ].join(" | ");
+  };
+
   const buildSliteQrData = (slite) => {
     const colorInfo = colors.find((c) => String(c.color_id) === String(slite?.color_id));
     const batchInfo = batches.find((b) => String(b.batch_id) === String(slite?.batch_id));
@@ -808,66 +920,58 @@ export default function SlittingManager() {
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
       {/* Header Toggle Button */}
-       <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[8.5%]" : "top-[2%]"}`}>
-
+      <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[8.5%]" : "top-[2%]"}`}>
         <Button
-
           type="button"
-
           onClick={() => setShowHeader((prev) => !prev)}
-
           className="h-10 w-10 rounded-full border-2 border-t-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105  active:scale-95"
-
           title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
-
         >
-
           {showHeader ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
-
         </Button>
 
       </div>
 
       {/* Header */}
       {showHeader && (
-      <div className="flex-shrink-0">
-        <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
-          <div className="flex items-center gap-3">
-            <Package className="w-7 h-7" />
-            <div>
-              <h1 className="text-2xl font-bold">إدارة التشريح</h1>
-              <p className="text-sm opacity-90">لوحة عمليات التشريح</p>
+        <div className="flex-shrink-0">
+          <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
+            <div className="flex items-center gap-3">
+              <Package className="w-7 h-7" />
+              <div>
+                <h1 className="text-2xl font-bold">إدارة التشريح</h1>
+                <p className="text-sm opacity-90">لوحة عمليات التشريح</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <NotificationsBell />
+              <span className="text-sm">مرحباً، {user?.full_name}</span>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => setShowLogoutDialog(true)}
+                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+              >
+                <ArrowRight className="w-4 h-4 ml-2 rotate-180" />
+                تسجيل الخروج
+              </Button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <NotificationsBell />
-            <span className="text-sm">مرحباً، {user?.full_name}</span>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => setShowLogoutDialog(true)}
-              className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-            >
-              <ArrowRight className="w-4 h-4 ml-2 rotate-180" />
-              تسجيل الخروج
-            </Button>
-          </div>
         </div>
-      </div>
       )}
 
       {!showHeader && (
-      <div className="flex-shrink-0 text-stone-50">
-        <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
-          </div>
-          <div className="h-10 w-px" />
-          <div className="min-w-0 text-right">
-            <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+        <div className="flex-shrink-0 text-stone-50">
+          <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
+            </div>
+            <div className="h-10 w-px" />
+            <div className="min-w-0 text-right">
+              <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* Main */}
@@ -881,7 +985,7 @@ export default function SlittingManager() {
               المدخلات
             </h2>
             <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
-              {activeOrderItem && (
+              {/* {activeOrderItem && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
                   <div className="text-sm">
                     <div className="font-bold">تم ربط الإدخال بطلب #{activeOrderItem.production_order_id}</div>
@@ -895,180 +999,347 @@ export default function SlittingManager() {
                     إلغاء الربط
                   </Button>
                 </div>
-              )}
+              )} */}
 
               <div>
                 {/* Input form for manual entry or QR */}
                 <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      className={`flex-1 ${ioMode === "input" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
-                      onClick={() => setIoMode("input")}
-                    >
-                      <Search className="w-4 h-4 ml-2" />
-                      QR
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className={`flex-1 ${ioMode === "output" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
-                      onClick={() => setIoMode("output")}
-                    >
-                      <Hash className="w-4 h-4 ml-2" />
-                      يدوي
-                    </Button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    className={`flex-1 ${ioMode === "input" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
+                    onClick={() => setIoMode("input")}
+                  >
+                    {/* <Hash className="w-4 h-4 ml-2" /> */}
+                    إدخال
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className={`flex-1 mx-2 ${ioMode === "output" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
+                    onClick={() => setIoMode("output")}
+                  >
+                    {/* <ArrowRight className="w-4 h-4 ml-2" /> */}
+                    إخراج
+                  </Button>
 
                   {ioMode === "input" && (
-                    <div className="space-y-3">
-                      <div className="text-sm text-gray-600">
-                        قم بلصق بيانات QR ثم اضغط "تطبيق البيانات"
+                    <div className="space-y-4">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          className={`flex-1 ${inputMode === "manual" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
+                          onClick={() => setInputMode("manual")}
+                        >
+                          <Hash className="w-4 h-4 ml-2" />
+                          يدوي
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className={`flex-1 ${inputMode === "qr" ? "bg-blue-50 border-blue-300 text-blue-700" : ""}`}
+                          onClick={() => setInputMode("qr")}
+                        >
+                          <Search className="w-4 h-4 ml-2" />
+                          QR
+                        </Button>
                       </div>
-                      <Input
-                        value={qrInput}
-                        onChange={(e) => setQrInput(e.target.value)}
-                        placeholder="width|color_id|batch_id|length|type_item|source|destination"
-                      />
-                      <Button
-                        onClick={() => {
-                          const parsed = parseQrInput(qrInput);
-                          if (!parsed) {
-                            toast.error("صيغة QR غير صحيحة");
-                            return;
-                          }
-                          setInputForm((prev) => ({
-                            ...prev,
-                            input_width: parsed.input_width,
-                            color_id: parsed.color_id,
-                            batch_id: parsed.batch_id,
-                            input_length: parsed.input_length,
-                            type_item: parsed.type_item || prev.type_item,
-                            source: parsed.source || prev.source,
-                            destination: parsed.destination || prev.destination,
-                          }));
-                          setIoMode("output");
-                          toast.success("تم تطبيق بيانات QR");
-                        }}
-                        className="w-full bg-blue-600 hover:bg-blue-700"
-                        disabled={!qrInput.trim()}
-                      >
-                        <Check className="w-5 h-5 ml-2" />
-                        تطبيق البيانات
-                      </Button>
+
+                      {inputMode === "qr" && (
+                        <div className="space-y-3">
+                          <div className="text-sm text-gray-600">
+                            قم بلصق بيانات QR ثم اضغط "تطبيق البيانات"
+                          </div>
+                          <Input
+                            value={qrInput}
+                            onChange={(e) => setQrInput(e.target.value)}
+                            placeholder="width|color_id|batch_id|length|type_item|source|destination"
+                          />
+                          <Button
+                            onClick={() => {
+                              const parsed = parseQrInput(qrInput);
+                              if (!parsed) {
+                                toast.error("صيغة QR غير صحيحة");
+                                return;
+                              }
+                              setInputForm((prev) => ({
+                                ...prev,
+                                input_width: parsed.input_width,
+                                color_id: parsed.color_id,
+                                batch_id: parsed.batch_id,
+                                input_length: parsed.input_length,
+                                type_item: parsed.type_item || prev.type_item,
+                                source: parsed.source || prev.source,
+                                destination: parsed.destination || prev.destination,
+                              }));
+                              setIoMode("output");
+                              toast.success("تم تطبيق بيانات QR");
+                            }}
+                            className="w-full bg-blue-600 hover:bg-blue-700"
+                            disabled={!qrInput.trim()}
+                          >
+                            <Check className="w-5 h-5 ml-2" />
+                            تطبيق البيانات
+                          </Button>
+                        </div>
+                      )}
+
+                      {inputMode === "manual" && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>العرض</Label>
+                            <div className="grid grid-cols-3 gap-2 mt-2">
+                              {["22", "44", "66"].map((width) => (
+                                <button
+                                  key={width}
+                                  type="button"
+                                  onClick={() => setInputForm(prev => ({ ...prev, input_width: width }))}
+                                  className={`
+                                    rounded-xl border-2 text-base font-medium
+                                    transition-all hover:scale-[1.02] active:scale-[0.98]
+                                    flex items-center justify-center p-3
+                                    ${inputForm.input_width === width
+                                      ? "border-secondary-f bg-secondary-f text-white shadow-lg"
+                                      : "border-gray-300 bg-white hover:border-secondary-f"
+                                    }
+                                  `}
+                                >
+                                  {width}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <Label>اللون</Label>
+                            <FilterSelect
+                              value={inputForm.color_id}
+                              onChange={(e) => setInputForm(prev => ({ ...prev, color_id: e.target.value }))}
+                              options={colorOptions}
+                              placeholder="اختر اللون"
+                            />
+                          </div>
+                          <div>
+                            <Label>الطبخة</Label>
+                            <FilterSelect
+                              value={inputForm.batch_id}
+                              onChange={(e) => setInputForm(prev => ({ ...prev, batch_id: e.target.value }))}
+                              options={batchOptions}
+                              placeholder="اختر الطبخة"
+                            />
+                          </div>
+                          <div>
+                            <Label>الكمية</Label>
+                            <Input
+                              value={inputForm.input_length}
+                              onFocus={() => setCurrentInput("input_length")}
+                              readOnly
+                              className={`text-center ${currentInput === "input_length" ? "ring-2 ring-blue-500" : ""}`}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <Label>ملاحظات</Label>
+                            <Input
+                              value={inputForm.notes}
+                              onFocus={() => setCurrentInput("input_notes")}
+                              placeholder="ملاحظات اختيارية"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {ioMode === "output" && (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label>العرض</Label>
-                          <div className="grid grid-cols-3 gap-2 mt-2">
-                            {["22", "44", "66"].map((width) => (
-                              <button
-                                key={width}
-                                type="button"
-                                onClick={() => setInputForm(prev => ({ ...prev, input_width: width }))}
-                                className={`
-                                  rounded-xl border-2 text-base font-medium
-                                  transition-all hover:scale-[1.02] active:scale-[0.98]
-                                  flex items-center justify-center p-3
-                                  ${inputForm.input_width === width
-                                    ? "border-secondary-f bg-secondary-f text-white shadow-lg"
-                                    : "border-gray-300 bg-white hover:border-secondary-f"
-                                  }
-                                `}
-                              >
-                                {width}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <Label>اللون</Label>
-                          <FilterSelect
-                            value={inputForm.color_id}
-                            onChange={(e) => setInputForm(prev => ({ ...prev, color_id: e.target.value }))}
-                            options={colorOptions}
-                            placeholder="اختر اللون"
-                          />
-                        </div>
-                        <div>
-                          <Label>الطبخة</Label>
-                          <FilterSelect
-                            value={inputForm.batch_id}
-                            onChange={(e) => setInputForm(prev => ({ ...prev, batch_id: e.target.value }))}
-                            options={batchOptions}
-                            placeholder="اختر الطبخة"
-                          />
-                        </div>
-                        <div>
-                          <Label>الكمية</Label>
-                          <Input
-                            value={inputForm.input_length}
-                            onFocus={() => setCurrentInput("input_length")}
-                            readOnly
-                            className={`text-center ${currentInput === "input_length" ? "ring-2 ring-blue-500" : ""}`}
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <Label>الكمية الخارجية</Label>
-                          <div className="space-y-3">
-                            {/* <div className="text-sm text-gray-600 mb-2">اختر نمط التوزيع:</div> */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <Button
-                                type="button"
-                                variant={selectedOutputPattern === "22x3" ? "default" : "outline"}
-                                className={`h-16 p-4 flex flex-col items-center justify-center ${selectedOutputPattern === "22x3"
-                                    ? "bg-blue-600 text-white border-blue-600"
-                                    : "border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
-                                  }`}
-                                onClick={() => handleCalculationModeSelect("22x3")}
-                              >
-                                <div className="text-lg font-bold">22 × 3</div>
-                                {/* <div className="text-xs opacity-80">3 قطع من 22 سم</div> */}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={selectedOutputPattern === "44x1-22x1" ? "default" : "outline"}
-                                className={`h-16 p-4 flex flex-col items-center justify-center ${selectedOutputPattern === "44x1-22x1"
-                                    ? "bg-blue-600 text-white border-blue-600"
-                                    : "border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
-                                  }`}
-                                onClick={() => handleCalculationModeSelect("44x1-22x1")}
-                              >
-                                <div className="text-lg font-bold">44 × 1 - 22 × 1</div>
-                                {/* <div className="text-xs opacity-80">1 قطعة 44 سم + 1 قطعة 22 سم</div> */}
-                              </Button>
-                            </div>
-                            {/* {selectedOutputPattern && (
-                              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <div className="text-sm text-blue-800">
-                                  <div className="font-bold mb-1">النمط المحدد:</div>
-                                  {selectedOutputPattern === "22x3" ? (
-                                    <div>
-                                      <span className="font-bold">3x22</span> - سيتم إرسال: output_length_22 = 300
-                                    </div>
-                                  ) : (
-                                    <div>
-                                      <span className="font-bold">1x44, 1x22</span> - سيتم إرسال: output_length_22 = 100, output_length_44 = 100
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )} */}
-                          </div>
-                        </div>
-                        <div className="col-span-2">
-                          <Label>ملاحظات</Label>
-                          <Input
-                            value={inputForm.notes}
-                            onFocus={() => setCurrentInput("notes")}
-                            placeholder="ملاحظات اختيارية"
-                          />
-                        </div>
+                      <div className="border rounded-lg p-3 bg-white">
+                        <div className="text-sm font-bold mb-2">بيانات الإدخال</div>
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              <th className="p-2 text-center">العرض</th>
+                              <th className="p-2 text-center">اللون</th>
+                              <th className="p-2 text-center">الطبخة</th>
+                              <th className="p-2 text-center">الكمية المدخل</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-t">
+                              <td className="p-2 text-center">{inputForm.input_width || "-"}</td>
+                              <td className="p-2 text-center">
+                                {colors.find(c => String(c.color_id) === String(inputForm.color_id))?.color_name || "-"}{" "}
+                                ({colors.find(c => String(c.color_id) === String(inputForm.color_id))?.color_code || "-"})
+                              </td>
+                              <td className="p-2 text-center">
+                                {batches.find(b => String(b.batch_id) === String(inputForm.batch_id))?.batch_number || "-"}
+                              </td>
+                              <td className="p-2 text-center">{inputForm.input_length || "-"}</td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
+
+                      <div className="flex items-center justify-center">
+                        <ArrowRight className="w-6 h-6 text-gray-400 rotate-90" />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label>الكمية الخارجية</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Button
+                            type="button"
+                            variant={selectedOutputPattern === "22x3" ? "default" : "outline"}
+                            className={`h-16 p-4 flex flex-col items-center justify-center ${selectedOutputPattern === "22x3"
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                              }`}
+                            onClick={() => handleCalculationModeSelect("22x3")}
+                          >
+                            <div className="text-lg font-bold">22 × 3</div>
+                            <div className="text-xs opacity-80">3 قطع من 22 سم</div>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={selectedOutputPattern === "44x1-22x1" ? "default" : "outline"}
+                            className={`h-16 p-4 flex flex-col items-center justify-center ${selectedOutputPattern === "44x1-22x1"
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                              }`}
+                            onClick={() => handleCalculationModeSelect("44x1-22x1")}
+                          >
+                            <div className="text-lg font-bold">44 × 1 - 22 × 1</div>
+                            <div className="text-xs opacity-80">1 قطعة 44 سم + 1 قطعة 22 سم</div>
+                          </Button>
+                        </div>
+
+                        {selectedOutputPattern === "22x3" && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label>طول القطعة (22)</Label>
+                              <Input
+                                value={outputForm.output_length_22}
+                                onFocus={() => setCurrentInput("output_length_22")}
+                                readOnly
+                                className={`text-center ${currentInput === "output_length_22" ? "ring-2 ring-blue-500" : ""}`}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <Label>المجموع</Label>
+                              <Input
+                                value={outputTotals.total ? String(outputTotals.total) : ""}
+                                readOnly
+                                className="text-center bg-gray-50"
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedOutputPattern === "44x1-22x1" && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label>طول القطعة (44)</Label>
+                              <Input
+                                value={outputForm.output_length_44}
+                                onFocus={() => setCurrentInput("output_length_44")}
+                                readOnly
+                                className={`text-center ${currentInput === "output_length_44" ? "ring-2 ring-blue-500" : ""}`}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <Label>طول القطعة (22)</Label>
+                              <Input
+                                value={outputForm.output_length_22}
+                                onFocus={() => setCurrentInput("output_length_22")}
+                                readOnly
+                                className={`text-center ${currentInput === "output_length_22" ? "ring-2 ring-blue-500" : ""}`}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <Label>المجموع</Label>
+                              <Input
+                                value={outputTotals.total ? String(outputTotals.total) : ""}
+                                readOnly
+                                className="text-center bg-gray-50"
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>رموز QR لكل قطعة</Label>
+                        <div className="border rounded-lg overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="p-2 text-center">#</th>
+                                <th className="p-2 text-center">العرض</th>
+                                <th className="p-2 text-center">الطول</th>
+                                <th className="p-2 text-center">الطباعة</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {outputItems.map((item, index) => (
+                                <tr key={item.id || index} className="border-t">
+                                  <td className="p-2 text-center">{index + 1}</td>
+                                  <td className="p-2 text-center">{item.width || "-"}</td>
+                                  <td className="p-2 text-center">{item.length || "-"}</td>
+                                  <td className="p-2 text-center">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        if (!item.width || !item.length) {
+                                          toast.error("يرجى إدخال بيانات الإخراج أولاً");
+                                          return;
+                                        }
+                                        const qrData = buildOutputQrData(item);
+                                        const footer = buildOutputQrFooter(item);
+                                        const url = getQrUrl(qrData);
+                                        printQr(url, `QR - تشريح (${item.width}x${item.length})`, footer);
+                                      }}
+                                    >
+                                      طباعة QR
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => {
+                            const items = outputItems.filter((item) => item.width && item.length);
+                            if (items.length === 0) {
+                              toast.error("يرجى إدخال بيانات الإخراج أولاً");
+                              return;
+                            }
+                            items.forEach((item) => {
+                              const qrData = buildOutputQrData(item);
+                              const footer = buildOutputQrFooter(item);
+                              const url = getQrUrl(qrData);
+                              printQr(url, `QR - تشريح (${item.width}x${item.length})`, footer);
+                            });
+                          }}
+                        >
+                          طباعة جميع QR
+                        </Button>
+                      </div>
+
+                      <div>
+                        <Label>ملاحظات الإخراج</Label>
+                        <Input
+                          value={outputForm.notes}
+                          onChange={(e) => setOutputForm(prev => ({ ...prev, notes: e.target.value }))}
+                          onFocus={() => setCurrentInput("output_notes")}
+                          placeholder="ملاحظات الإخراج"
+                        />
+                      </div>
+
                       <Button
                         onClick={handleCreateSlite}
                         className="w-full h-12 bg-blue-600 hover:bg-blue-700"
@@ -1172,7 +1443,7 @@ export default function SlittingManager() {
                       </Button>
                     )}
                   </div>
-                  
+
                   <table className="w-full">
                     <thead className="bg-gray-50 sticky top-8 z-10">
                       <tr className="text-xs font-bold">
@@ -1259,7 +1530,7 @@ export default function SlittingManager() {
                                 </div>
                               </td>
                             </tr>
-                            
+
                             {/* Expanded Details Row */}
                             {isExpanded && (
                               <tr>
@@ -1338,7 +1609,7 @@ export default function SlittingManager() {
               )}
             </div>
           </Card>
-          
+
           {/* Number Pad */}
           <Card className="p-4 pb-0 w-[260px] flex-shrink-0 self-stretch flex flex-col">
             <div className="grid grid-cols-3 gap-2 flex-1 content-start overflow-auto">
@@ -1355,24 +1626,24 @@ export default function SlittingManager() {
       </div>
 
       <StyledDialog
-          isOpen={showOrderDetails}
-          onOpenChange={(open) => {
-            setShowOrderDetails(open);
-            if (!open) {
-              setSelectedOrder(null);
-              setOrderItems([]);
-            }
-          }}
-          title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`}
-          contentClassName="max-w-6xl w-full"
-          onCancel={() => setShowOrderDetails(false)}
-          onConfirm={() => setShowOrderDetails(false)}
-          confirmLabel="إغلاق"
-          showCancel={false}
-        >
-          {!selectedOrder ? null : (
-            <div className="space-y-4 w-full">
-              {/* <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
+        isOpen={showOrderDetails}
+        onOpenChange={(open) => {
+          setShowOrderDetails(open);
+          if (!open) {
+            setSelectedOrder(null);
+            setOrderItems([]);
+          }
+        }}
+        title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`}
+        contentClassName="max-w-6xl w-full"
+        onCancel={() => setShowOrderDetails(false)}
+        onConfirm={() => setShowOrderDetails(false)}
+        confirmLabel="إغلاق"
+        showCancel={false}
+      >
+        {!selectedOrder ? null : (
+          <div className="space-y-4 w-full">
+            {/* <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
                 <div><span className="text-gray-500">التاريخ:</span> <span className="font-bold">{formatDate(selectedOrder.created_at)}</span></div>
                 <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
@@ -1383,147 +1654,147 @@ export default function SlittingManager() {
                 <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{formatTypeItem(selectedOrder.type_item)}</span></div>
               </div> */}
 
-              {loadingOrderDetails ? (
-                <LoadingState />
-              ) : (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full table-auto border-collapse">
-                    <thead className="bg-gray-100 sticky top-0 z-20">
-                      <tr>
-                        {["#", "العرض", "اللون", "الطبخة", "الكمية", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
-                          <th key={h} className="p-2 text-center border-b text-sm">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orderItems.length === 0 ? (
-                        <tr><td colSpan="11" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr>
-                      ) : orderItems.map((item, index) => (
-                        <tr key={item.production_order_item_id || index} className="border-t">
-                          <td className="p-2 text-center">#{item.production_order_item_id || index + 1}</td>
-                          <td className="p-2 text-center">{item.width || "-"}</td>
-                          <td className="p-2 text-center">{getColorLabel(item.color_id)}</td>
-                          <td className="p-2 text-center">{getBatchLabel(item.batch_id)}</td>
-                          <td className="p-2 text-center">{item.length || "-"}</td>
-                          <td className="p-2 text-center">{formatTypeItem(item.type_item || item.type)}</td>
-                          <td className="p-2 text-center">{formatDestination(item.source)}</td>
-                          <td className="p-2 text-center">{formatDestination(item.destination)}</td>
-                          <td className="p-2 text-center"><span className={`px-2 py-1 rounded-lg text-xs ${getStatusBadge(item.status).className}`}>{getStatusBadge(item.status).label}</span></td>
-                          <td className="p-2 text-center">{item.notes || "-"}</td>
-                          <td className="p-2 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleApplyOrderToInputs(item)}>إدخال</Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={String(item.status || "").toLowerCase() === ProductionStatus.completed}
-                                onClick={() => requestCompleteOrderItem(item)}
-                              >
-                                إتمام
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
+            {loadingOrderDetails ? (
+              <LoadingState />
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full table-auto border-collapse">
+                  <thead className="bg-gray-100 sticky top-0 z-20">
+                    <tr>
+                      {["#", "العرض", "اللون", "الطبخة", "الكمية", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
+                        <th key={h} className="p-2 text-center border-b text-sm">{h}</th>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </StyledDialog>
-
-        <StyledDialog
-          isOpen={showCompleteDialog}
-          onOpenChange={(open) => {
-            setShowCompleteDialog(open);
-            if (!open) setPendingCompleteItem(null);
-          }}
-          title="تأكيد إتمام العملية"
-          contentClassName="max-w-md w-full"
-          onCancel={() => {
-            setShowCompleteDialog(false);
-            setPendingCompleteItem(null);
-          }}
-          onConfirm={async () => {
-            if (pendingCompleteItem) {
-              await handleCompleteOrderItem(pendingCompleteItem);
-            }
-            setShowCompleteDialog(false);
-            setPendingCompleteItem(null);
-          }}
-          confirmLabel="تأكيد"
-          cancelLabel="إلغاء"
-        >
-          <div className="text-sm text-gray-700">
-            هل تريد إتمام الطلب{" "}
-            <span className="font-bold">
-              #{pendingCompleteItem?.production_order_id || pendingCompleteItem?.production_order_item_id || ""}
-            </span>{" "}
-            ونقله إلى المكتمل؟
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderItems.length === 0 ? (
+                      <tr><td colSpan="11" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr>
+                    ) : orderItems.map((item, index) => (
+                      <tr key={item.production_order_item_id || index} className="border-t">
+                        <td className="p-2 text-center">#{item.production_order_item_id || index + 1}</td>
+                        <td className="p-2 text-center">{item.width || "-"}</td>
+                        <td className="p-2 text-center">{getColorLabel(item.color_id)}</td>
+                        <td className="p-2 text-center">{getBatchLabel(item.batch_id)}</td>
+                        <td className="p-2 text-center">{item.length || "-"}</td>
+                        <td className="p-2 text-center">{formatTypeItem(item.type_item || item.type)}</td>
+                        <td className="p-2 text-center">{formatDestination(item.source)}</td>
+                        <td className="p-2 text-center">{formatDestination(item.destination)}</td>
+                        <td className="p-2 text-center"><span className={`px-2 py-1 rounded-lg text-xs ${getStatusBadge(item.status).className}`}>{getStatusBadge(item.status).label}</span></td>
+                        <td className="p-2 text-center">{item.notes || "-"}</td>
+                        <td className="p-2 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handleApplyOrderToInputs(item)}>إدخال</Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={String(item.status || "").toLowerCase() === ProductionStatus.completed}
+                              onClick={() => requestCompleteOrderItem(item)}
+                            >
+                              إتمام
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </StyledDialog>
+        )}
+      </StyledDialog>
 
-        <StyledDialog
-          isOpen={showSliteConfirmDialog}
-          onOpenChange={(open) => {
-            setShowSliteConfirmDialog(open);
-            if (!open) setPendingSlite(null);
-          }}
-          title="تأكيد عملية التشريح"
-          contentClassName="max-w-2xl w-full"
-          onCancel={() => {
-            setShowSliteConfirmDialog(false);
-            setPendingSlite(null);
-          }}
-          onConfirm={confirmCreateSlite}
-          confirmLabel="تأكيد العملية"
-          cancelLabel="إلغاء"
-        >
-          <div className="text-sm text-gray-700">
-            هل تريد تنفيذ عملية التشريح؟
-            <div className="mt-4">
-              <table className="w-full border-collapse border border-gray-200 rounded-lg overflow-hidden">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">عرض المدخل</th>
-                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المدخل</th>
-                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية الخارجي</th>
-                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
-                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
-                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
-                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="hover:bg-gray-50">
-                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_width || "-"}</td>
-                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_length || "-"}</td>
-                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.output_length || "-"}</td>
-                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
-                      {(() => {
-                        const color = colors.find(c => String(c.color_id) === String(pendingSlite?.color_id));
-                        return color ? `${color.color_name} (${color.color_code})` : "-";
-                      })()}
-                    </td>
-                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
-                      {(() => {
-                        const batch = batches.find(b => String(b.batch_id) === String(pendingSlite?.batch_id));
-                        return batch ? batch.batch_number : "-";
-                      })()}
-                    </td>
-                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                        التشريح
-                      </span>
-                    </td>
-                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.notes || "-"}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+      <StyledDialog
+        isOpen={showCompleteDialog}
+        onOpenChange={(open) => {
+          setShowCompleteDialog(open);
+          if (!open) setPendingCompleteItem(null);
+        }}
+        title="تأكيد إتمام العملية"
+        contentClassName="max-w-md w-full"
+        onCancel={() => {
+          setShowCompleteDialog(false);
+          setPendingCompleteItem(null);
+        }}
+        onConfirm={async () => {
+          if (pendingCompleteItem) {
+            await handleCompleteOrderItem(pendingCompleteItem);
+          }
+          setShowCompleteDialog(false);
+          setPendingCompleteItem(null);
+        }}
+        confirmLabel="تأكيد"
+        cancelLabel="إلغاء"
+      >
+        <div className="text-sm text-gray-700">
+          هل تريد إتمام الطلب{" "}
+          <span className="font-bold">
+            #{pendingCompleteItem?.production_order_id || pendingCompleteItem?.production_order_item_id || ""}
+          </span>{" "}
+          ونقله إلى المكتمل؟
+        </div>
+      </StyledDialog>
+
+      <StyledDialog
+        isOpen={showSliteConfirmDialog}
+        onOpenChange={(open) => {
+          setShowSliteConfirmDialog(open);
+          if (!open) setPendingSlite(null);
+        }}
+        title="تأكيد عملية التشريح"
+        contentClassName="max-w-2xl w-full"
+        onCancel={() => {
+          setShowSliteConfirmDialog(false);
+          setPendingSlite(null);
+        }}
+        onConfirm={confirmCreateSlite}
+        confirmLabel="تأكيد العملية"
+        cancelLabel="إلغاء"
+      >
+        <div className="text-sm text-gray-700">
+          هل تريد تنفيذ عملية التشريح؟
+          <div className="mt-4">
+            <table className="w-full border-collapse border border-gray-200 rounded-lg overflow-hidden">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">عرض المدخل</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المدخل</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية الخارجي</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="hover:bg-gray-50">
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_width || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_length || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.output_length || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                    {(() => {
+                      const color = colors.find(c => String(c.color_id) === String(pendingSlite?.color_id));
+                      return color ? `${color.color_name} (${color.color_code})` : "-";
+                    })()}
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                    {(() => {
+                      const batch = batches.find(b => String(b.batch_id) === String(pendingSlite?.batch_id));
+                      return batch ? batch.batch_number : "-";
+                    })()}
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                      التشريح
+                    </span>
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.notes || "-"}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </StyledDialog>
+        </div>
+      </StyledDialog>
 
       <StyledDialog
         isOpen={showDeleteSliteDialog}
@@ -1543,7 +1814,7 @@ export default function SlittingManager() {
         confirmVariant="destructive"
       >
         <div className="text-sm text-gray-700">
-          هل تريد حذف عملية التشريح 
+          هل تريد حذف عملية التشريح
           <span className="font-bold"> #{pendingDeleteSlite?.slite_id || ""}</span>؟
           <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1583,7 +1854,7 @@ export default function SlittingManager() {
         confirmVariant="destructive"
       >
         <div className="text-sm text-gray-700">
-          هل تريد حذف 
+          هل تريد حذف
           <span className="font-bold"> {selectedSlites.size} </span>
           عملية تشريح؟
           <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
