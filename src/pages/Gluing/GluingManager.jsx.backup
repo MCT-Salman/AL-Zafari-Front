@@ -37,6 +37,7 @@ import LoadingState from "../../components/common/LoadingState";
 import NotificationsBell from "../../components/common/NotificationsBell";
 
 import { toast } from "react-hot-toast";
+import { getApiData } from "../../utils/api";
 
 import {
 
@@ -343,119 +344,200 @@ export default function GluingManager() {
 
     return true;
 
-  };
+  notificationDedupRef.current.set(key, now);
 
+  return true;
 
+};
 
-  const loadOrders = async () => {
+const appendDecimal = (value) => {
 
-    try {
+const text = String(value || "");
 
-      setLoadingOrders(true);
+if (text.includes(".") || text.includes(",")) return text;
 
-      const response = await productionApi.getProductionOrdersByType(ProductionType.gluing);
+return text ? `${text},` : "0,";
 
-      const data = response?.data || response;
+};
 
-      const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+const orderStatusConfig = {
 
-      setOrders(list);
+[ProductionStatus.pending]: { label: "قيد الانتظار", className: "bg-yellow-100 text-yellow-800" },
 
-    } catch (error) {
+[ProductionStatus.preparing]: { label: "قيد التحضير", className: "bg-blue-100 text-blue-800" },
 
-      console.error("Error loading gluing orders:", error);
+[ProductionStatus.completed]: { label: "مكتمل", className: "bg-green-100 text-green-800" },
 
-      toast.error("فشل في تحميل الطلبات");
+[ProductionStatus.canceled]: { label: "ملغي", className: "bg-red-100 text-red-800" }
 
-    } finally {
+};
 
-      setLoadingOrders(false);
+const getStatusBadge = (status) => {
 
-    }
+return orderStatusConfig[status] || { label: status || "غير محدد", className: "bg-gray-100 text-gray-700" };
 
-  };
+};
 
+const sortRecordsAsc = (list = []) => {
+return [...list].sort((a, b) => {
+const aDate = a?.created_at ? new Date(a.created_at).getTime() : 0;
+const bDate = b?.created_at ? new Date(b.created_at).getTime() : 0;
+if (aDate !== bDate) return aDate - bDate;
+return Number(a?.production_order_item_id || a?.production_order_id || 0) - Number(b?.production_order_item_id || b?.production_order_id || 0);
+});
+};
 
+const currentOrders = useMemo(
+() => sortRecordsAsc(orders.filter((o) => String(o.status || "").toLowerCase() === ProductionStatus.pending)),
+[orders]
+);
 
-  const loadProcesses = async () => {
+const completedOrders = useMemo(
+() => sortRecordsAsc(orders.filter((o) => String(o.status || "").toLowerCase() === ProductionStatus.completed)),
+[orders]
+);
 
-    try {
+const colorOptions = useMemo(() => {
 
-      setLoadingProcesses(true);
+return colors.map(c => ({
 
-      const response = await productionProcessApi.getProcessesByType("gluing");
+value: String(c.color_id),
 
-      const data = response?.data?.processes || response?.data || response;
+label: `${c.color_name} (${c.color_code})`
 
-      setProcesses(Array.isArray(data) ? data : []);
+}));
 
-    } catch (error) {
+}, [colors]);
 
-      console.error("Error loading processes:", error);
+const availableColors = useMemo(() => {
+if (!inputForm.ruler_id) return colors;
+return colors.filter(c => String(c.ruler_id) === String(inputForm.ruler_id));
+}, [colors, inputForm.ruler_id]);
 
-      toast.error("فشل في تحميل المخرجات");
+const availableColorOptions = useMemo(() => {
+return availableColors.map(c => ({
+value: String(c.color_id),
+label: `${c.color_name} (${c.color_code})`
+}));
+}, [availableColors]);
 
-    } finally {
+const rulerOptions = useMemo(() => {
+return rulers.filter(r => {
+const material = materials.find(m => String(m.material_id) === String(r.material_id));
+return material && String(material.material_name || "").toLowerCase().includes("pvc");
+}).map(r => ({
+value: String(r.ruler_id),
+label: r.ruler_name
+}));
+}, [rulers, materials]);
 
-      setLoadingProcesses(false);
+const batchOptions = useMemo(() => {
 
-    }
+return batches.map(b => ({
 
-  };
+value: String(b.batch_id),
 
+label: b.batch_number || `دفعة ${b.batch_id}`
 
+}));
 
-  const loadReferenceData = async () => {
-    try {
-      const [colorRes, batchRes, materialRes, rulerRes] = await Promise.all([
-        colorApi.getColors(),
-        batchApi.getBatches(),
-        materialApi.getMaterials(),
-        rulerApi.getRulers()
-      ]);
-      const allMaterials = materialRes?.data?.materials || materialRes?.data || materialRes || [];
-      const filteredMaterials = allMaterials.filter(m =>
-        String(m?.material_name || "").toLowerCase().includes("pvc")
-      );
-      
-      setColors((colorRes?.data?.colors || colorRes?.data || colorRes || []) ?? []);
-      setBatches((batchRes?.data?.batches || batchRes?.data || batchRes || []) ?? []);
-      setMaterials(filteredMaterials);
-      setRulers((rulerRes?.data?.rulers || rulerRes?.data || rulerRes || []) ?? []);
-    } catch (error) {
-      toast.error("فشل في تحميل البيانات المرجعية");
-    }
-  };
+}, [batches]);
 
+const shouldNotify = (key, windowMs = 8000) => {
 
+const now = Date.now();
 
-  useEffect(() => {
+const lastSeen = notificationDedupRef.current.get(key);
 
-    loadReferenceData();
+if (lastSeen && now - lastSeen < windowMs) return false;
 
-    loadOrders();
+notificationDedupRef.current.set(key, now);
 
-    loadProcesses();
+return true;
 
-  }, []);
+};
 
-  useEffect(() => {
-    if (inputForm.ruler_id && !availableColors.some(c => String(c.color_id) === String(inputForm.color_id))) {
-      setInputForm(prev => ({ ...prev, color_id: "" }));
-    }
-  }, [inputForm.ruler_id, availableColors, inputForm.color_id]);
+const loadOrders = async () => {
+try {
+setLoadingOrders(true);
+const response = await productionApi.getProductionOrdersByType(ProductionType.gluing);
+const list = getApiData(response, ["data", "items"]);
+setOrders(Array.isArray(list) ? list : (Array.isArray(list?.data) ? list.data : []));
+} catch (error) {
+console.error("Error loading gluing orders:", error);
+toast.error("فشل في تحميل الطلبات");
+} finally {
+setLoadingOrders(false);
+}
+};
 
+const loadProcesses = async () => {
+try {
+setLoadingProcesses(true);
+const response = await productionProcessApi.getProcessesByType("gluing");
+const data = getApiData(response, ["data", "processes"]);
+setProcesses(Array.isArray(data) ? data : []);
+} catch (error) {
+console.error("Error loading processes:", error);
+toast.error("فشل في تحميل المخرجات");
+} finally {
+setLoadingProcesses(false);
+}
+};
 
+const loadReferenceData = async () => {
+try {
+const [colorRes, batchRes, materialRes, rulerRes] = await Promise.all([
+colorApi.getColors(),
+batchApi.getBatches(),
+materialApi.getMaterials(),
+rulerApi.getRulers()
+]);
+const allMaterials = getApiData(materialRes, ["materials", "data"]);
+const filteredMaterials = allMaterials.filter(m =>
+String(m?.material_name || "").toLowerCase().includes("pvc")
+);
+setColors(getApiData(colorRes, ["colors", "data"]));
+setBatches(getApiData(batchRes, ["batches", "data"]));
+setMaterials(filteredMaterials);
+setRulers(getApiData(rulerRes, ["rulers", "data"]));
+} catch (error) {
+toast.error("فشل في تحميل البيانات المرجعية");
+}
+};
 
-  useEffect(() => {
+useEffect(() => {
+const token = localStorage.getItem("accessToken");
 
-    const token = localStorage.getItem("accessToken");
+if (!token) return;
 
-    if (!token) return;
+const socket = connectSocket(token);
+
+const handleNotification = (payload) => {
+
+const data = payload?.data ?? payload;
+
+const key = `${payload?.type || "notification"}:${data?.productionOrderId || data?.production_order_id || ""}`;
+
+if (!shouldNotify(key, 5000)) return;
+
+loadOrders();
+
+loadProcesses();
+
+};
+
+socket.on("notification", handleNotification);
+
+socket.on("order:updated", handleNotification);
+
+socket.on("warehouse:order:new", handleNotification);
+
+socket.on("warehouse:orders", handleNotification);
+
+socket.on("order:new", handleNotification);
 
     const socket = connectSocket(token);
-
-
 
     const handleNotification = (payload) => {
 

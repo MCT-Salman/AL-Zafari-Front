@@ -5,6 +5,8 @@ import { useAuth } from "../../context/AuthContext";
 import { sliteApi } from "../../api/sliteApi";
 import { colorApi } from "../../api/colorApi";
 import { batchApi } from "../../api/batchApi";
+import { rulerApi } from "../../api/rulerApi";
+import { materialApi } from "../../api/materialApi";
 import { productionApi } from "../../api/productionApi";
 import { connectSocket, disconnectSocket } from "../../lib/socket";
 import { Card } from "../../components/ui/card";
@@ -66,6 +68,8 @@ export default function SlittingManager() {
   const [loadingSlites, setLoadingSlites] = useState(false);
   const [colors, setColors] = useState([]);
   const [batches, setBatches] = useState([]);
+  const [rulers, setRulers] = useState([]);
+  const [materials, setMaterials] = useState([]);
 
   const [pendingCompleteItem, setPendingCompleteItem] = useState(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
@@ -88,6 +92,7 @@ export default function SlittingManager() {
 
   const [inputForm, setInputForm] = useState({
     input_width: "66",
+    ruler_id: "",
     color_id: "",
     batch_id: "",
     input_length: "",
@@ -228,6 +233,28 @@ export default function SlittingManager() {
     }));
   }, [colors]);
 
+  const availableColors = useMemo(() => {
+    if (!inputForm.ruler_id) return colors;
+    return colors.filter(c => String(c.ruler_id) === String(inputForm.ruler_id));
+  }, [colors, inputForm.ruler_id]);
+
+  const availableColorOptions = useMemo(() => {
+    return availableColors.map(c => ({
+      value: String(c.color_id),
+      label: `${c.color_name} (${c.color_code})`
+    }));
+  }, [availableColors]);
+
+  const rulerOptions = useMemo(() => {
+    return rulers.filter(r => {
+      const material = materials.find(m => String(m.material_id) === String(r.material_id));
+      return material && String(material.material_name || "").toLowerCase().includes("pvc");
+    }).map(r => ({
+      value: String(r.ruler_id),
+      label: r.ruler_name
+    }));
+  }, [rulers, materials]);
+
   const batchOptions = useMemo(() => {
     return batches.map(b => ({
       value: String(b.batch_id),
@@ -310,12 +337,21 @@ export default function SlittingManager() {
 
   const loadReferenceData = async () => {
     try {
-      const [colorRes, batchRes] = await Promise.all([
+      const [colorRes, batchRes, rulerRes, materialRes] = await Promise.all([
         colorApi.getColors(),
-        batchApi.getBatches()
+        batchApi.getBatches(),
+        rulerApi.getRulers(),
+        materialApi.getMaterials()
       ]);
+      const allMaterials = materialRes?.data?.materials || materialRes?.data || materialRes || [];
+      const filteredMaterials = allMaterials.filter(m =>
+        String(m?.material_name || "").toLowerCase().includes("pvc")
+      );
+      
       setColors((colorRes?.data?.colors || colorRes?.data || colorRes || []) ?? []);
       setBatches((batchRes?.data?.batches || batchRes?.data || batchRes || []) ?? []);
+      setRulers((rulerRes?.data?.rulers || rulerRes?.data || rulerRes || []) ?? []);
+      setMaterials(filteredMaterials);
     } catch (error) {
       toast.error("فشل في تحميل البيانات المرجعية");
     }
@@ -326,6 +362,12 @@ export default function SlittingManager() {
     loadOrders();
     loadSlites();
   }, []);
+
+  useEffect(() => {
+    if (inputForm.ruler_id && !availableColors.some(c => String(c.color_id) === String(inputForm.color_id))) {
+      setInputForm(prev => ({ ...prev, color_id: "" }));
+    }
+  }, [inputForm.ruler_id, availableColors, inputForm.color_id]);
 
   useEffect(() => {
     const outputPattern = selectedOutputPattern === "22x3"
@@ -530,6 +572,7 @@ export default function SlittingManager() {
     setInputForm(prev => ({
       ...prev,
       input_width: item.width ? String(item.width) : "",
+      ruler_id: item.ruler_id ? String(item.ruler_id) : "",
       color_id: item.color_id ? String(item.color_id) : "",
       batch_id: item.batch_id ? String(item.batch_id) : "",
       input_length: item.length ? String(item.length) : "",
@@ -605,6 +648,7 @@ export default function SlittingManager() {
       // Reset forms
       setInputForm({
         input_width: "66",
+        ruler_id: "",
         color_id: "",
         batch_id: "",
         input_length: "",
@@ -747,10 +791,11 @@ export default function SlittingManager() {
     if (!raw) return null;
     const parts = raw.split("|").map((p) => String(p ?? "").trim());
     if (parts.length < 4) return null;
-    const [width, colorId, batchId, length, typeItem, source, destination] = parts;
+    const [width, colorId, batchId, length, typeItem, source, destination, rulerId] = parts;
     if (!width || !colorId || !batchId || !length) return null;
     return {
       input_width: width,
+      ruler_id: rulerId || "",
       color_id: colorId,
       batch_id: batchId,
       input_length: length,
@@ -980,10 +1025,6 @@ export default function SlittingManager() {
         <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
           {/* Left Upper - Input/Output Form */}
           <Card className="p-4 flex flex-col order-2 min-h-0">
-            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <ArrowRight className="w-5 h-5 text-blue-600" />
-              المدخلات
-            </h2>
             <div className="flex-1 min-h-0 overflow-auto pr-1 space-y-4">
               {/* {activeOrderItem && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
@@ -1062,6 +1103,7 @@ export default function SlittingManager() {
                               setInputForm((prev) => ({
                                 ...prev,
                                 input_width: parsed.input_width,
+                                ruler_id: parsed.ruler_id || prev.ruler_id,
                                 color_id: parsed.color_id,
                                 batch_id: parsed.batch_id,
                                 input_length: parsed.input_length,
@@ -1085,8 +1127,8 @@ export default function SlittingManager() {
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <Label>العرض</Label>
-                            <div className="grid grid-cols-3 gap-2 mt-2">
-                              {["22", "44", "66"].map((width) => (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              {["44", "66"].map((width) => (
                                 <button
                                   key={width}
                                   type="button"
@@ -1107,12 +1149,22 @@ export default function SlittingManager() {
                             </div>
                           </div>
                           <div>
+                            <Label>المسطرة</Label>
+                            <FilterSelect
+                              value={inputForm.ruler_id}
+                              onChange={(e) => setInputForm(prev => ({ ...prev, ruler_id: e.target.value, color_id: "" }))}
+                              options={rulerOptions}
+                              placeholder="اختر المسطرة"
+                            />
+                          </div>
+                          <div>
                             <Label>اللون</Label>
                             <FilterSelect
                               value={inputForm.color_id}
                               onChange={(e) => setInputForm(prev => ({ ...prev, color_id: e.target.value }))}
-                              options={colorOptions}
-                              placeholder="اختر اللون"
+                              options={availableColorOptions}
+                              placeholder={!inputForm.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"}
+                              disabled={!inputForm.ruler_id}
                             />
                           </div>
                           <div>
@@ -1142,6 +1194,14 @@ export default function SlittingManager() {
                               placeholder="ملاحظات اختيارية"
                             />
                           </div>
+                          <Button
+                            onClick={() => setIoMode("output")}
+                            className="w-full h-12 bg-green-600 hover:bg-green-700"
+                            disabled={!inputForm.input_width || !inputForm.color_id || !inputForm.batch_id || !inputForm.input_length}
+                          >
+                            <ArrowRight className="w-5 h-5 ml-2" />
+                             إخراج
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -1193,7 +1253,7 @@ export default function SlittingManager() {
                             onClick={() => handleCalculationModeSelect("22x3")}
                           >
                             <div className="text-lg font-bold">22 × 3</div>
-                            <div className="text-xs opacity-80">3 قطع من 22 سم</div>
+                            {/* <div className="text-xs opacity-80">3 قطع من 22 سم</div> */}
                           </Button>
                           <Button
                             type="button"
@@ -1205,14 +1265,14 @@ export default function SlittingManager() {
                             onClick={() => handleCalculationModeSelect("44x1-22x1")}
                           >
                             <div className="text-lg font-bold">44 × 1 - 22 × 1</div>
-                            <div className="text-xs opacity-80">1 قطعة 44 سم + 1 قطعة 22 سم</div>
+                            {/* <div className="text-xs opacity-80">1 قطعة 44 سم + 1 قطعة 22 سم</div> */}
                           </Button>
                         </div>
 
                         {selectedOutputPattern === "22x3" && (
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label>طول القطعة (22)</Label>
+                              <Label>الكمية</Label>
                               <Input
                                 value={outputForm.output_length_22}
                                 onFocus={() => setCurrentInput("output_length_22")}
@@ -1236,7 +1296,7 @@ export default function SlittingManager() {
                         {selectedOutputPattern === "44x1-22x1" && (
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label>طول القطعة (44)</Label>
+                              <Label>كمية </Label>
                               <Input
                                 value={outputForm.output_length_44}
                                 onFocus={() => setCurrentInput("output_length_44")}
@@ -1245,8 +1305,8 @@ export default function SlittingManager() {
                                 placeholder="0"
                               />
                             </div>
-                            <div>
-                              <Label>طول القطعة (22)</Label>
+                            {/* <div>
+                              <Label>كمية القطعة (22)</Label>
                               <Input
                                 value={outputForm.output_length_22}
                                 onFocus={() => setCurrentInput("output_length_22")}
@@ -1254,16 +1314,7 @@ export default function SlittingManager() {
                                 className={`text-center ${currentInput === "output_length_22" ? "ring-2 ring-blue-500" : ""}`}
                                 placeholder="0"
                               />
-                            </div>
-                            <div className="col-span-2">
-                              <Label>المجموع</Label>
-                              <Input
-                                value={outputTotals.total ? String(outputTotals.total) : ""}
-                                readOnly
-                                className="text-center bg-gray-50"
-                                placeholder="0"
-                              />
-                            </div>
+                            </div> */}
                           </div>
                         )}
                       </div>
@@ -1276,7 +1327,7 @@ export default function SlittingManager() {
                               <tr>
                                 <th className="p-2 text-center">#</th>
                                 <th className="p-2 text-center">العرض</th>
-                                <th className="p-2 text-center">الطول</th>
+                                <th className="p-2 text-center">الكمية</th>
                                 <th className="p-2 text-center">الطباعة</th>
                               </tr>
                             </thead>

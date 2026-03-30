@@ -6,6 +6,8 @@ import { productionApi } from "../../api/productionApi";
 import { productionProcessApi } from "../../api/productionProcessApi";
 import { colorApi } from "../../api/colorApi";
 import { batchApi } from "../../api/batchApi";
+import { materialApi } from "../../api/materialApi";
+import { rulerApi } from "../../api/rulerApi";
 import { connectSocket, disconnectSocket } from "../../lib/socket";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -65,6 +67,8 @@ export default function CuttingManager() {
   const [loadingProcesses, setLoadingProcesses] = useState(false);
   const [colors, setColors] = useState([]);
   const [batches, setBatches] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [rulers, setRulers] = useState([]);
 
   const [ioMode, setIoMode] = useState("input"); // input | output
   const [inputMode, setInputMode] = useState("manual"); // manual | qr
@@ -73,9 +77,9 @@ export default function CuttingManager() {
 
   const [inputForm, setInputForm] = useState({
     input_width: "",
+    ruler_id: "",
     color_id: "",
     batch_id: "",
-    thickness: "0.6",
     input_length: "",
     type_item: TypeItem.Machine,
     source: "slitting",
@@ -93,6 +97,7 @@ export default function CuttingManager() {
   const [currentInput, setCurrentInput] = useState("input_length");
   const [selectSearch, setSelectSearch] = useState({
     input_width: "",
+    ruler_id: "",
     color_id: "",
     batch_id: ""
   });
@@ -171,6 +176,28 @@ export default function CuttingManager() {
     }));
   }, [colors]);
 
+  const availableColors = useMemo(() => {
+    if (!inputForm.ruler_id) return colors;
+    return colors.filter(c => String(c.ruler_id) === String(inputForm.ruler_id));
+  }, [colors, inputForm.ruler_id]);
+
+  const availableColorOptions = useMemo(() => {
+    return availableColors.map(c => ({
+      value: String(c.color_id),
+      label: `${c.color_name} (${c.color_code})`
+    }));
+  }, [availableColors]);
+
+  const rulerOptions = useMemo(() => {
+    return rulers.filter(r => {
+      const material = materials.find(m => String(m.material_id) === String(r.material_id));
+      return material && String(material.material_name || "").toLowerCase().includes("pvc");
+    }).map(r => ({
+      value: String(r.ruler_id),
+      label: r.ruler_name
+    }));
+  }, [rulers, materials]);
+
   const batchOptions = useMemo(() => {
     return batches.map(b => ({
       value: String(b.batch_id),
@@ -216,6 +243,12 @@ export default function CuttingManager() {
     });
   }, [activeOrderItem?.thickness, selectedColorInfo?.thickness]);
 
+  useEffect(() => {
+    if (inputForm.ruler_id && !availableColors.some(c => String(c.color_id) === String(inputForm.color_id))) {
+      setInputForm(prev => ({ ...prev, color_id: "" }));
+    }
+  }, [inputForm.ruler_id, availableColors, inputForm.color_id]);
+
   const shouldNotify = (key, windowMs = 8000) => {
     const now = Date.now();
     const lastSeen = notificationDedupRef.current.get(key);
@@ -255,12 +288,21 @@ export default function CuttingManager() {
 
   const loadReferenceData = async () => {
     try {
-      const [colorRes, batchRes] = await Promise.all([
+      const [colorRes, batchRes, materialRes, rulerRes] = await Promise.all([
         colorApi.getColors(),
-        batchApi.getBatches()
+        batchApi.getBatches(),
+        materialApi.getMaterials(),
+        rulerApi.getRulers()
       ]);
+      const allMaterials = materialRes?.data?.materials || materialRes?.data || materialRes || [];
+      const filteredMaterials = allMaterials.filter(m =>
+        String(m?.material_name || "").toLowerCase().includes("pvc")
+      );
+      
       setColors((colorRes?.data?.colors || colorRes?.data || colorRes || []) ?? []);
       setBatches((batchRes?.data?.batches || batchRes?.data || batchRes || []) ?? []);
+      setMaterials(filteredMaterials);
+      setRulers((rulerRes?.data?.rulers || rulerRes?.data || rulerRes || []) ?? []);
     } catch (error) {
       toast.error("فشل في تحميل البيانات المرجعية");
     }
@@ -923,15 +965,26 @@ export default function CuttingManager() {
                       </div>
                     </div>
                     <div>
+                      <Label>المسطرة</Label>
+                      <FilterSelect
+                        value={inputForm.ruler_id}
+                        onChange={(e) => setInputForm(prev => ({ ...prev, ruler_id: e.target.value, color_id: "" }))}
+                        onSearchValueChange={(value) => setSelectSearch(prev => ({ ...prev, ruler_id: value }))}
+                        onInputFocus={() => setCurrentInput("select:ruler_id")}
+                        options={rulerOptions}
+                        placeholder="اختر المسطرة"
+                      />
+                    </div>
+                    <div>
                       <Label>اللون</Label>
                       <FilterSelect
                         value={inputForm.color_id}
                         onChange={(e) => setInputForm(prev => ({ ...prev, color_id: e.target.value }))}
-                        searchValue={selectSearch.color_id}
                         onSearchValueChange={(value) => setSelectSearch(prev => ({ ...prev, color_id: value }))}
                         onInputFocus={() => setCurrentInput("select:color_id")}
-                        options={colorOptions}
-                        placeholder="اختر اللون"
+                        options={availableColorOptions}
+                        placeholder={!inputForm.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"}
+                        disabled={!inputForm.ruler_id}
                       />
                     </div>
                     <div>
