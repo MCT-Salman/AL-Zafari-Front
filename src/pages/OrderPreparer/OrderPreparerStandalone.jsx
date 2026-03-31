@@ -1,4 +1,4 @@
-// src/pages/OrderPreparer/OrderPreparerPage.jsx
+// src/pages/OrderPreparer/OrderPreparerStandalone.jsx
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "../../components/common/DashboardHeader";
@@ -19,7 +19,7 @@ import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { getTableColumns, renderTableHeader } from "../../components/common/StandardTableColumns";
-import QRCode from "qrcode";
+// import QRCode from "qrcode"; // Commented out temporarily
 import {
     ShoppingCart,
     Plus,
@@ -49,10 +49,10 @@ import { useAuth } from "../../context/AuthContext";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
 
-export default function OrderPreparerPage() {
+export default function OrderPreparerStandalone() {
     const navigate = useNavigate();
     const { logout, user } = useAuth();
-    const [activeTab, setActiveTab] = useState("qr"); // qr | production | orders
+    const [viewMode, setViewMode] = useState("qr"); // qr | production | orders
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const tableContainerRef = useRef(null);
@@ -135,6 +135,12 @@ export default function OrderPreparerPage() {
     // Generate QR Code for order
     const generateQRCode = async (order) => {
         try {
+            // QR functionality temporarily disabled
+            toast.error("وظيفة QR غير متاحة حالياً");
+            console.log("QR Code generation disabled for order:", order);
+            
+            // TODO: Re-enable when qrcode module is properly installed
+            /*
             const qrData = {
                 order_id: order.Sales_order_id || order.order_id,
                 customer_name: order.customer?.name || "N/A",
@@ -160,6 +166,7 @@ export default function OrderPreparerPage() {
             setQrCodeDataUrl(dataUrl);
             setSelectedOrderForQR(order);
             setShowQRDialog(true);
+            */
         } catch (error) {
             toast.error("فشل في توليد كود QR");
             console.error("QR Code generation error:", error);
@@ -168,6 +175,12 @@ export default function OrderPreparerPage() {
 
     // Print QR Code
     const printQRCode = () => {
+        // QR functionality temporarily disabled
+        toast.error("وظيفة الطباعة غير متاحة حالياً");
+        console.log("Print QR Code functionality disabled");
+        
+        // TODO: Re-enable when qrcode module is properly installed
+        /*
         if (!qrCodeDataUrl) return;
 
         const printWindow = window.open('', '_blank');
@@ -223,6 +236,7 @@ export default function OrderPreparerPage() {
         
         printWindow.document.write(printContent);
         printWindow.document.close();
+        */
     };
 
     // Filtered data
@@ -278,9 +292,9 @@ export default function OrderPreparerPage() {
     // Load data
     useEffect(() => {
         loadInitialData();
-        if (activeTab === "orders") loadOrders();
-        if (activeTab === "production") loadProductionOrders();
-    }, [activeTab]);
+        if (viewMode === "orders") loadOrders();
+        if (viewMode === "production") loadProductionOrders();
+    }, [viewMode]);
 
     const loadInitialData = async () => {
         try {
@@ -470,7 +484,7 @@ export default function OrderPreparerPage() {
             const orderData = {
                 status: "pending",
                 notes: formData.notes,
-                items: productionItems.map(item =>({
+                items: productionItems.map(item => ({
                     type_item: item.type_item,
                     color_id: item.color_id,
                     batch_id: item.batch_id,
@@ -517,28 +531,6 @@ export default function OrderPreparerPage() {
         return batches.filter(b => String(b.color_id) === String(formData.color_id));
     }, [batches, formData.color_id]);
 
-    const { exportToExcel: exportOrdersToExcel, loading: exportingOrders } = useExport({
-        sheetName: "الطلبات",
-        columns: [
-            { key: "order_id", header: "#" },
-            { key: "date", header: "التاريخ" },
-            { key: "items", header: "العناصر" },
-            { key: "sales", header: "المبيعات" },
-            { key: "customer", header: "الزبون" },
-            { key: "status", header: "الحالة" },
-            { key: "notes", header: "ملاحظات" },
-        ],
-        columnWidths: [
-            { wch: 8 },
-            { wch: 20 },
-            { wch: 12 },
-            { wch: 22 },
-            { wch: 22 },
-            { wch: 14 },
-            { wch: 28 },
-        ],
-    });
-
     // Helper functions from salesApi
     const getOrderStatus = (order) => order.status || 'غير محدد';
     const getFormattedDate = (order) => salesApi.getFormattedDate(order);
@@ -546,66 +538,56 @@ export default function OrderPreparerPage() {
     const getIssuedBy = (order) => salesApi.getIssuedBy(order);
 
     return (
-        <div className="min-h-screen bg-gray-50" dir="rtl">
+        <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
             <DashboardHeader
-                title="مجهز الطلبات"
-                user={user}
-                onLogout={logout}
-                isVisible={isHeaderVisible}
-                onToggleVisibility={() => setIsHeaderVisible(!isHeaderVisible)}
-            />
-
-            {/* Tabs */}
-            <div className="bg-white border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex space-x-8 space-x-reverse">
-                        <button
-                            onClick={() => setActiveTab("qr")}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                                activeTab === "qr"
-                                    ? "border-blue-500 text-blue-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                            }`}
+                isHeaderVisible={isHeaderVisible}
+                setIsHeaderVisible={setIsHeaderVisible}
+                leftContent={
+                    <div className="flex items-center flex-nowrap overflow-x-auto">
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => setViewMode("qr")}
+                            className={`px-4 py-2.5 text-base min-w-[120px] whitespace-nowrap touch-manipulation border-2 ${viewMode === "qr"
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                }`}
                         >
-                            <div className="flex items-center space-x-2 space-x-reverse">
-                                <QrCode className="h-4 w-4" />
-                                <span>توليد QR</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("production")}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                                activeTab === "production"
-                                    ? "border-blue-500 text-blue-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                            }`}
+                            <QrCode className="w-5 h-5 ml-2" />
+                            توليد QR
+                        </Button>
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => setViewMode("production")}
+                            className={`px-4 py-2.5 text-base min-w-[120px] whitespace-nowrap touch-manipulation border-2 ${viewMode === "production"
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                }`}
                         >
-                            <div className="flex items-center space-x-2 space-x-reverse">
-                                <Plus className="h-4 w-4" />
-                                <span>طلب إنتاج</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("orders")}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                                activeTab === "orders"
-                                    ? "border-blue-500 text-blue-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                            }`}
+                            <Plus className="w-5 h-5 ml-2" />
+                            طلب إنتاج
+                        </Button>
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            onClick={() => setViewMode("orders")}
+                            className={`px-4 py-2.5 text-base min-w-[120px] whitespace-nowrap touch-manipulation border-2 ${viewMode === "orders"
+                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
+                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                                }`}
                         >
-                            <div className="flex items-center space-x-2 space-x-reverse">
-                                <FileText className="h-4 w-4" />
-                                <span>سجل الطلبات</span>
-                            </div>
-                        </button>
+                            <FileText className="w-5 h-5 ml-2" />
+                            سجل الطلبات
+                        </Button>
                     </div>
-                </div>
-            </div>
+                }
+            />
 
             {/* Content */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {activeTab === "qr" && (
+                {viewMode === "qr" && (
                     <div className="space-y-6">
                         <Card className="p-6">
                             <h3 className="text-lg font-semibold mb-4">توليد QR</h3>
@@ -705,11 +687,11 @@ export default function OrderPreparerPage() {
                                 </Button>
                                 <Button
                                     onClick={printQRCode}
-                                    disabled={!qrCodeDataUrl}
+                                    disabled={true}
                                     className="flex-1"
                                 >
                                     <Printer className="h-4 w-4 ml-2" />
-                                    طباعة QR
+                                    طباعة QR (غير متاح)
                                 </Button>
                             </div>
                         </Card>
@@ -740,7 +722,7 @@ export default function OrderPreparerPage() {
                                                             <td className="p-2 text-right">#{order.order_id}</td>
                                                             <td className="p-2 text-right">{firstItem.material_name || '-'}</td>
                                                             <td className="p-2 text-right">
-                                                                {firstItem.color_name || '-'} ({firstItem.color_code || '-'}
+                                                                {firstItem.color_name || '-'} ({firstItem.color_code || '-'})
                                                             </td>
                                                             <td className="p-2 text-right">{firstItem.width || '-'}</td>
                                                             <td className="p-2 text-right">{firstItem.quantity || '-'}</td>
@@ -800,7 +782,7 @@ export default function OrderPreparerPage() {
                     </div>
                 )}
 
-                {activeTab === "production" && (
+                {viewMode === "production" && (
                     <div className="space-y-6">
                         <Card className="p-6">
                             <h3 className="text-lg font-semibold mb-4">طلب إنتاج</h3>
@@ -814,27 +796,11 @@ export default function OrderPreparerPage() {
                                         onChange={(value) => handleFieldChange("material_id", value)}
                                         options={materials.map(m => ({
                                             value: String(m.material_id),
-                                            label: m.material_name
+                                            label: String(m.material_name || "")
                                         }))}
                                         placeholder="اختر المادة"
                                     />
                                 </div>
-                                <div>
-                                    <Label>المسطرة</Label>
-                                    <FilterSelect
-                                        value={formData.ruler_id}
-                                        onChange={(value) => handleFieldChange("ruler_id", value)}
-                                        options={rulers.filter(r => !formData.material_id || String(r.material_id) === String(formData.material_id)).map(r => ({
-                                            value: String(r.ruler_id),
-                                            label: r.ruler_name
-                                        }))}
-                                        placeholder="اختر المسطرة"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Type and Width */}
-                            <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div>
                                     <Label>النوع</Label>
                                     <FilterSelect
@@ -844,23 +810,22 @@ export default function OrderPreparerPage() {
                                         placeholder="اختر النوع"
                                     />
                                 </div>
-                                <div>
-                                    <Label>العرض</Label>
-                                    <FilterSelect
-                                        value={formData.width}
-                                        onChange={(value) => handleFieldChange("width", value)}
-                                        options={widthValues.map(w => ({
-                                            value: String(w.value),
-                                            label: w.value
-                                        }))}
-                                        placeholder="اختر العرض"
-                                        loading={loadingWidths}
-                                    />
-                                </div>
                             </div>
 
-                            {/* Color and Batch */}
+                            {/* Ruler and Color Selection */}
                             <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <Label>المسطرة</Label>
+                                    <FilterSelect
+                                        value={formData.ruler_id}
+                                        onChange={(value) => handleFieldChange("ruler_id", value)}
+                                        options={rulers.map(r => ({
+                                            value: String(r.ruler_id),
+                                            label: String(r.ruler_name || "")
+                                        }))}
+                                        placeholder="اختر المسطرة"
+                                    />
+                                </div>
                                 <div>
                                     <Label>اللون</Label>
                                     <FilterSelect
@@ -868,9 +833,25 @@ export default function OrderPreparerPage() {
                                         onChange={(value) => handleFieldChange("color_id", value)}
                                         options={filteredColors.map(c => ({
                                             value: String(c.color_id),
-                                            label: `${c.color_code} - ${c.color_name}`
+                                            label: `${c.color_name} (${c.color_code})`
                                         }))}
                                         placeholder="اختر اللون"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Width and Batch Selection */}
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <Label>العرض</Label>
+                                    <FilterSelect
+                                        value={formData.width}
+                                        onChange={(value) => handleFieldChange("width", value)}
+                                        options={widthValues.map(w => ({
+                                            value: String(w.value),
+                                            label: String(w.label || w.value)
+                                        }))}
+                                        placeholder="اختر العرض"
                                     />
                                 </div>
                                 <div>
@@ -981,41 +962,148 @@ export default function OrderPreparerPage() {
                     </div>
                 )}
 
-                {/* QR Code Dialog */}
-                <StyledDialog
-                    isOpen={showQRDialog}
-                    onClose={() => setShowQRDialog(false)}
-                    title="QR Code للطلب"
-                >
-                    <div className="text-center">
-                        {qrCodeDataUrl && (
-                            <div>
-                                <img src={qrCodeDataUrl} alt="QR Code" className="mx-auto mb-4" />
-                                <div className="space-y-2 text-sm text-gray-600 mb-4">
-                                    <p>رقم الطلب: #{selectedOrderForQR?.Sales_order_id || selectedOrderForQR?.order_id}</p>
-                                    <p>العميل: {selectedOrderForQR?.customer?.name}</p>
-                                    <p>المادة: {selectedOrderForQR?.items?.[0]?.material_name}</p>
-                                    <p>اللون: {selectedOrderForQR?.items?.[0]?.color_name}</p>
-                                    <p>العرض: {selectedOrderForQR?.items?.[0]?.width}</p>
-                                    <p>الكمية: {selectedOrderForQR?.items?.[0]?.quantity}</p>
+                {viewMode === "orders" && (
+                    <div className="space-y-6">
+                        {/* Filters */}
+                        <Card className="p-6">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="flex-1">
+                                    <Input
+                                        placeholder="بحث في الطلبات..."
+                                        value={ordersSearchTerm}
+                                        onChange={(e) => setOrdersSearchTerm(e.target.value)}
+                                    />
                                 </div>
-                                <div className="flex space-x-2 space-x-reverse justify-center">
-                                    <Button onClick={printQRCode}>
-                                        <Printer className="h-4 w-4 ml-2" />
-                                        طباعة
-                                    </Button>
-                                    <Button 
-                                        variant="outline" 
-                                        onClick={() => setShowQRDialog(false)}
-                                    >
-                                        إغلاق
-                                    </Button>
-                                </div>
+                                <FilterSelect
+                                    value={ordersStatusFilter}
+                                    onChange={setOrdersStatusFilter}
+                                    options={ORDER_STATUS_OPTIONS}
+                                    placeholder="الحالة"
+                                />
                             </div>
-                        )}
+                        </Card>
+
+                        {/* Orders Table */}
+                        <Card className="p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-semibold">سجل الطلبات</h3>
+                                <ResultsCounter
+                                    total={filteredOrders.length}
+                                    showing={paginatedOrders.length}
+                                    label="طلب"
+                                />
+                            </div>
+
+                            {ordersLoading ? (
+                                <LoadingState />
+                            ) : paginatedOrders.length > 0 ? (
+                                <>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            {renderTableHeader(getTableColumns("SALES_ORDERS"))}
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {paginatedOrders.map((order) => {
+                                                    const firstItem = order.items?.[0] || {};
+                                                    return (
+                                                        <tr key={order.order_id} className="hover:bg-gray-50">
+                                                            <td className="p-2 text-right">#{order.order_id}</td>
+                                                            <td className="p-2 text-right">{firstItem.material_name || '-'}</td>
+                                                            <td className="p-2 text-right">
+                                                                {firstItem.color_name || '-'} ({firstItem.color_code || '-'})
+                                                            </td>
+                                                            <td className="p-2 text-right">{firstItem.width || '-'}</td>
+                                                            <td className="p-2 text-right">{firstItem.quantity || '-'}</td>
+                                                            <td className="p-2 text-right">{formatTypeItem(firstItem.type_item)}</td>
+                                                            <td className="p-2 text-right">{firstItem.batch_number || '-'}</td>
+                                                            <td className="p-2 text-right">{firstItem.thickness || '-'}</td>
+                                                            <td className="p-2 text-right">
+                                                                <span className={`px-2 py-1 text-xs rounded-full ${getStatusBadge(order.status)?.className}`}>
+                                                                    {getStatusBadge(order.status)?.label}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2 text-right">{getIssuedBy(order)}</td>
+                                                            <td className="p-2 text-right">{getFormattedDate(order)}</td>
+                                                            <td className="p-2 text-right">{order.notes || '-'}</td>
+                                                            <td className="p-2 text-right">
+                                                                <div className="flex space-x-1 space-x-reverse">
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        size="sm"
+                                                                        onClick={() => generateQRCode(order)}
+                                                                        title="توليد QR Code"
+                                                                    >
+                                                                        <QrCode className="h-4 w-4" />
+                                                                    </Button>
+                                                                    <Button variant="ghost" size="sm">
+                                                                        <Eye className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Pagination */}
+                                    <div className="mt-4 flex items-center justify-between">
+                                        <RowsPerPageSelector
+                                            value={ordersRowsPerPage}
+                                            onChange={setOrdersRowsPerPage}
+                                            total={filteredOrders.length}
+                                        />
+                                        <PaginationControls
+                                            currentPage={ordersCurrentPage}
+                                            totalPages={ordersTotalPages}
+                                            onPageChange={setOrdersCurrentPage}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center py-8 text-gray-500">
+                                    لا توجد طلبات مطابقة
+                                </div>
+                            )}
+                        </Card>
                     </div>
-                </StyledDialog>
+                )}
             </div>
+
+            {/* QR Code Dialog */}
+            <StyledDialog
+                isOpen={showQRDialog}
+                onClose={() => setShowQRDialog(false)}
+                title="QR Code للطلب"
+            >
+                <div className="text-center">
+                    {qrCodeDataUrl && (
+                        <div>
+                            <img src={qrCodeDataUrl} alt="QR Code" className="mx-auto mb-4" />
+                            <div className="space-y-2 text-sm text-gray-600 mb-4">
+                                <p>رقم الطلب: #{selectedOrderForQR?.Sales_order_id || selectedOrderForQR?.order_id}</p>
+                                <p>العميل: {selectedOrderForQR?.customer?.name}</p>
+                                <p>المادة: {selectedOrderForQR?.items?.[0]?.material_name}</p>
+                                <p>اللون: {selectedOrderForQR?.items?.[0]?.color_name}</p>
+                                <p>العرض: {selectedOrderForQR?.items?.[0]?.width}</p>
+                                <p>الكمية: {selectedOrderForQR?.items?.[0]?.quantity}</p>
+                            </div>
+                            <div className="flex space-x-2 space-x-reverse justify-center">
+                                <Button onClick={printQRCode}>
+                                    <Printer className="h-4 w-4 ml-2" />
+                                    طباعة
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    onClick={() => setShowQRDialog(false)}
+                                >
+                                    إغلاق
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </StyledDialog>
         </div>
     );
 }

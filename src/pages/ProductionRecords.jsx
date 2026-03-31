@@ -44,7 +44,8 @@ import {
     Search,
     Filter,
     ChevronUp,
-    ChevronDown
+    ChevronDown,
+    ArrowRight
 } from "lucide-react";
 import LoadingState from "../components/common/LoadingState";
 import { getApiData } from "../utils/api";
@@ -98,6 +99,7 @@ export default function ProductionRecords() {
     const [widthFilter, setWidthFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(20); // فلتر العرض
+    const [activeNav, setActiveNav] = useState("records"); // "create" | "history" | "records"
 
     const ROLE_LABELS = {
         admin: "مدير النظام",
@@ -555,50 +557,38 @@ export default function ProductionRecords() {
                             <Button
                                 size="lg"
                                 variant="outline"
-                                onClick={() => setActiveTab(ProductionType.warehouse)}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeTab === ProductionType.warehouse
+                                onClick={() => navigate("/production?mode=create")}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeNav === "create"
                                     ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
                                     : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
                                     }`}
                             >
-                                <Package className="w-5 h-5 ml-2" />
-                                المستودع
+                                <ShoppingCart className="w-5 h-5 ml-2" />
+                                طلب إنتاج جديد
                             </Button>
                             <Button
                                 size="lg"
                                 variant="outline"
-                                onClick={() => setActiveTab(ProductionType.slitting)}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeTab === ProductionType.slitting
+                                onClick={() => navigate("/production?mode=history")}
+                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeNav === "history"
                                     ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
                                     : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
                                     }`}
                             >
-                                <Scissors className="w-5 h-5 ml-2" />
-                                التشريح
+                                <History className="w-5 h-5 ml-2" />
+                                سجل الإنتاج
                             </Button>
                             <Button
                                 size="lg"
                                 variant="outline"
-                                onClick={() => setActiveTab(ProductionType.cutting)}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeTab === ProductionType.cutting
+                                onClick={() => setActiveNav("records")}
+                                className={`px-6 py-3 text-base min-w-[140px] touch-manipulation border-2 ${activeNav === "records"
                                     ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
                                     : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
                                     }`}
                             >
-                                <Scissors className="w-5 h-5 ml-2" />
-                                القص
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                onClick={() => setActiveTab(ProductionType.gluing)}
-                                className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${activeTab === ProductionType.gluing
-                                    ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                    : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                    }`}
-                            >
-                                <Droplet className="w-5 h-5 ml-2" />
-                                التغرية
+                                <Layers className="w-5 h-5 ml-2" />
+                                سجل الإنتاج بالأقسام
                             </Button>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -606,19 +596,10 @@ export default function ProductionRecords() {
                             <Button
                                 size="lg"
                                 variant="outline"
-                                onClick={() => navigate("/dashboard")}
-                                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                            >
-                                <Home className="w-5 h-5 ml-2" />
-                                الرئيسية
-                            </Button>
-                            <Button
-                                size="lg"
-                                variant="outline"
                                 onClick={() => setShowLogoutDialog(true)}
-                                className="px-4 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                                className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
                             >
-                                <LogOut className="w-5 h-5 ml-2" />
+                                <ArrowRight className="w-5 h-5 ml-2 rotate-180" />
                                 تسجيل الخروج
                             </Button>
                         </div>

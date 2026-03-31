@@ -1,6 +1,6 @@
 // src\pages\Production\ProductionManager.jsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { productionApi } from "../../api/productionApi";
 import { salesApi } from "../../api/salesApi";
 import { colorApi } from "../../api/colorApi";
@@ -49,7 +49,8 @@ import {
     Layers,
     Search,
     ChevronUp,
-    ChevronDown
+    ChevronDown,
+    ArrowRight
 } from "lucide-react";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
@@ -60,6 +61,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").r
 
 export default function ProductionManager() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { logout, user } = useAuth();
     const [viewMode, setViewMode] = useState("create");
     const [loading, setLoading] = useState(false);
@@ -224,11 +226,26 @@ export default function ProductionManager() {
 
     // Load initial data
     useEffect(() => {
+        // Check for mode parameter from URL
+        const mode = searchParams.get('mode');
+        if (mode === 'history') {
+            setViewMode('history');
+        } else if (mode === 'create') {
+            setViewMode('create');
+        }
+        
         loadInitialData();
+    }, [searchParams]);
+
+    // Load production orders when viewMode changes to history
+    useEffect(() => {
         if (viewMode === "history") {
             loadProductionOrders();
-            loadPreparerOrders();
         }
+    }, [viewMode]);
+
+    useEffect(() => {
+        loadPreparerOrders();
     }, [viewMode]);
 
     const loadInitialData = async () => {
@@ -1075,33 +1092,15 @@ export default function ProductionManager() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <NotificationsBell />
-                        {/* <Button
+                        <Button
                             size="lg"
                             variant="outline"
-                            onClick={() => navigate("/settings")}
-                            className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            onClick={() => setShowLogoutDialog(true)}
+                            className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
                         >
-                            <Settings className="w-5 h-5 ml-2" />
-                            الإعدادات
-                        </Button> */}
-                        {/* <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => navigate("/dashboard")}
-                            className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                        >
-                            <Home className="w-5 h-5 ml-2" />
-                            الرئيسية
-                        </Button> */}
-                        {/* <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={handleLogout}
-                            className="px-4 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                        >
-                            <LogOut className="w-5 h-5 ml-2" />
+                            <ArrowRight className="w-5 h-5 ml-2 rotate-180" />
                             تسجيل الخروج
-                        </Button> */}
+                        </Button>
                     </div>
                 </div>
             )}
