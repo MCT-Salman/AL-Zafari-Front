@@ -129,6 +129,7 @@ export default function UserForm({ user, formData, setFormData, loading, error }
           value={formData.role || ""}
           onChange={(e) => handleRoleChange(e.target.value)}
           disabled={loading}
+          showDropdownAbove={true}
           options={[
             "admin",
             "accountant",

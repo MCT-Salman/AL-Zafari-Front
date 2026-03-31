@@ -174,8 +174,10 @@ export default function SlittingManager() {
         next.output_length_22 = prev.output_length_22 || defaultLength;
         next.output_length_44 = "";
       } else if (mode === "44x1-22x1") {
-        next.output_length_22 = prev.output_length_22 || defaultLength;
-        next.output_length_44 = prev.output_length_44 || defaultLength;
+        // When switching to 44x1-22x1 mode, sync both fields with the same value
+        const syncLength = prev.output_length_22 || prev.output_length_44 || defaultLength;
+        next.output_length_22 = syncLength;
+        next.output_length_44 = syncLength;
       }
 
       return next;
@@ -347,7 +349,7 @@ export default function SlittingManager() {
       const filteredMaterials = allMaterials.filter(m =>
         String(m?.material_name || "").toLowerCase().includes("pvc")
       );
-      
+
       setColors((colorRes?.data?.colors || colorRes?.data || colorRes || []) ?? []);
       setBatches((batchRes?.data?.batches || batchRes?.data || batchRes || []) ?? []);
       setRulers((rulerRes?.data?.rulers || rulerRes?.data || rulerRes || []) ?? []);
@@ -571,7 +573,7 @@ export default function SlittingManager() {
     setActiveOrderItem(item);
     setInputForm(prev => ({
       ...prev,
-      input_width: item.width ? String(item.width) : "",
+      // Remove input_width from being set - keep existing value
       ruler_id: item.ruler_id ? String(item.ruler_id) : "",
       color_id: item.color_id ? String(item.color_id) : "",
       batch_id: item.batch_id ? String(item.batch_id) : "",
@@ -581,7 +583,7 @@ export default function SlittingManager() {
       destination: item.destination || "slitting",
       notes: item.notes || ""
     }));
-    setIoMode("output");
+    // Remove setIoMode("output") - stay in input mode
   };
 
   const handleCreateSlite = () => {
@@ -1181,12 +1183,12 @@ export default function SlittingManager() {
                             <Input
                               value={inputForm.input_length}
                               onFocus={() => setCurrentInput("input_length")}
-                              readOnly
+                              onChange={(e) => setInputForm(prev => ({ ...prev, input_length: e.target.value }))}
                               className={`text-center ${currentInput === "input_length" ? "ring-2 ring-blue-500" : ""}`}
                               placeholder="0"
                             />
                           </div>
-                          <div className="col-span-2">
+                          <div className="col-span-1">
                             <Label>ملاحظات</Label>
                             <Input
                               value={inputForm.notes}
@@ -1194,14 +1196,14 @@ export default function SlittingManager() {
                               placeholder="ملاحظات اختيارية"
                             />
                           </div>
-                          <Button
+                          <div className="col-span-2">
+                            <Button
+                            className="w-full"
                             onClick={() => setIoMode("output")}
-                            className="w-full h-12 bg-green-600 hover:bg-green-700"
-                            disabled={!inputForm.input_width || !inputForm.color_id || !inputForm.batch_id || !inputForm.input_length}
                           >
-                            <ArrowRight className="w-5 h-5 ml-2" />
-                             إخراج
+                            إدخال
                           </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1276,7 +1278,7 @@ export default function SlittingManager() {
                               <Input
                                 value={outputForm.output_length_22}
                                 onFocus={() => setCurrentInput("output_length_22")}
-                                readOnly
+                                onChange={(e) => setOutputForm(prev => ({ ...prev, output_length_22: e.target.value }))}
                                 className={`text-center ${currentInput === "output_length_22" ? "ring-2 ring-blue-500" : ""}`}
                                 placeholder="0"
                               />
@@ -1294,27 +1296,24 @@ export default function SlittingManager() {
                         )}
 
                         {selectedOutputPattern === "44x1-22x1" && (
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 gap-3">
                             <div>
-                              <Label>كمية </Label>
+                              <Label>الكمية</Label>
                               <Input
                                 value={outputForm.output_length_44}
                                 onFocus={() => setCurrentInput("output_length_44")}
-                                readOnly
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  setOutputForm(prev => ({ 
+                                    ...prev, 
+                                    output_length_44: newValue,
+                                    output_length_22: newValue // Sync both fields
+                                  }));
+                                }}
                                 className={`text-center ${currentInput === "output_length_44" ? "ring-2 ring-blue-500" : ""}`}
                                 placeholder="0"
                               />
                             </div>
-                            {/* <div>
-                              <Label>كمية القطعة (22)</Label>
-                              <Input
-                                value={outputForm.output_length_22}
-                                onFocus={() => setCurrentInput("output_length_22")}
-                                readOnly
-                                className={`text-center ${currentInput === "output_length_22" ? "ring-2 ring-blue-500" : ""}`}
-                                placeholder="0"
-                              />
-                            </div> */}
                           </div>
                         )}
                       </div>
