@@ -2271,7 +2271,7 @@ export default function ProductionManager() {
                                 <div className="font-bold text-sm">{salesApi.getIssuedBy(selectedPreparerOrder) || "-"}</div>
                             </div>
                             <div className="bg-gray-50 p-3 rounded-lg">
-                                <div className="text-xs text-gray-500">الحالة</div>
+                                <div className="text-xs text-gray-500 mb-1">الحالة</div>
                                 <div className="font-bold text-sm">
                                     {(() => {
                                         const badge = salesApi.getStatusBadge(selectedPreparerOrder?.status);
@@ -2314,7 +2314,7 @@ export default function ProductionManager() {
                                                 <td className="p-2 text-center">{item.thickness ?? "-"}</td>
                                                 <td className="p-2 text-center">{item.quantity ?? "-"}</td>
                                                 <td className="p-2 text-center">{item.batch_number || item.batch?.batch_number || "-"}</td>
-                                                <td className="p-2 text-center">{item.type_item || "-"}</td>
+                                                <td className="p-2 text-center">{formatTypeItem(item.type_item)}</td>
                                             </tr>
                                         ))
                                     )}
