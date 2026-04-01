@@ -858,6 +858,12 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                 setFormData(prev => ({ ...prev, width: String(defaultWidth.value) }));
 
+            } else if (widthData.length > 0) {
+
+                // If no default but has values, set the first one
+
+                setFormData(prev => ({ ...prev, width: String(widthData[0].value) }));
+
             } else {
 
                 setFormData(prev => ({ ...prev, width: "" }));
@@ -2402,49 +2408,45 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
         try {
 
-            // Send each production order to sales API
+            // Collect all items from production orders
 
-            for (const order of productionOrders) {
+            const allItems = productionOrders.map(order => ({
 
-                const orderData = {
+                type_item: order.type_item,
 
-                    customer_id: null, // Production orders may not have customer
+                color_id: parseInt(order.color_id),
 
-                    items: [{
+                batch_id: parseInt(order.batch_id),
 
-                        material_id: order.material_id,
+                width: parseFloat(order.width),
 
-                        ruler_id: order.ruler_id,
+                length: parseFloat(getMaterialConstantLabel(selectedMaterial, "height")) || 100,
 
-                        color_id: order.color_id,
+                quantity: parseInt(order.quantity),
 
-                        batch_id: order.batch_id,
+                thickness: parseFloat(order.thickness),
 
-                        width: order.width,
+                notes: order.notes
 
-                        thickness: order.thickness,
-
-                        quantity: order.quantity,
-
-                        notes: order.notes,
-
-                        type_item: order.type_item
-
-                    }],
-
-                    notes: `طلب إنتاج - ${order.material_name}`,
-
-                    status: 'production',
-
-                    order_type: 'production'
-
-                };
+            }));
 
 
 
-                await salesApi.createOrder(orderData);
+            const orderData = {
 
-            }
+                status: 'pending',
+
+                notes: '',
+
+                items: allItems
+
+            };
+
+
+
+            console.log("Sending order data:", JSON.stringify(orderData, null, 2));
+
+            await salesApi.createSalesOrder(orderData);
 
 
 
@@ -2463,6 +2465,150 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
         } finally {
 
             setProductionLoading(false);
+
+        }
+
+    };
+
+
+
+    const handleUpdateProductionOrder = () => {
+
+        try {
+
+            // Find the order being edited
+
+            const orderIndex = productionOrders.findIndex(order => order.id === editingItemId);
+
+            if (orderIndex === -1) {
+
+                toast.error("لم يتم العثور على الطلب للتعديل");
+
+                return;
+
+            }
+
+            // Update the order in the list
+
+            const updatedOrder = {
+
+                ...productionOrders[orderIndex],
+
+                material_id: formData.material_id,
+
+                ruler_id: formData.ruler_id,
+
+                color_id: formData.color_id,
+
+                batch_id: formData.batch_id,
+
+                width: formData.width,
+
+                thickness: formData.thickness,
+
+                quantity: formData.quantity,
+
+                notes: formData.notes,
+
+                type_item: formData.type_item
+
+            };
+
+            setProductionOrders(prev => {
+
+                const newOrders = [...prev];
+
+                newOrders[orderIndex] = updatedOrder;
+
+                return newOrders;
+
+            });
+
+            // Reset editing mode
+
+            setEditingItemId(null);
+
+            // Clear form
+
+            setFormData({
+
+                material_id: "",
+
+                ruler_id: "",
+
+                color_id: "",
+
+                batch_id: "",
+
+                width: "",
+
+                thickness: "",
+
+                quantity: "",
+
+                notes: "",
+
+                type_item: ""
+
+            });
+
+            toast.success("تم تحديث طلب الإنتاج بنجاح");
+
+        } catch (error) {
+
+            console.error("Error updating production order:", error);
+
+            toast.error("فشل في تحديث طلب الإنتاج");
+
+        }
+
+    };
+
+
+
+    const handleEditProductionOrder = (order) => {
+
+        try {
+
+            // Switch to production order tab
+
+            setViewMode("colors");
+
+            // Set the form data with the order details
+
+            setFormData({
+
+                material_id: order.material_id,
+
+                ruler_id: order.ruler_id,
+
+                color_id: order.color_id,
+
+                batch_id: order.batch_id,
+
+                width: order.width,
+
+                thickness: order.thickness,
+
+                quantity: order.quantity,
+
+                notes: order.notes || "",
+
+                type_item: order.type_item
+
+            });
+
+            // Set editing mode for the order
+
+            setEditingItemId(order.id);
+
+            toast.success("تم تحميل طلب الإنتاج للتعديل");
+
+        } catch (error) {
+
+            console.error("Error editing production order:", error);
+
+            toast.error("فشل في تحميل طلب الإنتاج للتعديل");
 
         }
 
@@ -3168,57 +3314,43 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
             : baseBatches;
 
-        const base = visibleBatches.map(b => ({
+        let base = visibleBatches.map(b => ({
 
-            const rawImage = c.imageUrl || c.image_url || c.color_image || null;
+            value: String(b.batch_id),
 
-            const resolvedImage = rawImage
+            label: b.batch_number || "دفعة " + b.batch_id
 
-                ? (rawImage.startsWith("http") ? rawImage : `${API_BASE_URL}${rawImage}`)
-
-                : null;
-
-            return {
-
-                value: String(c.color_id),
-
-                label: `${c.color_name} (${c.color_code})${pricingStatus.label}`,
-
-                disabled: !pricingStatus.priced,
-
-                imageUrl: resolvedImage
-
-            };
-
-        });
+        }));
 
 
 
-        // When editing, ensure the selected color is always in options
+        // Filter by search term
 
-        if (editingItemId && formData.color_id) {
+        if (term) {
 
-            const selectedColor = colors.find(c => String(c.color_id) === String(formData.color_id));
+            base = base.filter(b => 
 
-            if (selectedColor && !baseOptions.find(opt => opt.value === String(formData.color_id))) {
+                b.label.toLowerCase().includes(term)
 
-                const rawImage = selectedColor.imageUrl || selectedColor.image_url || selectedColor.color_image || null;
+            );
 
-                const resolvedImage = rawImage
+        }
 
-                    ? (rawImage.startsWith("http") ? rawImage : `${API_BASE_URL}${rawImage}`)
 
-                    : null;
 
-                baseOptions.push({
+        // When editing, ensure the selected batch is always in options
 
-                    value: String(selectedColor.color_id),
+        if (editingItemId && formData.batch_id) {
 
-                    label: `${selectedColor.color_name} (${selectedColor.color_code})`,
+            const selectedBatch = batches.find(b => String(b.batch_id) === String(formData.batch_id));
 
-                    disabled: false,
+            if (selectedBatch && !base.find(opt => opt.value === String(formData.batch_id))) {
 
-                    imageUrl: resolvedImage
+                base.push({
+
+                    value: String(selectedBatch.batch_id),
+
+                    label: selectedBatch.batch_number || "دفعة " + selectedBatch.batch_id
 
                 });
 
@@ -3228,9 +3360,9 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
-        return baseOptions;
+        return base;
 
-    }, [filteredColorsBySearch, getColorPricingStatus, editingItemId, formData.color_id, colors]);
+    }, [batches, formData.material_id, formData.batch_id, batchSearchTerm, editingItemId]);
 
 
 
@@ -3272,7 +3404,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
         const availableRulers = formData.material_id
 
-            ? rulers.filter(r => r.material_id === formData.material_id)
+            ? rulers.filter(r => String(r.material_id) === String(formData.material_id))
 
             : rulers;
 
@@ -3291,18 +3423,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     // Color options for select
 
     const colorOptions = useMemo(() => {
-
-        if (tableContainerRef.current) {
-
-            const scrollAmount = 200;
-
-            const newScrollLeft = tableContainerRef.current.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount);
-
-            tableContainerRef.current.scrollTo({ left: newScrollLeft, behavior: 'smooth' });
-
-        }
-
-    }, []);
+        return availablePricedColors.map(c => ({
+            value: String(c.color_id),
+            label: c.color_name + " (" + c.color_code + ")"
+        }));
+    }, [availablePricedColors]);
 
 
 
@@ -3312,18 +3437,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
         const baseBatches = Array.isArray(batches) ? batches : [];
 
-        const base = formData.material_id
-
-            ? baseBatches.filter(b => String(b.material_id) === String(formData.material_id))
-
-            : baseBatches;
+        const base = formData.material_id ? baseBatches.filter(b => String(b.material_id) === String(formData.material_id)) : baseBatches;
 
         return base.map(b => ({
-
             value: String(b.batch_id),
-
-            label: b.batch_number || `دفعة ${b.batch_id}`
-
+            label: b.batch_number || "دفعة " + b.batch_id
         }));
 
     }, [batches, formData.material_id]);
@@ -3924,17 +4042,17 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         className={`
 
-                                                            rounded-2xl border-3 text-lg font-bold
+                                                            rounded-xl border-3 text-base font-medium
 
                                                             transition-all touch-manipulation hover:scale-105 active:scale-95
 
-                                                            flex items-center justify-center px-4 py-3 min-h-[56px]
+                                                            flex items-center justify-center p-2
 
                                                             ${formData.type_item === t.value
 
                                                                 ? "border-primary-f bg-primary-f text-white shadow-lg"
 
-                                                                : "border-gray-300 bg-white hover:border-secondary-s"
+                                                                : "border-gray-300 bg-white hover:border-primary-f"
 
                                                             }
 
@@ -3956,34 +4074,149 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
-                                    {/* الحقول الإضافية */}
-
                                     <div className="space-y-3">
 
+                                        {/* أولاً: العرض على سطر واحد */}
                                         <div>
 
-                                            <Label className="font-bold text-sm mb-2 block">المسطرة</Label>
+                                            <Label className="font-bold text-sm mb-2 block">العرض</Label>
 
-                                            <FilterSelect
+                                            {widthValues.length > 1 ? (
 
-                                                value={formData.ruler_id ? String(formData.ruler_id) : ""}
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 
-                                                onChange={(e) => handleFieldChange("ruler_id", e.target.value)}
+                                                    {widthOptions.map(w => (
 
-                                                options={rulerOptions}
+                                                        <button
 
-                                                placeholder="اختر المسطرة"
+                                                            key={w.value}
 
-                                                className="w-full text-sm"
+                                                            onClick={() => {
 
-                                                disabled={!formData.material_id}
+                                                                console.log("Width clicked:", w.value, typeof w.value);
 
-                                            />
+                                                                console.log("Current formData.width:", formData.width, typeof formData.width);
+
+                                                                console.log("isSelectedMaterialBoard:", isSelectedMaterialBoard);
+
+                                                                console.log("widthValues:", widthValues);
+
+                                                                handleFieldChange("width", w.value);
+
+                                                            }}
+
+                                                            className={`
+
+                                                                rounded-xl border-3 text-base font-medium
+
+                                                                transition-all touch-manipulation hover:scale-105 active:scale-95
+
+                                                                flex items-center justify-center p-2
+
+                                                                ${String(formData.width) === String(w.value)
+
+                                                                    ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+
+                                                                    : "border-gray-300 bg-white hover:border-secondary-s"
+
+                                                                }
+
+                                                            `}
+
+                                                            disabled={widthValues.length === 0}
+
+                                                        >
+
+                                                            {w.label}
+
+                                                        </button>
+
+                                                    ))}
+
+                                                </div>
+
+                                            ) : (
+
+                                                <Input
+
+                                                    type="number"
+
+                                                    value={formData.width}
+
+                                                    onChange={(e) => handleFieldChange("width", e.target.value)}
+
+                                                    onClick={() => {
+
+                                                        setActiveField("width");
+
+                                                        setNumpadMode("quantity");
+
+                                                    }}
+
+                                                    className="h-12 text-lg text-center font-bold bg-gray-100"
+
+                                                    placeholder={widthValues.length === 1 ? widthValues[0].label : "0"}
+
+                                                    disabled={!isSelectedMaterialBoard}
+
+                                                />
+
+                                            )}
 
                                         </div>
 
 
 
+                                        {/* ثانياً: المسطرة على سطر واحد */}
+                                        <div>
+
+                                            <Label className="font-bold text-sm mb-2 block">المسطرة</Label>
+
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+
+                                                {rulerOptions.map(r => (
+
+                                                    <button
+
+                                                        key={r.value}
+
+                                                        onClick={() => handleFieldChange("ruler_id", r.value)}
+
+                                                        className={`
+
+                                                            rounded-xl border-3 text-base font-medium
+
+                                                            transition-all touch-manipulation hover:scale-105 active:scale-95
+
+                                                            flex items-center justify-center p-2
+
+                                                            ${formData.ruler_id === r.value
+
+                                                                ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+
+                                                                : "border-gray-300 bg-white hover:border-secondary-s"
+
+                                                            }
+
+                                                        `}
+
+                                                        disabled={!formData.material_id}
+
+                                                    >
+
+                                                        {r.label}
+
+                                                    </button>
+
+                                                ))}
+
+                                            </div>
+
+                                        </div>
+
+
+
+                                        {/* ثالثاً: اللون select */}
                                         <div>
 
                                             <Label className="font-bold text-sm mb-2 block">اللون</Label>
@@ -4012,67 +4245,8 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
-                                        <div className="grid grid-cols-2 gap-2">
-
-                                            {widthValues.length > 1 ? (
-
-                                                <div>
-
-                                                    <Label className="font-bold text-sm mb-2 block">العرض</Label>
-
-                                                    <FilterSelect
-
-                                                        value={formData.width ? String(formData.width) : ""}
-
-                                                        onChange={(e) => handleFieldChange("width", e.target.value)}
-
-                                                        options={widthOptions}
-
-                                                        placeholder="اختر العرض"
-
-                                                        className="w-full text-sm"
-
-                                                        disabled={!isSelectedMaterialBoard}
-
-                                                    />
-
-                                                </div>
-
-                                            ) : (
-
-                                                <div>
-
-                                                    <Label className="font-bold text-sm mb-2 block">العرض</Label>
-
-                                                    <Input
-
-                                                        type="number"
-
-                                                        value={formData.width}
-
-                                                        onChange={(e) => handleFieldChange("width", e.target.value)}
-
-                                                        onClick={() => {
-
-                                                            setActiveField("width");
-
-                                                            setNumpadMode("quantity");
-
-                                                        }}
-
-                                                        className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
-
-                                                        placeholder={widthValues.length === 1 ? widthValues[0].label : "0"}
-
-                                                        disabled={!isSelectedMaterialBoard}
-
-                                                    />
-
-                                                </div>
-
-                                            )}
-
-
+                                        {/* رابعاً: الكمية - السماكة - رقم الطبخة على سطر واحد */}
+                                        <div className="grid grid-cols-3 gap-2">
 
                                             <div>
 
@@ -4094,7 +4268,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     }}
 
-                                                    className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
+                                                    className="h-12 text-lg text-center font-bold bg-gray-100"
 
                                                     placeholder="0"
 
@@ -4102,25 +4276,79 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             </div>
 
-                                        </div>
 
-
-
-                                        {thicknessValues.length > 1 ? (
 
                                             <div>
 
                                                 <Label className="font-bold text-sm mb-2 block">السماكة</Label>
 
+                                                {thicknessValues.length > 1 ? (
+
+                                                    <FilterSelect
+
+                                                        value={formData.thickness ? String(formData.thickness) : ""}
+
+                                                        onChange={(e) => handleFieldChange("thickness", e.target.value)}
+
+                                                        options={thicknessOptions}
+
+                                                        placeholder="السماكة"
+
+                                                        className="w-full text-sm"
+
+                                                    />
+
+                                                ) : (
+
+                                                    <Input
+
+                                                        type="number"
+
+                                                        value={formData.thickness}
+
+                                                        onChange={(e) => handleFieldChange("thickness", e.target.value)}
+
+                                                        onClick={() => {
+
+                                                            setActiveField("thickness");
+
+                                                            setNumpadMode("quantity");
+
+                                                        }}
+
+                                                        className="h-12 text-lg text-center font-bold bg-gray-100"
+
+                                                        placeholder={thicknessValues.length === 1 ? thicknessValues[0].label : "0.6"}
+
+                                                        step="0.1"
+
+                                                    />
+
+                                                )}
+
+                                            </div>
+
+
+
+                                            <div>
+
+                                                <Label className="font-bold text-sm mb-2 block">رقم الطبخة</Label>
+
                                                 <FilterSelect
 
-                                                    value={formData.thickness ? String(formData.thickness) : ""}
+                                                    value={formData.batch_id ? String(formData.batch_id) : ""}
 
-                                                    onChange={(e) => handleFieldChange("thickness", e.target.value)}
+                                                    onChange={(e) => handleFieldChange("batch_id", e.target.value)}
 
-                                                    options={thicknessOptions}
+                                                    disabled={!isSelectedMaterialBoard && !formData.width}
 
-                                                    placeholder="اختر السماكة"
+                                                    searchValue={batchSearchTerm}
+
+                                                    onSearchValueChange={(v) => setBatchSearchTerm(v)}
+
+                                                    options={batchOptions}
+
+                                                    placeholder="اختر الطبخة"
 
                                                     className="w-full text-sm"
 
@@ -4128,61 +4356,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             </div>
 
-                                        ) : (
-
-                                            <div>
-
-                                                <Label className="font-bold text-sm mb-2 block">السماكة</Label>
-
-                                                <Input
-
-                                                    type="number"
-
-                                                    value={formData.thickness}
-
-                                                    onChange={(e) => handleFieldChange("thickness", e.target.value)}
-
-                                                    className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
-
-                                                    placeholder={thicknessValues.length === 1 ? thicknessValues[0].label : "0.6"}
-
-                                                    step="0.1"
-
-                                                />
-
-                                            </div>
-
-                                        )}
-
-
-
-                                        <div>
-
-                                            <Label className="font-bold text-sm mb-2 block">رقم الطبخة</Label>
-
-                                            <FilterSelect
-
-                                                value={formData.batch_id ? String(formData.batch_id) : ""}
-
-                                                onChange={(e) => handleFieldChange("batch_id", e.target.value)}
-
-                                                disabled={!isSelectedMaterialBoard && !formData.width}
-
-                                                searchValue={batchSearchTerm}
-
-                                                onSearchValueChange={(v) => setBatchSearchTerm(v)}
-
-                                                options={batchOptions}
-
-                                                placeholder="اختر الطبخة"
-
-                                                className="w-full text-sm"
-
-                                            />
-
                                         </div>
 
 
+
+                                        {/* خامساً: الملاحظات */}
 
                                         <div>
 
@@ -4202,33 +4380,75 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         </div>
 
-                                    </div>
 
 
+                                        {/* سادساً: زر التعديل أو الإضافة */}
 
-                                    <div className="mt-auto pt-2">
+                                        {editingItemId ? (
 
-                                        <div className="flex gap-2">
+                                            <div className="mt-auto pt-2 flex gap-2">
 
-                                            <Button
+                                                <Button
 
-                                                onClick={handleAddProductionOrder}
+                                                    onClick={cancelEdit}
 
-                                                size="lg"
+                                                    size="lg"
 
-                                                className="w-full h-14 text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform bg-orange-600 hover:bg-orange-700"
+                                                    variant="outline"
 
-                                                disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
+                                                    className="flex-1 h-14 text-lg font-bold touch-manipulation active:scale-95 transition-transform"
 
-                                            >
+                                                >
 
-                                                <Plus className="w-5 h-5 ml-2" />
+                                                    <X className="w-5 h-5 ml-2" />
 
-                                                إضافة لطلب الإنتاج
+                                                    إلغاء التعديل
 
-                                            </Button>
+                                                </Button>
 
-                                        </div>
+                                                <Button
+
+                                                    onClick={handleUpdateProductionOrder}
+
+                                                    size="lg"
+
+                                                    className="flex-1 h-14 text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform bg-green-600 hover:bg-green-700"
+
+                                                >
+
+                                                    <Check className="w-5 h-5 ml-2" />
+
+                                                    تأكيد التعديل
+
+                                                </Button>
+
+                                            </div>
+
+                                        ) : (
+
+                                            <div className="mt-auto pt-2">
+
+                                                <Button
+
+                                                    onClick={handleAddProductionOrder}
+
+                                                    size="lg"
+
+                                                    className="w-full h-14 text-lg font-bold text-white touch-manipulation active:scale-95 transition-transform bg-orange-600 hover:bg-orange-700"
+
+                                                    disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
+
+                                                >
+
+                                                    <Plus className="w-5 h-5 ml-2" />
+
+                                                    إضافة لطلب الإنتاج
+
+                                                </Button>
+
+                                            </div>
+
+                                        )}
 
                                     </div>
 
@@ -4298,11 +4518,19 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             <th className="p-2 text-right border-b">المادة</th>
 
-                                                            <th className="p-2 text-center border-b">اللون</th>
+                                                            <th className="p-2 text-center border-b">العرض</th>
+
+                                                            <th className="p-2 text-right border-b">اللون</th>
+
+                                                            <th className="p-2 text-center border-b">النوع</th>
 
                                                             <th className="p-2 text-center border-b">الكمية</th>
 
-                                                            <th className="p-2 text-center border-b">العرض</th>
+                                                            <th className="p-2 text-right border-b">المسطرة</th>
+
+                                                            <th className="p-2 text-center border-b">السماكة</th>
+
+                                                            <th className="p-2 text-center border-b">الطبخة</th>
 
                                                             <th className="p-2 text-center border-b">إجراء</th>
 
@@ -4318,7 +4546,9 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                 <td className="p-2 font-medium">{order.material_name}</td>
 
-                                                                <td className="p-2 text-center">
+                                                                <td className="p-2 text-center">{order.width || "-"}</td>
+
+                                                                <td className="p-2">
 
                                                                     <div className="flex items-center justify-center gap-1">
 
@@ -4336,23 +4566,53 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                 </td>
 
+                                                                <td className="p-2 text-center">
+
+                                                                    {formatTypeItem(order.type_item)}
+
+                                                                </td>
+
                                                                 <td className="p-2 text-center font-bold">{order.quantity} م</td>
 
-                                                                <td className="p-2 text-center">{order.width}</td>
+                                                                <td className="p-2">{order.ruler_name || "-"}</td>
+
+                                                                <td className="p-2 text-center">{order.thickness || "0.6"}</td>
+
+                                                                <td className="p-2 text-center">{order.batch_number || "-"}</td>
 
                                                                 <td className="p-2 text-center">
 
-                                                                    <button
+                                                                    <div className="flex items-center justify-center gap-2">
 
-                                                                        onClick={() => setProductionOrders(prev => prev.filter(item => item.id !== order.id))}
+                                                                        <button
 
-                                                                        className="text-red-600 hover:text-red-800 text-sm"
+                                                                            onClick={() => handleEditProductionOrder(order)}
 
-                                                                    >
+                                                                            className="text-blue-600 hover:text-blue-800 text-sm"
 
-                                                                        <Trash2 className="w-4 h-4" />
+                                                                            title="تعديل الطلب"
 
-                                                                    </button>
+                                                                        >
+
+                                                                            <Edit className="w-4 h-4" />
+
+                                                                        </button>
+
+                                                                        <button
+
+                                                                            onClick={() => setProductionOrders(prev => prev.filter(item => item.id !== order.id))}
+
+                                                                            className="text-red-600 hover:text-red-800 text-sm"
+
+                                                                            title="حذف الطلب"
+
+                                                                        >
+
+                                                                            <Trash2 className="w-4 h-4" />
+
+                                                                        </button>
+
+                                                                    </div>
 
                                                                 </td>
 
@@ -5944,7 +6204,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                     <>
 
-                    /* وضع السجل */
+                    {/* وضع السجل */}
 
                     <Card className="flex flex-col h-full min-h-0 overflow-hidden p-3">
 
@@ -6404,7 +6664,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
-                                        <div className="bg-gray-50 p-3 rounded-lg border">
+                                        {!isOrderPreparer ? <div className="bg-gray-50 p-3 rounded-lg border">
 
                                             <div className="text-xs text-gray-500">تعديل الحالة</div>
 
@@ -6429,6 +6689,8 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                                             </div>
 
                                         </div>
+                                    : ""    
+                                    }
 
 
 
