@@ -6876,7 +6876,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                 <th className="p-3 text-center">QR</th>
 
-                                                                <th className="p-3 text-center">طباعة</th>
+                                                                {/* <th className="p-3 text-center">طباعة</th> */}
 
                                                                 <th className="p-3 text-center">ملاحظات</th>
 
@@ -7000,7 +7000,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                         </td>
 
-                                                                        <td className="p-3 text-center">
+                                                                        {/* <td className="p-3 text-center">
 
                                                                             <Button
 
@@ -7020,7 +7020,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                             </Button>
 
-                                                                        </td>
+                                                                        </td> */}
 
                                                                         <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
 
