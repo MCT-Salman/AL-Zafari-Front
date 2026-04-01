@@ -55,9 +55,12 @@ export default function WarehouseKeeper() {
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [entryTab, setEntryTab] = useState("manual");
     const [ordersTab, setOrdersTab] = useState("current");
+    const [salesOrdersTab, setSalesOrdersTab] = useState("pending");
     const [orders, setOrders] = useState([]);
+    const [salesOrders, setSalesOrders] = useState([]);
     const [movements, setMovements] = useState([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
+    const [loadingSalesOrders, setLoadingSalesOrders] = useState(false);
     const [loadingMovements, setLoadingMovements] = useState(false);
     const [materials, setMaterials] = useState([]);
     const [rulers, setRulers] = useState([]);
@@ -149,6 +152,14 @@ export default function WarehouseKeeper() {
         () => sortRecordsAsc(orders.filter((o) => String(o.status || "").toLowerCase() === ProductionStatus.completed)),
         [orders, sortRecordsAsc]
     );
+    const pendingSalesOrders = useMemo(
+        () => sortRecordsAsc(salesOrders.filter((o) => String(o.status || "").toLowerCase() === "pending")),
+        [salesOrders, sortRecordsAsc]
+    );
+    const completedSalesOrders = useMemo(
+        () => sortRecordsAsc(salesOrders.filter((o) => String(o.status || "").toLowerCase() === "completed")),
+        [salesOrders, sortRecordsAsc]
+    );
     const sortedMovements = useMemo(() => sortRecordsAsc(movements), [movements, sortRecordsAsc]);
     const colorOptions = useMemo(() => availableColors.map((c) => {
         const rawImage = c.imageUrl || c.image_url || c.color_image || null;
@@ -234,6 +245,30 @@ export default function WarehouseKeeper() {
         ].join(" | ");
     };
 
+    const loadSalesOrders = async () => {
+        try {
+            setLoadingSalesOrders(true);
+            const token = localStorage.getItem('accessToken');
+            const response = await fetch(`${API_BASE_URL}/order/`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setSalesOrders(data.data || []);
+            } else {
+                toast.error(data.message || 'فشل في تحميل طلبات المبيعات');
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('فشل في تحميل طلبات المبيعات');
+        } finally {
+            setLoadingSalesOrders(false);
+        }
+    };
+
     const loadOrders = async () => {
         try {
             setLoadingOrders(true);
@@ -304,6 +339,7 @@ export default function WarehouseKeeper() {
         };
         loadRefs();
         loadOrders();
+        loadSalesOrders();
         loadMovements();
     }, []);
 
@@ -332,6 +368,7 @@ export default function WarehouseKeeper() {
         const socket = connectSocket(token);
         const refresh = () => {
             loadOrders();
+            loadSalesOrders();
             loadMovements();
         };
         ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated", "notification"]
@@ -376,6 +413,79 @@ export default function WarehouseKeeper() {
         }));
         setEntryTab("manual");
         toast.success("تم تطبيق بيانات QR");
+    };
+
+    const updateSalesOrderStatus = async (orderId, status) => {
+        try {
+            const token = localStorage.getItem('accessToken');
+            const response = await fetch(`${API_BASE_URL}/order/${orderId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status })
+            });
+            const data = await response.json();
+            if (data.success) {
+                setSalesOrders(prev => prev.map(order => 
+                    order.order_id === orderId ? { ...order, status } : order
+                ));
+                toast.success('تم تحديث حالة الطلب بنجاح');
+            } else {
+                toast.error(data.message || 'فشل في تحديث حالة الطلب');
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('فشل في تحديث حالة الطلب');
+        }
+    };
+
+    const loadSalesOrderDetails = async (orderId) => {
+        try {
+            const token = localStorage.getItem('accessToken');
+            const response = await fetch(`${API_BASE_URL}/order/${orderId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            if (data.success) {
+                return data.data;
+            } else {
+                toast.error(data.message || 'فشل في تحميل تفاصيل الطلب');
+                return null;
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('فشل في تحميل تفاصيل الطلب');
+            return null;
+        }
+    };
+
+    const handleSalesOrderSelect = async (order) => {
+        setSelectedOrder(order);
+        try {
+            setLoadingOrderDetails(true);
+            const details = await loadSalesOrderDetails(order.order_id);
+            if (details && details.items) {
+                // تحديث معلومات الطلب مع العناصر
+                setSelectedOrder({
+                    ...order,
+                    items: details.items
+                });
+                // تلقائياً انتقل إلى مدخلات طلبات المبيعات
+                setEntryTab("sales");
+                // عرض تفاصيل الطلب
+                setShowOrderDetails(true);
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("فشل في تحميل تفاصيل الطلب");
+        } finally {
+            setLoadingOrderDetails(false);
+        }
     };
 
     const handleOrderSelect = async (order) => {
@@ -617,100 +727,168 @@ export default function WarehouseKeeper() {
     const handleBackspace = () => trimActiveInput();
     const handleClear = () => clearActiveInput();
 
+    const renderSalesOrdersTable = (list) => (
+        <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
+            <div className="min-w-[800px]">
+                <table className="w-full border-collapse">
+                    <thead className="bg-gray-100 sticky top-0 z-30">
+                        <tr>
+                            {["#", "الزبون", "الهاتف", "المدينة", "العناصر", "المبلغ", "الحالة", "المبيعات", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
+                                <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap min-w-[80px] bg-gray-100">{h}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loadingSalesOrders ? (
+                            <tr><td colSpan="11" className="p-6"><LoadingState /></td></tr>
+                        ) : list.length === 0 ? (
+                            <tr><td colSpan="11" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات مبيعات</td></tr>
+                        ) : list.map((order, index) => {
+                            const statusBadge = {
+                                pending: { label: "قيد الانتظار", className: "bg-yellow-100 text-yellow-800" },
+                                completed: { label: "مكتمل", className: "bg-green-100 text-green-800" },
+                                preparing: { label: "قيد التحضير", className: "bg-blue-100 text-blue-800" },
+                                canceled: { label: "ملغي", className: "bg-red-100 text-red-800" }
+                            }[order.status] || { label: order.status, className: "bg-gray-100 text-gray-800" };
+                            
+                            return (
+                                <tr key={order.order_id} className="h-14 border-b hover:bg-gray-50">
+                                    <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">#{order.order_id}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[100px]">{order.customer?.name || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{order.customer?.phone || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{order.customer?.city || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">
+                                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+                                            {order.count_items || order.items?.length || 0}
+                                        </span>
+                                    </td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{Number(order.total_amount || 0).toLocaleString()}</td>
+                                    <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[100px]">
+                                        <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
+                                            {statusBadge.label}
+                                        </span>
+                                    </td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{order.sales?.full_name || order.sales?.username || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[120px]">{formatDate(order.created_at)}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[150px] max-w-[150px] truncate" title={order.notes}>{order.notes || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center whitespace-nowrap min-w-[120px]">
+                                        <div className="flex h-8 items-center justify-center gap-1">
+                                            <button 
+                                                onClick={handleSalesOrderSelect}
+                                                className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            {salesOrdersTab === "pending" && (
+                                                <select 
+                                                    value={order.status} 
+                                                    onChange={(e) => updateSalesOrderStatus(order.order_id, e.target.value)}
+                                                    className="h-8 px-2 text-xs border rounded"
+                                                >
+                                                    <option value="pending">قيد الانتظار</option>
+                                                    <option value="preparing">قيد التحضير</option>
+                                                    <option value="completed">مكتمل</option>
+                                                    <option value="canceled">ملغي</option>
+                                                </select>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+
     const renderOrdersTable = (list) => (
         <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
-            <table className="w-full border-collapse">
-                <thead className="bg-gray-100 sticky top-0 z-20">
-                    <tr>
-                        {["#", "المادة", "اللون", "العرض", "الكمية", "النوع", "الطبخة", "السماكة", "الوجهة", "المصدر", "الحالة", "المستخدم", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
-                            <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap">{h}</th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {loadingOrders ? (
-                        <tr><td colSpan="15" className="p-6"><LoadingState /></td></tr>
-                    ) : list.length === 0 ? (
-                        <tr><td colSpan="15" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
-                    ) : list.map((order, index) => {
-                        const batch = order.batch || batches.find((b) => String(b.batch_id) === String(order.batch_id));
-                        const status = getStatusBadge(order.status);
-                        const color = order.color || colors.find((c) => String(c.color_id) === String(order.color_id));
-                        return (
-                            <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
-                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">#{order.production_order_id}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{pvcMaterial?.material_name || "-"}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
-                                    {color ? (
-                                        <div className="flex items-center justify-center gap-1">
-                                            {color.imageUrl && (
-                                                <img
-                                                    src={color.imageUrl.startsWith("http") ? color.imageUrl : `${API_BASE_URL}${color.imageUrl}`}
-                                                    alt={color.color_name}
-                                                    className="w-4 h-4 rounded border border-gray-300"
-                                                />
-                                            )}
-                                            <span className="text-xs">{color.color_name} ({color.color_code})</span>
+            <div className="min-w-[1000px]">
+                <table className="w-full border-collapse">
+                    <thead className="bg-gray-100 sticky top-0 z-30">
+                        <tr>
+                            {["#", "المادة", "اللون", "العرض", "الكمية", "النوع", "الطبخة", "السماكة", "الوجهة", "المصدر", "الحالة", "المستخدم", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
+                                <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap min-w-[70px] bg-gray-100">{h}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loadingOrders ? (
+                            <tr><td colSpan="15" className="p-6"><LoadingState /></td></tr>
+                        ) : list.length === 0 ? (
+                            <tr><td colSpan="15" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
+                        ) : list.map((order, index) => {
+                            const batch = order.batch || batches.find((b) => String(b.batch_id) === String(order.batch_id));
+                            const status = getStatusBadge(order.status);
+                            const color = order.color || colors.find((c) => String(c.color_id) === String(order.color_id));
+                            return (
+                                <tr key={order.production_order_item_id || `${order.production_order_id}-${index}`} className="h-14 border-b hover:bg-gray-50">
+                                    <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">#{order.production_order_id}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{pvcMaterial?.material_name || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[100px]">
+                                        {color ? (
+                                            <div className="flex items-center justify-center gap-1">
+                                                {color.imageUrl && (
+                                                    <img
+                                                        src={color.imageUrl.startsWith("http") ? color.imageUrl : `${API_BASE_URL}${color.imageUrl}`}
+                                                        alt={color.color_name}
+                                                        className="w-4 h-4 rounded border border-gray-300"
+                                                    />
+                                                )}
+                                                <span className="text-xs">{color.color_name} ({color.color_code})</span>
+                                            </div>
+                                        ) : '-'}
+                                    </td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">{order.width || FIXED_WIDTH}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">{order.length || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">{formatTypeItem(order.type_item)}</td>
+                                    <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{order.batch_number || batch?.batch_number || "-"}</td>
+                                    <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">{order.thickness || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">
+                                        <div className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 px-3 py-1.5 shadow-sm">
+                                            <span className="font-medium text-blue-700">
+                                                {formatDestination(order.destination)}
+                                            </span>
                                         </div>
-                                    ) : '-'}
-                                </td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.width || FIXED_WIDTH}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.length || "-"}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{formatTypeItem(order.type_item)}</td>
-                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">{order.batch_number || batch?.batch_number || "-"}</td>
-                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">{order.thickness || "-"}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
-                                    <div className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 px-3 py-1.5 shadow-sm">
-                                        <span className="font-medium text-blue-700">
-                                            {formatDestination(order.destination)}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{formatSource(order.source)}</td>
-                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap"><span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span></td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{user?.full_name || "-"}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{formatDate(order.created_at)}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.notes || "-"}</td>
-                                <td className="px-1 py-2 align-middle text-center whitespace-nowrap">
-                                    <div className="flex h-8 items-center justify-center gap-1">
-                                        <button onClick={() => handleOrderSelect(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"><Eye className="w-4 h-4" /></button>
-                                        {ordersTab === "current" && (
-                                            <>
-                                                <button onClick={() => handleApplyOrderToInputs(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"><Hash className="w-4 h-4" /></button>
-                                                <button onClick={() => requestCompleteOrderItem(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50"><Check className="w-4 h-4" /></button>
-                                            </>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+                                    </td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{formatSource(order.source)}</td>
+                                    <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]"><span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span></td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{user?.full_name || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[120px]">{formatDate(order.created_at)}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[150px] max-w-[150px] truncate" title={order.notes}>{order.notes || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center whitespace-nowrap min-w-[120px]">
+                                        <div className="flex h-8 items-center justify-center gap-1">
+                                            <button onClick={() => handleOrderSelect(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"><Eye className="w-4 h-4" /></button>
+                                            {ordersTab === "current" && (
+                                                <>
+                                                    <button onClick={() => handleApplyOrderToInputs(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"><Hash className="w-4 h-4" /></button>
+                                                    <button onClick={() => requestCompleteOrderItem(order)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50"><Check className="w-4 h-4" /></button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 
     return (
         <div className="h-screen overflow-hidden flex flex-col bg-gray-50 relative" dir="rtl">
-             <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[8.5%]" : "top-[2%]"}`}>
-
-        <Button
-
-          type="button"
-
-          onClick={() => setShowHeader((prev) => !prev)}
-
-          className="h-10 w-10 rounded-full border-2 border-t-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105  active:scale-95"
-
-          title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
-
-        >
-
-          {showHeader ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
-
-        </Button>
-
-      </div>
+            <div className={`absolute left-0 left-[49%] z-40 transition-all duration-300 ${showHeader ? "top-[8.5%]" : "top-[2%]"}`}>
+                <Button
+                    type="button"
+                    onClick={() => setShowHeader((prev) => !prev)}
+                    className="h-10 w-10 rounded-full border-2 border-t-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 active:scale-95"
+                    title={showHeader ? "إخفاء الهيدر" : "إظهار الهيدر"}
+                >
+                    {showHeader ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+                </Button>
+            </div>
 
             {showHeader && (
             <div className="flex-shrink-0">
@@ -757,47 +935,198 @@ export default function WarehouseKeeper() {
 
             <div className="flex-1 flex flex-col gap-1 px-4 mt-1 overflow-hidden">
                 <div className={`grid shrink-0 gap-1 ${showHeader ? "grid-cols-3 h-[60%]" : "grid-cols-5 h-[55%]"}`}>
-                    <Card className={`p-4 flex flex-col gap-4 min-h-0 ${showHeader ? "col-span-1" : "col-span-2"}`}>
+                    <Card className={`p-4 pt-0 flex flex-col gap-4 min-h-0 ${showHeader ? "col-span-1" : "col-span-2"}`}>
                         <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2"><Package className="w-5 h-5 text-secondary-s" /><h2 className="text-sm font-bold">الطلبات</h2></div>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" className={ordersTab === "current" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setOrdersTab("current")}>قيد الانتظار</Button>
-                                <Button variant="outline" size="sm" className={ordersTab === "completed" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setOrdersTab("completed")}>المكتملة</Button>
-                                <Button variant="outline" size="sm" onClick={loadOrders} disabled={loadingOrders}><RefreshCw className={`w-4 h-4 ml-2 ${loadingOrders ? "animate-spin" : ""}`} />تحديث</Button>
-                            </div>
+                            {/* <div className="flex items-center gap-2"><Package className="w-5 h-5 text-secondary-s" /><h2 className="text-sm font-bold">الطلبات</h2></div> */}
                         </div>
-                        {renderOrdersTable(ordersTab === "current" ? currentOrders : completedOrders)}
+                        
+                        {/* تابين رئيسية للطلبات */}
+                        <div className="flex gap-1 border-b">
+                            <button 
+                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${
+                                    ordersTab === "production" 
+                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700" 
+                                        : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                                }`}
+                                onClick={() => setOrdersTab("production")}
+                            >
+                                طلبات الإنتاج
+                            </button>
+                            <button 
+                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${
+                                    ordersTab === "sales" 
+                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700" 
+                                        : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                                }`}
+                                onClick={() => setOrdersTab("sales")}
+                            >
+                                طلبات المبيعات
+                            </button>
+                        </div>
+                        
+                        {/* محتوى التابين */}
+                        {ordersTab === "production" ? (
+                            <div className="flex-1 flex flex-col gap-2 min-h-0">
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    <Button variant="outline" size="sm" className={salesOrdersTab === "current" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setSalesOrdersTab("current")}>قيد الانتظار</Button>
+                                    <Button variant="outline" size="sm" className={salesOrdersTab === "completed" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setSalesOrdersTab("completed")}>المكتملة</Button>
+                                    <Button variant="outline" size="sm" onClick={loadOrders} disabled={loadingOrders}><RefreshCw className={`w-4 h-4 ml-2 ${loadingOrders ? "animate-spin" : ""}`} />تحديث</Button>
+                                </div>
+                                <div className="flex-1 min-h-0 overflow-hidden">
+                                    {renderOrdersTable(salesOrdersTab === "current" ? currentOrders : completedOrders)}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col gap-2 min-h-0">
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    <Button variant="outline" size="sm" className={salesOrdersTab === "pending" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setSalesOrdersTab("pending")}>قيد الانتظار</Button>
+                                    <Button variant="outline" size="sm" className={salesOrdersTab === "completed" ? "bg-blue-50 border-blue-300 text-primary-f" : ""} onClick={() => setSalesOrdersTab("completed")}>المكتملة</Button>
+                                    <Button variant="outline" size="sm" onClick={loadSalesOrders} disabled={loadingSalesOrders}><RefreshCw className={`w-4 h-4 ml-2 ${loadingSalesOrders ? "animate-spin" : ""}`} />تحديث</Button>
+                                </div>
+                                <div className="flex-1 min-h-0 overflow-hidden">
+                                    {renderSalesOrdersTable(salesOrdersTab === "pending" ? pendingSalesOrders : completedSalesOrders)}
+                                </div>
+                            </div>
+                        )}
                     </Card>
 
                     <Card className={`p-4 flex flex-col ${showHeader ? "col-span-2" : "col-span-3"}`}>
-                        <h2 className="text-lg font-bold  flex items-center gap-2"><ArrowRight className="w-5 h-5 text-blue-600" />المدخلات</h2>
-                        <div className="flex-1 overflow-auto pr-1 space-y-2">
-                            {/* {activeOrderItem && <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between"><div className="text-sm"><div className="font-bold">تم ربط الإدخال بطلب #{activeOrderItem.production_order_id}</div><div className="text-xs text-gray-600">عنصر #{activeOrderItem.production_order_item_id}</div></div><Button variant="outline" size="sm" onClick={() => setActiveOrderItem(null)}>إلغاء الربط</Button></div>} */}
-                            <div className="flex gap-2">
-                                <Button variant="outline" className={`flex-1 h-13 ${entryTab === "qr" ? "bg-blue-50 border-blue-300 text-primary-f" : ""}`} onClick={() => setEntryTab("qr")}><Search className="w-4 h-4 ml-2" />QR</Button>
-                                <Button variant="outline" className={`flex-1 h-13 ${entryTab === "manual" ? "bg-blue-50 border-blue-300 text-primary-f" : ""}`} onClick={() => setEntryTab("manual")}><Hash className="w-4 h-4 ml-2" />يدوي</Button>
-                            </div>
-                            {entryTab === "qr" ? (
-                                <div className="space-y-3">
-                                    <div className="text-sm text-gray-600">الصيغة: `material|ruler|color_code|width|thickness|quantity|batch`</div>
-                                    <Input value={qrInput} className={`h-13`} onChange={(e) => setQrInput(e.target.value)} onFocus={() => setCurrentInput("qr")} placeholder="material|ruler|color_code|width|thickness|quantity|batch" />
-                                    <Button onClick={applyQrData} className="w-full h-13 bg-primary-f hover:bg-blue-700" disabled={!qrInput.trim()}><Check className="w-5 h-5 ml-2" />تطبيق البيانات</Button>
-                                </div>
+                        {/* <h2 className="text-lg font-bold  flex items-center gap-2"><ArrowRight className="w-5 h-5 text-blue-600" />المدخلات</h2> */}
+                        
+                        {/* تابين رئيسية للمدخلات */}
+                        <div className="flex gap-1 border-b">
+                            <button 
+                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${
+                                    entryTab === "production" 
+                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700" 
+                                        : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                                }`}
+                                onClick={() => setEntryTab("production")}
+                            >
+                                مدخلات طلبات الإنتاج
+                            </button>
+                            <button 
+                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${
+                                    entryTab === "sales" 
+                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700" 
+                                        : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                                }`}
+                                onClick={() => setEntryTab("sales")}
+                            >
+                                مدخلات طلبات المبيعات
+                            </button>
+                        </div>
+                        
+                        {/* محتوى التابين */}
+                        <div className="flex-1 overflow-auto pr-1 space-y-2 min-h-0">
+                            {entryTab === "production" ? (
+                                <>
+                                    <div className="flex gap-2 flex-shrink-0">
+                                        <Button variant="outline" className={`flex-1 h-13 ${entryTab === "qr" ? "bg-blue-50 border-blue-300 text-primary-f" : ""}`} onClick={() => setEntryTab("qr")}><Search className="w-4 h-4 ml-2" />QR</Button>
+                                        <Button variant="outline" className={`flex-1 h-13 ${entryTab === "manual" ? "bg-blue-50 border-blue-300 text-primary-f" : ""}`} onClick={() => setEntryTab("manual")}><Hash className="w-4 h-4 ml-2" />يدوي</Button>
+                                    </div>
+                                    {entryTab === "qr" ? (
+                                        <div className="space-y-3">
+                                            <div className="text-sm text-gray-600">الصيغة: `material|ruler|color_code|width|thickness|quantity|batch`</div>
+                                            <Input value={qrInput} className={`h-13`} onChange={(e) => setQrInput(e.target.value)} onFocus={() => setCurrentInput("qr")} placeholder="material|ruler|color_code|width|thickness|quantity|batch" />
+                                            <Button onClick={applyQrData} className="w-full h-13 bg-primary-f hover:bg-blue-700" disabled={!qrInput.trim()}><Check className="w-5 h-5 ml-2" />تطبيق البيانات</Button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-5 gap-1">
+                                                <div><Label className={'mb-1'}>المسطرة</Label><FilterSelect value={outputForm.ruler_id} onChange={(e) => setOutputForm((p) => ({ ...p, ruler_id: e.target.value, color_id: "" }))} searchValue={selectSearch.ruler} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, ruler: value }))} onInputFocus={() => setCurrentInput("select:ruler")} options={availableRulers.map((r) => ({ value: String(r.ruler_id), label: r.ruler_name }))} placeholder="اختر المسطرة" disabled={!outputForm.material_id} /></div>
+                                                <div><Label className={'mb-1'}>اللون</Label><FilterSelect value={outputForm.color_id} onChange={(e) => setOutputForm((p) => ({ ...p, color_id: e.target.value }))} searchValue={selectSearch.color} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, color: value }))} onInputFocus={() => setCurrentInput("select:color")} options={colorOptions} placeholder={!outputForm.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"} disabled={!outputForm.ruler_id} /></div>
+                                                <div><Label className={'mb-1'}>الطبخة</Label><FilterSelect value={outputForm.batch_id} onChange={(e) => setOutputForm((p) => ({ ...p, batch_id: e.target.value }))} searchValue={selectSearch.batch} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, batch: value }))} onInputFocus={() => setCurrentInput("select:batch")} options={batchOptions} placeholder="اختر الطبخة" disabled={!outputForm.material_id} /></div>
+                                                <div><Label className={'mb-1'}>العرض</Label><button type="button" className="w-full rounded-lg border-2 border-secondary-s bg-secondary-s text-white p-3 font-bold shadow-lg">{FIXED_WIDTH}</button></div>
+                                                <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} searchValue={selectSearch.thickness} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, thickness: value }))} onInputFocus={() => setCurrentInput("select:thickness")} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1">
+                                                <div><Label className={'mb-1'}>الكمية</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} searchValue={selectSearch.length} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, length: value }))} onInputFocus={() => setCurrentInput("select:length")} options={lengthOptions} placeholder="اختر الكمية" disabled={!lengthOptions.length} /></div>
+                                                <div><Label className={'mb-1'}>عدد الكراتين</Label><Input type="number" min="1" className={`h-13`} value={outputForm.carton_count} onChange={(e) => setOutputForm((p) => ({ ...p, carton_count: e.target.value }))} onFocus={() => setCurrentInput("carton_count")} placeholder="عدد الكراتين" /></div>
+                                                <div className="col-span-1"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
+                                            </div>
+                                            <Button onClick={handleOutputSubmit} className="w-full h-13 bg-green-600 hover:bg-green-700"><Check className="w-5 h-5 ml-2" />حفظ المخرج</Button>
+                                        </div>
+                                    )}
+                                </>
                             ) : (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-5 gap-1">
-                                        <div><Label className={'mb-1'}>المسطرة</Label><FilterSelect value={outputForm.ruler_id} onChange={(e) => setOutputForm((p) => ({ ...p, ruler_id: e.target.value, color_id: "" }))} searchValue={selectSearch.ruler} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, ruler: value }))} onInputFocus={() => setCurrentInput("select:ruler")} options={availableRulers.map((r) => ({ value: String(r.ruler_id), label: r.ruler_name }))} placeholder="اختر المسطرة" disabled={!outputForm.material_id} /></div>
-                                        <div><Label className={'mb-1'}>اللون</Label><FilterSelect value={outputForm.color_id} onChange={(e) => setOutputForm((p) => ({ ...p, color_id: e.target.value }))} searchValue={selectSearch.color} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, color: value }))} onInputFocus={() => setCurrentInput("select:color")} options={colorOptions} placeholder={!outputForm.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"} disabled={!outputForm.ruler_id} /></div>
-                                        <div><Label className={'mb-1'}>الطبخة</Label><FilterSelect value={outputForm.batch_id} onChange={(e) => setOutputForm((p) => ({ ...p, batch_id: e.target.value }))} searchValue={selectSearch.batch} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, batch: value }))} onInputFocus={() => setCurrentInput("select:batch")} options={batchOptions} placeholder="اختر الطبخة" disabled={!outputForm.material_id} /></div>
-                                        <div><Label className={'mb-1'}>العرض</Label><button type="button" className="w-full rounded-lg border-2 border-secondary-s bg-secondary-s text-white p-3 font-bold shadow-lg">{FIXED_WIDTH}</button></div>
-                                        <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} searchValue={selectSearch.thickness} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, thickness: value }))} onInputFocus={() => setCurrentInput("select:thickness")} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
+                                <div className="flex-1 overflow-auto pr-1 space-y-2">
+                                    {/* عرض معلومات طلب المبيعات المحدد */}
+                                    {selectedOrder?.order_id && entryTab === "sales" && (
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h4 className="font-bold text-blue-700">طلب المبيعات #{selectedOrder.order_id}</h4>
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={() => {
+                                                        setSelectedOrder(null);
+                                                        setOrderItems([]);
+                                                    }}
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 text-sm">
+                                                <div><span className="text-gray-600">الزبون:</span> <span className="font-medium">{selectedOrder.customer?.name || "-"}</span></div>
+                                                <div><span className="text-gray-600">المبلغ:</span> <span className="font-medium">{Number(selectedOrder.total_amount || 0).toLocaleString()}</span></div>
+                                                <div><span className="text-gray-600">العناصر:</span> <span className="font-medium">{selectedOrder.items?.length || 0}</span></div>
+                                                <div><span className="text-gray-600">الحالة:</span> <span className="font-medium">{{
+                                                    pending: "قيد الانتظار",
+                                                    completed: "مكتمل",
+                                                    preparing: "قيد التحضير",
+                                                    canceled: "ملغي"
+                                                }[selectedOrder.status] || selectedOrder.status}</span></div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* عرض عناصر طلب المبيعات */}
+                                    {selectedOrder?.items && selectedOrder.items.length > 0 && (
+                                        <div className="border rounded-lg overflow-hidden">
+                                            <div className="bg-gray-100 px-3 py-2 border-b">
+                                                <h4 className="font-medium text-sm">عناصر الطلب</h4>
+                                            </div>
+                                            <div className="max-h-60 overflow-auto">
+                                                <table className="w-full text-xs">
+                                                    <thead className="bg-gray-50 sticky top-0">
+                                                        <tr>
+                                                            {["#", "المادة", "اللون", "العرض", "الطول", "السماكة", "النوع", "الكمية"].map((h) => (
+                                                                <th key={h} className="p-1 text-center border-b text-xs">{h}</th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedOrder.items.map((item, index) => (
+                                                            <tr key={index} className="border-b hover:bg-gray-50">
+                                                                <td className="p-1 text-center">#{index + 1}</td>
+                                                                <td className="p-1 text-center">{item.material_name || "-"}</td>
+                                                                <td className="p-1 text-center">
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        <div className="w-2 h-2 rounded border border-gray-300" style={{ backgroundColor: item.color_code }} />
+                                                                        <span className="text-xs">{item.color_name || "-"}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-1 text-center">{item.width || "-"}</td>
+                                                                <td className="p-1 text-center">{item.length || "-"}</td>
+                                                                <td className="p-1 text-center">{item.thickness || "-"}</td>
+                                                                <td className="p-1 text-center">{item.type_item === "Presser" ? "كوي" : item.type_item === "Machine" ? "مكنة" : item.type_item || "-"}</td>
+                                                                <td className="p-1 text-center">{item.quantity || "-"}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex items-center justify-center p-8 text-gray-500">
+                                        <div className="text-center">
+                                            <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                                            <p className="text-sm">مدخلات طلبات المبيعات</p>
+                                            <p className="text-xs mt-2">اختر طلباً من جدول طلبات المبيعات لعرض العناصر</p>
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-1">
-                                        <div><Label className={'mb-1'}>الكمية</Label><FilterSelect value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} searchValue={selectSearch.length} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, length: value }))} onInputFocus={() => setCurrentInput("select:length")} options={lengthOptions} placeholder="اختر الكمية" disabled={!lengthOptions.length} /></div>
-                                        <div><Label className={'mb-1'}>عدد الكراتين</Label><Input type="number" min="1" className={`h-13`} value={outputForm.carton_count} onChange={(e) => setOutputForm((p) => ({ ...p, carton_count: e.target.value }))} onFocus={() => setCurrentInput("carton_count")} placeholder="عدد الكراتين" /></div>
-                                        <div className="col-span-1"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
-                                    </div>
-                                    <Button onClick={handleOutputSubmit} className="w-full h-13 bg-green-600 hover:bg-green-700"><Check className="w-5 h-5 ml-2" />حفظ المخرج</Button>
                                 </div>
                             )}
                         </div>
@@ -805,13 +1134,11 @@ export default function WarehouseKeeper() {
                 </div>
 
                 <div className="flex gap-1 flex-1 min-h-0 flex-row-reverse">
-                    
-
                     <Card className="p-4 pb-0 flex flex-col flex-1  min-h-0">
                         {/* <div className="flex items-center justify-between"><h3 className="text-lg font-bold flex items-center gap-2"><Package className="w-5 h-5 text-purple-600" />جدول المخرجات</h3><Button variant="outline" size="sm" onClick={loadMovements} disabled={loadingMovements}><RefreshCw className={`w-4 h-4 ml-2 ${loadingMovements ? "animate-spin" : ""}`} />تحديث</Button></div> */}
                         <div className="flex-1 min-h-0 overflow-auto border rounded-lg bg-white">
                             {/* Multi-select controls */}
-                            <div className="p-2 bg-gray-100 border-b flex items-center justify-between sticky top-0 z-10">
+                            <div className="p-2 bg-gray-100 border-b flex items-center justify-between sticky top-0 z-10 flex-shrink-0">
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="checkbox"
@@ -836,56 +1163,72 @@ export default function WarehouseKeeper() {
                                 )}
                             </div>
                             
-                            <table className="min-w-[1100px] w-full table-fixed border-collapse">
-                                <thead className="bg-gray-100 sticky top-8 z-10"><tr>{["", "#", "اللون", "الطبخة", "الكمية", "العرض", "السماكة", "الوجهة", "المستخدم", "التوقيت", "الملاحظات", "إجراءات"].map((h) => <th key={h} className="p-2 text-center border-b text-sm">{h}</th>)}</tr></thead>
-                                <tbody>
-                                    {loadingMovements ? <tr><td colSpan="13" className="p-6"><LoadingState /></td></tr> : sortedMovements.length === 0 ? <tr><td colSpan="13" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد مخرجات</td></tr> : sortedMovements.map((m) => (
-                                        <tr key={m.movement_id} className={`border-b hover:bg-gray-50 ${selectedMovements.has(m.movement_id) ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}>
-                                            <td className="p-2 text-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedMovements.has(m.movement_id)}
-                                                    onChange={() => toggleMovementSelection(m.movement_id)}
-                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                            </td>
-                                            <td className="p-2 text-center text-sm">#{m.movement_id}</td>
-                                            <td className="p-2 text-center text-sm">{m.color?.color_name || "-"} ({m.color?.color_code || "-"})</td>
-                                            <td className="p-2 text-center text-sm">{m.batch?.batch_number || "-"}</td>
-                                            <td className="p-2 text-center text-sm">{m.length || "-"}</td>
-                                            <td className="p-2 text-center text-sm">{m.width || FIXED_WIDTH}</td>
-                                            <td className="p-2 text-center text-sm">{m.thickness || "-"}</td>
-                                            <td className="p-2 text-center text-sm">{formatDestination(m.destination)}</td>
-                                            <td className="p-2 text-center text-sm">{m.user?.full_name || m.user?.username || "-"}</td>
-                                            <td className="p-2 text-center text-sm">{formatDate(m.created_at)}</td>
-                                            <td className="p-2 text-center text-sm max-w-[140px] truncate" title={m.notes || "-"}>{m.notes || "-"}</td>
-                                            <td className="p-2 text-center">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            const qrData = buildMovementQrData(m);
-                                                            const qrFooter = buildMovementQrFooter(m);
-                                                            printQr(getQrUrl(qrData), `QR - مخرج #${m.movement_id}`, qrFooter);
-                                                        }}
-                                                        className="text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg"
-                                                        title="طباعة QR"
-                                                    >
-                                                        <Printer className="w-4 h-4" />
-                                                    </button>
-                                                    <button onClick={() => { setSelectedMovement(m); setShowMovementDetails(true); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg"><Eye className="w-4 h-4" /></button>
-                                                    <button
-                                                        onClick={() => requestDeleteMovement(m)}
-                                                        className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
-                                                        title="حذف المخرج"
-                                                    >
-                                                        <Trash className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
+                            <div className="flex-1 min-h-0 overflow-auto">
+                                <table className="min-w-[1100px] w-full table-fixed border-collapse">
+                                    <thead className="bg-gray-100 sticky top-0 z-30">
+                                        <tr>
+                                            {["", "#", "اللون", "الطبخة", "الكمية", "العرض", "السماكة", "الوجهة", "المستخدم", "التوقيت", "الملاحظات", "إجراءات"].map((h) => (
+                                                <th key={h} className="p-2 text-center border-b text-sm bg-gray-100">{h}</th>
+                                            ))}
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {loadingMovements ? (
+                                            <tr><td colSpan="13" className="p-6"><LoadingState /></td></tr>
+                                        ) : sortedMovements.length === 0 ? (
+                                            <tr><td colSpan="13" className="p-8 text-center text-gray-400">
+                                                <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد مخرجات
+                                            </td></tr>
+                                        ) : sortedMovements.map((m) => (
+                                            <tr key={m.movement_id} className={`border-b hover:bg-gray-50 ${selectedMovements.has(m.movement_id) ? 'bg-blue-50 border-l-4 border-blue-500' : ''}`}>
+                                                <td className="p-2 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedMovements.has(m.movement_id)}
+                                                        onChange={() => toggleMovementSelection(m.movement_id)}
+                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    />
+                                                </td>
+                                                <td className="p-2 text-center text-sm">#{m.movement_id}</td>
+                                                <td className="p-2 text-center text-sm">{m.color?.color_name || "-"} ({m.color?.color_code || "-"})</td>
+                                                <td className="p-2 text-center text-sm">{m.batch?.batch_number || "-"}</td>
+                                                <td className="p-2 text-center text-sm">{m.length || "-"}</td>
+                                                <td className="p-2 text-center text-sm">{m.width || FIXED_WIDTH}</td>
+                                                <td className="p-2 text-center text-sm">{m.thickness || "-"}</td>
+                                                <td className="p-2 text-center text-sm">{formatDestination(m.destination)}</td>
+                                                <td className="p-2 text-center text-sm">{m.user?.full_name || m.user?.username || "-"}</td>
+                                                <td className="p-2 text-center text-sm">{formatDate(m.created_at)}</td>
+                                                <td className="p-2 text-center text-sm max-w-[140px] truncate" title={m.notes || "-"}>{m.notes || "-"}</td>
+                                                <td className="p-2 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button
+                                                            onClick={() => {
+                                                                const qrData = buildMovementQrData(m);
+                                                                const qrFooter = buildMovementQrFooter(m);
+                                                                printQr(getQrUrl(qrData), `QR - مخرج #${m.movement_id}`, qrFooter);
+                                                            }}
+                                                            className="text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg"
+                                                            title="طباعة QR"
+                                                        >
+                                                            <Printer className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => { setSelectedMovement(m); setShowMovementDetails(true); }} className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg">
+                                                            <Eye className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => requestDeleteMovement(m)}
+                                                            className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
+                                                            title="حذف المخرج"
+                                                        >
+                                                            <Trash className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </Card>
 
@@ -901,42 +1244,94 @@ export default function WarehouseKeeper() {
                 </div>
             </div>
 
-            <StyledDialog isOpen={showOrderDetails} onOpenChange={setShowOrderDetails} title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`} contentClassName="max-w-7xl w-full" onCancel={() => setShowOrderDetails(false)} onConfirm={() => setShowOrderDetails(false)} confirmLabel="إغلاق" showCancel={false}>
+            <StyledDialog isOpen={showOrderDetails} onOpenChange={setShowOrderDetails} title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : selectedOrder?.order_id ? `#${selectedOrder.order_id}` : ""}`} contentClassName="max-w-7xl w-full" onCancel={() => setShowOrderDetails(false)} onConfirm={() => setShowOrderDetails(false)} confirmLabel="إغلاق" showCancel={false}>
                 {selectedOrder && (
                     <div className="space-y-4 w-full">
-                        {/* <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
-                            <div><span className="text-gray-500">التاريخ:</span> <span className="font-bold">{formatDate(selectedOrder.created_at)}</span></div>
-                            <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
-                            <div><span className="text-gray-500">الوجهة:</span> <span className="font-bold">{formatDestination(selectedOrder.destination)}</span></div>
-                            <div><span className="text-gray-500">العرض:</span> <span className="font-bold">{selectedOrder.width || FIXED_WIDTH}</span></div>
-                            <div><span className="text-gray-500">الكمية:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
-                            <div><span className="text-gray-500">السماكة:</span> <span className="font-bold">{selectedOrder.thickness || "-"}</span></div>
-                            <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{formatTypeItem(selectedOrder.type_item || selectedOrder.type)}</span></div>
-                            <div><span className="text-gray-500">المصدر:</span> <span className="font-bold">{formatSource(selectedOrder.source || "warehouse")}</span></div>
-                            <div><span className="text-gray-500">الطبخة:</span> <span className="font-bold">{selectedOrder.batch_number || selectedOrder.batch?.batch_number || "-"}</span></div>
-                            <div className="md:col-span-2"><span className="text-gray-500">اللون:</span> <span className="font-bold">{selectedOrder.color_name || selectedOrder.color?.color_name || "-"} ({selectedOrder.color_code || selectedOrder.color?.color_code || "-"})</span></div>
-                            <div className="md:col-span-2"><span className="text-gray-500">الملاحظات:</span> <span className="font-bold">{selectedOrder.notes || "-"}</span></div>
-                        </div> */}
+                        {/* معلومات أساسية للطلب */}
+                        {selectedOrder.order_id && (
+                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                <h3 className="font-bold text-blue-700 mb-3">معلومات طلب المبيعات</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.order_id}</span></div>
+                                    <div><span className="text-gray-500">الزبون:</span> <span className="font-bold">{selectedOrder.customer?.name || "-"}</span></div>
+                                    <div><span className="text-gray-500">الهاتف:</span> <span className="font-bold">{selectedOrder.customer?.phone || "-"}</span></div>
+                                    <div><span className="text-gray-500">المدينة:</span> <span className="font-bold">{selectedOrder.customer?.city || "-"}</span></div>
+                                    <div><span className="text-gray-500">المبلغ:</span> <span className="font-bold">{Number(selectedOrder.total_amount || 0).toLocaleString()}</span></div>
+                                    <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{{
+                                        pending: "قيد الانتظار",
+                                        completed: "مكتمل",
+                                        preparing: "قيد التحضير",
+                                        canceled: "ملغي"
+                                    }[selectedOrder.status] || selectedOrder.status}</span></div>
+                                    <div><span className="text-gray-500">المبيعات:</span> <span className="font-bold">{selectedOrder.sales?.full_name || selectedOrder.sales?.username || "-"}</span></div>
+                                    <div><span className="text-gray-500">التاريخ:</span> <span className="font-bold">{formatDate(selectedOrder.created_at)}</span></div>
+                                </div>
+                                {selectedOrder.notes && (
+                                    <div className="mt-3 pt-3 border-t border-blue-200">
+                                        <span className="text-gray-500">الملاحظات:</span> <span className="font-bold">{selectedOrder.notes}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        
+                        {/* جدول العناصر */}
                         {loadingOrderDetails ? <LoadingState /> : (
                             <div className="border rounded-lg overflow-hidden">
                                 <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
-                                    <thead className="bg-gray-100"><tr>{["#", "العرض", "الكمية", "السماكة", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>)}</tr></thead>
+                                    <thead className="bg-gray-100">
+                                        <tr>
+                                            {selectedOrder.items ? 
+                                                ["#", "المادة", "اللون", "العرض", "الطول", "السماكة", "النوع", "الطبخة", "الكمية", "السعر", "المجموع", "الملاحظات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>) :
+                                                ["#", "العرض", "الكمية", "السماكة", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>)
+                                            }
+                                        </tr>
+                                    </thead>
                                     <tbody>
-                                        {orderItems.length === 0 ? <tr><td colSpan="8" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr> : orderItems.map((item, index) => {
-                                            return (
-                                            <tr key={item.production_order_item_id || index} className="border-t">
-                                                <td className="p-2 text-center">#{item.production_order_item_id || index + 1}</td>
-                                                <td className="p-2 text-center">{item.width || FIXED_WIDTH}</td>
-                                                <td className="p-2 text-center">{item.length || "-"}</td>
-                                                <td className="p-2 text-center">{item.thickness || "-"}</td>
-                                                <td className="p-2 text-center">{formatDestination(item.destination)}</td>
-                                                <td className="p-2 text-center"><span className={`px-2 py-1 rounded-lg text-xs ${getStatusBadge(item.status).className}`}>{getStatusBadge(item.status).label}</span></td>
-                                                <td className="p-2 text-center">{item.notes || "-"}</td>
-                                                <td className="p-2 text-center"><div className="flex items-center justify-center gap-2"><Button variant="outline" size="sm" onClick={() => handleApplyOrderToInputs(item)}>إدخال</Button><Button variant="outline" size="sm" disabled={String(item.status || "").toLowerCase() === ProductionStatus.completed} onClick={() => requestCompleteOrderItem(item)}>إتمام</Button></div></td>
-                                            </tr>
-                                        );
-                                        })}
+                                        {selectedOrder.items ? (
+                                            selectedOrder.items.length === 0 ? (
+                                                <tr><td colSpan={selectedOrder.items ? 12 : 8} className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr>
+                                            ) : selectedOrder.items.map((item, index) => (
+                                                <tr key={item.order_id || index} className="border-t">
+                                                    <td className="p-2 text-center">#{index + 1}</td>
+                                                    <td className="p-2 text-center">{item.material_name || "-"}</td>
+                                                    <td className="p-2 text-center">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <div className="w-3 h-3 rounded border border-gray-300" style={{ backgroundColor: item.color_code }} />
+                                                            <span className="text-xs">{item.color_name || "-"} ({item.color_code || "-"})</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2 text-center">{item.width || "-"}</td>
+                                                    <td className="p-2 text-center">{item.length || "-"}</td>
+                                                    <td className="p-2 text-center">{item.thickness || "-"}</td>
+                                                    <td className="p-2 text-center">{item.type_item === "Presser" ? "كوي" : item.type_item === "Machine" ? "مكنة" : item.type_item || "-"}</td>
+                                                    <td className="p-2 text-center">{item.batch_number || "-"}</td>
+                                                    <td className="p-2 text-center">{item.quantity || "-"}</td>
+                                                    <td className="p-2 text-center">{Number(item.price_per_meter || 0).toLocaleString()}</td>
+                                                    <td className="p-2 text-center">{Number(item.subtotal || 0).toLocaleString()}</td>
+                                                    <td className="p-2 text-center max-w-[150px] truncate" title={item.notes}>{item.notes || "-"}</td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            orderItems.length === 0 ? (
+                                                <tr><td colSpan="8" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr>
+                                            ) : orderItems.map((item, index) => (
+                                                <tr key={item.production_order_item_id || index} className="border-t">
+                                                    <td className="p-2 text-center">#{item.production_order_item_id || index + 1}</td>
+                                                    <td className="p-2 text-center">{item.width || FIXED_WIDTH}</td>
+                                                    <td className="p-2 text-center">{item.length || "-"}</td>
+                                                    <td className="p-2 text-center">{item.thickness || "-"}</td>
+                                                    <td className="p-2 text-center">{formatDestination(item.destination)}</td>
+                                                    <td className="p-2 text-center"><span className={`px-2 py-1 rounded-lg text-xs ${getStatusBadge(item.status).className}`}>{getStatusBadge(item.status).label}</span></td>
+                                                    <td className="p-2 text-center">{item.notes || "-"}</td>
+                                                    <td className="p-2 text-center">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <Button variant="outline" size="sm" onClick={() => handleApplyOrderToInputs(item)}>إدخال</Button>
+                                                            <Button variant="outline" size="sm" disabled={String(item.status || "").toLowerCase() === ProductionStatus.completed} onClick={() => requestCompleteOrderItem(item)}>إتمام</Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
