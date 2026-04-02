@@ -96,6 +96,7 @@ export default function SlittingManager() {
     color_id: "",
     batch_id: "",
     input_length: "",
+    thickness: "",
     type_item: "",
     source: "warehouse",
     destination: "slitting",
@@ -467,6 +468,10 @@ export default function SlittingManager() {
       setInputForm(prev => ({ ...prev, input_length: String(prev.input_length || "") + value }));
       return;
     }
+    if (currentInput === "thickness") {
+      setInputForm(prev => ({ ...prev, thickness: String(prev.thickness || "") + value }));
+      return;
+    }
     if (currentInput === "output_length") {
       setOutputForm(prev => ({ ...prev, output_length: String(prev.output_length || "") + value }));
       return;
@@ -476,7 +481,14 @@ export default function SlittingManager() {
       return;
     }
     if (currentInput === "output_length_44") {
-      setOutputForm(prev => ({ ...prev, output_length_44: String(prev.output_length_44 || "") + value }));
+      setOutputForm(prev => {
+        const newValue = String(prev.output_length_44 || "") + value;
+        // Sync both fields when using 44x1-22x1 pattern
+        if (selectedOutputPattern === "44x1-22x1") {
+          return { ...prev, output_length_44: newValue, output_length_22: newValue };
+        }
+        return { ...prev, output_length_44: newValue };
+      });
       return;
     }
     if (currentInput === "qr") {
@@ -503,6 +515,10 @@ export default function SlittingManager() {
       setInputForm(prev => ({ ...prev, input_length: back(prev.input_length) }));
       return;
     }
+    if (currentInput === "thickness") {
+      setInputForm(prev => ({ ...prev, thickness: back(prev.thickness) }));
+      return;
+    }
     if (currentInput === "output_length") {
       setOutputForm(prev => ({ ...prev, output_length: back(prev.output_length) }));
       return;
@@ -512,7 +528,14 @@ export default function SlittingManager() {
       return;
     }
     if (currentInput === "output_length_44") {
-      setOutputForm(prev => ({ ...prev, output_length_44: back(prev.output_length_44) }));
+      setOutputForm(prev => {
+        const newValue = back(prev.output_length_44);
+        // Sync both fields when using 44x1-22x1 pattern
+        if (selectedOutputPattern === "44x1-22x1") {
+          return { ...prev, output_length_44: newValue, output_length_22: newValue };
+        }
+        return { ...prev, output_length_44: newValue };
+      });
       return;
     }
     if (currentInput === "qr") {
@@ -538,6 +561,10 @@ export default function SlittingManager() {
       setInputForm(prev => ({ ...prev, input_length: "" }));
       return;
     }
+    if (currentInput === "thickness") {
+      setInputForm(prev => ({ ...prev, thickness: "" }));
+      return;
+    }
     if (currentInput === "output_length") {
       setOutputForm(prev => ({ ...prev, output_length: "" }));
       return;
@@ -547,7 +574,13 @@ export default function SlittingManager() {
       return;
     }
     if (currentInput === "output_length_44") {
-      setOutputForm(prev => ({ ...prev, output_length_44: "" }));
+      setOutputForm(prev => {
+        // Sync both fields when using 44x1-22x1 pattern
+        if (selectedOutputPattern === "44x1-22x1") {
+          return { ...prev, output_length_44: "", output_length_22: "" };
+        }
+        return { ...prev, output_length_44: "" };
+      });
       return;
     }
     if (currentInput === "qr") {
@@ -581,6 +614,7 @@ export default function SlittingManager() {
       color_id: item.color_id ? String(item.color_id) : "",
       batch_id: item.batch_id ? String(item.batch_id) : "",
       input_length: item.length ? String(item.length) : "",
+      thickness: item.thickness ? String(item.thickness) : "",
       type_item: item.type_item || "",
       source: item.source || "warehouse",
       destination: item.destination || "slitting",
@@ -597,11 +631,11 @@ export default function SlittingManager() {
       }
 
       if (!outputForm.calculationMode) {
-        toast.error("يرجى اختيار طريقة حساب الكمية الخارجية");
+        toast.error("يرجى اختيار طريقة حساب الكمية الخارجة");
         return;
       }
       if (outputForm.calculationMode === "22x3" && !outputForm.output_length_22) {
-        toast.error("يرجى إدخال طول الجزء (22) للكمية الخارجية");
+        toast.error("يرجى إدخال طول الجزء (22) للكمية الخارجة");
         return;
       }
       if (outputForm.calculationMode === "44x1-22x1" && (!outputForm.output_length_22 || !outputForm.output_length_44)) {
@@ -612,17 +646,29 @@ export default function SlittingManager() {
       // Prepare payload for confirmation dialog
       const length22 = toNumber(outputForm.output_length_22);
       const length44 = toNumber(outputForm.output_length_44);
+      // Calculate output_length string from current values
+      let outputLengthStr = "";
+      if (outputForm.calculationMode === "22x3") {
+        outputLengthStr = `3x${length22}`;
+      } else if (outputForm.calculationMode === "44x1-22x1") {
+        outputLengthStr = `1x44, 1x22 (${length44}+${length22}=${length44 + length22})`;
+      }
+      // Calculate the output quantity value to display
+      const outputQtyValue = outputForm.calculationMode === "22x3" 
+        ? toNumber(outputForm.output_length_22)  // Show input quantity, not total
+        : toNumber(outputForm.output_length_44) || toNumber(outputForm.output_length_22); // Show input quantity
+      
       const payload = {
         color_id: Number(inputForm.color_id),
         batch_id: Number(inputForm.batch_id),
-        type_item: "Presser", // Default value since we removed the field
-        input_length: Number(inputForm.input_length),
-        output_length: outputForm.output_length, // String format: "3x22" or "1x44, 1x22"
+        type_item: "Presser",
+        input_length: outputQtyValue, // Use output quantity value
+        output_length: outputLengthStr, // Calculate fresh from current values
         input_width: Number(inputForm.input_width),
         output_length_22: outputForm.calculationMode === "22x3" ? length22 * 3 : length22,
         ...(outputForm.calculationMode === "44x1-22x1" && { output_length_44: length44 }),
-        source: "warehouse", // Default value since we removed the field
-        destination: "slitting", // Default value since we removed the field
+        source: "warehouse",
+        destination: "slitting",
         notes: outputForm.notes || inputForm.notes
       };
 
@@ -656,7 +702,7 @@ export default function SlittingManager() {
         ruler_id: "",
         color_id: "",
         batch_id: "",
-        input_length: "",
+        thickness: "",
         type_item: "",
         source: "warehouse",
         destination: "slitting",
@@ -880,7 +926,7 @@ export default function SlittingManager() {
       <table className="w-full border-collapse">
         <thead className="sticky top-0 z-20 bg-gray-100">
           <tr>
-            {["#", "اللون", "العرض", "الكمية", "النوع", "الطبخة", "السماكة", "الوجهة", "المصدر", "الحالة", "المستخدم", "التوقيت", "الملاحظات", "الإجراءات"].map((header) => (
+            {["#", "اللون", "العرض", "الكمية", "الطبخة", "المصدر", "الوجهة", "الحالة", "التوقيت", "الملاحظات", "الإجراءات"].map((header) => (
               <th key={header} className="px-1 py-2 text-center text-sm whitespace-nowrap border-b">
                 {header}
               </th>
@@ -889,10 +935,10 @@ export default function SlittingManager() {
         </thead>
         <tbody>
           {loadingOrders ? (
-            <tr><td colSpan="15" className="p-6"><LoadingState /></td></tr>
+            <tr><td colSpan="11" className="p-6"><LoadingState /></td></tr>
           ) : list.length === 0 ? (
             <tr>
-              <td colSpan="14" className="p-8 text-center text-gray-400">
+              <td colSpan="11" className="p-8 text-center text-gray-400">
                 <AlertCircle className="mx-auto mb-2 h-10 w-10 opacity-50" />
                 لا توجد طلبات
               </td>
@@ -910,27 +956,20 @@ export default function SlittingManager() {
                 </td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.width || "-"}</td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.length || "-"}</td>
-                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
-                  <span className="inline-flex items-center rounded-full bg-gray-50 px-2.5 py-1 font-medium text-gray-700">
-                    {formatTypeItem(order.type_item)}
-                  </span>
-                </td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.batch?.batch_number || "-"}</td>
-                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.thickness || "-"}</td>
-                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
-                  <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
-                    {formatDestination(order.destination)}
-                  </span>
-                </td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
                   <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
                     {formatDestination(order.source)}
                   </span>
                 </td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
+                  <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
+                    {formatDestination(order.destination)}
+                  </span>
+                </td>
+                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">
                   <span className={`rounded-lg px-2 py-1 text-xs ${statusBadge.className}`}>{statusBadge.label}</span>
                 </td>
-                <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{user?.full_name || "-"}</td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{formatDate(order.created_at)}</td>
                 <td className="px-1 py-2 text-center align-middle text-sm whitespace-nowrap">{order.notes || "-"}</td>
                 <td className="px-1 py-2 text-center align-middle whitespace-nowrap">
@@ -1182,12 +1221,12 @@ export default function SlittingManager() {
                             />
                           </div>
                           <div>
-                            <Label>الكمية</Label>
+                            <Label>السماكة</Label>
                             <Input
-                              value={inputForm.input_length}
-                              onFocus={() => setCurrentInput("input_length")}
-                              onChange={(e) => setInputForm(prev => ({ ...prev, input_length: e.target.value }))}
-                              className={`text-center ${currentInput === "input_length" ? "ring-2 ring-blue-500" : ""}`}
+                              value={inputForm.thickness}
+                              onFocus={() => setCurrentInput("thickness")}
+                              onChange={(e) => setInputForm(prev => ({ ...prev, thickness: e.target.value }))}
+                              className={`text-center ${currentInput === "thickness" ? "ring-2 ring-blue-500" : ""}`}
                               placeholder="0"
                             />
                           </div>
@@ -1235,7 +1274,7 @@ export default function SlittingManager() {
                               <td className="p-2 text-center">
                                 {batches.find(b => String(b.batch_id) === String(inputForm.batch_id))?.batch_number || "-"}
                               </td>
-                              <td className="p-2 text-center">{inputForm.input_length || "-"}</td>
+                              <td className="p-2 text-center">{outputForm.output_length_22 || outputForm.output_length_44 || "-"}</td>
                             </tr>
                           </tbody>
                         </table>
@@ -1246,7 +1285,7 @@ export default function SlittingManager() {
                       </div>
 
                       <div className="space-y-3">
-                        <Label>الكمية الخارجية</Label>
+                        <Label>الكمية الخارجة</Label>
                         <div className="grid grid-cols-2 gap-3">
                           <Button
                             type="button"
@@ -1310,7 +1349,7 @@ export default function SlittingManager() {
                                   setOutputForm(prev => ({ 
                                     ...prev, 
                                     output_length_44: newValue,
-                                    output_length_22: newValue // Sync both fields
+                                    output_length_22: newValue
                                   }));
                                 }}
                                 className={`text-center ${currentInput === "output_length_44" ? "ring-2 ring-blue-500" : ""}`}
@@ -1322,7 +1361,7 @@ export default function SlittingManager() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label>رموز QR لكل قطعة</Label>
+                        {/* <Label>رموز QR لكل قطعة</Label> */}
                         <div className="border rounded-lg overflow-hidden">
                           <table className="w-full text-sm">
                             <thead className="bg-gray-100">
@@ -1502,12 +1541,11 @@ export default function SlittingManager() {
                       <tr className="text-xs font-bold">
                         <th className="p-2 text-center border-b"></th>
                         <th className="p-2 text-center border-b">#</th>
-                        <th className="p-2 text-center border-b">العرض</th>
                         <th className="p-2 text-center border-b">اللون</th>
-                        <th className="p-2 text-center border-b">رقم الطبخة</th>
-                        <th className="p-2 text-center border-b">الكمية</th>
-                        <th className="p-2 text-center border-b">الكمية الخارجية</th>
+                        <th className="p-2 text-center border-b">العرض</th>
+                        <th className="p-2 text-center border-b">الكمية المدخلة</th>
                         <th className="p-2 text-center border-b">النوع</th>
+                        <th className="p-2 text-center border-b">الطبخة</th>
                         <th className="p-2 text-center border-b">المصدر</th>
                         <th className="p-2 text-center border-b">الوجهة</th>
                         <th className="p-2 text-center border-b">1x22</th>
@@ -1533,15 +1571,14 @@ export default function SlittingManager() {
                                 />
                               </td>
                               <td className="p-2 text-center">#{slite.slite_id}</td>
-                              <td className="p-2 text-center">{slite.input_width}</td>
                               <td className="p-2 text-center">
                                 {colors.find(c => String(c.color_id) === String(slite.color_id))?.color_name || "-"}{" "}
                                 ({colors.find(c => String(c.color_id) === String(slite.color_id))?.color_code || "-"})
                               </td>
-                              <td className="p-2 text-center">{batches.find(b => String(b.batch_id) === String(slite.batch_id))?.batch_number || "-"}</td>
+                              <td className="p-2 text-center">{slite.input_width}</td>
                               <td className="p-2 text-center">{slite.input_length}</td>
-                              <td className="p-2 text-center">{slite.output_length || "-"}</td>
                               <td className="p-2 text-center">{translateTypeItem(slite.type_item)}</td>
+                              <td className="p-2 text-center">{batches.find(b => String(b.batch_id) === String(slite.batch_id))?.batch_number || "-"}</td>
                               <td className="p-2 text-center">{translateSource(slite.source)}</td>
                               <td className="p-2 text-center">{translateSource(slite.destination)}</td>
                               <td className="p-2 text-center">{slite.output_length_22 || "-"}</td>
@@ -1595,11 +1632,11 @@ export default function SlittingManager() {
                                         <span className="ml-2">{slite.input_width} سم</span>
                                       </div>
                                       <div>
-                                        <span className="font-semibold text-gray-600">الكمية المدخل:</span>
+                                        <span className="font-semibold text-gray-600">الكمية المدخلة:</span>
                                         <span className="ml-2">{slite.input_length} سم</span>
                                       </div>
                                       <div>
-                                        <span className="font-semibold text-gray-600">الكمية الخارجية:</span>
+                                        <span className="font-semibold text-gray-600">الكمية الخارجة:</span>
                                         <span className="ml-2">{slite.output_length || "-"}</span>
                                       </div>
                                       <div>
@@ -1714,25 +1751,26 @@ export default function SlittingManager() {
                 <table className="w-full table-auto border-collapse">
                   <thead className="bg-gray-100 sticky top-0 z-20">
                     <tr>
-                      {["#", "العرض", "اللون", "الطبخة", "الكمية", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
+                      {["#", "اللون", "العرض", "الكمية", "النوع", "الطبخة", "المصدر", "الوجهة", "الحالة", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
                         <th key={h} className="p-2 text-center border-b text-sm">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {orderItems.length === 0 ? (
-                      <tr><td colSpan="11" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr>
+                      <tr><td colSpan="12" className="p-6 text-center text-gray-400">لا توجد عناصر لهذا الطلب</td></tr>
                     ) : orderItems.map((item, index) => (
                       <tr key={item.production_order_item_id || index} className="border-t">
                         <td className="p-2 text-center">#{item.production_order_item_id || index + 1}</td>
-                        <td className="p-2 text-center">{item.width || "-"}</td>
                         <td className="p-2 text-center">{getColorLabel(item.color_id)}</td>
-                        <td className="p-2 text-center">{getBatchLabel(item.batch_id)}</td>
+                        <td className="p-2 text-center">{item.width || "-"}</td>
                         <td className="p-2 text-center">{item.length || "-"}</td>
                         <td className="p-2 text-center">{formatTypeItem(item.type_item || item.type)}</td>
+                        <td className="p-2 text-center">{getBatchLabel(item.batch_id)}</td>
                         <td className="p-2 text-center">{formatDestination(item.source)}</td>
                         <td className="p-2 text-center">{formatDestination(item.destination)}</td>
                         <td className="p-2 text-center"><span className={`px-2 py-1 rounded-lg text-xs ${getStatusBadge(item.status).className}`}>{getStatusBadge(item.status).label}</span></td>
+                        <td className="p-2 text-center">{formatDate(item.created_at)}</td>
                         <td className="p-2 text-center">{item.notes || "-"}</td>
                         <td className="p-2 text-center">
                           <div className="flex items-center justify-center gap-2">
@@ -1810,37 +1848,41 @@ export default function SlittingManager() {
             <table className="w-full border-collapse border border-gray-200 rounded-lg overflow-hidden">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">عرض المدخل</th>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المدخل</th>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية الخارجي</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">العرض</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المدخلة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">النوع</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المصدر</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">1x22</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">1x44</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المستخدم</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="hover:bg-gray-50">
-                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_width || "-"}</td>
-                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_length || "-"}</td>
-                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.output_length || "-"}</td>
                   <td className="border border-gray-200 px-3 py-2 text-center text-sm">
                     {(() => {
                       const color = colors.find(c => String(c.color_id) === String(pendingSlite?.color_id));
                       return color ? `${color.color_name} (${color.color_code})` : "-";
                     })()}
                   </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_width || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.input_length || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{translateTypeItem(pendingSlite?.type_item)}</td>
                   <td className="border border-gray-200 px-3 py-2 text-center text-sm">
                     {(() => {
                       const batch = batches.find(b => String(b.batch_id) === String(pendingSlite?.batch_id));
                       return batch ? batch.batch_number : "-";
                     })()}
                   </td>
-                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
-                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                      التشريح
-                    </span>
-                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{translateSource(pendingSlite?.source)}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{translateSource(pendingSlite?.destination)}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.output_length_22 || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.output_length_44 || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{user?.full_name || "-"}</td>
                   <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingSlite?.notes || "-"}</td>
                 </tr>
               </tbody>

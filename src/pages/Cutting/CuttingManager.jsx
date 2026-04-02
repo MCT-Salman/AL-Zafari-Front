@@ -729,16 +729,16 @@ export default function CuttingManager() {
       <table className="w-full border-collapse">
         <thead className="bg-gray-100 sticky top-0 z-20">
           <tr>
-            {["#", "اللون", "العرض", "الكمية", "النوع", "الطبخة", "السماكة", "الوجهة", "المصدر", "الحالة", "المستخدم", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
+            {["#", "اللون", "العرض", "الكمية", "السماكة", "الطبخة", "الوجهة", "المصدر", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
               <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {loadingOrders ? (
-            <tr><td colSpan="15" className="p-6"><LoadingState /></td></tr>
+            <tr><td colSpan="11" className="p-6"><LoadingState /></td></tr>
           ) : list.length === 0 ? (
-            <tr><td colSpan="15" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
+            <tr><td colSpan="11" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات</td></tr>
           ) : list.map((order, index) => {
             const colorInfo = colors.find(c => String(c.color_id) === String(order.color_id));
             const batchInfo = batches.find(b => String(b.batch_id) === String(order.batch_id));
@@ -754,13 +754,8 @@ export default function CuttingManager() {
                 </td>
                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.width || "-"}</td>
                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.length || "-"}</td>
-                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
-                  <span className="inline-flex items-center rounded-full bg-gray-50 px-2.5 py-1 font-medium text-gray-700">
-                    {order.type_item === TypeItem.Machine ? "مكنة" : order.type_item === TypeItem.Presser ? "كوي" : order.type_item || "-"}
-                  </span>
-                </td>
-                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{batchInfo?.batch_number || "-"}</td>
                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.thickness || "-"}</td>
+                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{batchInfo?.batch_number || "-"}</td>
                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">
                   <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
                     {formatDestination(order.destination)}
@@ -774,8 +769,6 @@ export default function CuttingManager() {
                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap">
                   <span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span>
                 </td>
-                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{user?.full_name || "-"}</td>
-                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{formatDate(order.created_at)}</td>
                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap">{order.notes || "-"}</td>
                 <td className="px-1 py-2 align-middle text-center whitespace-nowrap">
                   <div className="flex h-8 items-center justify-center gap-1">
@@ -1251,13 +1244,14 @@ export default function CuttingManager() {
                       <tr className="text-xs font-bold">
                         <th className="p-2 text-center border-b"></th>
                         <th className="p-2 text-center border-b">#</th>
-                        <th className="p-2 text-center border-b">العرض</th>
                         <th className="p-2 text-center border-b">اللون</th>
-                        <th className="p-2 text-center border-b">الطبخة</th>
-                        <th className="p-2 text-center border-b">الكمية</th>
+                        <th className="p-2 text-center border-b">العرض</th>
+                        <th className="p-2 text-center border-b">الكمية المدخلة</th>
+                        <th className="p-2 text-center border-b">الكمية المخرجة</th>
                         <th className="p-2 text-center border-b">النوع</th>
-                        <th className="p-2 text-center border-b">الكمية المخرج</th>
+                        <th className="p-2 text-center border-b">الطبخة</th>
                         <th className="p-2 text-center border-b">الوجهة</th>
+                        <th className="p-2 text-center border-b">المصدر</th>
                         <th className="p-2 text-center border-b">المستخدم</th>
                         <th className="p-2 text-center border-b">التوقيت</th>
                         <th className="p-2 text-center border-b">ملاحظات</th>
@@ -1281,13 +1275,14 @@ export default function CuttingManager() {
                               />
                             </td>
                             <td className="p-2 text-center">#{proc.process_id}</td>
-                            <td className="p-2 text-center">{proc.input_width}</td>
                             <td className="p-2 text-center">{colorName} ({colorCode})</td>
-                            <td className="p-2 text-center">{batchNumber}</td>
+                            <td className="p-2 text-center">{proc.input_width}</td>
                             <td className="p-2 text-center">{proc.input_length}</td>
-                            <td className="p-2 text-center">{proc.type_item === TypeItem.Presser ? "كوي" : "مكنة"}</td>
                             <td className="p-2 text-center">{proc.output_length}</td>
+                            <td className="p-2 text-center">{proc.type_item === TypeItem.Presser ? "كوي" : "مكنة"}</td>
+                            <td className="p-2 text-center">{batchNumber}</td>
                             <td className="p-2 text-center">{formatDestination(proc.destination)}</td>
+                            <td className="p-2 text-center">{formatDestination(proc.source)}</td>
                             <td className="p-2 text-center">{proc.user?.full_name || proc.user?.username || "-"}</td>
                             <td className="p-2 text-center">{formatDate(proc.created_at)}</td>
                             <td className="p-2 text-center">{proc.notes || "-"}</td>
@@ -1355,28 +1350,16 @@ export default function CuttingManager() {
         </div>
       </div>
 
-      <StyledDialog isOpen={showOrderDetails} onOpenChange={setShowOrderDetails} title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`} contentClassName="max-w-7xl w-full" onCancel={() => setShowOrderDetails(false)} onConfirm={() => setShowOrderDetails(false)} confirmLabel="إغلاق" showCancel={false}>
+      <StyledDialog isOpen={showOrderDetails} onOpenChange={setShowOrderDetails} title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`} contentClassName="max-w-[95vw] w-full" onCancel={() => setShowOrderDetails(false)} onConfirm={() => setShowOrderDetails(false)} confirmLabel="إغلاق" showCancel={false}>
         {selectedOrder && (
           <div className="space-y-4 w-full">
-            {/* <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div><span className="text-gray-500">رقم الطلب:</span> <span className="font-bold">#{selectedOrder.production_order_id}</span></div>
-              <div><span className="text-gray-500">العرض:</span> <span className="font-bold">{selectedOrder.width || "-"}</span></div>
-              <div><span className="text-gray-500">الكمية:</span> <span className="font-bold">{selectedOrder.length || "-"}</span></div>
-              <div><span className="text-gray-500">النوع:</span> <span className="font-bold">{selectedOrder.type_item === TypeItem.Machine ? "مكنة" : selectedOrder.type_item === TypeItem.Presser ? "كوي" : selectedOrder.type_item || "-"}</span></div>
-              <div className="md:col-span-2"><span className="text-gray-500">اللون:</span> <span className="font-bold">{colors.find(c => String(c.color_id) === String(selectedOrder.color_id))?.color_name || "-"} ({colors.find(c => String(c.color_id) === String(selectedOrder.color_id))?.color_code || "-"})</span></div>
-              <div className="md:col-span-2"><span className="text-gray-500">الطبخة:</span> <span className="font-bold">{batches.find(b => String(b.batch_id) === String(selectedOrder.batch_id))?.batch_number || "-"}</span></div>
-              <div><span className="text-gray-500">المصدر:</span> <span className="font-bold">{formatDestination(selectedOrder.source)}</span></div>
-              <div><span className="text-gray-500">الوجهة:</span> <span className="font-bold">{formatDestination(selectedOrder.destination)}</span></div>
-              <div><span className="text-gray-500">الحالة:</span> <span className="font-bold">{getStatusBadge(selectedOrder.status).label}</span></div>
-              <div className="md:col-span-2"><span className="text-gray-500">الملاحظات:</span> <span className="font-bold">{selectedOrder.notes || "-"}</span></div>
-            </div> */}
             {loadingOrderDetails ? <LoadingState /> : (
               <div className="border rounded-lg overflow-hidden">
-                <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
+                <table className="w-full table-auto text-sm">
                   <thead className="bg-gray-100">
                     <tr>
-                      {["#", "العرض", "اللون", "الطبخة", "الكمية", "النوع", "المصدر", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => (
-                        <th key={h} className="p-2 text-center whitespace-nowrap">{h}</th>
+                      {["#", "اللون", "العرض", "الكمية", "النوع", "السماكة", "الطبخة", "الوجهة", "المصدر", "الحالة", "المستخدم", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
+                        <th key={h} className="p-1.5 text-center whitespace-nowrap text-xs">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1387,37 +1370,38 @@ export default function CuttingManager() {
                       const status = getStatusBadge(item.status);
                       return (
                         <tr key={item.production_order_item_id || index} className="border-b hover:bg-gray-50">
-                          <td className="p-2 text-center">#{item.production_order_id}</td>
-                          <td className="p-2 text-center">{item.width || "-"}</td>
-                          <td className="p-2 text-center">
-                            <div className="text-xs">
-                              <div>{colorInfo?.color_name || "-"}</div>
-                              <div className="text-gray-500">({colorInfo?.color_code || "-"})</div>
-                            </div>
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">#{item.production_order_id}</td>
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">
+                            <div>{colorInfo?.color_name || "-"}</div>
+                            <div className="text-gray-500">({colorInfo?.color_code || "-"})</div>
                           </td>
-                          <td className="p-2 text-center">{batchInfo?.batch_number || "-"}</td>
-                          <td className="p-2 text-center">{item.length || "-"}</td>
-                          <td className="p-2 text-center">
-                            <span className="inline-flex items-center rounded-full bg-gray-50 px-2.5 py-1 font-medium text-gray-700">
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">{item.width || "-"}</td>
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">{item.length || "-"}</td>
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">
+                            <span className="inline-flex items-center rounded-full bg-gray-50 px-1.5 py-0.5 font-medium text-gray-700 text-xs">
                               {item.type_item === TypeItem.Machine ? "مكنة" : item.type_item === TypeItem.Presser ? "كوي" : item.type_item || "-"}
                             </span>
                           </td>
-                          <td className="p-2 text-center">
-                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
-                              {formatDestination(item.source)}
-                            </span>
-                          </td>
-                          <td className="p-2 text-center">
-                            <span className="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700">
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">{item.thickness || "-"}</td>
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">{batchInfo?.batch_number || "-"}</td>
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">
+                            <span className="inline-flex items-center rounded-full bg-green-50 px-1.5 py-0.5 font-medium text-green-700 text-xs">
                               {formatDestination(item.destination)}
                             </span>
                           </td>
-                          <td className="p-2 text-center">
-                            <span className={`px-2 py-1 rounded-lg text-xs ${status.className}`}>{status.label}</span>
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-1.5 py-0.5 font-medium text-blue-700 text-xs">
+                              {formatDestination(item.source)}
+                            </span>
                           </td>
-                          <td className="p-2 text-center text-xs">{item.notes || "-"}</td>
-                          <td className="p-2 text-center">
-                            <div className="flex h-8 items-center justify-center gap-1">
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${status.className}`}>{status.label}</span>
+                          </td>
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">{user?.full_name || "-"}</td>
+                          <td className="p-1.5 text-center whitespace-nowrap text-xs">{formatDate(item.created_at)}</td>
+                          <td className="p-1.5 text-center text-xs max-w-[80px] truncate" title={item.notes}>{item.notes || "-"}</td>
+                          <td className="p-1.5 text-center whitespace-nowrap">
+                            <div className="flex h-6 items-center justify-center gap-0.5">
                               {ordersTab === "current" && (
                                 <>
                                   <button 
@@ -1425,20 +1409,20 @@ export default function CuttingManager() {
                                       handleApplyOrderToInputs(item);
                                       setShowOrderDetails(false);
                                     }} 
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50" 
+                                    className="flex h-6 w-6 items-center justify-center rounded p-1 text-emerald-600 hover:bg-emerald-50" 
                                     title="تطبيق على الإدخال"
                                   >
-                                    <Hash className="w-4 h-4" />
+                                    <Hash className="w-3 h-3" />
                                   </button>
                                   <button 
                                     onClick={() => {
                                       requestCompleteOrderItem(item);
                                       setShowOrderDetails(false);
                                     }} 
-                                    className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50" 
+                                    className="flex h-6 w-6 items-center justify-center rounded p-1 text-green-700 hover:bg-green-50" 
                                     title="إتمام الطلب"
                                   >
-                                    <Check className="w-4 h-4" />
+                                    <Check className="w-3 h-3" />
                                   </button>
                                 </>
                               )}
@@ -1502,27 +1486,33 @@ export default function CuttingManager() {
             <table className="w-full border-collapse border border-gray-200 rounded-lg overflow-hidden">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">العرض</th>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المدخل</th>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">السماكة</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">اللون</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">العرض</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المدخلة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المخرجة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">النوع</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية المخرج</th>
-                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المصدر</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المصدر</th>
+                  <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المستخدم</th>
                   <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="hover:bg-gray-50">
-                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.input_width || "-"}</td>
-                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.input_length || "-"}</td>
-                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.thickness || "-"}</td>
                   <td className="border border-gray-200 px-3 py-2 text-center text-sm">
                     {(() => {
                       const color = colors.find(c => String(c.color_id) === String(pendingProcess?.color_id));
                       return color ? `${color.color_name} (${color.color_code})` : "-";
                     })()}
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.input_width || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.input_length || "-"}</td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm font-bold text-blue-600">
+                    {outputItems.map(item => item.length).filter(length => length).join(', ') || '-'}
+                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                    {pendingProcess?.type_item === TypeItem.Presser ? "كوي" : "مكنة"}
                   </td>
                   <td className="border border-gray-200 px-3 py-2 text-center text-sm">
                     {(() => {
@@ -1530,19 +1520,17 @@ export default function CuttingManager() {
                       return batch ? batch.batch_number : "-";
                     })()}
                   </td>
-                  <td className="border border-gray-200 px-3 py-2 text-center text-sm font-bold text-blue-600">
-                    {outputItems.map(item => item.length).filter(length => length).join(', ') || '-'}
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                    <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                      {formatDestination(pendingProcess?.destination)}
+                    </span>
                   </td>
                   <td className="border border-gray-200 px-3 py-2 text-center text-sm">
                     <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                      التشريح
+                      {formatDestination(pendingProcess?.source)}
                     </span>
                   </td>
-                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">
-                    <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
-                      اللصق
-                    </span>
-                  </td>
+                  <td className="border border-gray-200 px-3 py-2 text-center text-sm">{user?.full_name || "-"}</td>
                   <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingProcess?.notes || "-"}</td>
                 </tr>
               </tbody>
