@@ -571,10 +571,13 @@ export default function SlittingManager() {
   const handleApplyOrderToInputs = (item) => {
     if (!item) return;
     setActiveOrderItem(item);
+    // Derive ruler_id from color if not directly available
+    const color = item.color || colors.find((c) => String(c.color_id) === String(item.color_id));
+    const rulerId = item.ruler_id || color?.ruler_id || color?.ruler?.ruler_id;
     setInputForm(prev => ({
       ...prev,
       // Remove input_width from being set - keep existing value
-      ruler_id: item.ruler_id ? String(item.ruler_id) : "",
+      ruler_id: rulerId ? String(rulerId) : "",
       color_id: item.color_id ? String(item.color_id) : "",
       batch_id: item.batch_id ? String(item.batch_id) : "",
       input_length: item.length ? String(item.length) : "",
