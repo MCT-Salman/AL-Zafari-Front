@@ -699,9 +699,23 @@ export default function WarehouseKeeper() {
 
     const requestCompleteSalesOrder = (order) => {
         if (!order?.order_id) return;
-        // Use a simple confirmation toast for sales orders
-        if (confirm(`هل تريد إتمام طلب المبيعات #${order.order_id}؟`)) {
-            handleCompleteSalesOrder(order);
+        // Use StyledDialog like production orders
+        setPendingCompleteItem(order);
+        setShowCompleteDialog(true);
+    };
+
+    const handleCompleteSalesOrderConfirm = async () => {
+        if (!pendingCompleteItem?.order_id) return;
+        try {
+            await updateSalesOrderStatus(pendingCompleteItem.order_id, "completed");
+            toast.success("تم إتمام طلب المبيعات بنجاح");
+            loadSalesOrders();
+        } catch (error) {
+            console.error(error);
+            toast.error("فشل في إتمام طلب المبيعات");
+        } finally {
+            setShowCompleteDialog(false);
+            setPendingCompleteItem(null);
         }
     };
 
@@ -936,7 +950,7 @@ export default function WarehouseKeeper() {
                             <tr key={order.order_id} className="h-14 border-b hover:bg-gray-50">
                                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">#{order.order_id}</td>
                                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[100px]">{order.customer?.name || "-"}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{order.customer?.phone || "-"}</td>
+                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]"><span dir="ltr">{order.customer?.phone || "-"}</span></td>
                                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{order.customer?.city || "-"}</td>
                                 <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{Number(order.total_amount || 0).toLocaleString()}</td>
                                 <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[100px]">
@@ -1583,23 +1597,51 @@ export default function WarehouseKeeper() {
                     setPendingCompleteItem(null);
                 }}
                 onConfirm={async () => {
-                    if (pendingCompleteItem) {
+                    if (pendingCompleteItem?.order_id) {
+                        // Sales order completion
+                        await handleCompleteSalesOrderConfirm();
+                    } else if (pendingCompleteItem?.production_order_item_id) {
+                        // Production order completion
                         await handleCompleteOrderItem(pendingCompleteItem);
+                        setShowCompleteDialog(false);
+                        setPendingCompleteItem(null);
                     }
-                    setShowCompleteDialog(false);
-                    setPendingCompleteItem(null);
                 }}
                 confirmLabel="تأكيد"
                 cancelLabel="إلغاء"
             >
                 <div className="text-sm text-gray-700">
-                    هل تريد إتمام الطلب
-                    {" "}
-                    <span className="font-bold">
-                        #{pendingCompleteItem?.production_order_id || pendingCompleteItem?.production_order_item_id || ""}
-                    </span>
-                    {" "}
-                    ونقله إلى المكتمل؟
+                    {pendingCompleteItem?.order_id ? (
+                        // Sales order completion
+                        <>
+                            هل تريد إتمام طلب المبيعات
+                            {" "}
+                            <span className="font-bold">
+                                #{pendingCompleteItem?.order_id}
+                            </span>
+                            {" "}
+                            ونقله إلى المكتمل؟
+                            <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div><span className="font-medium">الزبون:</span> {pendingCompleteItem?.customer?.name || "-"}</div>
+                                    <div><span className="font-medium" >الهاتف:</span> <span dir="ltr">{pendingCompleteItem?.customer?.phone || "-"}</span></div>
+                                    <div><span className="font-medium">المدينة:</span> {pendingCompleteItem?.customer?.city || "-"}</div>
+                                    <div><span className="font-medium">المبلغ:</span> {Number(pendingCompleteItem?.total_amount || 0).toLocaleString()}</div>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        // Production order completion
+                        <>
+                            هل تريد إتمام الطلب
+                            {" "}
+                            <span className="font-bold">
+                                #{pendingCompleteItem?.production_order_id || pendingCompleteItem?.production_order_item_id || ""}
+                            </span>
+                            {" "}
+                            ونقله إلى المكتمل؟
+                        </>
+                    )}
                 </div>
             </StyledDialog>
 
