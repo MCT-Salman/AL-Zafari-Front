@@ -65,10 +65,17 @@ export default function DashboardHeader({
       </div>
 
       {isHeaderVisible && (
-        <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-40">
-          <div className="flex flex-wrap gap-3">{leftContent}</div>
-
+        <div dir="rtl" className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-40">
           <div className="flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => navigate("/dashboard")}
+              className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+            >
+              <Home className="w-5 h-5 ml-2" />
+              الرئيسية
+            </Button>
             <NotificationsBell />
             <Button
               size="lg"
@@ -109,15 +116,6 @@ export default function DashboardHeader({
             <Button
               size="lg"
               variant="outline"
-              onClick={() => navigate("/dashboard")}
-              className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-            >
-              <Home className="w-5 h-5 ml-2" />
-              الرئيسية
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
               onClick={handleLogout}
               className="px-4 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
             >
@@ -125,6 +123,8 @@ export default function DashboardHeader({
               تسجيل الخروج
             </Button>
           </div>
+
+          <div className="flex flex-wrap gap-3">{leftContent}</div>
         </div>
       )}
 

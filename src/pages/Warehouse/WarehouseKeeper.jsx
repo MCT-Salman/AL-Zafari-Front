@@ -263,19 +263,37 @@ export default function WarehouseKeeper() {
         ].join(" | ");
     };
 
-    const loadSalesOrders = async () => {
+    const loadSalesOrders = useCallback(async () => {
         try {
             setLoadingSalesOrders(true);
             const token = localStorage.getItem('accessToken');
-            const response = await fetch(`${API_BASE_URL}/order/`, {
+            
+            // Use the exact original URL format
+            const url = `${API_BASE_URL}/order/`;
+            console.log('[loadSalesOrders] Fetching from:', url);
+            console.log('[loadSalesOrders] Token exists:', !!token);
+            
+            const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 }
             });
+            
+            console.log('[loadSalesOrders] Response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[loadSalesOrders] HTTP error:', response.status, errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
             const data = await response.json();
+            console.log('[loadSalesOrders] API response:', data);
+            
             if (data.success) {
                 const allOrders = data.data || [];
+                console.log('[loadSalesOrders] Total orders from API:', allOrders.length);
                 
                 // Load details for each order to check items material
                 const ordersWithDetails = await Promise.all(
@@ -292,32 +310,45 @@ export default function WarehouseKeeper() {
                                 return { ...order, items: detailsData.data.items };
                             }
                             return order;
-                        } catch {
+                        } catch (err) {
+                            console.error(`[loadSalesOrders] Error loading details for order ${order.order_id}:`, err);
                             return order;
                         }
                     })
                 );
                 
-                // Filter out orders containing PVC
-                const filteredOrders = ordersWithDetails.filter(order => {
-                    if (!order.items || order.items.length === 0) return true; // Keep orders without items
-                    return !order.items.some(item => {
+                // Filter items within each order - remove PVC items but keep the order
+                const filteredOrders = ordersWithDetails.map(order => {
+                    if (!order.items || order.items.length === 0) return order;
+                    const nonPvcItems = order.items.filter(item => {
                         const materialName = String(item.material_name || "").toLowerCase();
-                        return materialName.includes("pvc");
+                        return !materialName.includes("pvc");
                     });
+                    return { ...order, items: nonPvcItems };
+                }).filter(order => {
+                    if (!order.items || order.items.length === 0) return true;
+                    return order.items.length > 0;
                 });
                 
+                console.log('[loadSalesOrders] Final filtered orders:', filteredOrders.length);
                 setSalesOrders(filteredOrders);
             } else {
+                console.error('[loadSalesOrders] API error:', data.message);
                 toast.error(data.message || 'فشل في تحميل طلبات المبيعات');
             }
         } catch (error) {
-            console.error(error);
-            toast.error('فشل في تحميل طلبات المبيعات');
+            console.error('[loadSalesOrders] Error:', error);
+            toast.error('فشل في تحميل طلبات المبيعات: ' + error.message);
         } finally {
             setLoadingSalesOrders(false);
         }
-    };
+    }, []);
+
+    // Create a ref to always have access to the latest loadSalesOrders function
+    const loadSalesOrdersRef = useRef(loadSalesOrders);
+    useEffect(() => {
+        loadSalesOrdersRef.current = loadSalesOrders;
+    }, [loadSalesOrders]);
 
     const loadOrders = async () => {
         try {
@@ -417,18 +448,44 @@ export default function WarehouseKeeper() {
     useEffect(() => {
         const token = localStorage.getItem("accessToken");
         if (!token) return;
+        
         const socket = connectSocket(token);
-        const refresh = () => {
+        
+        // Debug socket connection
+        console.log("[Socket] Connecting...", socket?.id);
+        
+        const refresh = (data) => {
+            console.log("[Socket] Event received:", data);
+            // Use the latest function via a ref or direct call
             loadOrders();
-            loadSalesOrders();
             loadMovements();
+            // Call loadSalesOrders directly - useCallback ensures it's the latest version
+            loadSalesOrdersRef.current?.();
+            // Show toast for new orders
+            if (data && (data.order_id || data.sales_order_id)) {
+                toast.info(`طلب جديد #${data.order_id || data.sales_order_id}`);
+            }
         };
-        ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated", "notification"]
-            .forEach((name) => socket.on(name, refresh));
-        return () => {
+        
+        // Ensure socket is connected before attaching listeners
+        if (socket) {
+            socket.on("connect", () => {
+                console.log("[Socket] Connected:", socket.id);
+            });
+            
             ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated", "notification"]
-                .forEach((name) => socket.off(name, refresh));
-            disconnectSocket();
+                .forEach((name) => socket.on(name, refresh));
+                
+            socket.on("disconnect", () => {
+                console.log("[Socket] Disconnected");
+            });
+        }
+        
+        return () => {
+            if (socket) {
+                ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated", "notification"]
+                    .forEach((name) => socket.off(name, refresh));
+            }
         };
     }, []);
 
@@ -503,14 +560,23 @@ export default function WarehouseKeeper() {
                 }
             });
             const data = await response.json();
+            console.log(`[loadSalesOrderDetails] Order ${orderId} response:`, data);
             if (data.success) {
+                // Filter out PVC items from the order details
+                if (data.data && data.data.items) {
+                    const nonPvcItems = data.data.items.filter(item => {
+                        const materialName = String(item.material_name || "").toLowerCase();
+                        return !materialName.includes("pvc");
+                    });
+                    return { ...data.data, items: nonPvcItems };
+                }
                 return data.data;
             } else {
                 toast.error(data.message || 'فشل في تحميل تفاصيل الطلب');
                 return null;
             }
         } catch (error) {
-            console.error(error);
+            console.error('[loadSalesOrderDetails] Error:', error);
             toast.error('فشل في تحميل تفاصيل الطلب');
             return null;
         }
