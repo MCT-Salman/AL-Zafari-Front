@@ -22,7 +22,7 @@ const LayoutContent = () => {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const isOrdersPage = location.pathname === "/orders";
-  const filteredSideData = sideData.filter((item) => !item.role || item.role === user?.role);
+  const filteredSideData = sideData.filter((item) => !item.role || String(item.role).toLowerCase() === String(user?.role || "").toLowerCase());
   const navItems = filteredSideData.map((item) => ({
     title: item.title,
     href: item.link,

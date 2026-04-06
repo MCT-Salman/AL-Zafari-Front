@@ -1,17 +1,14 @@
-// src/pages/Sales/SalesDashboard.jsx
+// src/pages/Sales/OrderPreparerDashboard.jsx
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ShoppingCart,
-  Package,
   Clock,
   CheckCircle,
-  Wallet,
-  FileText,
   Factory,
   Loader2,
   TrendingUp,
-  Calendar
+  Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PageHeader from "../../components/common/PageHeader";
@@ -22,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
 
 // Stat Card Component
-function StatCard({ title, value, subtitle, icon: Icon, colorClass, delay = 0 }) {
+function StatCard({ title, value, subtitle, icon: Icon, colorClass }) {
   return (
     <Card className={cn(
       "relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1",
@@ -51,7 +48,6 @@ function StatCard({ title, value, subtitle, icon: Icon, colorClass, delay = 0 })
           </div>
         </div>
       </CardContent>
-      {/* Decorative gradient line */}
       <div className={cn("absolute bottom-0 left-0 right-0 h-1", colorClass.gradient)} />
     </Card>
   );
@@ -110,12 +106,11 @@ function OrdersSectionCard({ title, icon: Icon, orders, colorClass, total }) {
   );
 }
 
-export default function SalesDashboard() {
+export default function OrderPreparerDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Load stats on mount
   useEffect(() => {
     loadStats();
   }, []);
@@ -142,13 +137,12 @@ export default function SalesDashboard() {
       setStats(data.data || null);
     } catch (err) {
       setError(err.message || "فشل في تحميل الإحصائيات");
-      console.error("[SalesDashboard] Error loading stats:", err);
+      console.error("[OrderPreparerDashboard] Error loading stats:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -159,7 +153,6 @@ export default function SalesDashboard() {
     });
   };
 
-  // Color schemes
   const salesColors = {
     border: "border-blue-200",
     text: "text-blue-700",
@@ -182,28 +175,10 @@ export default function SalesDashboard() {
     badge: "border-orange-300 text-orange-700"
   };
 
-  const revenueColors = {
-    border: "border-green-200",
-    text: "text-green-700",
-    bg: "bg-white",
-    iconBg: "bg-green-100",
-    icon: "text-green-600",
-    gradient: "bg-gradient-to-r from-green-400 to-green-600"
-  };
-
-  const invoiceColors = {
-    border: "border-purple-200",
-    text: "text-purple-700",
-    bg: "bg-white",
-    iconBg: "bg-purple-100",
-    icon: "text-purple-600",
-    gradient: "bg-gradient-to-r from-purple-400 to-purple-600"
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingState message="جاري تحميل إحصائيات المبيعات..." />
+        <LoadingState message="جاري تحميل إحصائيات الطلبات..." />
       </div>
     );
   }
@@ -236,8 +211,8 @@ export default function SalesDashboard() {
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
         <PageHeader
-          title="لوحة تحكم المبيعات"
-          subtitle={stats?.date ? `إحصائيات يوم ${formatDate(stats.date)}` : "إحصائيات اليوم"}
+          title="لوحة تحكم مجهز الطلبات"
+          subtitle={stats?.date ? `إحصائيات يوم ${formatDate(stats.date)}` : "إحصائيات الطلبات"}
         />
 
         {/* Error Message */}
@@ -249,45 +224,6 @@ export default function SalesDashboard() {
             dismissable={true}
           />
         )}
-
-        {/* Revenue & Invoices Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Total Sales */}
-          <StatCard
-            title="إجمالي المبيعات اليوم"
-            value={stats?.todaySales?.toLocaleString() || "0"}
-            subtitle="ل.س"
-            icon={Wallet}
-            colorClass={revenueColors}
-          />
-
-          {/* Invoices Count */}
-          <StatCard
-            title="عدد الفواتير"
-            value={stats?.todayInvoicesCount?.toLocaleString() || "0"}
-            subtitle="فاتورة"
-            icon={FileText}
-            colorClass={invoiceColors}
-          />
-
-          {/* Sales Orders Total */}
-          <StatCard
-            title="إجمالي طلبات المبيعات"
-            value={salesOrders?.total?.toLocaleString() || "0"}
-            subtitle="طلب"
-            icon={ShoppingCart}
-            colorClass={salesColors}
-          />
-
-          {/* Production Orders Total */}
-          <StatCard
-            title="إجمالي طلبات الإنتاج"
-            value={productionOrders?.total?.toLocaleString() || "0"}
-            subtitle="طلب"
-            icon={Factory}
-            colorClass={productionColors}
-          />
-        </div>
 
         {/* Orders Status Sections */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -310,7 +246,7 @@ export default function SalesDashboard() {
           />
         </div>
 
-        {/* Detailed Breakdown */}
+        {/* Detailed Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Sales Pending */}
           <Card className="border-2 border-yellow-200">
@@ -346,6 +282,40 @@ export default function SalesDashboard() {
             </CardContent>
           </Card>
 
+          {/* Sales Completed */}
+          <Card className="border-2 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">المبيعات - مكتملة</p>
+                  <p className="text-2xl font-bold text-green-700">
+                    {salesOrders?.completed || 0}
+                  </p>
+                </div>
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Sales Total */}
+          <Card className="border-2 border-indigo-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">المبيعات - الإجمالي</p>
+                  <p className="text-2xl font-bold text-indigo-700">
+                    {salesOrders?.total || 0}
+                  </p>
+                </div>
+                <div className="p-2 bg-indigo-100 rounded-lg">
+                  <Package className="w-5 h-5 text-indigo-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Production Pending */}
           <Card className="border-2 border-orange-200">
             <CardContent className="p-4">
@@ -375,6 +345,40 @@ export default function SalesDashboard() {
                 </div>
                 <div className="p-2 bg-cyan-100 rounded-lg">
                   <Loader2 className="w-5 h-5 text-cyan-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Production Completed */}
+          <Card className="border-2 border-emerald-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">الإنتاج - مكتملة</p>
+                  <p className="text-2xl font-bold text-emerald-700">
+                    {productionOrders?.completed || 0}
+                  </p>
+                </div>
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-emerald-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Production Total */}
+          <Card className="border-2 border-teal-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">الإنتاج - الإجمالي</p>
+                  <p className="text-2xl font-bold text-teal-700">
+                    {productionOrders?.total || 0}
+                  </p>
+                </div>
+                <div className="p-2 bg-teal-100 rounded-lg">
+                  <Factory className="w-5 h-5 text-teal-600" />
                 </div>
               </div>
             </CardContent>

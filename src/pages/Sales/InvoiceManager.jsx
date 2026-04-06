@@ -1504,7 +1504,7 @@ export default function InvoiceManager() {
                 setIsHeaderVisible={setIsHeaderVisible}
                 leftContent={
                     <>
-                        <Button
+                        {/* <Button
                             size="lg"
                             variant="outline"
                             onClick={() => setViewMode("create")}
@@ -1515,7 +1515,7 @@ export default function InvoiceManager() {
                         >
                             <Receipt className="w-5 h-5 ml-2" />
                             فاتورة جديدة
-                        </Button>
+                        </Button> */}
                         {isAdmin && (
                             <Button
                                 size="lg"

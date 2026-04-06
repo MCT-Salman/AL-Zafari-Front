@@ -84,12 +84,12 @@ const StatsCard = ({
     <CardContent className="p-6">
       <div className="flex items-start justify-between">
         <div className="space-y-3">
-          <p className={cn("text-xl font-extrabold", titleColor)}>{title}</p>
-          <div className="flex items-baseline gap-2">
-            <span className={cn("text-3xl font-black tracking-tight", valueColor)}>
+          <p className={cn("text-sm font-extrabold", titleColor)}>{title}</p>
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className={cn("text-xl font-black tracking-tight truncate max-w-full", valueColor)} title={value}>
               {value}
             </span>
-            <span className={cn("text-sm font-semibold", unitColor)}>
+            <span className={cn("text-xs font-semibold", unitColor)}>
               {unit}
             </span>
           </div>
@@ -113,10 +113,10 @@ const StatsCard = ({
         
          {showIcon && Icon && (
           <div className={cn(
-            "p-3 rounded-2xl shadow-sm border bg-white dark:bg-gray-800",
+            "p-2 rounded-xl shadow-sm border bg-white",
             iconColor.replace("text-", "border-")
           )}>
-            <Icon className={cn("w-7 h-7", iconColor)} />
+            <Icon className={cn("w-5 h-5", iconColor)} />
           </div>
         )}
       </div>

@@ -34,7 +34,7 @@ const ROLE_LABELS = {
     [UserRole.Warehouse_Products]: "أمين مستودع المنتجات",
     [UserRole.Dissection_Technician]: "فني التشريح",
     [UserRole.Cutting_Technician]: "فني القص",
-    [UserRole.Gluing_Technician]: "فني اللصق"
+    [UserRole.Gluing_Technician]: "فني التغرية"
 };
 const BASE_FORM = {
     material_id: "",
@@ -166,7 +166,10 @@ export default function WarehouseKeeper() {
         [salesOrders, sortRecordsAsc]
     );
     const completedSalesOrders = useMemo(
-        () => sortRecordsAsc(salesOrders.filter((o) => String(o.status || "").toLowerCase() === "completed")),
+        () => sortRecordsAsc(salesOrders.filter((o) => {
+            const status = String(o.status || "").toLowerCase();
+            return status === "completed" || status === "outofwarehouse";
+        })),
         [salesOrders, sortRecordsAsc]
     );
     const sortedMovements = useMemo(() => {
@@ -206,9 +209,9 @@ export default function WarehouseKeeper() {
         if (!value) return "-";
         const destinationMap = {
             'slitting': "التشريح",
-            'cutting': "القص", 
+            'cutting': "القص",
             'production': "الإنتاج",
-            'gluing': "اللصق"
+            'gluing': "التغرية"
         };
         return destinationMap[String(value)] || String(value) || "-";
     };
@@ -218,7 +221,7 @@ export default function WarehouseKeeper() {
         slitting: "التشريح",
         cutting: "القص",
         production: "الإنتاج",
-        gluing: "اللصق"
+        gluing: "التغرية"
     }[value] || value || "-");
     const formatTypeItem = (value) => value === TypeItem.Presser ? "كوي" : value === TypeItem.Machine ? "مكنة" : value || "-";
     const getStatusBadge = (status) => productionApi.getStatusBadge(String(status || "").toLowerCase());
@@ -267,34 +270,30 @@ export default function WarehouseKeeper() {
         try {
             setLoadingSalesOrders(true);
             const token = localStorage.getItem('accessToken');
-            
+
             // Use the exact original URL format
             const url = `${API_BASE_URL}/order/`;
             console.log('[loadSalesOrders] Fetching from:', url);
-            console.log('[loadSalesOrders] Token exists:', !!token);
-            
+
             const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 }
             });
-            
-            console.log('[loadSalesOrders] Response status:', response.status);
-            
+
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('[loadSalesOrders] HTTP error:', response.status, errorText);
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
-            
+
             const data = await response.json();
-            console.log('[loadSalesOrders] API response:', data);
-            
+
             if (data.success) {
                 const allOrders = data.data || [];
                 console.log('[loadSalesOrders] Total orders from API:', allOrders.length);
-                
+
                 // Load details for each order to check items material
                 const ordersWithDetails = await Promise.all(
                     allOrders.map(async (order) => {
@@ -316,7 +315,7 @@ export default function WarehouseKeeper() {
                         }
                     })
                 );
-                
+
                 // Filter items within each order - remove PVC items but keep the order
                 const filteredOrders = ordersWithDetails.map(order => {
                     if (!order.items || order.items.length === 0) return order;
@@ -329,8 +328,8 @@ export default function WarehouseKeeper() {
                     if (!order.items || order.items.length === 0) return true;
                     return order.items.length > 0;
                 });
-                
-                console.log('[loadSalesOrders] Final filtered orders:', filteredOrders.length);
+
+                console.log('[loadSalesOrders] Setting sales orders:', filteredOrders.length);
                 setSalesOrders(filteredOrders);
             } else {
                 console.error('[loadSalesOrders] API error:', data.message);
@@ -342,13 +341,36 @@ export default function WarehouseKeeper() {
         } finally {
             setLoadingSalesOrders(false);
         }
-    }, []);
+    }, [API_BASE_URL]);
 
     // Create a ref to always have access to the latest loadSalesOrders function
     const loadSalesOrdersRef = useRef(loadSalesOrders);
     useEffect(() => {
         loadSalesOrdersRef.current = loadSalesOrders;
+        console.log("[Ref] loadSalesOrders updated:", typeof loadSalesOrders);
     }, [loadSalesOrders]);
+
+    // Debug: expose function to window for testing
+    useEffect(() => {
+        window.__debugLoadSalesOrders = () => {
+            console.log("[Debug] Manually calling loadSalesOrders...");
+            console.log("[Debug] Ref current:", loadSalesOrdersRef.current);
+            console.log("[Debug] Type:", typeof loadSalesOrdersRef.current);
+            if (typeof loadSalesOrdersRef.current === 'function') {
+                loadSalesOrdersRef.current();
+                return "Called successfully";
+            }
+            return "Ref is not a function: " + loadSalesOrdersRef.current;
+        };
+        window.__debugSalesOrdersState = () => {
+            console.log("[Debug] Current salesOrders state:", salesOrders);
+            return salesOrders;
+        };
+        return () => {
+            delete window.__debugLoadSalesOrders;
+            delete window.__debugSalesOrdersState;
+        };
+    }, [salesOrders]);
 
     const loadOrders = async () => {
         try {
@@ -448,46 +470,137 @@ export default function WarehouseKeeper() {
     useEffect(() => {
         const token = localStorage.getItem("accessToken");
         if (!token) return;
-        
+
         const socket = connectSocket(token);
-        
+        let originalOnevent = null;
+
         // Debug socket connection
-        console.log("[Socket] Connecting...", socket?.id);
-        
+        console.log("[Socket] Initializing...", socket?.id);
+
         const refresh = (data) => {
-            console.log("[Socket] Event received:", data);
-            // Use the latest function via a ref or direct call
+            console.log("[Socket] Production event received:", data);
             loadOrders();
             loadMovements();
-            // Call loadSalesOrders directly - useCallback ensures it's the latest version
             loadSalesOrdersRef.current?.();
-            // Show toast for new orders
             if (data && (data.order_id || data.sales_order_id)) {
-                toast.info(`طلب جديد #${data.order_id || data.sales_order_id}`);
+                const orderId = data.order_id || data.sales_order_id;
+                toast.custom(
+                    (t) => (
+                        <div className={`pointer-events-auto flex items-center gap-3 rounded-lg border bg-white px-3 py-2 shadow-lg ${t.visible ? "animate-enter" : "animate-leave"}`}>
+                            <div className="text-sm font-medium text-gray-800">طلب جديد #{orderId}</div>
+                            <button type="button" className="ml-auto rounded-md border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50" onClick={() => toast.dismiss(t.id)}>إغلاق</button>
+                        </div>
+                    ),
+                    { duration: Infinity, id: `warehouse-new-order-${orderId}` }
+                );
             }
         };
-        
-        // Ensure socket is connected before attaching listeners
+
+        const refreshSalesOnly = (data) => {
+            console.log("[Socket] Sales order event received:", data);
+            console.log("[Socket] Calling loadSalesOrders...");
+            // Directly call the function through ref
+            if (typeof loadSalesOrdersRef.current === 'function') {
+                loadSalesOrdersRef.current();
+            } else {
+                console.error("[Socket] loadSalesOrdersRef.current is not a function");
+            }
+            if (data && (data.order_id || data.sales_order_id)) {
+                const orderId = data.order_id || data.sales_order_id;
+                toast.success(`طلب مبيعات جديد #${orderId} - يرجى التحقق من الطلبات الواردة`);
+            }
+        };
+
+        const handleNotification = (data) => {
+            console.log("[Socket] Notification received:", data);
+            const type = data?.type || "";
+            const lowerType = String(type).toLowerCase();
+            console.log("[Socket] Notification type:", type, "lower:", lowerType);
+            
+            // Handle sales orders - ORDER_NEW, sales_order, etc.
+            if (lowerType.includes('sales') || lowerType.includes('order') || lowerType.includes('طلب')) {
+                console.log("[Socket] ✓ Matched sales/order condition, reloading sales orders");
+                const fn = loadSalesOrdersRef.current;
+                if (typeof fn === 'function') {
+                    console.log("[Socket] Calling loadSalesOrdersRef.current()...");
+                    fn();
+                } else {
+                    console.error("[Socket] loadSalesOrdersRef.current is not a function:", fn);
+                }
+            }
+            
+            // Handle production/warehouse notifications
+            if (lowerType.includes('production') || lowerType.includes('warehouse') || lowerType.includes('مستودع') || lowerType.includes('إنتاج')) {
+                console.log("[Socket] ✓ Matched production/warehouse condition, reloading orders and movements");
+                loadOrders();
+                loadMovements();
+            }
+        };
+
         if (socket) {
             socket.on("connect", () => {
                 console.log("[Socket] Connected:", socket.id);
+                loadOrders();
+                loadMovements();
+                loadSalesOrdersRef.current?.();
             });
-            
-            ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated", "notification"]
+
+            // Production orders events
+            ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated"]
                 .forEach((name) => socket.on(name, refresh));
-                
-            socket.on("disconnect", () => {
-                console.log("[Socket] Disconnected");
-            });
+
+            // Sales orders specific events - use inline function to avoid stale closure
+            ["sales_order:new", "sales_order:created", "sales:order:new", "order:sales:new", "sales:new", "new:sales_order", "sales_order:updated"]
+                .forEach((name) => socket.on(name, (data) => {
+                    console.log(`[Socket] ${name} event received:`, data);
+                    console.log("[Socket] Calling loadSalesOrders via ref...");
+                    const fn = loadSalesOrdersRef.current;
+                    if (typeof fn === 'function') {
+                        fn();
+                    } else {
+                        console.error("[Socket] loadSalesOrdersRef.current is not a function:", fn);
+                    }
+                    if (data && (data.order_id || data.sales_order_id)) {
+                        const orderId = data.order_id || data.sales_order_id;
+                        toast.success(`طلب مبيعات جديد #${orderId} - يرجى التحقق من الطلبات الواردة`);
+                    }
+                }));
+
+            // Notification events
+            ["notification", "warehouse:notification", "order:notification", "sales:notification"]
+                .forEach((name) => socket.on(name, handleNotification));
+
+            // Debug: log ALL raw events
+            if (socket.onevent) {
+                originalOnevent = socket.onevent.bind(socket);
+                socket.onevent = function(packet) {
+                    console.log("[Socket] Raw event:", packet.data?.[0], packet.data?.[1]);
+                    if (originalOnevent) originalOnevent.call(socket, packet);
+                };
+            }
+
+            socket.on("disconnect", () => console.log("[Socket] Disconnected"));
+            socket.on("connect_error", (error) => console.error("[Socket] Connection error:", error));
+
+            // Check connection status
+            setTimeout(() => {
+                console.log("[Socket] Status:", socket.connected, "ID:", socket.id);
+            }, 3000);
         }
-        
+
         return () => {
             if (socket) {
-                ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated", "notification"]
-                    .forEach((name) => socket.off(name, refresh));
+                ["ORDER_NEW", "warehouse:orders", "warehouse:order:new", "order:new", "order:updated"].forEach((name) => socket.off(name, refresh));
+                // Remove all listeners for sales order events
+                ["sales_order:new", "sales_order:created", "sales:order:new", "order:sales:new", "sales:new", "new:sales_order", "sales_order:updated"]
+                    .forEach((name) => socket.off(name));
+                ["notification", "warehouse:notification", "order:notification", "sales:notification"].forEach((name) => socket.off(name, handleNotification));
+                if (originalOnevent && socket.onevent) socket.onevent = originalOnevent;
             }
         };
     }, []);
+
+
 
     const parseQrData = (raw) => {
         const parts = String(raw || "").split("|").map((p) => String(p || "").trim());
@@ -537,7 +650,7 @@ export default function WarehouseKeeper() {
             });
             const data = await response.json();
             if (data.success) {
-                setSalesOrders(prev => prev.map(order => 
+                setSalesOrders(prev => prev.map(order =>
                     order.order_id === orderId ? { ...order, status } : order
                 ));
                 toast.success('تم تحديث حالة الطلب بنجاح');
@@ -679,7 +792,7 @@ export default function WarehouseKeeper() {
         setSelectedOrder(order);
         setShowSalesOrderInfo(false); // Hide the info card when using input action
         setEntryTab("sales");
-        
+
         // Always load order details to get items (list only has count_items, not the actual items)
         loadSalesOrderDetails(order.order_id).then(details => {
             if (details && details.items && details.items.length > 0) {
@@ -692,43 +805,43 @@ export default function WarehouseKeeper() {
             }
         });
     };
-    
+
     const fillSalesOrderForm = (item) => {
         if (!item) {
             console.log("[fillSalesOrderForm] No item provided");
             return;
         }
-        
+
         console.log("[fillSalesOrderForm] Item:", item);
         console.log("[fillSalesOrderForm] Available colors count:", colors.length);
         console.log("[fillSalesOrderForm] Available batches count:", batches.length);
         console.log("[fillSalesOrderForm] Looking for color_code:", item.color_code);
         console.log("[fillSalesOrderForm] Looking for batch_id:", item.batch_id, "or batch_number:", item.batch_number);
-        
+
         // Find color by color_code (string comparison)
         const color = colors.find((c) => String(c.color_code).trim() === String(item.color_code).trim());
         console.log("[fillSalesOrderForm] Found color:", color);
-        
+
         const rulerId = color?.ruler_id || color?.ruler?.ruler_id;
         console.log("[fillSalesOrderForm] rulerId from color:", rulerId);
-        
+
         // Find the actual ruler from rulers array to get material_id
         const ruler = rulers.find((r) => String(r.ruler_id) === String(rulerId));
         console.log("[fillSalesOrderForm] Found ruler:", ruler);
-        
+
         const materialId = ruler?.material_id ? String(ruler.material_id) : (pvcMaterial ? String(pvcMaterial.material_id) : "");
         console.log("[fillSalesOrderForm] materialId:", materialId);
-        
+
         // Use batch_id directly if available, otherwise find by batch_number
-        const batchId = item.batch_id 
-            ? String(item.batch_id) 
+        const batchId = item.batch_id
+            ? String(item.batch_id)
             : batches.find((b) => String(b.batch_number).trim() === String(item.batch_number).trim())?.batch_id;
         console.log("[fillSalesOrderForm] batchId:", batchId);
-        
+
         // Use quantity as length (quantity is the length value)
         const lengthValue = item.quantity || item.length;
         console.log("[fillSalesOrderForm] lengthValue:", lengthValue);
-        
+
         // Fill sales form and clear production form
         setSalesForm({
             material_id: materialId,
@@ -744,7 +857,7 @@ export default function WarehouseKeeper() {
         });
         // Clear production form completely
         setProductionForm(BASE_FORM);
-        
+
         // Reset flag after React processes the update
         setTimeout(() => {
             skipValidationRef.current = false;
@@ -754,7 +867,7 @@ export default function WarehouseKeeper() {
     const handleCompleteSalesOrder = async (order) => {
         if (!order?.order_id) return;
         try {
-            await updateSalesOrderStatus(order.order_id, "completed");
+            await updateSalesOrderStatus(order.order_id, "outofwarehouse");
             toast.success("تم إتمام طلب المبيعات بنجاح");
             loadSalesOrders();
         } catch (error) {
@@ -773,7 +886,7 @@ export default function WarehouseKeeper() {
     const handleCompleteSalesOrderConfirm = async () => {
         if (!pendingCompleteItem?.order_id) return;
         try {
-            await updateSalesOrderStatus(pendingCompleteItem.order_id, "completed");
+            await updateSalesOrderStatus(pendingCompleteItem.order_id, "outofwarehouse");
             toast.success("تم إتمام طلب المبيعات بنجاح");
             loadSalesOrders();
         } catch (error) {
@@ -786,11 +899,18 @@ export default function WarehouseKeeper() {
     };
 
     const handleOutputSubmit = () => {
-        if (!outputForm.ruler_id || !outputForm.color_id || !outputForm.batch_id || !outputForm.length || !outputForm.thickness || !outputForm.destination) {
-            return toast.error("الطبخة والكمية والسماكة وباقي الحقول مطلوبة");
+        const isSales = entryTab === "sales";
+        if (!outputForm.ruler_id || !outputForm.color_id) {
+            return toast.error("المسطرة واللون مطلوبة");
+        }
+        if (!isSales && (!outputForm.batch_id || !outputForm.length || !outputForm.thickness || !outputForm.destination)) {
+            return toast.error("الطبخة والكمية والسماكة مطلوبة لطلبات الإنتاج");
+        }
+        if (isSales && !outputForm.width) {
+            return toast.error("يرجى إدخال العرض");
         }
         // Set pending output data and show confirmation dialog
-        setPendingOutput({...outputForm});
+        setPendingOutput({ ...outputForm });
         setShowOutputConfirmDialog(true);
     };
 
@@ -798,50 +918,56 @@ export default function WarehouseKeeper() {
         try {
             const num = (value) => Number(String(value).replace(",", "."));
             const cartonCount = num(pendingOutput.carton_count) || 1;
-            
+            const isSales = entryTab === "sales";
+
             // Create multiple records based on carton count
             const createPromises = [];
+            const batchId = pendingOutput.batch_id ? num(pendingOutput.batch_id) : null;
+            const lengthValue = pendingOutput.length ? num(pendingOutput.length) : null;
+            const thicknessValue = pendingOutput.thickness ? num(pendingOutput.thickness) : null;
             for (let i = 0; i < cartonCount; i++) {
                 const movementData = {
                     color_id: num(pendingOutput.color_id),
-                    batch_id: num(pendingOutput.batch_id),
-                    length: num(pendingOutput.length),
-                    width: num(FIXED_WIDTH),
-                    thickness: num(pendingOutput.thickness),
-                    destination: pendingOutput.destination,
+                    batch_id: batchId,
+                    length: lengthValue,
+                    width: num(pendingOutput.width || FIXED_WIDTH),
+                    thickness: thicknessValue,
                     notes: pendingOutput.notes ? (cartonCount > 1 ? `${pendingOutput.notes} (كرتون ${i + 1}/${cartonCount})` : pendingOutput.notes) : (cartonCount > 1 ? `كرتون ${i + 1}/${cartonCount}` : "")
                 };
+                if (!isSales) {
+                    movementData.destination = pendingOutput.destination;
+                }
                 createPromises.push(warehouseApi.createWarehouseMovement(movementData));
             }
-            
+
             const responses = await Promise.all(createPromises);
             const newMovements = responses.map(response => response?.data?.movement || response?.data || response?.movement).filter(Boolean);
-            
+
             if (newMovements.length > 0) {
                 setMovements((prev) => [...newMovements, ...prev]);
             }
-            
+
             // If this was a sales order input, complete the order
             if (selectedOrder?.order_id && entryTab === "sales") {
-                await updateSalesOrderStatus(selectedOrder.order_id, "completed");
+                await updateSalesOrderStatus(selectedOrder.order_id, "outofwarehouse");
                 // Clear selected order
                 setSelectedOrder(null);
                 setOrderItems([]);
             }
-            
+
             // If this was a production order input, complete the item
             if (activeOrderItem?.production_order_item_id && entryTab === "manual") {
                 await productionApi.updateProductionItemStatus(activeOrderItem.production_order_item_id, ProductionStatus.completed);
                 updateLocalStatus(activeOrderItem.production_order_item_id, ProductionStatus.completed);
                 setActiveOrderItem(null);
             }
-            
+
             // Clear both forms completely after saving
             setProductionForm(BASE_FORM);
             setSalesForm(BASE_FORM);
-            
-            const completionMessage = selectedOrder?.order_id && entryTab === "sales" 
-                ? " وإتمام طلب المبيعات" 
+
+            const completionMessage = selectedOrder?.order_id && entryTab === "sales"
+                ? " وإتمام طلب المبيعات"
                 : activeOrderItem?.production_order_item_id && entryTab === "manual"
                     ? " وإتمام طلب الإنتاج"
                     : "";
@@ -925,6 +1051,10 @@ export default function WarehouseKeeper() {
             setOutputForm((prev) => ({ ...prev, carton_count: `${prev.carton_count || ""}${value}` }));
             return;
         }
+        if (currentInput === "width") {
+            setOutputForm((prev) => ({ ...prev, width: `${prev.width || ""}${value}` }));
+            return;
+        }
         if (currentInput === "length") {
             setOutputForm((prev) => ({ ...prev, length: `${prev.length || ""}${value}` }));
             return;
@@ -946,6 +1076,10 @@ export default function WarehouseKeeper() {
         }
         if (currentInput === "carton_count") {
             setOutputForm((prev) => ({ ...prev, carton_count: String(prev.carton_count || "").slice(0, -1) }));
+            return;
+        }
+        if (currentInput === "width") {
+            setOutputForm((prev) => ({ ...prev, width: String(prev.width || "").slice(0, -1) }));
             return;
         }
         if (currentInput === "length") {
@@ -971,6 +1105,10 @@ export default function WarehouseKeeper() {
             setOutputForm((prev) => ({ ...prev, carton_count: "" }));
             return;
         }
+        if (currentInput === "width") {
+            setOutputForm((prev) => ({ ...prev, width: "" }));
+            return;
+        }
         if (currentInput === "length") {
             setOutputForm((prev) => ({ ...prev, length: "" }));
             return;
@@ -989,79 +1127,100 @@ export default function WarehouseKeeper() {
     const handleBackspace = () => trimActiveInput();
     const handleClear = () => clearActiveInput();
 
-    const renderSalesOrdersTable = (list) => (
-        <div className="h-full overflow-auto border rounded-lg bg-white">
-            <table className="w-full border-collapse min-w-[800px]">
-                <thead className="bg-gray-100 sticky top-0 z-50">
-                    <tr>
-                        {["#", "الزبون", "الهاتف", "المدينة", "المبلغ", "الحالة", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
-                            <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap min-w-[80px] bg-gray-100">{h}</th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {loadingSalesOrders ? (
-                        <tr><td colSpan="9" className="p-6"><LoadingState /></td></tr>
-                    ) : list.length === 0 ? (
-                        <tr><td colSpan="9" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات مبيعات</td></tr>
-                    ) : list.map((order, index) => {
-                        const statusBadge = {
-                            pending: { label: "قيد الانتظار", className: "bg-yellow-100 text-yellow-800" },
-                            completed: { label: "مكتمل", className: "bg-green-100 text-green-800" },
-                            preparing: { label: "قيد التحضير", className: "bg-blue-100 text-blue-800" },
-                            canceled: { label: "ملغي", className: "bg-red-100 text-red-800" }
-                        }[order.status] || { label: order.status, className: "bg-gray-100 text-gray-800" };
-                        
-                        return (
-                            <tr key={order.order_id} className="h-14 border-b hover:bg-gray-50">
-                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">#{order.order_id}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[100px]">{order.customer?.name || "-"}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]"><span dir="ltr">{order.customer?.phone || "-"}</span></td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{order.customer?.city || "-"}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{Number(order.total_amount || 0).toLocaleString()}</td>
-                                <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[100px]">
-                                    <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
-                                        {statusBadge.label}
-                                    </span>
-                                </td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[120px]">{formatDate(order.created_at)}</td>
-                                <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[150px] max-w-[150px] truncate" title={order.notes}>{order.notes || "-"}</td>
-                                <td className="px-1 py-2 align-middle text-center whitespace-nowrap min-w-[120px]">
-                                    <div className="flex h-8 items-center justify-center gap-1">
-                                        <button 
-                                            onClick={() => handleSalesOrderSelect(order)}
-                                            className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"
-                                            title="عرض التفاصيل"
-                                        >
-                                            <Eye className="w-4 h-4" />
-                                        </button>
-                                        {salesOrdersTab === "pending" && (
-                                            <>
-                                                <button 
-                                                    onClick={() => handleApplySalesOrderToInputs(order)}
-                                                    className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"
-                                                    title="إدخال"
-                                                >
-                                                    <Hash className="w-4 h-4" />
-                                                </button>
-                                                <button 
-                                                    onClick={() => requestCompleteSalesOrder(order)}
-                                                    className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50"
-                                                    title="إتمام"
-                                                >
-                                                    <Check className="w-4 h-4" />
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
-    );
+    const renderSalesOrdersTable = (list) => {
+        const statusMap = {
+            pending: { label: "قيد الانتظار", className: "bg-yellow-100 text-yellow-800" },
+            completed: { label: "مكتمل", className: "bg-green-100 text-green-800" },
+            outofwarehouse: { label: "اخراج من المستودع", className: "bg-purple-100 text-purple-800" },
+            preparing: { label: "قيد التحضير", className: "bg-blue-100 text-blue-800" },
+            canceled: { label: "ملغي", className: "bg-red-100 text-red-800" }
+        };
+
+        const rows = (list || []).flatMap((order) => {
+            const items = Array.isArray(order.items) && order.items.length > 0 ? order.items : [null];
+            return items.map((item) => ({
+                order,
+                item
+            }));
+        });
+
+        return (
+            <div className="h-full overflow-auto border rounded-lg bg-white">
+                <table className="w-full border-collapse min-w-[1000px]">
+                    <thead className="bg-gray-100 sticky top-0 z-50">
+                        <tr>
+                            {["#", "المادة", "اللون", "العرض", "الكمية", "الطبخة", "الحالة", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
+                                <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap min-w-[70px] bg-gray-100">{h}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loadingSalesOrders ? (
+                            <tr><td colSpan="10" className="p-6"><LoadingState /></td></tr>
+                        ) : rows.length === 0 ? (
+                            <tr><td colSpan="10" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات مبيعات</td></tr>
+                        ) : rows.map(({ order, item }, index) => {
+                            const statusBadge = statusMap[order.status] || { label: order.status, className: "bg-gray-100 text-gray-800" };
+                            const colorName = item?.color_name || item?.color?.color_name || "-";
+                            const colorCode = item?.color_code || item?.color?.color_code || "";
+                            const materialName = item?.material_name || item?.material?.material_name || "-";
+                            const width = item?.width ?? "-";
+                            const quantity = item?.quantity ?? "-";
+                            const batchNumber = item?.batch_number || item?.batch?.batch_number || "-";
+                            return (
+                                <tr key={`${order.order_id}-${item?.order_item_id || item?.id || index}`} className="h-14 border-b hover:bg-gray-50">
+                                    <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">#{order.order_id}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{materialName}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[100px]">
+                                        <span className="text-xs">{colorName}{colorCode ? ` (${colorCode})` : ""}</span>
+                                    </td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">{width}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">{quantity}</td>
+                                    <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{batchNumber}</td>
+                                    <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">
+                                        <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
+                                            {statusBadge.label}
+                                        </span>
+                                    </td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[120px]">{formatDate(order.created_at)}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[150px] max-w-[150px] truncate" title={item?.notes || order.notes}>{item?.notes || order.notes || "-"}</td>
+                                    <td className="px-1 py-2 align-middle text-center whitespace-nowrap min-w-[120px]">
+                                        <div className="flex h-8 items-center justify-center gap-1">
+                                            <button
+                                                onClick={() => handleSalesOrderSelect(order)}
+                                                className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"
+                                                title="عرض التفاصيل"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            {salesOrdersTab === "pending" && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleApplySalesOrderToInputs(order)}
+                                                        className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"
+                                                        title="إدخال"
+                                                    >
+                                                        <Hash className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => requestCompleteSalesOrder(order)}
+                                                        className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-green-700 hover:bg-green-50"
+                                                        title="إتمام"
+                                                    >
+                                                        <Check className="w-4 h-4" />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
 
     const renderOrdersTable = (list) => (
         <div className="h-full overflow-auto border rounded-lg bg-white">
@@ -1139,87 +1298,105 @@ export default function WarehouseKeeper() {
             </div>
 
             {showHeader && (
-            <div className="flex-shrink-0">
-                <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
-                    <div className="flex items-center gap-1">
-                        <Package className="w-7 h-7" />
-                        <div><h1 className="text-2xl font-bold">إدارة المستودع الخام</h1><p className="text-sm opacity-90">لوحة حركات المستودع الخام</p></div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1">
-                        <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-                            {/* <div className="text-xs opacity-80">اسم المستخدم</div> */}
-                            <div className="text-base font-bold">{user?.full_name || user?.username || "-"}</div>
+                <div className="flex-shrink-0">
+                    <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md">
+                        <div className="flex items-center gap-1">
+                            <Package className="w-7 h-7" />
+                            <div><h1 className="text-2xl font-bold">إدارة المستودع الخام</h1><p className="text-sm opacity-90">لوحة حركات المستودع الخام</p></div>
                         </div>
-                        <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-                            {/* <div className="text-xs opacity-80">الدور</div> */}
-                            <div className="text-base font-bold">{ROLE_LABELS[user?.role] || user?.role}</div>
+                        <div className="flex flex-wrap items-center gap-1">
+                            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+                                {/* <div className="text-xs opacity-80">اسم المستخدم</div> */}
+                                <div className="text-base font-bold">{user?.full_name || user?.username || "-"}</div>
+                            </div>
+                            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+                                {/* <div className="text-xs opacity-80">الدور</div> */}
+                                <div className="text-base font-bold">{ROLE_LABELS[user?.role] || user?.role}</div>
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <NotificationsBell />
-                        <Button size="lg" variant="outline" onClick={() => setShowLogoutDialog(true)} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
-                            <ArrowRight className="w-4 h-4 ml-2 rotate-180" />تسجيل الخروج
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <NotificationsBell />
+                            <Button size="lg" variant="outline" onClick={() => setShowLogoutDialog(true)} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
+                                <ArrowRight className="w-4 h-4 ml-2 rotate-180" />تسجيل الخروج
+                            </Button>
+                        </div>
                     </div>
                 </div>
-            </div>
             )}
 
             {!showHeader && (
-            <div className="flex-shrink-0 text-stone-50">
-                <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
-                    <div className="min-w-0">
-                        {/* <div className="text-[11px]">اسم المستخدم</div> */}
-                        <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
-                    </div>
-                    <div className="h-10 w-px" />
-                    <div className="min-w-0 text-right">
-                        {/* <div className="text-[11px] ">الدور</div> */}
-                        <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+                <div className="flex-shrink-0 text-stone-50">
+                    <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
+                        <div className="min-w-0">
+                            {/* <div className="text-[11px]">اسم المستخدم</div> */}
+                            <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
+                        </div>
+                        <div className="h-10 w-px" />
+                        <div className="min-w-0 text-right">
+                            {/* <div className="text-[11px] ">الدور</div> */}
+                            <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+                        </div>
                     </div>
                 </div>
-            </div>
             )}
 
             <div className="flex-1 flex flex-col gap-1 px-4 mt-1 overflow-hidden">
                 <div className={`grid shrink-0 gap-1 ${showHeader ? "grid-cols-3 h-[60%]" : "grid-cols-5 h-[55%]"}`}>
                     <Card className={`p-4 pt-0 flex flex-col gap-4 min-h-0 ${showHeader ? "col-span-1" : "col-span-2"}`}>
                         <div className="flex items-center justify-between gap-3">
-                            {/* <div className="flex items-center gap-2"><Package className="w-5 h-5 text-secondary-s" /><h2 className="text-sm font-bold">الطلبات</h2></div> */}
+                            <div />
                         </div>
-                        
+
                         {/* تابين رئيسية للطلبات */}
-                        <div className="flex gap-1 border-b">
-                            <button 
-                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${
-                                    ordersTab === "production" 
-                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700" 
+                        <div className="flex gap-1 border-b items-center justify-between">
+                            <button
+                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${ordersTab === "production"
+                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700"
                                         : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                                }`}
+                                    }`}
                                 onClick={() => {
                                     setOrdersTab("production");
                                     setEntryTab("production");
                                     setSalesOrdersTab("current");
                                 }}
                             >
-                                طلبات الإنتاج
+                                <span className="inline-flex items-center gap-2">
+                                    طلبات الإنتاج
+                                    {currentOrders.length > 0 && (
+                                        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">
+                                            {currentOrders.length}
+                                        </span>
+                                    )}
+                                </span>
                             </button>
-                            <button 
-                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${
-                                    ordersTab === "sales" 
-                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700" 
+                            <button
+                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${ordersTab === "sales"
+                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700"
                                         : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                                }`}
+                                    }`}
                                 onClick={() => {
                                     setOrdersTab("sales");
                                     setEntryTab("sales");
                                     setSalesOrdersTab("pending");
                                 }}
                             >
-                                طلبات المبيعات
+                                <span className="inline-flex items-center gap-2">
+                                    طلبات المبيعات
+                                    {pendingSalesOrders.length > 0 && (
+                                        <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">
+                                            {pendingSalesOrders.length}
+                                        </span>
+                                    )}
+                                </span>
                             </button>
+                            <div className="mr-auto inline-flex items-center gap-2 pb-1">
+                                <span className="text-xs text-gray-500">الإجمالي</span>
+                                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">
+                                    {currentOrders.length + pendingSalesOrders.length}
+                                </span>
+                            </div>
                         </div>
-                        
+
                         {/* محتوى التابين */}
                         {ordersTab === "production" ? (
                             <div className="flex-1 flex flex-col gap-2 min-h-0 overflow-hidden">
@@ -1248,31 +1425,29 @@ export default function WarehouseKeeper() {
 
                     <Card className={`p-4 flex flex-col ${showHeader ? "col-span-2" : "col-span-3"}`}>
                         {/* <h2 className="text-lg font-bold  flex items-center gap-2"><ArrowRight className="w-5 h-5 text-blue-600" />المدخلات</h2> */}
-                        
+
                         {/* تابين رئيسية للمدخلات */}
                         <div className="flex gap-1 border-b">
-                            <button 
-                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${
-                                    entryTab === "production" 
-                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700" 
+                            <button
+                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${entryTab === "production"
+                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700"
                                         : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                                }`}
+                                    }`}
                                 onClick={() => setEntryTab("production")}
                             >
                                 مدخلات طلبات الإنتاج
                             </button>
-                            <button 
-                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${
-                                    entryTab === "sales" 
-                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700" 
+                            <button
+                                className={`px-3 py-2 text-xs font-medium rounded-t-lg transition-colors ${entryTab === "sales"
+                                        ? "bg-blue-50 border border-b-2 border-blue-500 text-blue-700"
                                         : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                                }`}
+                                    }`}
                                 onClick={() => setEntryTab("sales")}
                             >
                                 مدخلات طلبات المبيعات
                             </button>
                         </div>
-                        
+
                         {/* محتوى التابين */}
                         <div className="flex-1 overflow-auto pr-1 space-y-2 min-h-0">
                             {entryTab === "production" ? (
@@ -1312,9 +1487,9 @@ export default function WarehouseKeeper() {
                                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                                             <div className="flex items-center justify-between mb-2">
                                                 <h4 className="font-bold text-blue-700">طلب المبيعات #{selectedOrder.order_id}</h4>
-                                                <Button 
-                                                    variant="outline" 
-                                                    size="sm" 
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
                                                     onClick={() => {
                                                         setSelectedOrder(null);
                                                         setOrderItems([]);
@@ -1336,7 +1511,7 @@ export default function WarehouseKeeper() {
                                             </div>
                                         </div>
                                     )}
-                                    
+
                                     {/* عرض عناصر طلب المبيعات */}
                                     {showSalesOrderInfo && selectedOrder?.items && selectedOrder.items.length > 0 && (
                                         <div className="border rounded-lg overflow-hidden">
@@ -1375,7 +1550,7 @@ export default function WarehouseKeeper() {
                                             </div>
                                         </div>
                                     )}
-                                    
+
                                     {/* رسالة توجيهية - تظهر فقط عند عدم اختيار طلب */}
                                     {/* {!selectedOrder?.order_id && (
                                         <div className="flex items-center justify-center p-8 text-gray-500">
@@ -1386,7 +1561,7 @@ export default function WarehouseKeeper() {
                                             </div>
                                         </div>
                                     )} */}
-                                    
+
                                     {/* نموذج إدخال مخرج المبيعات */}
                                     <div className="">
                                         {/* <h4 className="font-medium text-sm mb-3 text-gray-700">إدخال مخرج جديد</h4> */}
@@ -1395,12 +1570,11 @@ export default function WarehouseKeeper() {
                                                 <div><Label className={'mb-1'}>المسطرة</Label><FilterSelect value={outputForm.ruler_id} onChange={(e) => setOutputForm((p) => ({ ...p, ruler_id: e.target.value, color_id: "" }))} searchValue={selectSearch.ruler} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, ruler: value }))} onInputFocus={() => setCurrentInput("select:ruler")} options={availableRulers.map((r) => ({ value: String(r.ruler_id), label: r.ruler_name }))} placeholder="اختر المسطرة" disabled={!outputForm.material_id} /></div>
                                                 <div><Label className={'mb-1'}>اللون</Label><FilterSelect value={outputForm.color_id} onChange={(e) => setOutputForm((p) => ({ ...p, color_id: e.target.value }))} searchValue={selectSearch.color} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, color: value }))} onInputFocus={() => setCurrentInput("select:color")} options={colorOptions} placeholder={!outputForm.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"} disabled={!outputForm.ruler_id} /></div>
                                                 <div><Label className={'mb-1'}>الطبخة</Label><FilterSelect value={outputForm.batch_id} onChange={(e) => setOutputForm((p) => ({ ...p, batch_id: e.target.value }))} searchValue={selectSearch.batch} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, batch: value }))} onInputFocus={() => setCurrentInput("select:batch")} options={batchOptions} placeholder="اختر الطبخة" disabled={!outputForm.material_id} /></div>
-                                                <div><Label className={'mb-1'}>العرض</Label><button type="button" className="w-full rounded-lg border-2 border-secondary-s bg-secondary-s text-white p-3 font-bold shadow-lg">{FIXED_WIDTH}</button></div>
+                                                <div><Label className={'mb-1'}>العرض</Label><Input type="text" className={`h-13`} value={outputForm.width} onChange={(e) => setOutputForm((p) => ({ ...p, width: e.target.value }))} onFocus={() => setCurrentInput("width")} placeholder="العرض" /></div>
                                                 <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} searchValue={selectSearch.thickness} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, thickness: value }))} onInputFocus={() => setCurrentInput("select:thickness")} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
                                             </div>
-                                            <div className="grid grid-cols-3 gap-1">
+                                            <div className="grid grid-cols-2 gap-1">
                                                 <div><Label className={'mb-1'}>الكمية</Label><Input type="text" className={`h-13`} value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} onFocus={() => setCurrentInput("length")} placeholder="الكمية" /></div>
-                                                <div><Label className={'mb-1'}>عدد الكراتين</Label><Input type="number" min="1" className={`h-13`} value={outputForm.carton_count} onChange={(e) => setOutputForm((p) => ({ ...p, carton_count: e.target.value }))} onFocus={() => setCurrentInput("carton_count")} placeholder="عدد الكراتين" /></div>
                                                 <div className="col-span-1"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
                                             </div>
                                             <Button onClick={handleOutputSubmit} className="w-full h-13 bg-green-600 hover:bg-green-700"><Check className="w-5 h-5 ml-2" />حفظ مخرج المبيعات</Button>
@@ -1440,7 +1614,7 @@ export default function WarehouseKeeper() {
                                     </Button>
                                 )}
                             </div>
-                            
+
                             <div className="flex-1 min-h-0 overflow-auto">
                                 <table className="min-w-[1100px] w-full table-fixed border-collapse">
                                     <thead className="bg-gray-100 sticky top-0 z-50">
@@ -1474,7 +1648,7 @@ export default function WarehouseKeeper() {
                                                 <td className="p-2 text-center text-sm">{m.length || "-"}</td>
                                                 <td className="p-2 text-center text-sm">{m.thickness || "-"}</td>
                                                 <td className="p-2 text-center text-sm">{m.batch?.batch_number || "-"}</td>
-                                                <td className="p-2 text-center text-sm">{formatDestination(m.destination)}</td>
+                                                <td className="p-2 text-center text-sm">{m.destination ? formatDestination(m.destination) : ""}</td>
                                                 <td className="p-2 text-center text-sm">{m.user?.full_name || m.user?.username || "-"}</td>
                                                 <td className="p-2 text-center text-sm">{formatDate(m.created_at)}</td>
                                                 <td className="p-2 text-center text-sm max-w-[140px] truncate" title={m.notes || "-"}>{m.notes || "-"}</td>
@@ -1552,14 +1726,14 @@ export default function WarehouseKeeper() {
                                 )}
                             </div>
                         )} */}
-                        
+
                         {/* جدول العناصر */}
                         {loadingOrderDetails ? <LoadingState /> : (
                             <div className="border rounded-lg overflow-hidden">
                                 <table className="w-full table-auto text-sm [&_td]:break-words [&_th]:break-words">
                                     <thead className="bg-gray-100">
                                         <tr>
-                                            {selectedOrder.items ? 
+                                            {selectedOrder.items ?
                                                 ["#", "المادة", "اللون", "العرض", "الكمية", "النوع", "السماكة", "الطبخة", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>) :
                                                 ["#", "المادة", "اللون", "العرض", "الكمية", "النوع", "السماكة", "الطبخة", "الوجهة", "الحالة", "الملاحظات", "الإجراءات"].map((h) => <th key={h} className="p-2 text-center">{h}</th>)
                                             }
@@ -1590,6 +1764,7 @@ export default function WarehouseKeeper() {
                                                             const statusMap = {
                                                                 pending: { label: "قيد الانتظار", className: "bg-yellow-100 text-yellow-800" },
                                                                 completed: { label: "مكتمل", className: "bg-green-100 text-green-800" },
+                                                                outofwarehouse: { label: "اخراج من المستودع", className: "bg-purple-100 text-purple-800" },
                                                                 preparing: { label: "قيد التحضير", className: "bg-blue-100 text-blue-800" },
                                                                 canceled: { label: "ملغي", className: "bg-red-100 text-red-800" }
                                                             };
@@ -1745,9 +1920,15 @@ export default function WarehouseKeeper() {
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الكمية</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">السماكة</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الطبخة</th>
-                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المسطرة</th>
-                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">عدد الكراتين</th>
-                                    <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
+                                    {entryTab !== "sales" && (
+                                        <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المسطرة</th>
+                                    )}
+                                    {entryTab !== "sales" && (
+                                        <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">عدد الكراتين</th>
+                                    )}
+                                    {entryTab !== "sales" && (
+                                        <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الوجهة</th>
+                                    )}
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">المستخدم</th>
                                     <th className="border border-gray-200 px-3 py-2 text-center text-xs font-medium">الملاحظات</th>
                                 </tr>
@@ -1769,18 +1950,24 @@ export default function WarehouseKeeper() {
                                             return batch ? batch.batch_number : "-";
                                         })()}
                                     </td>
-                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
-                                        {(() => {
-                                            const ruler = rulers.find(r => String(r.ruler_id) === String(pendingOutput?.ruler_id));
-                                            return ruler ? ruler.ruler_name : "-";
-                                        })()}
-                                    </td>
-                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingOutput?.carton_count || "1"}</td>
-                                    <td className="border border-gray-200 px-3 py-2 text-center text-sm">
-                                        <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                                            {formatDestination(pendingOutput?.destination)}
-                                        </span>
-                                    </td>
+                                    {entryTab !== "sales" && (
+                                        <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                                            {(() => {
+                                                const ruler = rulers.find(r => String(r.ruler_id) === String(pendingOutput?.ruler_id));
+                                                return ruler ? ruler.ruler_name : "-";
+                                            })()}
+                                        </td>
+                                    )}
+                                    {entryTab !== "sales" && (
+                                        <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingOutput?.carton_count || "1"}</td>
+                                    )}
+                                    {entryTab !== "sales" && (
+                                        <td className="border border-gray-200 px-3 py-2 text-center text-sm">
+                                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                                                {formatDestination(pendingOutput?.destination)}
+                                            </span>
+                                        </td>
+                                    )}
                                     <td className="border border-gray-200 px-3 py-2 text-center text-sm">{user?.full_name || user?.username || "-"}</td>
                                     <td className="border border-gray-200 px-3 py-2 text-center text-sm">{pendingOutput?.notes || "-"}</td>
                                 </tr>
@@ -1808,7 +1995,7 @@ export default function WarehouseKeeper() {
                 confirmVariant="destructive"
             >
                 <div className="text-sm text-gray-700">
-                    هل تريد حذف المخرج 
+                    هل تريد حذف المخرج
                     <span className="font-bold"> #{pendingDeleteMovement?.movement_id || ""}</span>؟
                     <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
                         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1845,7 +2032,7 @@ export default function WarehouseKeeper() {
                 confirmVariant="destructive"
             >
                 <div className="text-sm text-gray-700">
-                    هل تريد حذف 
+                    هل تريد حذف
                     <span className="font-bold"> {selectedMovements.size} </span>
                     مخرج؟
                     <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">

@@ -117,6 +117,7 @@ export default function OrderPreparerPage() {
     const ORDER_STATUS_OPTIONS = [
         { value: OrderStatus.pending, label: "قيد الانتظار" },
         { value: OrderStatus.preparing, label: "قيد التحضير" },
+        { value: OrderStatus.outofwarehouse, label: "اخراج من المستودع" },
         { value: OrderStatus.completed, label: "مكتمل" },
         { value: OrderStatus.canceled, label: "ملغي" }
     ];

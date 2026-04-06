@@ -16,7 +16,7 @@ const roleLabels = {
   Warehouse_Products: "منتجات المستودع",
   Dissection_Technician: "فني التشريح",
   Cutting_Technician: "فني القطع",
-  Gluing_Technician: "فني اللصق",
+  Gluing_Technician: "فني التغرية",
 };
 
 export default function UserModal({ user, onClose, onSave }) {

@@ -1059,6 +1059,15 @@ export default function ProductionManager() {
                         <Button
                             size="lg"
                             variant="outline"
+                            onClick={() => navigate("/production/dashboard")}
+                            className="px-6 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                        >
+                            <Home className="w-5 h-5 ml-2" />
+                            الرئيسية
+                        </Button>
+                        <Button
+                            size="lg"
+                            variant="outline"
                             onClick={() => setViewMode("create")}
                             className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
                                 ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"

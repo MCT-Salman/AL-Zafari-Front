@@ -24,6 +24,7 @@
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.13.0",
+    "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",
     "styled-component": "^2.8.0",
     "tailwind-merge": "^3.4.0",

@@ -435,7 +435,7 @@ export default function Constants() {
           {/* Search */}
           <div className="-my-4">
             <SearchInput
-              placeholder="ابحث عن قيمة أو ملصق أو ملاحظة"
+              placeholder="ابحث عن قيمة أو تغرية أو ملاحظة"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -556,7 +556,7 @@ export default function Constants() {
                                 <TableRow>
                                   <TableHead>القيمة</TableHead>
                                   <TableHead>الوحدة</TableHead>
-                                  <TableHead>الملصق</TableHead>
+                                  <TableHead>التغرية</TableHead>
                                   <TableHead>ملاحظات</TableHead>
                                   <TableHead>الافتراضي</TableHead>
                                   <TableHead>الإجراءات</TableHead>
@@ -648,7 +648,7 @@ export default function Constants() {
           </div>
 
           <div>
-            <label className="text-sm font-medium">الملصق</label>
+            <label className="text-sm font-medium">التغرية</label>
             <Input
               value={formValueData.label}
               onChange={(e) =>

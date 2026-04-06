@@ -137,9 +137,9 @@ export const productionApi = {
   getProductionTypeLabel: (type) => {
     const typeMap = {
       [ProductionType.warehouse]: 'مستودع',
-      [ProductionType.slitting]: 'تقطيع',
+      [ProductionType.slitting]: 'التشريح',
       [ProductionType.cutting]: 'قص',
-      [ProductionType.gluing]: 'لصق',
+      [ProductionType.gluing]: 'تغرية',
       [ProductionType.orderproduction]: 'إنتاج'
     };
     return typeMap[type] || type || 'غير محدد';
@@ -147,9 +147,9 @@ export const productionApi = {
 
   getMovementDestinationLabel: (destination) => {
     const destMap = {
-      [MovementDestination.slitting]: 'تقطيع',
+      [MovementDestination.slitting]: 'التشريح',
       [MovementDestination.cutting]: 'قص',
-      [MovementDestination.gluing]: 'لصق',
+      [MovementDestination.gluing]: 'تغرية',
       [MovementDestination.production]: 'إنتاج',
       [MovementDestination.warehouse]: 'مستودع'
     };
@@ -159,7 +159,7 @@ export const productionApi = {
   getProcessSourceLabel: (source) => {
     const sourceMap = {
       [ProcessSource.warehouse]: 'مستودع',
-      [ProcessSource.slitting]: 'تقطيع',
+      [ProcessSource.slitting]: 'التشريح',
       [ProcessSource.cutting]: 'قص',
       [ProcessSource.production]: 'إنتاج'
     };

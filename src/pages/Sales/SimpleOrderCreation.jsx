@@ -180,33 +180,10 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     });
 
     const [savingQrQuantity, setSavingQrQuantity] = useState(false);
-    const isOrderPreparer = variant === "order-preparer";
     const isOrdersPage = variant === "orders";
-    const showOrderSwitch = isOrdersPage || isOrderPreparer;
+    const showOrderSwitch = isOrdersPage;
 
-    const ordersApi = isOrderPreparer
-        ? {
-            getOrders: salesApi.getSalesOrders,
-            getOrderById: salesApi.getSalesOrderById,
-            createOrder: salesApi.createSalesOrder,
-            updateOrder: salesApi.updateSalesOrder,
-            updateOrderStatus: (id, status) => salesApi.updateSalesOrder(id, { status }),
-            updateOrderItem: (_orderId, itemId, itemData) => salesApi.updateSalesOrderItem(itemId, itemData),
-            deleteMultipleOrders: salesApi.deleteMultipleSalesOrders,
-            getOrderStatus: salesApi.getSalesOrderStatus,
-            getFormattedDate: salesApi.getFormattedDate,
-            getStatusBadge: salesApi.getStatusBadge,
-            getSalesUserName: salesApi.getIssuedBy,
-            getCustomerName: orderApi.getCustomerName,
-            getCustomerPhone: orderApi.getCustomerPhone,
-            getCustomerCity: orderApi.getCustomerCity,
-            getCustomerAddress: orderApi.getCustomerAddress,
-            formatCustomerInfo: orderApi.formatCustomerInfo,
-            calculateOrderTotal: orderApi.calculateOrderTotal,
-            formatCurrency: orderApi.formatCurrency
-        }
-
-        : orderApi;
+    const ordersApi = orderApi;
 
     const isQrQuantityChanged = useMemo(() => {
         const current = String(qrGenDialog.quantity ?? "");
@@ -327,6 +304,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
+
     const getStatusLabel = (status) => {
 
         switch (status) {
@@ -338,6 +316,10 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
             case OrderStatus.preparing:
 
                 return "قيد التحضير";
+
+            case OrderStatus.outofwarehouse:
+
+                return "اخراج من المستودع";
 
             case OrderStatus.completed:
 
@@ -767,7 +749,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
             `عدد العناصر:${orderItems.length}`,
 
-            `إجمالي الكمية:${totalPreviewQuantity} م`,
+            `?????? ??????:${totalPreviewQuantity}${totalQuantityUnitLabel}`,
 
             "العناصر:",
 
@@ -1259,6 +1241,22 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
     }, [formData.material_id, materials, selectedMaterial]);
 
+    const getItemQuantityUnit = useCallback((item) => {
+        const direct = item?.quantity_unit;
+        if (direct) return direct;
+        const materialName = String(item?.material_name || item?.material?.material_name || "").toLowerCase();
+        return materialName.includes("pvc") ? "م" : "قطعة";
+    }, []);
+
+    const quantityUnitLabel = isSelectedMaterialPvc ? "م" : "قطعة";
+    const hasMixedQuantityUnits = useMemo(() => {
+        const units = new Set(orderItems.map((it) => getItemQuantityUnit(it)));
+        return units.size > 1;
+    }, [orderItems, getItemQuantityUnit]);
+    const totalQuantityUnitLabel = hasMixedQuantityUnits ? "" : ` ${quantityUnitLabel}`;
+
+
+
     const getMaterialConstantLabel = useCallback((material, type) => {
 
         const values = material?.constant_values || [];
@@ -1272,6 +1270,28 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
         return pick.label || `${pick.value ?? ""} ${pick.unit || ""}`.trim();
 
     }, []);
+
+    const getMaterialConstantValue = useCallback((material, type) => {
+        const values = material?.constant_values || [];
+        const candidates = values.filter(v => v.type === type);
+        const pick = candidates.find(v => v.isDefault) || candidates[0];
+        if (!pick) return null;
+        const raw = pick.value ?? pick.label ?? "";
+        const num = Number(raw);
+        if (Number.isFinite(num)) return num;
+        const match = String(raw).match(/[\d.]+/);
+        return match ? Number(match[0]) : null;
+    }, []);
+
+
+    useEffect(() => {
+        if (!selectedMaterial || isSelectedMaterialPvc) return;
+        const widthVal = getMaterialConstantValue(selectedMaterial, "width");
+        if (widthVal != null) {
+            setFormData((prev) => ({ ...prev, width: String(widthVal) }));
+        }
+    }, [selectedMaterial, isSelectedMaterialPvc, getMaterialConstantValue]);
+
 
 
 
@@ -1679,6 +1699,9 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
+        const widthFromConst = !isSelectedMaterialPvc ? getMaterialConstantValue(selectedMaterial, "width") : null;
+        const lengthFromConst = !isSelectedMaterialPvc ? getMaterialConstantValue(selectedMaterial, "height") : null;
+
         const newItemBase = {
 
             id: editingItemId || Date.now(),
@@ -1693,13 +1716,14 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
             batch_id: formData.batch_id,
 
-            width: formData.width,
+            width: !isSelectedMaterialPvc && widthFromConst != null ? String(widthFromConst) : formData.width,
 
-            length: 100,
+            length: !isSelectedMaterialPvc && lengthFromConst != null ? Number(lengthFromConst) : 100,
 
             thickness: formData.thickness,
 
             quantity: formData.quantity,
+            quantity_unit: isSelectedMaterialPvc ? "م" : "قطعة",
 
             notes: formData.notes,
 
@@ -1829,7 +1853,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
         const qrUrl = getOrderQrUrl(qrData);
 
-        const footerText = `عدد العناصر: ${orderItems.length} | إجمالي الكمية: ${totalPreviewQuantity} م`;
+        const footerText = `??? ???????: ${orderItems.length} | ?????? ??????: ${totalPreviewQuantity}${totalQuantityUnitLabel}`;
 
         setOrderQrPreview({
 
@@ -1913,7 +1937,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
         const qrUrl = getOrderQrUrl(qrData);
 
-        const footerText = `مادة: ${material?.material_name} | كمية: ${formData.quantity} م`;
+        const footerText = `????: ${material?.material_name} | ????: ${formData.quantity} ${quantityUnitLabel}`;
 
 
 
@@ -3071,22 +3095,22 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
     // Filter materials for order-preparer - only show PVC materials
     const filteredMaterials = useMemo(() => {
-        if (!isOrderPreparer) return materials;
+        if (!false) return materials;
         return materials.filter(m => {
             const materialName = m.material_name?.toLowerCase() || "";
             return materialName.includes("pvc");
         });
-    }, [materials, isOrderPreparer]);
+    }, [materials, false]);
 
     // Auto-select first PVC material for order-preparer
     useEffect(() => {
-        if (isOrderPreparer && filteredMaterials.length > 0 && !formData.material_id) {
+        if (false && filteredMaterials.length > 0 && !formData.material_id) {
             setFormData(prev => ({
                 ...prev,
                 material_id: String(filteredMaterials[0].material_id)
             }));
         }
-    }, [isOrderPreparer, filteredMaterials, formData.material_id]);
+    }, [false, filteredMaterials, formData.material_id]);
 
 
     if (loading && viewMode === "create" && materials.length === 0) {
@@ -3099,18 +3123,19 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
     return (
 
-        <div className="h-screen flex flex-col overflow-auto bg-gray-50">
+        <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
             <DashboardHeader
                 isHeaderVisible={isHeaderVisible}
                 setIsHeaderVisible={setIsHeaderVisible}
+                hideHeaderToggle={true}
             />
 
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div className="flex-1 min-h-0 overflow-hidden">
 
                 {/* Tabs Navigation - WhatsApp Style (Sticky) */}
 
-                <div className="sticky top-0 z-20 flex items-center border-b border-gray-300 bg-white mt-2 mx-2 rounded-t-lg shadow-sm">
+                <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white mt-2 mx-2 rounded-t-lg shadow-sm px-2 py-2">
 
                     {showOrderSwitch && (
 
@@ -3118,24 +3143,16 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                             onClick={() => setViewMode("create")}
 
-                            className={`flex-1 py-3 px-4 text-sm font-medium transition-all relative ${viewMode === "create"
-
-                                ? "text-primary-f"
-
-                                : "text-gray-500 hover:text-gray-700"
-
+                            className={`flex-1 min-w-[160px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "create"
+                                ? "bg-primary-f text-white border-primary-f shadow"
+                                : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
                                 }`}
 
                         >
 
-                            {isOrderPreparer ? "توليد QR" : "المواد"}
+                            {false ? "توليد QR" : "المواد"}
 
-                            {viewMode === "create" && (
-
-                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-f" />
-
-                            )}
-
+                            
                         </button>
 
                     )}
@@ -3144,55 +3161,40 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                         onClick={() => setViewMode("history")}
 
-                        className={`flex-1 py-3 px-4 text-sm font-medium transition-all relative ${viewMode === "history"
-
-                            ? "text-primary-f"
-
-                            : "text-gray-500 hover:text-gray-700"
-
+                        className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "history"
+                            ? "bg-primary-f text-white border-primary-f shadow"
+                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
                             }`}
 
                     >
 
                         سجل الطلبات
 
-                        {viewMode === "history" && (
-
-                            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-f" />
-
-                        )}
-
+                        
                     </button>
 
                     <button
 
                         onClick={() => setViewMode("colors")}
 
-                        className={`flex-1 py-3 px-4 text-sm font-medium transition-all relative ${viewMode === "colors"
-
-                            ? "text-primary-f"
-
-                            : "text-gray-500 hover:text-gray-700"
-
+                        className={`flex-1 min-w-[160px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "colors"
+                            ? "bg-primary-f text-white border-primary-f shadow"
+                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
                             }`}
 
                     >
 
-                        {isOrderPreparer ? "طلب انتاج" : "الشركات المكافئة"}
+                        {false ? "طلب انتاج" : "الشركات المكافئة"}
 
-                        {viewMode === "colors" && (
-
-                            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-f" />
-
-                        )}
-
+                        
                     </button>
 
                 </div>
 
+                <div className="flex-1 min-h-0 flex flex-col">
                 {viewMode === "colors" ? (
 
-                    isOrderPreparer ? (
+                    false ? (
 
                         <div className="h-full min-h-0 px-2 pb-2">
 
@@ -3210,7 +3212,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
 
-                                            {(Array.isArray(isOrderPreparer ? filteredMaterials : materials) ? (isOrderPreparer ? filteredMaterials : materials) : []).map(m => (
+                                            {(Array.isArray(false ? filteredMaterials : materials) ? (false ? filteredMaterials : materials) : []).map(m => (
 
                                                 <button
 
@@ -3230,7 +3232,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             ? "border-primary-f bg-secondary-f text-white shadow-lg"
 
-                                                            : isOrderPreparer
+                                                            : false
 
                                                                 ? "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
 
@@ -3704,7 +3706,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             <div>
 
-                                                <Label className="font-bold text-sm mb-1 block">الكمية</Label>
+                                                <Label className="font-bold text-sm mb-1 block">{`الكمية (${quantityUnitLabel})`}</Label>
 
                                                 <Input
 
@@ -3960,7 +3962,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         {/* جدول طلبات الإنتاج */}
 
-                                        <div className="flex-1 overflow-auto min-h-0">
+                                        <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]">
 
                                             {productionOrders.length > 0 ? (
 
@@ -4026,7 +4028,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                 </td>
 
-                                                                <td className="p-2 text-center font-bold">{order.quantity} م</td>
+                                                                <td className="p-2 text-center font-bold">{order.quantity} {getItemQuantityUnit(order)}</td>
 
                                                                 <td className="p-2">{order.ruler_name || "-"}</td>
 
@@ -4136,7 +4138,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
 
-                                    {(Array.isArray(isOrderPreparer ? filteredMaterials : materials) ? (isOrderPreparer ? filteredMaterials : materials) : []).map(m => (
+                                    {(Array.isArray(false ? filteredMaterials : materials) ? (false ? filteredMaterials : materials) : []).map(m => (
 
                                         <button
 
@@ -4156,7 +4158,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     ? "border-primary-f bg-secondary-f text-white shadow-lg"
 
-                                                    : isOrderPreparer
+                                                    : false
 
                                                         ? "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
 
@@ -4736,7 +4738,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                     <div>
 
-                                        <Label className="font-bold text-sm mb-1 block">الكمية</Label>
+                                        <Label className="font-bold text-sm mb-1 block">{`الكمية (${quantityUnitLabel})`}</Label>
 
                                         <div className="flex items-center gap-2">
 
@@ -4922,11 +4924,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                     <Button
 
-                                        onClick={isOrderPreparer ? handleGenerateQrDirectly : addOrUpdateItem}
+                                        onClick={false ? handleGenerateQrDirectly : addOrUpdateItem}
 
                                         size="sm"
 
-                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : isOrderPreparer ? 'bg-purple-600 hover:bg-purple-700' : 'bg-primary-f hover:bg-secondary-f'
+                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : false ? 'bg-purple-600 hover:bg-purple-700' : 'bg-primary-f hover:bg-secondary-f'
 
                                             }`}
 
@@ -4948,7 +4950,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             <>
 
-                                                {isOrderPreparer ? (
+                                                {false ? (
 
                                                     <>
 
@@ -4988,7 +4990,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-auto">
 
-                            {isOrderPreparer ? (
+                            {false ? (
 
                                 <Card className="flex flex-col h-full min-h-0 overflow-auto">
 
@@ -5056,7 +5058,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                 <div className="space-y-2">
 
-                                                    <div className="grid grid-cols-2 gap-2 text-sm max-w-xs mx-auto">
+                                                    {/* <div className="grid grid-cols-2 gap-2 text-sm max-w-xs mx-auto">
 
                                                         <div className="bg-gray-50 rounded-lg p-2">
 
@@ -5066,11 +5068,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         <div className="bg-gray-50 rounded-lg p-2">
 
-                                                            إجمالي الكمية: <span className="font-bold">{orderQrPreview.totalQuantity || orderItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)} م</span>
+                                                            ?????? ??????: <span className="font-bold">{orderQrPreview.totalQuantity || orderItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)}{totalQuantityUnitLabel}</span>
 
                                                         </div>
 
-                                                    </div>
+                                                    </div> */}
 
                                                     <div className="flex items-center justify-center gap-2">
 
@@ -5198,7 +5200,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
-                                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                                {/* <div className="grid grid-cols-2 gap-3 text-sm">
 
                                                     <div className="bg-gray-50 rounded-lg p-2">
 
@@ -5208,11 +5210,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     <div className="bg-gray-50 rounded-lg p-2">
 
-                                                        إجمالي الكمية: <span className="font-bold">{totalPreviewQuantity} م</span>
+                                                        ?????? ??????: <span className="font-bold">{totalPreviewQuantity}{totalQuantityUnitLabel}</span>
 
                                                     </div>
 
-                                                </div>
+                                                </div> */}
 
 
 
@@ -5262,7 +5264,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                     </td>
 
-                                                                    <td className="p-2 text-center font-bold">{item.quantity} م</td>
+                                                                    <td className="p-2 text-center font-bold">{item.quantity} {getItemQuantityUnit(item)}</td>
 
                                                                     <td className="p-2">{item.ruler_name}</td>
 
@@ -5322,7 +5324,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                 <span className="font-bold text-lg">العناصر: {orderItems.length}</span>
 
-                                                {isOrderPreparer && (
+                                                {false && (
 
                                                     <Button
 
@@ -5422,7 +5424,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             ref={tableContainerRef}
 
-                                            className="flex-1 overflow-auto min-h-0"
+                                            className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]"
 
                                             style={{ direction: 'rtl' }}
 
@@ -5498,7 +5500,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             <td className="p-1 text-center font-bold text-sm">
 
-                                                                {item.quantity} م
+                                                                {item.quantity} {getItemQuantityUnit(item)}
 
                                                             </td>
 
@@ -5588,7 +5590,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         <div className="flex justify-end pt-2">
 
-                                            {isOrderPreparer ? (
+                                            {false ? (
 
                                                 <Button
 
@@ -5632,7 +5634,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             <Check className="w-4 h-4 ml-2" />
 
-                                                            {isOrderPreparer ? "توليد QR" : "حفظ"}
+                                                            {false ? "توليد QR" : "حفظ"}
 
                                                         </>
 
@@ -5660,7 +5662,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                         {/* وضع السجل */}
 
-                        <Card className="flex flex-col h-full min-h-0 overflow-auto p-2">
+                        <Card className="flex flex-col flex-1 min-h-0 overflow-hidden p-2">
 
                             <div className="flex justify-between items-center mb-1 flex-shrink-0">
 
@@ -5764,6 +5766,8 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         { value: "pending", label: "قيد الانتظار" },
 
+                                        { value: "outofwarehouse", label: "اخراج من المستودع" },
+
                                         { value: "completed", label: "مكتمل" },
 
                                         { value: "cancelled", label: "ملغي" },
@@ -5778,9 +5782,9 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                             {/* جدول السجل مع التمرير */}
 
-                            <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
+                            <div className="flex-1 overflow-y-auto overflow-x-auto xl:overflow-x-hidden min-h-0 border rounded-lg bg-white max-h-[50vh] min-[1366px]:min-h-[40vh]">
 
-                                <table className="min-w-[1400px] w-full table-fixed border-collapse">
+                                <table className="min-w-[1400px] xl:min-w-0 w-full table-fixed xl:table-auto border-collapse">
 
                                     <thead className="bg-gray-100 sticky top-0 z-20">
 
@@ -5888,7 +5892,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             {order.customer ? (
 
-                                                                <div className="text-sm">
+                                                                <div className="text-sm xl:whitespace-normal xl:break-words">
 
                                                                     <div className="font-medium">{order.customer.name}</div>
 
@@ -5904,7 +5908,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         </td>
 
-                                                        <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
+                                                        <td className="p-2 text-center max-w-[150px] xl:max-w-none truncate xl:whitespace-normal xl:break-words text-sm" title={order.notes}>
 
                                                             {order.notes || "-"}
 
@@ -6118,7 +6122,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
-                                            {!isOrderPreparer ? <div className="bg-gray-50 p-3 rounded-lg border">
+                                            {!false ? <div className="bg-gray-50 p-3 rounded-lg border">
 
                                                 <div className="text-xs text-gray-500">تعديل الحالة</div>
 
@@ -6277,7 +6281,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                                         {orderDetails.items && orderDetails.items.length > 0 ? (
 
                                             <div>
-
+{/* 
                                                 <div className="flex items-center justify-between mb-2">
 
                                                     <h4 className="font-bold text-base flex items-center gap-2">
@@ -6298,7 +6302,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     </div>
 
-                                                </div>
+                                                </div> */}
 
 
 
@@ -6326,7 +6330,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                     <th className="p-3 text-center">الكمية</th>
 
-                                                                    <th className="p-3 text-center">رقم الدفعة</th>
+                                                                    <th className="p-3 text-center">رقم الطبخة</th>
 
                                                                     <th className="p-3 text-center">QR</th>
 
@@ -6430,7 +6434,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                             </td>
 
-                                                                            <td className="p-3 text-center font-bold">{item.quantity} م</td>
+                                                                            <td className="p-3 text-center font-bold">{item.quantity} {getItemQuantityUnit(item)}</td>
 
                                                                             <td className="p-3 text-center font-mono text-xs">{item.batch_number || '-'}</td>
 
@@ -6547,6 +6551,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                     </>
 
                 )}
+                </div>
 
 
 
@@ -6628,7 +6633,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                     <div className="space-y-3">
 
-                        <div className="grid grid-cols-2 gap-2 text-sm">
+                        {/* <div className="grid grid-cols-2 gap-2 text-sm">
 
                             <div className="bg-gray-50 rounded-lg p-2">
 
@@ -6638,11 +6643,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                             <div className="bg-gray-50 rounded-lg p-2">
 
-                                إجمالي الكمية: <span className="font-bold">{orderQrPreview.totalQuantity} م</span>
+                                ?????? ??????: <span className="font-bold">{orderQrPreview.totalQuantity}{totalQuantityUnitLabel}</span>
 
                             </div>
 
-                        </div>
+                        </div> */}
 
                         <div className="flex items-center justify-center">
 
@@ -6752,7 +6757,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                         <div className="space-y-2">
 
-                            <Label className="font-bold">الكمية (متر)</Label>
+                                                <Label className="font-bold">{`الكمية (${qrGenDialog.item?.quantity_unit || quantityUnitLabel})`}</Label>
 
                             <div className="flex items-center gap-2">
 
@@ -6792,7 +6797,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                             <div className="text-xs text-gray-400">
 
-                                الكمية الأصلية: {qrGenDialog.item?.quantity} م
+                                ?????? ???????: {qrGenDialog.item?.quantity} {qrGenDialog.item?.quantity_unit || quantityUnitLabel}
 
                             </div>
 
@@ -6834,7 +6839,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         <span className="font-semibold">الكمية:</span>{" "}
 
-                                        <span>{qrGenDialog.quantity || qrGenDialog.item?.quantity || "-"}</span>
+                                        <span>{qrGenDialog.quantity || qrGenDialog.item?.quantity || "-"} {qrGenDialog.item?.quantity_unit || quantityUnitLabel}</span>
 
                                     </div>
 

@@ -27,7 +27,7 @@ export const UserRoleLabels = {
   [UserRole.Warehouse_Products]: 'منتجات المستودع',
   [UserRole.Dissection_Technician]: 'فني التشريح',
   [UserRole.Cutting_Technician]: 'فني القطع',
-  [UserRole.Gluing_Technician]: 'فني اللصق',
+  [UserRole.Gluing_Technician]: 'فني التغرية',
 };
 
 export const CustomerType = {
@@ -100,6 +100,7 @@ export const OrderStatusLabels = {
   [OrderStatus.pending]: 'قيد الانتظار',
   [OrderStatus.preparing]: 'قيد التحضير',
   [OrderStatus.canceled]: 'ملغي',
+  [OrderStatus.outofwarehouse]: 'اخراج من المستودع',
   [OrderStatus.completed]: 'مكتمل',
 };
 

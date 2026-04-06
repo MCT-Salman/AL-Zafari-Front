@@ -46,7 +46,7 @@ const ROLE_LABELS = {
   [UserRole.Warehouse_Products]: "أمين مستودع المنتجات",
   [UserRole.Dissection_Technician]: "فني التشريح",
   [UserRole.Cutting_Technician]: "فني القص",
-  [UserRole.Gluing_Technician]: "فني اللصق"
+  [UserRole.Gluing_Technician]: "فني التغرية"
 };
 
 export default function CuttingManager() {
@@ -665,7 +665,7 @@ export default function CuttingManager() {
     const destMap = {
       "slitting": "التشريح",
       "cutting": "القص",
-      "gluing": "اللصق",
+      "gluing": "التغرية",
       "production": "الإنتاج",
       "warehouse": "المستودع"
     };
@@ -1573,7 +1573,7 @@ export default function CuttingManager() {
                 return batch ? batch.batch_number : "-";
               })()}</div>
               <div><span className="font-medium">المصدر:</span> التشريح</div>
-              <div><span className="font-medium">الوجهة:</span> اللصق</div>
+              <div><span className="font-medium">الوجهة:</span> التغرية</div>
               <div><span className="font-medium">الملاحظات:</span> {pendingDeleteProcess?.notes || "-"}</div>
             </div>
           </div>

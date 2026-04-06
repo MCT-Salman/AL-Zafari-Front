@@ -129,7 +129,11 @@ const Sidebar = ({ items = [], footerItem }) => {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1">
         {items.map((item, index) => {
-          const isActive = location.pathname === item.href;
+          const isHome = item.href === '/dashboard';
+          const isRoleDashboard = location.pathname === '/production/dashboard' || 
+                                 location.pathname === '/sales/dashboard' ||
+                                 location.pathname === '/order-preparer-dashboard';
+          const isActive = location.pathname === item.href || (isHome && isRoleDashboard);
           const Icon = item.icon;
 
           return (

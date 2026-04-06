@@ -167,7 +167,7 @@ export default function ColorsReadOnly() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 mt-3 overflow-auto rounded  bg-white">
+      <div className="flex-1 min-h-0 mt-3 overflow-y-auto overflow-x-auto rounded bg-white max-h-[50vh] min-[1366px]:min-h-[40vh]">
         {loading ? (
           <div className="p-6">
             <LoadingState message="جاري تحميل الألوان..." />

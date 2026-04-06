@@ -46,7 +46,7 @@ const ROLE_LABELS = {
   [UserRole.Warehouse_Products]: "أمين مستودع المنتجات",
   [UserRole.Dissection_Technician]: "فني التشريح",
   [UserRole.Cutting_Technician]: "فني القص",
-  [UserRole.Gluing_Technician]: "فني اللصق"
+  [UserRole.Gluing_Technician]: "فني التغرية"
 };
 
 export default function SlittingManager() {
@@ -155,12 +155,12 @@ export default function SlittingManager() {
       "slitting": "التشريح",
       "production": "الإنتاج",
       "cutting": "القص",
-      "gluing": "اللصق",
+      "gluing": "التغرية",
       "المستودع": "warehouse",
       "التشريح": "slitting",
       "الإنتاج": "production",
       "القص": "cutting",
-      "اللصق": "gluing"
+      "التغرية": "gluing"
     };
     return translations[value] || value;
   };
@@ -275,7 +275,7 @@ export default function SlittingManager() {
   };
 
   const currentOrders = useMemo(
-    () => sortRecordsAsc(orders.filter((order) => String(order.status || "").toLowerCase() !== ProductionStatus.completed)),
+    () => sortRecordsAsc(orders.filter((order) => !(String(order.status || "").toLowerCase() === ProductionStatus.completed))),
     [orders]
   );
 
@@ -832,7 +832,7 @@ export default function SlittingManager() {
     slitting: "التشريح",
     production: "الإنتاج",
     cutting: "القص",
-    gluing: "اللصق"
+    gluing: "التغرية"
   }[value] || value || "-");
 
   const formatTypeItem = (value) => value === TypeItem.Machine ? "مكنة" : value === TypeItem.Presser ? "كوي" : value || "-";
@@ -1130,7 +1130,7 @@ export default function SlittingManager() {
                       {inputMode === "qr" && (
                         <div className="space-y-3">
                           <div className="text-sm text-gray-600">
-                            قم بلصق بيانات QR ثم اضغط "تطبيق البيانات"
+                            قم التغرية بيانات QR ثم اضغط "تطبيق البيانات"
                           </div>
                           <Input
                             value={qrInput}

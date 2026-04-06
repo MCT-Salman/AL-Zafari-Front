@@ -2,9 +2,10 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { Toaster } from 'react-hot-toast';
+import { Toaster, ToastBar, toast } from 'react-hot-toast';
 import RoleProtectedRoute from "./components/RoleProtectedRoute";
 import ProductionManager from "./pages/Production/ProductionManager";
+import ProductionDashboard from "./pages/Production/ProductionDashboard";
 import ProductionRecords from "./pages/ProductionRecords";
 import InvoiceManager from "./pages/Sales/InvoiceManager";
 
@@ -26,6 +27,8 @@ const SalesPage = lazy(() => import("./pages/Sales/SimpleOrderCreation"));
 const OrderPreparationPage = lazy(() => import("./pages/OrderPreparation/OrderPreparationPage"));
 const InvoiceHistory = lazy(() => import("./pages/Admin/InvoiceHistory"));
 const SalesHome = lazy(() => import("./pages/Sales/SalesHome"));
+const SalesDashboard = lazy(() => import("./pages/Sales/SalesDashboard"));
+const OrderPreparerDashboard = lazy(() => import("./pages/Sales/OrderPreparerDashboard"));
 const WarehouseKeeper = lazy(() => import("./pages/Warehouse/WarehouseKeeper"));
 const SlittingManager = lazy(() => import("./pages/Slitting/SlittingManager"));
 const CuttingManager = lazy(() => import("./pages/Cutting/CuttingManager"));
@@ -41,22 +44,27 @@ const DefaultRoute = () => {
   const { user } = useAuth();
   const target =
     user?.role === 'production_manager'
-      ? "/production"
+      ? "/production/dashboard"
       : user?.role === 'Dissection_Technician'
         ? "/slitting"
         : user?.role === 'Cutting_Technician'
           ? "/cutting"
           : user?.role === 'Gluing_Technician'
             ? "/gluing"
-        : "/dashboard";
+            : user?.role === 'cashier'
+              ? "/sales"
+              : user?.role === 'sales'
+                ? "/order-preparer"
+                : "/dashboard";
   return <Navigate to={target} replace />;
 };
 
 // Dashboard switcher based on role
 const DashboardSwitcher = () => {
   const { user } = useAuth();
-  if (user?.role === 'sales') return <SalesHome />;
-  if (user?.role === 'production_manager') return <Navigate to="/production" replace />;
+  if (user?.role === 'cashier') return <SalesHome />;
+  if (user?.role === 'sales') return <OrderPreparerDashboard />;
+  if (user?.role === 'production_manager') return <Navigate to="/production/dashboard" replace />;
   if (user?.role === 'Dissection_Technician') return <Navigate to="/slitting" replace />;
   if (user?.role === 'Cutting_Technician') return <Navigate to="/cutting" replace />;
   if (user?.role === 'Gluing_Technician') return <Navigate to="/gluing" replace />;
@@ -110,25 +118,8 @@ const App = () => {
                 </RoleProtectedRoute>
               } />
               <Route path="/customers" element={
-                <RoleProtectedRoute allowedRoles="sales">
+                <RoleProtectedRoute allowedRoles={["sales", "cashier"]}>
                   <CustomerManagement />
-                </RoleProtectedRoute>
-              } />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Route>
-              <Route path="/orders" element={
-                <RoleProtectedRoute allowedRoles="sales">
-                  <OrderManagement />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/order-preparer" element={
-                <RoleProtectedRoute allowedRoles="sales">
-                  <OrderPreparer />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/sales" element={
-                <RoleProtectedRoute allowedRoles="sales">
-                  <SalesPage />
                 </RoleProtectedRoute>
               } />
               <Route path="/order-preparation" element={
@@ -136,41 +127,85 @@ const App = () => {
                   <OrderPreparationPage />
                 </RoleProtectedRoute>
               } />
-              <Route path="/invoice" element={
-                <RoleProtectedRoute allowedRoles={["sales", "admin"]}>
+             
+              
+              <Route path="/invoice-history" element={
+                <RoleProtectedRoute allowedRoles="admin">
+                  <InvoiceHistory />
+                </RoleProtectedRoute>
+              } />
+
+               <Route path="/production/dashboard" element={
+                <RoleProtectedRoute allowedRoles="production_manager">
+                  <ProductionDashboard />
+                </RoleProtectedRoute>
+              } />
+
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
+
+            {/* Routes without MainLayout */}
+             <Route path="/invoice" element={
+                <RoleProtectedRoute allowedRoles={["sales", "admin", "cashier"]}>
                   <InvoiceManager />
                 </RoleProtectedRoute>
               } />
-              <Route path="/production" element={
+             <Route path="/production" element={
                 <RoleProtectedRoute allowedRoles="production_manager">
                   <ProductionManager />
                 </RoleProtectedRoute>
               } />
+            
               <Route path="/production-records" element={
                 <RoleProtectedRoute allowedRoles="production_manager">
                   <ProductionRecords />
                 </RoleProtectedRoute>
               } />
-              <Route path="/warehouse" element={
-                <RoleProtectedRoute allowedRoles="Warehouse_Keeper">
-                  <WarehouseKeeper />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/slitting" element={
-                <RoleProtectedRoute allowedRoles="Dissection_Technician">
-                  <SlittingManager />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/cutting" element={
-                <RoleProtectedRoute allowedRoles="Cutting_Technician">
-                  <CuttingManager />
-                </RoleProtectedRoute>
-              } />
-              <Route path="/gluing" element={
-                <RoleProtectedRoute allowedRoles="Gluing_Technician">
-                  <GluingManager />
-                </RoleProtectedRoute>
-              } />
+            <Route path="/orders" element={
+              <RoleProtectedRoute allowedRoles={["sales", "cashier"]}>
+                <OrderManagement />
+              </RoleProtectedRoute>
+            } />
+            <Route path="/order-preparer" element={
+              <RoleProtectedRoute allowedRoles={["sales", "cashier"]}>
+                <OrderPreparer />
+              </RoleProtectedRoute>
+            } />
+            <Route path="/sales" element={
+              <RoleProtectedRoute allowedRoles={["sales", "cashier"]}>
+                <SalesPage />
+              </RoleProtectedRoute>
+            } />
+            <Route path="/sales/dashboard" element={
+              <RoleProtectedRoute allowedRoles={["sales", "cashier"]}>
+                <SalesDashboard />
+              </RoleProtectedRoute>
+            } />
+            <Route path="/order-preparer-dashboard" element={
+              <RoleProtectedRoute allowedRoles="sales">
+                <OrderPreparerDashboard />
+              </RoleProtectedRoute>
+            } />
+            <Route path="/warehouse" element={
+              <RoleProtectedRoute allowedRoles="Warehouse_Keeper">
+                <WarehouseKeeper />
+              </RoleProtectedRoute>
+            } />
+            <Route path="/slitting" element={
+              <RoleProtectedRoute allowedRoles="Dissection_Technician">
+                <SlittingManager />
+              </RoleProtectedRoute>
+            } />
+            <Route path="/cutting" element={
+              <RoleProtectedRoute allowedRoles="Cutting_Technician">
+                <CuttingManager />
+              </RoleProtectedRoute>
+            } />
+            <Route path="/gluing" element={
+              <RoleProtectedRoute allowedRoles="Gluing_Technician">
+                <GluingManager />
+              </RoleProtectedRoute>
+            } />
             
           </Routes>
         </Suspense>
@@ -181,10 +216,15 @@ const App = () => {
         gutter={16}
         containerStyle={{
           top: 24,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          pointerEvents: "none",
           zIndex: 9999,
         }}
         toastOptions={{
-          duration: 4000,
+          duration: Infinity,
 
           style: {
             direction: 'rtl',
@@ -203,6 +243,7 @@ const App = () => {
             fontSize: '15px',
             fontWeight: '600',
             maxWidth: '420px',
+            margin: '0 auto',
             gap: '12px',
           },
 
@@ -242,7 +283,30 @@ const App = () => {
             },
           },
         }}
-      />
+      >
+        {(t) => (
+          <div className="pointer-events-auto">
+            <ToastBar toast={t}>
+              {({ icon, message }) => (
+                <div className="flex items-center gap-3 w-full">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {icon}
+                    <span className="truncate">{message}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-800 shadow-sm hover:bg-gray-100"
+                    style={{ whiteSpace: "nowrap" }}
+                    onClick={() => toast.dismiss(t.id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </ToastBar>
+          </div>
+        )}
+      </Toaster>
     </>
   );
 };

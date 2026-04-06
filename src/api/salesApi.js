@@ -165,6 +165,7 @@ export const salesApi = {
     const statusMap = {
       pending: { label: "قيد الانتظار", className: "bg-yellow-100 text-yellow-800" },
       preparing: { label: "قيد التحضير", className: "bg-blue-100 text-blue-800" },
+      outofwarehouse: { label: 'اخراج من المستودع', className: 'bg-purple-100 text-purple-800' },
       completed: { label: "مكتمل", className: "bg-green-100 text-green-800" },
       canceled: { label: "ملغي", className: "bg-red-100 text-red-800" }
     };

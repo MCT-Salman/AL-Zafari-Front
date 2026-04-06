@@ -21,11 +21,14 @@ import {
  * Props:
  * - leftContent: React node(s) displayed on the left side (e.g. create/history buttons)
  * - isHeaderVisible, setIsHeaderVisible: control visibility toggle
+ * - hideCustomersAndInvoices: hide customers and invoices buttons (for order preparer page)
  */
 export default function DashboardHeader({
   leftContent = null,
   isHeaderVisible,
-  setIsHeaderVisible
+  setIsHeaderVisible,
+  hideCustomersAndInvoices = false,
+  hideHeaderToggle = false
 }) {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
@@ -49,11 +52,12 @@ export default function DashboardHeader({
     <div className="relative flex-shrink-0">
       <div className={isHeaderVisible ? "h-[88px]" : "h-[36px]"} />
 
-      <div
-        className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
-          isHeaderVisible ? "top-[60px]" : "top-2"
-        }`}
-      >
+      {!hideHeaderToggle && (
+        <div
+          className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+            isHeaderVisible ? "top-[60px]" : "top-2"
+          }`}
+        >
         <Button
           type="button"
           onClick={() => setIsHeaderVisible((prev) => !prev)}
@@ -62,11 +66,12 @@ export default function DashboardHeader({
         >
           {isHeaderVisible ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
         </Button>
-      </div>
+        </div>
+      )}
 
       {isHeaderVisible && (
         <div dir="rtl" className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-40">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               size="lg"
               variant="outline"
@@ -76,16 +81,17 @@ export default function DashboardHeader({
               <Home className="w-5 h-5 ml-2" />
               الرئيسية
             </Button>
-            <NotificationsBell />
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => navigate("/orders")}
-              className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-            >
-              <ShoppingCart className="w-5 h-5 ml-2" />
-              الطلبات
-            </Button>
+            {String(user?.role || "").toLowerCase() === 'cashier' && (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("/orders")}
+                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+              >
+                <ShoppingCart className="w-5 h-5 ml-2" />
+                الطلبات
+              </Button>
+            )}
             <Button
               size="lg"
               variant="outline"
@@ -95,24 +101,42 @@ export default function DashboardHeader({
               <ShoppingCart className="w-5 h-5 ml-2" />
               مجهز الطلبات
             </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => navigate("/customers")}
-              className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-            >
-              <Users className="w-5 h-5 ml-2" />
-              الزبائن
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => navigate("/invoice")}
-              className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-            >
-              <Receipt className="w-5 h-5 ml-2" />
-              الفواتير
-            </Button>
+            {!hideCustomersAndInvoices && (
+              <>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate("/customers")}
+                  className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                >
+                  <Users className="w-5 h-5 ml-2" />
+                  الزبائن
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate("/invoice")}
+                  className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                >
+                  <Receipt className="w-5 h-5 ml-2" />
+                  الفواتير
+                </Button>
+              </>
+            )}
+            <div className="flex flex-wrap gap-3">{leftContent}</div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-white/20 bg-white/10">
+              <div className="text-sm font-bold">
+                {user?.full_name || user?.username || "-"}
+              </div>
+              <div className="h-4 w-px bg-white/30" />
+              <div className="text-xs font-semibold">
+                {ROLE_LABELS[user?.role] || user?.role || "-"}
+              </div>
+            </div>
+            <NotificationsBell />
             <Button
               size="lg"
               variant="outline"
@@ -123,8 +147,6 @@ export default function DashboardHeader({
               تسجيل الخروج
             </Button>
           </div>
-
-          <div className="flex flex-wrap gap-3">{leftContent}</div>
         </div>
       )}
 

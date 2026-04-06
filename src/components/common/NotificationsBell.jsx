@@ -70,8 +70,9 @@ export default function NotificationsBell({ size = "lg", className = "" }) {
     const socket = connectSocket(token);
 
     const handleSocketNotification = (payload) => {
+      console.log("[NotificationsBell] Socket notification received:", payload);
       const data = payload?.data ?? payload;
-      const key = `${payload?.type || "notification"}:${payload?.title || ""}:${payload?.body || ""}:${data?.productionOrderId || data?.production_order_id || ""}`;
+      const key = `${payload?.type || "notification"}:${payload?.title || ""}:${payload?.body || ""}:${data?.productionOrderId || data?.production_order_id || data?.order_id || data?.sales_order_id || ""}`;
       if (!shouldNotify(key, 8000)) return;
 
       if (payload?.title || payload?.body) {
@@ -79,6 +80,10 @@ export default function NotificationsBell({ size = "lg", className = "" }) {
       } else if (data?.message) {
         toast.success(data.message);
       }
+
+      // Reload notifications from server to ensure we have the latest
+      loadNotifications();
+      loadUnreadCount();
 
       setNotifications(prev => {
         const entry = {
@@ -97,9 +102,12 @@ export default function NotificationsBell({ size = "lg", className = "" }) {
       setUnreadCount(prev => prev + 1);
     };
 
-    socket.on("notification", handleSocketNotification);
+    // Listen to multiple notification events
+    const events = ["notification", "warehouse:notification", "order:notification", "sales:notification"];
+    events.forEach(event => socket.on(event, handleSocketNotification));
+
     return () => {
-      socket.off("notification", handleSocketNotification);
+      events.forEach(event => socket.off(event, handleSocketNotification));
     };
   }, []);
 
