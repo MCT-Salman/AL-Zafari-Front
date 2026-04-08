@@ -180,9 +180,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     });
 
     const [savingQrQuantity, setSavingQrQuantity] = useState(false);
-    const isOrdersPage = variant === "orders";
-    const showOrderSwitch = isOrdersPage;
-
     const ordersApi = orderApi;
 
     const isQrQuantityChanged = useMemo(() => {
@@ -3129,67 +3126,47 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                 isHeaderVisible={isHeaderVisible}
                 setIsHeaderVisible={setIsHeaderVisible}
                 hideHeaderToggle={true}
+                hideOrderPreparer={true}
+                customersLabel=" الزبائن"
+                invoicesLabel="إضافة فاتورة"
+                leftContent={(
+                    <>
+                        <button
+                            onClick={() => setViewMode("colors")}
+                            className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${viewMode === "colors"
+                                ? "bg-white text-primary-f border-white shadow"
+                                : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                                }`}
+                        >
+                            الشركات المكافئة
+                        </button>
+                    </>
+                )}
             />
 
             <div className="flex-1 min-h-0 overflow-hidden">
-
-                {/* Tabs Navigation - WhatsApp Style (Sticky) */}
-
-                <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white mt-2 mx-2 rounded-t-lg shadow-sm px-2 py-2">
-
-                    {showOrderSwitch && (
-
+                {viewMode !== "colors" && (
+                    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white mt-2 mx-2 rounded-t-lg shadow-sm px-2 py-2">
                         <button
-
                             onClick={() => setViewMode("create")}
-
-                            className={`flex-1 min-w-[160px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "create"
+                            className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "create"
                                 ? "bg-primary-f text-white border-primary-f shadow"
                                 : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
                                 }`}
-
                         >
-
-                            {false ? "توليد QR" : "المواد"}
-
-                            
+                            إضافة طلب جديد
                         </button>
-
-                    )}
-
-                    <button
-
-                        onClick={() => setViewMode("history")}
-
-                        className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "history"
-                            ? "bg-primary-f text-white border-primary-f shadow"
-                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                            }`}
-
-                    >
-
-                        سجل الطلبات
-
-                        
-                    </button>
-
-                    <button
-
-                        onClick={() => setViewMode("colors")}
-
-                        className={`flex-1 min-w-[160px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "colors"
-                            ? "bg-primary-f text-white border-primary-f shadow"
-                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                            }`}
-
-                    >
-
-                        {false ? "طلب انتاج" : "الشركات المكافئة"}
-
-                        
-                    </button>
-
-                </div>
+                        <button
+                            onClick={() => setViewMode("history")}
+                            className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "history"
+                                ? "bg-primary-f text-white border-primary-f shadow"
+                                : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                                }`}
+                        >
+                            سجل الطلبات
+                        </button>
+                    </div>
+                )}
 
                 <div className="flex-1 min-h-0 flex flex-col">
                 {viewMode === "colors" ? (

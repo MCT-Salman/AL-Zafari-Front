@@ -22,13 +22,18 @@ import {
  * - leftContent: React node(s) displayed on the left side (e.g. create/history buttons)
  * - isHeaderVisible, setIsHeaderVisible: control visibility toggle
  * - hideCustomersAndInvoices: hide customers and invoices buttons (for order preparer page)
+ * - hideOrderPreparer: hide order preparer button on pages that should only show cashier navigation
+ * - customersLabel, invoicesLabel: optional button label overrides
  */
 export default function DashboardHeader({
   leftContent = null,
   isHeaderVisible,
   setIsHeaderVisible,
   hideCustomersAndInvoices = false,
-  hideHeaderToggle = false
+  hideHeaderToggle = false,
+  hideOrderPreparer = false,
+  customersLabel = "الزبائن",
+  invoicesLabel = "الفواتير"
 }) {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
@@ -92,15 +97,17 @@ export default function DashboardHeader({
                 الطلبات
               </Button>
             )}
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => navigate("/order-preparer")}
-              className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-            >
-              <ShoppingCart className="w-5 h-5 ml-2" />
-              طلب انتاج
-            </Button>
+            {!hideOrderPreparer && (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("/order-preparer")}
+                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+              >
+                <ShoppingCart className="w-5 h-5 ml-2" />
+                طلب انتاج
+              </Button>
+            )}
             {!hideCustomersAndInvoices && (
               <>
                 <Button
@@ -110,7 +117,7 @@ export default function DashboardHeader({
                   className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
                 >
                   <Users className="w-5 h-5 ml-2" />
-                  الزبائن
+                  {customersLabel}
                 </Button>
                 <Button
                   size="lg"
@@ -119,7 +126,7 @@ export default function DashboardHeader({
                   className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
                 >
                   <Receipt className="w-5 h-5 ml-2" />
-                  الفواتير
+                  {invoicesLabel}
                 </Button>
               </>
             )}
