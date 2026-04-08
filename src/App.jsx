@@ -120,11 +120,6 @@ const App = () => {
                   <InvoiceHistory />
                 </RoleProtectedRoute>
               } />
-              <Route path="/customers" element={
-                <RoleProtectedRoute allowedRoles={["sales", "cashier"]}>
-                  <CustomerManagement />
-                </RoleProtectedRoute>
-              } />
               <Route path="/order-preparation" element={
                 <RoleProtectedRoute allowedRoles="production_manager">
                   <OrderPreparationPage />
@@ -177,6 +172,11 @@ const App = () => {
             <Route path="/sales" element={
               <RoleProtectedRoute allowedRoles={["sales", "cashier"]}>
                 <SalesPage />
+              </RoleProtectedRoute>
+            } />
+            <Route path="/customers" element={
+              <RoleProtectedRoute allowedRoles={["sales", "cashier"]}>
+                <CustomerManagement />
               </RoleProtectedRoute>
             } />
             <Route path="/sales/dashboard" element={

@@ -1,5 +1,6 @@
 // src\pages\Sales\CustomerManagement.jsx
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { customerApi } from "../../api/customerApi";
 import { useCrud } from "../../hooks/useCrud";
 import { useExport } from "../../hooks/useExport";
@@ -29,12 +30,18 @@ import EmptyState from "../../components/common/EmptyState";
 import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import PaginationControls from "../../components/common/PaginationControls";
+import DashboardHeader from "../../components/common/DashboardHeader";
+import { useAuth } from "../../context/AuthContext";
 
 import SwitchActive from "../../components/common/SwitchActive";
 
 import FilterSelect from "../../components/common/FilterSelect";
 
 export default function CustomerManagement() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
   // Create adapter to map generic CRUD method names to customerApi method names
   const customerApiAdapter = useMemo(() => ({
     getItems: (...args) => customerApi.getCustomers(...args),
@@ -347,220 +354,233 @@ export default function CustomerManagement() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 space-y-8 p-2">
-      <div className=" mx-auto">
-        <PageHeader
-          title="إدارة العملاء"
-          subtitle={`إجمالي العملاء: ${customers.length}`}
-          actionLabel="إضافة عميل جديد"
-          onAction={handleOpenCreate}
-        />
+    <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+      <DashboardHeader
+        isHeaderVisible={isHeaderVisible}
+        setIsHeaderVisible={setIsHeaderVisible}
+        hideHeaderToggle={true}
+        hideOrderPreparer={String(user?.role || "").toLowerCase() === "cashier"}
+        customersLabel="الزبائن"
+        invoicesLabel="إضافة فاتورة"
+        leftContent={(
+          <button
+            onClick={() => navigate("/sales?tab=colors")}
+            className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all bg-white/10 text-white border-white/30 hover:bg-white/20"
+          >
+            الشركات المكافئة
+          </button>
+        )}
+      />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {mainStats.map((stat) => (
-            <StatsCard key={stat.id} {...stat} />
-          ))}
-        </div>
+      <div className="flex-1 min-h-0 overflow-auto p-2">
+        <div className="mx-auto space-y-8">
+          <PageHeader
+            title="إدارة العملاء"
+            subtitle={`إجمالي العملاء: ${customers.length}`}
+            actionLabel="إضافة عميل جديد"
+            onAction={handleOpenCreate}
+          />
 
-        {/* Customers Table Card */}
-        <Card className="p-6">
-          <div className="">
-            <h2 className="text-xl font-bold">قائمة العملاء</h2>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+            {mainStats.map((stat) => (
+              <StatsCard key={stat.id} {...stat} />
+            ))}
           </div>
 
-          {/* Messages */}
-          {error && (
-            <MessageAlert
-              type="error"
-              message={error}
-              onDismiss={() => { }}
-              dismissable={true}
-            />
-          )}
-          {toggleError && (
-            <MessageAlert
-              type="error"
-              message={toggleError}
-              onDismiss={() => setToggleError("")}
-              dismissable={true}
-            />
-          )}
-          {success && (
-            <MessageAlert
-              type="success"
-              message={success}
-              onDismiss={() => setSuccess("")}
-              dismissable={true}
-            />
-          )}
+          {/* Customers Table Card */}
+          <Card className="p-6">
+            <div className="">
+              <h2 className="text-xl font-bold">قائمة العملاء</h2>
+            </div>
 
-          {/* Search */}
-          <div className="-my-4">
-            <SearchInput
-              placeholder="ابحث عن عميل (الاسم أو الهاتف أو المدينة أو العنوان)"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+            {/* Messages */}
+            {error && (
+              <MessageAlert
+                type="error"
+                message={error}
+                onDismiss={() => { }}
+                dismissable={true}
+              />
+            )}
+            {toggleError && (
+              <MessageAlert
+                type="error"
+                message={toggleError}
+                onDismiss={() => setToggleError("")}
+                dismissable={true}
+              />
+            )}
+            {success && (
+              <MessageAlert
+                type="success"
+                message={success}
+                onDismiss={() => setSuccess("")}
+                dismissable={true}
+              />
+            )}
 
-          {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <FilterSelect
-              label="نوع العميل"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              options={[
-                { value: "", label: "جميع الأنواع" },
-                { value: "customer", label: "عميل" },
-                { value: "supplier", label: "مورد" },
-              ]}
-            />
-
-            <FilterSelect
-              label="الحالة"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              options={[
-                { value: "", label: "جميع العملاء" },
-                { value: "active", label: "نشط فقط" },
-                { value: "inactive", label: "غير نشط فقط" },
-              ]}
-            />
-
-            <ResultsCounter
-              current={filteredCustomers.length}
-              total={customers.length}
-            />
-          </div>
-
-          <div className="flex justify-between">
-            {/* Rows Per Page Selector */}
-            <div className=" flex justify-start">
-              <RowsPerPageSelector
-                value={rowsPerPage}
-                onChange={setRowsPerPage}
-                options={[5, 10, 20, 50]}
+            {/* Search */}
+            <div className="-my-4">
+              <SearchInput
+                placeholder="ابحث عن عميل (الاسم أو الهاتف أو المدينة أو العنوان)"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
 
-            {/* Export Button */}
-            <Button
-              onClick={handleExport}
-              disabled={exportLoading || filteredCustomers.length === 0}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white p-6 rounded-xl"
-            >
-              {exportLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                  <span>جاري التصدير...</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  <span>تصدير Excel ({filteredCustomers.length})</span>
-                </>
-              )}
-            </Button>
-          </div>
+            {/* Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FilterSelect
+                label="نوع العميل"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                options={[
+                  { value: "", label: "جميع الأنواع" },
+                  { value: "customer", label: "عميل" },
+                  { value: "supplier", label: "مورد" },
+                ]}
+              />
 
-          {/* Customers Table */}
-          {loading ? (
-            <LoadingState message="جاري تحميل العملاء..." />
-          ) : filteredCustomers.length === 0 ? (
-            <EmptyState message="لا يوجد عملاء" />
-          ) : (
-            <>
-              <div className="overflow-x-auto rounded-lg ">
-                <Table onSort={handleSort}>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead sortable sortKey="name">اسم العميل</TableHead>
-                      <TableHead sortable sortKey="phone">رقم الهاتف</TableHead>
-                      <TableHead sortable sortKey="balance">الذمة</TableHead>
-                      <TableHead>المدينة</TableHead>
-                      <TableHead>العنوان</TableHead>
-                      <TableHead>الحالة</TableHead>
-                      <TableHead>الملاحظات</TableHead>
-                      <TableHead>الإجراءات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedCustomers.map((customer) => (
-                      <TableRow key={customer.customer_id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4 text-gray-500" />
-                            {customer.name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Phone className="w-4 h-4 text-gray-500" />
-                            <span dir="ltr">{customer.phone}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-bold text-primary-f">
-                          {new Intl.NumberFormat("en-US").format(parseFloat(customer.balance || 0) || 0)} ل.س
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-gray-500" />
-                            {customer.city}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="max-w-xs truncate">
-                            {customer.address}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={customer.is_active ? "default" : "secondary"}
-                            className={customer.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
-                          >
-                            {customer.is_active ? "نشط" : "غير نشط"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {customer.notes || "-"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <SwitchActive
-                              isActive={customer.is_active}
-                              onToggle={() => handleToggleStatus(customer.customer_id)}
-                              mode="playPause"
-                              confirmBeforeToggle={true}
-                            />
-                            <CrudActions
-                              onView={() => openViewModal(customer.customer_id)}
-                              onEdit={() => handleOpenEdit(customer)}
-                              onDelete={() => openDeleteModal(customer)}
-                              size="md"
-                            />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <FilterSelect
+                label="الحالة"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                options={[
+                  { value: "", label: "جميع العملاء" },
+                  { value: "active", label: "نشط فقط" },
+                  { value: "inactive", label: "غير نشط فقط" },
+                ]}
+              />
+
+              <ResultsCounter
+                current={filteredCustomers.length}
+                total={customers.length}
+              />
+            </div>
+
+            <div className="flex justify-between">
+              <div className="flex justify-start">
+                <RowsPerPageSelector
+                  value={rowsPerPage}
+                  onChange={setRowsPerPage}
+                  options={[5, 10, 20, 50]}
+                />
               </div>
 
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                onPageChange={setCurrentPage}
-              />
-            </>
-          )}
-        </Card>
-      </div>
+              <Button
+                onClick={handleExport}
+                disabled={exportLoading || filteredCustomers.length === 0}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white p-6 rounded-xl"
+              >
+                {exportLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    <span>جاري التصدير...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>تصدير Excel ({filteredCustomers.length})</span>
+                  </>
+                )}
+              </Button>
+            </div>
 
-      {/* Unified CRUD Modal */}
-      <CrudModal
+            {loading ? (
+              <LoadingState message="جاري تحميل العملاء..." />
+            ) : filteredCustomers.length === 0 ? (
+              <EmptyState message="لا يوجد عملاء" />
+            ) : (
+              <>
+                <div className="overflow-x-auto rounded-lg ">
+                  <Table onSort={handleSort}>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead sortable sortKey="name">اسم العميل</TableHead>
+                        <TableHead sortable sortKey="phone">رقم الهاتف</TableHead>
+                        <TableHead sortable sortKey="balance">الذمة</TableHead>
+                        <TableHead>المدينة</TableHead>
+                        <TableHead>العنوان</TableHead>
+                        <TableHead>الحالة</TableHead>
+                        <TableHead>الملاحظات</TableHead>
+                        <TableHead>الإجراءات</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedCustomers.map((customer) => (
+                        <TableRow key={customer.customer_id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-gray-500" />
+                              {customer.name}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Phone className="w-4 h-4 text-gray-500" />
+                              <span dir="ltr">{customer.phone}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-bold text-primary-f">
+                            {new Intl.NumberFormat("en-US").format(parseFloat(customer.balance || 0) || 0)} ل.س
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-gray-500" />
+                              {customer.city}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-xs truncate">
+                              {customer.address}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={customer.is_active ? "default" : "secondary"}
+                              className={customer.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                            >
+                              {customer.is_active ? "نشط" : "غير نشط"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {customer.notes || "-"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <SwitchActive
+                                isActive={customer.is_active}
+                                onToggle={() => handleToggleStatus(customer.customer_id)}
+                                mode="playPause"
+                                confirmBeforeToggle={true}
+                              />
+                              <CrudActions
+                                onView={() => openViewModal(customer.customer_id)}
+                                onEdit={() => handleOpenEdit(customer)}
+                                onDelete={() => openDeleteModal(customer)}
+                                size="md"
+                              />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPrevious={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  onNext={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  onPageChange={setCurrentPage}
+                />
+              </>
+            )}
+          </Card>
+
+          <CrudModal
         isOpen={modalState.isOpen}
         mode={modalState.mode}
         onClose={() => {
@@ -706,7 +726,9 @@ export default function CustomerManagement() {
             </div>
           </div>
         )}
-      </CrudModal>
+          </CrudModal>
+        </div>
+      </div>
     </div>
   );
 }

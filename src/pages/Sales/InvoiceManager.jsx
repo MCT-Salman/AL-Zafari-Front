@@ -1502,8 +1502,17 @@ export default function InvoiceManager() {
             <DashboardHeader
                 isHeaderVisible={isHeaderVisible}
                 setIsHeaderVisible={setIsHeaderVisible}
+                hideOrderPreparer={true}
+                customersLabel="الزبائن"
+                invoicesLabel="إضافة فاتورة"
                 leftContent={
                     <>
+                        <button
+                            onClick={() => navigate("/sales?tab=colors")}
+                            className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all bg-white/10 text-white border-white/30 hover:bg-white/20"
+                        >
+                            الشركات المكافئة
+                        </button>
                         {/* <Button
                             size="lg"
                             variant="outline"

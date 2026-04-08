@@ -1,5 +1,5 @@
 // src/components/common/DashboardHeader.jsx
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../..//context/AuthContext";
 import { Button } from "../ui/button";
@@ -36,6 +36,7 @@ export default function DashboardHeader({
   invoicesLabel = "الفواتير"
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout, user } = useAuth();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const ROLE_LABELS = {
@@ -52,6 +53,13 @@ export default function DashboardHeader({
   const handleLogout = () => {
     setShowLogoutDialog(true);
   };
+
+  const getNavButtonClass = (isActive = false) =>
+    `px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 ${
+      isActive
+        ? "bg-white text-primary-f border-white shadow"
+        : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+    }`;
 
   return (
     <div className="relative flex-shrink-0">
@@ -81,7 +89,7 @@ export default function DashboardHeader({
               size="lg"
               variant="outline"
               onClick={() => navigate("/dashboard")}
-              className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+              className={getNavButtonClass(location.pathname === "/dashboard")}
             >
               <Home className="w-5 h-5 ml-2" />
               الرئيسية
@@ -91,7 +99,7 @@ export default function DashboardHeader({
                 size="lg"
                 variant="outline"
                 onClick={() => navigate("/orders")}
-                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                className={getNavButtonClass(location.pathname === "/orders")}
               >
                 <ShoppingCart className="w-5 h-5 ml-2" />
                 الطلبات
@@ -102,7 +110,7 @@ export default function DashboardHeader({
                 size="lg"
                 variant="outline"
                 onClick={() => navigate("/order-preparer")}
-                className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                className={getNavButtonClass(location.pathname === "/order-preparer")}
               >
                 <ShoppingCart className="w-5 h-5 ml-2" />
                 طلب انتاج
@@ -114,7 +122,7 @@ export default function DashboardHeader({
                   size="lg"
                   variant="outline"
                   onClick={() => navigate("/customers")}
-                  className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                  className={getNavButtonClass(location.pathname === "/customers")}
                 >
                   <Users className="w-5 h-5 ml-2" />
                   {customersLabel}
@@ -123,7 +131,7 @@ export default function DashboardHeader({
                   size="lg"
                   variant="outline"
                   onClick={() => navigate("/invoice")}
-                  className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                  className={getNavButtonClass(location.pathname === "/invoice")}
                 >
                   <Receipt className="w-5 h-5 ml-2" />
                   {invoicesLabel}

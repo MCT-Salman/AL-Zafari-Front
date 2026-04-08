@@ -1,6 +1,6 @@
 ﻿// src\pages\Sales\SimpleOrderCreation.jsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DashboardHeader from "../../components/common/DashboardHeader";
 import { orderApi } from "../../api/orderApi";
 import { salesApi } from "../../api/salesApi";
@@ -33,6 +33,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").r
 
 export default function SimpleOrderCreation({ variant = "orders" }) {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { logout, user } = useAuth();
     const [viewMode, setViewMode] = useState("create"); // create | history | colors
     const [loading, setLoading] = useState(false);
@@ -377,6 +378,17 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
         if (viewMode === "history") loadOrders();
 
     }, [viewMode]);
+
+    useEffect(() => {
+        const tab = searchParams.get("tab");
+        if (tab === "colors" && viewMode !== "colors") {
+            setViewMode("colors");
+        } else if (tab === "history" && viewMode !== "history") {
+            setViewMode("history");
+        } else if (tab === "create" && viewMode !== "create") {
+            setViewMode("create");
+        }
+    }, [searchParams, viewMode]);
 
 
 
@@ -3132,7 +3144,10 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                 leftContent={(
                     <>
                         <button
-                            onClick={() => setViewMode("colors")}
+                            onClick={() => {
+                                setViewMode("colors");
+                                setSearchParams({ tab: "colors" });
+                            }}
                             className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${viewMode === "colors"
                                 ? "bg-white text-primary-f border-white shadow"
                                 : "bg-white/10 text-white border-white/30 hover:bg-white/20"
@@ -3148,7 +3163,10 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                 {viewMode !== "colors" && (
                     <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white mt-2 mx-2 rounded-t-lg shadow-sm px-2 py-2">
                         <button
-                            onClick={() => setViewMode("create")}
+                            onClick={() => {
+                                setViewMode("create");
+                                setSearchParams({ tab: "create" });
+                            }}
                             className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "create"
                                 ? "bg-primary-f text-white border-primary-f shadow"
                                 : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
@@ -3157,7 +3175,10 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                             إضافة طلب جديد
                         </button>
                         <button
-                            onClick={() => setViewMode("history")}
+                            onClick={() => {
+                                setViewMode("history");
+                                setSearchParams({ tab: "history" });
+                            }}
                             className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "history"
                                 ? "bg-primary-f text-white border-primary-f shadow"
                                 : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
