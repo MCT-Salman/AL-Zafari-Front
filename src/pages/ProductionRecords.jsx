@@ -88,7 +88,7 @@ const PRODUCTION_DEPARTMENTS = [
         return "-";
     };
 
-export default function ProductionRecords() {
+export default function ProductionRecords({ embedded = false }) {
     const navigate = useNavigate();
     const { logout, user } = useAuth();
     const [loading, setLoading] = useState(false);
@@ -530,27 +530,98 @@ export default function ProductionRecords() {
         );
     };
 
-    return (
-        <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
-                        {/* Header */}
-            <div className={isHeaderVisible ? "h-[88px]" : "h-[36px]"} />
+    const mainContent = (
+        <div className={`${embedded ? "h-full" : "flex-1"} min-h-0 p-3 overflow-hidden`}>
+            <div className="h-full flex flex-col min-h-0">
+                {/* Department Tabs */}
+                <div className="flex flex-wrap gap-2 mb-4 p-3 bg-white rounded-lg border">
+                    {PRODUCTION_DEPARTMENTS.map(department => renderTabButton(department))}
+                </div>
 
-            <div
-                className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
-                    isHeaderVisible ? "top-[60px]" : "top-2"
-                }`}
-            >
-                <Button
-                    type="button"
-                    onClick={() => setIsHeaderVisible((prev) => !prev)}
-                    className="h-10 w-10 rounded-full border-2 border-t-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 active:scale-95"
-                    title={isHeaderVisible ? "إخفاء الهيدر" : "إظهار الهيدر"}
-                >
-                    {isHeaderVisible ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
-                </Button>
+                {/* Filters */}
+                <div className="flex flex-wrap gap-3 mb-4 p-3 bg-white rounded-lg border">
+                    <div className="flex-1 min-w-[200px]">
+                        <div className="relative">
+                            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <Input
+                                placeholder="بحث..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pr-10"
+                            />
+                        </div>
+                    </div>
+                    <div className="min-w-[150px]">
+                        <FilterSelect
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            options={[
+                                { value: "", label: "جميع الحالات" },
+                                ...STATUS_OPTIONS
+                            ]}
+                            placeholder="الحالة"
+                        />
+                    </div>
+                    <div className="min-w-[120px]">
+                        <FilterSelect
+                            value={widthFilter}
+                            onChange={(e) => setWidthFilter(e.target.value)}
+                            options={[
+                                { value: "", label: "جميع الأعراض" },
+                                { value: "22", label: "22" },
+                                { value: "44", label: "44" },
+                                { value: "66", label: "66" },
+
+                            ]}
+                            placeholder="العرض"
+                        />
+                    </div>
+                    <Button
+                        variant="outline"
+                        onClick={handleRefreshData}
+                        className="px-4 py-2"
+                    >
+                        <RefreshCw className="w-4 h-4 ml-2" />
+                        تحديث
+                    </Button>
+                </div>
+
+                {/* Statistics Cards */}
+                {renderStatisticsCards()}
+
+                {/* Table */}
+                <div className="flex-1 min-h-0 bg-white rounded-lg border overflow-hidden">
+                    {renderTable()}
+                </div>
             </div>
+        </div>
+    );
 
-            {isHeaderVisible && (
+    return (
+        <div className={`${embedded ? "h-full" : "h-screen"} flex flex-col overflow-hidden bg-gray-50`}>
+            {!embedded && (
+                <>
+                    {/* Header */}
+                    <div className={isHeaderVisible ? "h-[88px]" : "h-[36px]"} />
+
+                    <div
+                        className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+                            isHeaderVisible ? "top-[60px]" : "top-2"
+                        }`}
+                    >
+                        <Button
+                            type="button"
+                            onClick={() => setIsHeaderVisible((prev) => !prev)}
+                            className="h-10 w-10 rounded-full border-2 border-t-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 active:scale-95"
+                            title={isHeaderVisible ? "إخفاء الهيدر" : "إظهار الهيدر"}
+                        >
+                            {isHeaderVisible ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+                        </Button>
+                    </div>
+                </>
+            )}
+
+            {!embedded && isHeaderVisible && (
                 <div className="relative flex-shrink-0">
                     <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-40">
                         <div className="flex flex-wrap gap-3">
@@ -607,7 +678,7 @@ export default function ProductionRecords() {
                 </div>
             )}
 
-            {!isHeaderVisible && (
+            {!embedded && !isHeaderVisible && (
                 <div className="fixed top-0 left-0 right-0 z-30">
                     <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-1 shadow-sm backdrop-blur">
                         <div className="min-w-0">
@@ -624,73 +695,7 @@ export default function ProductionRecords() {
                     </div>
                 </div>
             )}
-{/* Main Content */}
-            <div className="flex-1 min-h-0 p-3 overflow-hidden">
-                <div className="h-full flex flex-col min-h-0">
-                    {/* Department Tabs */}
-                    <div className="flex flex-wrap gap-2 mb-4 p-3 bg-white rounded-lg border">
-                        {PRODUCTION_DEPARTMENTS.map(department => renderTabButton(department))}
-                    </div>
-
-                    {/* Filters */}
-                    <div className="flex flex-wrap gap-3 mb-4 p-3 bg-white rounded-lg border">
-                        <div className="flex-1 min-w-[200px]">
-                            <div className="relative">
-                                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                <Input
-                                    placeholder="بحث..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="pr-10"
-                                />
-                            </div>
-                        </div>
-                        <div className="min-w-[150px]">
-                            <FilterSelect
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                options={[
-                                    { value: "", label: "جميع الحالات" },
-                                    ...STATUS_OPTIONS
-                                ]}
-                                placeholder="الحالة"
-                            />
-                        </div>
-                        <div className="min-w-[120px]">
-                            <FilterSelect
-                                value={widthFilter}
-                                onChange={(e) => setWidthFilter(e.target.value)}
-                                options={[
-                                    { value: "", label: "جميع الأعراض" },
-                                    { value: "22", label: "22" },
-                                    { value: "44", label: "44" },
-                                    { value: "66", label: "66" },
-
-                                ]}
-                                placeholder="العرض"
-                            />
-                        </div>
-                        <Button
-                            variant="outline"
-                            onClick={handleRefreshData}
-                            className="px-4 py-2"
-                        >
-                            <RefreshCw className="w-4 h-4 ml-2" />
-                            تحديث
-                        </Button>
-                    </div>
-
-                    {/* Statistics Cards */}
-                    {renderStatisticsCards()}
-
-
-
-                    {/* Table */}
-                    <div className="flex-1 min-h-0 bg-white rounded-lg border overflow-hidden">
-                        {renderTable()}
-                    </div>
-                </div>
-            </div>
+            {mainContent}
 
             {/* Item Details Dialog */}
             <StyledDialog

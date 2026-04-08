@@ -46,7 +46,6 @@ import {
     Wrench,
     Scissors,
     Droplet,
-    Layers,
     Search,
     ChevronUp,
     ChevronDown,
@@ -56,6 +55,7 @@ import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
 import toast from "react-hot-toast";
 import { TypeItem, ProductionType, ProductionStatus, MovementDestination, ProcessSource } from "../../types/enums";
+import ProductionRecords from "../ProductionRecords";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
 
@@ -63,7 +63,8 @@ export default function ProductionManager() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { logout, user } = useAuth();
-    const [viewMode, setViewMode] = useState("create");
+    const [mainTab, setMainTab] = useState("production_process"); // production_process | preparer_history
+    const [processSubTab, setProcessSubTab] = useState("create"); // create | history | department_records
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -71,7 +72,6 @@ export default function ProductionManager() {
     const [typeFilter, setTypeFilter] = useState("");
     const [widthFilter, setWidthFilter] = useState(""); // فلتر العرض
     const [widthTab, setWidthTab] = useState("all"); // تبويب حسب العرض: all, 22, 44, 66, 88, 110
-    const [historyTab, setHistoryTab] = useState("production"); // production | order-preparer
     const [showPreview, setShowPreview] = useState(false);
     const [editingItemId, setEditingItemId] = useState(null);
     const [editingOrderId, setEditingOrderId] = useState(null);
@@ -88,7 +88,7 @@ export default function ProductionManager() {
     const [colorSearchCode, setColorSearchCode] = useState("");
     const [batchSearchTerm, setBatchSearchTerm] = useState("");
     const [statusNotification, setStatusNotification] = useState(null);
-    const viewModeRef = useRef(viewMode);
+    const viewModeRef = useRef({ mainTab: "production_process", processSubTab: "create" });
 
     const ROLE_LABELS = {
         admin: "مدير النظام",
@@ -229,24 +229,28 @@ export default function ProductionManager() {
         // Check for mode parameter from URL
         const mode = searchParams.get('mode');
         if (mode === 'history') {
-            setViewMode('history');
+            setMainTab("production_process");
+            setProcessSubTab('history');
         } else if (mode === 'create') {
-            setViewMode('create');
+            setMainTab("production_process");
+            setProcessSubTab('create');
         }
         
         loadInitialData();
     }, [searchParams]);
 
-    // Load production orders when viewMode changes to history
+    // Load production orders when process history tab is active
     useEffect(() => {
-        if (viewMode === "history") {
+        if (mainTab === "production_process" && processSubTab === "history") {
             loadProductionOrders();
         }
-    }, [viewMode]);
+    }, [mainTab, processSubTab]);
 
     useEffect(() => {
-        loadPreparerOrders();
-    }, [viewMode]);
+        if (mainTab === "preparer_history") {
+            loadPreparerOrders();
+        }
+    }, [mainTab]);
 
     const loadInitialData = async () => {
         try {
@@ -439,8 +443,8 @@ export default function ProductionManager() {
     };
 
     useEffect(() => {
-        viewModeRef.current = viewMode;
-    }, [viewMode]);
+        viewModeRef.current = { mainTab, processSubTab };
+    }, [mainTab, processSubTab]);
 
     useEffect(() => {
         const token = localStorage.getItem("accessToken");
@@ -496,7 +500,10 @@ export default function ProductionManager() {
                     body,
                     created_at: new Date().toISOString()
                 });
-                if (viewModeRef.current === "history") {
+                if (
+                    viewModeRef.current.mainTab === "production_process" &&
+                    viewModeRef.current.processSubTab === "history"
+                ) {
                     loadProductionOrders();
                 }
             }
@@ -657,6 +664,8 @@ export default function ProductionManager() {
         });
     }, [preparerOrders, searchTerm, statusFilter]);
 
+    const activeRecordsTab = mainTab === "preparer_history" ? "order-preparer" : "production";
+
     // Pagination logic for orders tables
     const totalPagesProduction = Math.ceil(filteredProductionOrders.length / rowsPerPage);
     const totalPagesPreparer = Math.ceil(filteredPreparerOrders.length / rowsPerPage);
@@ -664,13 +673,13 @@ export default function ProductionManager() {
     const endIndex = startIndex + rowsPerPage;
     const paginatedProductionOrders = filteredProductionOrders.slice(startIndex, endIndex);
     const paginatedPreparerOrders = filteredPreparerOrders.slice(startIndex, endIndex);
-    const activeTotalPages = historyTab === "order-preparer" ? totalPagesPreparer : totalPagesProduction;
-    const activeTotalResults = historyTab === "order-preparer" ? filteredPreparerOrders.length : filteredProductionOrders.length;
+    const activeTotalPages = activeRecordsTab === "order-preparer" ? totalPagesPreparer : totalPagesProduction;
+    const activeTotalResults = activeRecordsTab === "order-preparer" ? filteredPreparerOrders.length : filteredProductionOrders.length;
 
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, statusFilter, typeFilter, widthFilter, widthTab, historyTab]);
+    }, [searchTerm, statusFilter, typeFilter, widthFilter, widthTab, activeRecordsTab]);
 
     const filteredBatchOptions = useMemo(() => {
         const term = String(batchSearchTerm || "").trim().toLowerCase();
@@ -930,7 +939,7 @@ export default function ProductionManager() {
             setEditingOrderId(null);
 
             // تحديث قائمة الطلبات إذا كنا في وضع السجل
-            if (viewMode === "history") {
+            if (mainTab === "production_process" && processSubTab === "history") {
                 loadProductionOrders();
             }
 
@@ -976,7 +985,8 @@ export default function ProductionManager() {
             status: order.status
         });
         setEditingOrderId(order.production_order_id);
-        setViewMode("create");
+        setMainTab("production_process");
+        setProcessSubTab("create");
         // تمرير إلى أعلى الصفحة
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -1025,7 +1035,7 @@ export default function ProductionManager() {
         }
     };
 
-    if (loading && viewMode === "create" && colors.length === 0) {
+    if (loading && mainTab === "production_process" && processSubTab === "create" && colors.length === 0) {
         return (
             <div className="h-screen flex items-center justify-center">
                 <LoadingState />
@@ -1068,35 +1078,29 @@ export default function ProductionManager() {
                         <Button
                             size="lg"
                             variant="outline"
-                            onClick={() => setViewMode("create")}
-                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "create"
-                                ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
-                                }`}
-                        >
-                            <ShoppingCart className="w-5 h-5 ml-2" />
-                            طلب إنتاج جديد
-                        </Button>
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => setViewMode("history")}
-                            className={`px-6 py-3 text-base min-w-[120px] touch-manipulation border-2 ${viewMode === "history"
-                                ? "bg-primary-f text-white border-primary-f text-secondary-f text-xl hover:bg-primary-f/50"
-                                : "bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                            onClick={() => setMainTab("preparer_history")}
+                            className={`px-6 py-3 text-base min-w-[150px] touch-manipulation border-2 ${mainTab === "preparer_history"
+                                ? "bg-white text-primary-f border-white shadow"
+                                : "bg-white/10 text-white border-white/30 hover:bg-white/20"
                                 }`}
                         >
                             <History className="w-5 h-5 ml-2" />
-                            سجل الإنتاج
+                            سجل طلبات انتاج
                         </Button>
                         <Button
                             size="lg"
                             variant="outline"
-                            onClick={() => navigate("/production-records")}
-                            className="px-6 py-3 text-base min-w-[140px] touch-manipulation border-2 bg-primary-f text-white border-primary-f hover:bg-primary-f/10"
+                            onClick={() => {
+                                setMainTab("production_process");
+                                setProcessSubTab("create");
+                            }}
+                            className={`px-6 py-3 text-base min-w-[150px] touch-manipulation border-2 ${mainTab === "production_process"
+                                ? "bg-white text-primary-f border-white shadow"
+                                : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                                }`}
                         >
-                            <Layers className="w-5 h-5 ml-2" />
-                            سجل الإنتاج بالأقسام
+                            <ShoppingCart className="w-5 h-5 ml-2" />
+                            عملية انتاج
                         </Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1150,7 +1154,38 @@ export default function ProductionManager() {
                         </div>
                     </div>
                 )}
-                {viewMode === "create" ? (
+                {mainTab === "production_process" && (
+                    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 mb-3 border-b border-gray-200 bg-white rounded-t-lg shadow-sm px-2 py-2">
+                        <button
+                            onClick={() => setProcessSubTab("create")}
+                            className={`flex-1 min-w-[170px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${processSubTab === "create"
+                                ? "bg-primary-f text-white border-primary-f shadow"
+                                : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                                }`}
+                        >
+                            اضافة طلب جديد
+                        </button>
+                        <button
+                            onClick={() => setProcessSubTab("history")}
+                            className={`flex-1 min-w-[220px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${processSubTab === "history"
+                                ? "bg-primary-f text-white border-primary-f shadow"
+                                : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                                }`}
+                        >
+                            سجل طلبات عمليات الانتاج الاساسي
+                        </button>
+                        <button
+                            onClick={() => setProcessSubTab("department_records")}
+                            className={`flex-1 min-w-[230px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${processSubTab === "department_records"
+                                ? "bg-primary-f text-white border-primary-f shadow"
+                                : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                                }`}
+                        >
+                            سجل طلبات عمليات الانتاج حسب الاقسام
+                        </button>
+                    </div>
+                )}
+                {mainTab === "production_process" && processSubTab === "create" ? (
                     <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_2.2fr_1.6fr] gap-3 h-full min-h-0">
                         {/* العمود الأيمن - اختيار المادة ولوحة الأرقام */}
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
@@ -1673,31 +1708,18 @@ export default function ProductionManager() {
                             </Card>
                         </div>
                     </div>
+                ) : mainTab === "production_process" && processSubTab === "department_records" ? (
+                    <div className="h-full min-h-0">
+                        <ProductionRecords embedded />
+                    </div>
                 ) : (
                     /* وضع السجل */
                     <Card className="flex flex-col h-full min-h-0 overflow-hidden p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-2 flex-shrink-0 w-full">
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => setHistoryTab("production")}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                        historyTab === "production"
-                                            ? "bg-primary-f text-white"
-                                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                                    }`}
-                                >
-                                    سجل طلبات الإنتاج
-                                </button>
-                                <button
-                                    onClick={() => setHistoryTab("order-preparer")}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                                        historyTab === "order-preparer"
-                                            ? "bg-primary-f text-white"
-                                            : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                                    }`}
-                                >
-                                    سجل طلبات الانتاج
-                                </button>
+                            <div className="font-bold text-base text-gray-800">
+                                {activeRecordsTab === "production"
+                                    ? "سجل طلبات عمليات الانتاج الاساسي"
+                                    : "سجل طلبات انتاج"}
                             </div>
                         </div>
 
@@ -1723,7 +1745,7 @@ export default function ProductionManager() {
                                 ]}
                                 className="h-8 text-sm max-w-[250px]"
                             />
-                            {historyTab === "production" && (
+                            {activeRecordsTab === "production" && (
                                 <FilterSelect
                                     value={typeFilter}
                                     onChange={(e) => setTypeFilter(e.target.value)}
@@ -1742,18 +1764,18 @@ export default function ProductionManager() {
                         <div className="flex justify-end gap-2">
                             <Button
                                 size="sm"
-                                onClick={() => (historyTab === "production" ? loadProductionOrders() : loadPreparerOrders())}
+                                onClick={() => (activeRecordsTab === "production" ? loadProductionOrders() : loadPreparerOrders())}
                                 className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white"
-                                disabled={historyTab === "production" ? loadingOrders : loadingPreparerOrders}
+                                disabled={activeRecordsTab === "production" ? loadingOrders : loadingPreparerOrders}
                             >
-                                {(historyTab === "production" ? loadingOrders : loadingPreparerOrders) ? (
+                                {(activeRecordsTab === "production" ? loadingOrders : loadingPreparerOrders) ? (
                                     <RefreshCw className="w-4 h-4 ml-1 animate-spin" />
                                 ) : (
                                     <RotateCcw className="w-4 h-4 ml-1" />
                                 )}
                                 تحديث
                             </Button>
-                            {historyTab === "production" && (
+                            {activeRecordsTab === "production" && (
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -1782,7 +1804,7 @@ export default function ProductionManager() {
                         </div>
 
                         {/* Width Tabs */}
-                        {historyTab === "production" && (
+                        {activeRecordsTab === "production" && (
                             <div className="flex gap-1 mb-2 flex-wrap">
                                 {[
                                     { value: "all", label: "الكل" },
@@ -1806,7 +1828,7 @@ export default function ProductionManager() {
 
                         {/* جدول السجل */}
                         <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
-                            {historyTab === "production" ? (
+                            {activeRecordsTab === "production" ? (
                                 <table className="min-w-[1400px] w-full table-fixed border-collapse">
                                 <thead className="bg-gray-100 sticky top-0 z-20">
                                     <tr>
