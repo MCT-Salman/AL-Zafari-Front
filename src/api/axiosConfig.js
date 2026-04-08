@@ -1,6 +1,6 @@
 // src\api\axiosConfig.js
 import axios from 'axios';
-import { isLoggingOut } from '@/utils/authSession';
+import { clearAuthSession, isLoggingOut, setLoggingOutFlag, updateAccessToken } from '@/utils/authSession';
 
 const baseURL = import.meta.env.VITE_API_URL;
 
@@ -86,16 +86,18 @@ axiosInstance.interceptors.response.use(
         const refreshToken = localStorage.getItem('refreshToken');
         const response = await axiosInstance.post('/auth/refresh', { refreshToken });
         const accessToken = response?.data?.data?.accessToken || response?.data?.accessToken;
+        const expiresIn = response?.data?.data?.expiresIn || response?.data?.expiresIn;
 
         if (accessToken) {
-          localStorage.setItem('accessToken', accessToken);
+          updateAccessToken({ accessToken, expiresIn });
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         }
         
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         // إعادة توجيه إلى تسجيل الدخول إذا فشل التجديد
-        localStorage.clear();
+        setLoggingOutFlag(true);
+        clearAuthSession();
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }

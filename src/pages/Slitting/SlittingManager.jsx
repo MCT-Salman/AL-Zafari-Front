@@ -1032,9 +1032,18 @@ export default function SlittingManager() {
                 <p className="text-sm opacity-90">لوحة عمليات التشريح</p>
               </div>
             </div>
+            <div className="flex flex-wrap items-center gap-1">
+              <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+                {/* <div className="text-xs opacity-80">اسم المستخدم</div> */}
+                <div className="text-base font-bold">{user?.full_name || user?.username || "-"}</div>
+              </div>
+              <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+                {/* <div className="text-xs opacity-80">الدور</div> */}
+                <div className="text-base font-bold">{ROLE_LABELS[user?.role] || user?.role}</div>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <NotificationsBell />
-              <span className="text-sm">مرحباً، {user?.full_name}</span>
               <Button
                 size="lg"
                 variant="outline"

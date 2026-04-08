@@ -1,6 +1,7 @@
 // src\api\authApi.js
 import axiosInstance from './axiosConfig';
 import { handleApiError } from "../utils/errorHandler";
+import { clearAuthSession } from "@/utils/authSession";
 
 export const authApi = {
   login: async (credentials) => {
@@ -19,7 +20,7 @@ export const authApi = {
     } catch (error) {
       throw handleApiError(error, 'حدث خطأ في تسجيل الخروج');
     } finally {
-      localStorage.clear();
+      clearAuthSession();
     }
   },
 
