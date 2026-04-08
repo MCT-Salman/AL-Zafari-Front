@@ -57,8 +57,8 @@ export default function DashboardHeader({
   const getNavButtonClass = (isActive = false) =>
     `px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 ${
       isActive
-        ? "bg-white text-primary-f border-white shadow"
-        : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+        ? "bg-secondary-s text-white border-secondary-s shadow hover:bg-primary-f hover:border-secondary-s"
+        : "bg-white/10 text-white border-white/30 hover:bg-primary-f hover:border-secondary-s"
     }`;
 
   return (
