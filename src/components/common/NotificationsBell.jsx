@@ -159,7 +159,7 @@ export default function NotificationsBell({ size = "lg", className = "" }) {
         )}
       </Button>
       {open && (
-        <div className="absolute z-50 mt-2 w-[340px] max-h-[380px] overflow-auto rounded-lg border bg-white text-gray-900 shadow-lg">
+        <div className="absolute -right-10 z-50 mt-2 max-h-[380px] w-[340px] max-w-[calc(100vw-1rem)] overflow-auto rounded-lg border bg-white text-gray-900 shadow-lg">
           <div className="p-3 border-b flex items-center justify-between">
             <span className="font-bold text-sm">الإشعارات الحديثة</span>
             <Button variant="outline" size="sm" onClick={markAllRead}>

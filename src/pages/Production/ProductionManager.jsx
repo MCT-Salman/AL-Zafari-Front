@@ -13,6 +13,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import FilterSelect from "../../components/common/FilterSelect";
+import DynamicTableFilters, { dynamicTableFiltersDefaults } from "../../components/common/DynamicTableFilters";
 import StyledDialog from "../../components/common/StyledDialog";
 import PaginationControls from "../../components/common/PaginationControls";
 import ResultsCounter from "../../components/common/ResultsCounter";
@@ -47,8 +48,6 @@ import {
     Scissors,
     Droplet,
     Search,
-    ChevronUp,
-    ChevronDown,
     ArrowRight
 } from "lucide-react";
 import LoadingState from "../../components/common/LoadingState";
@@ -66,10 +65,13 @@ export default function ProductionManager() {
     const [mainTab, setMainTab] = useState("production_process"); // production_process | preparer_history
     const [processSubTab, setProcessSubTab] = useState("create"); // create | history | department_records
     const [loading, setLoading] = useState(false);
-    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("");
-    const [typeFilter, setTypeFilter] = useState("");
+    const [productionRecordFilters, setProductionRecordFilters] = useState({
+        ...dynamicTableFiltersDefaults,
+        productionType: ""
+    });
+    const [preparerRecordFilters, setPreparerRecordFilters] = useState({
+        ...dynamicTableFiltersDefaults
+    });
     const [widthFilter, setWidthFilter] = useState(""); // فلتر العرض
     const [widthTab, setWidthTab] = useState("all"); // تبويب حسب العرض: all, 22, 44, 66, 88, 110
     const [showPreview, setShowPreview] = useState(false);
@@ -102,6 +104,29 @@ export default function ProductionManager() {
     };
 
     const getPreparerOrderId = (order) => order?.Sales_order_id ?? order?.sales_order_id ?? order?.id ?? null;
+    const normalizeFilterValue = (value) => String(value || "").toLowerCase().trim();
+    const parseFilterDate = (value, endOfDay = false) => {
+        if (!value) return null;
+        return new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}`);
+    };
+    const getRecordUserId = (order) =>
+        order?.issued_by?.id
+        ?? order?.issued_by?.user_id
+        ?? order?.sales_user_id
+        ?? order?.sales?.id
+        ?? "";
+    const getRecordUserName = (order) =>
+        order?.issued_by?.full_name
+        || order?.issued_by?.username
+        || order?.sales?.full_name
+        || order?.sales?.username
+        || "";
+    const getRecordDate = (order) => {
+        const rawDate = order?.created_at || order?.date || order?.createdAt || null;
+        if (!rawDate) return null;
+        const parsed = new Date(rawDate);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
 
     // Pagination states for production orders table
     const [currentPage, setCurrentPage] = useState(1);
@@ -614,55 +639,74 @@ export default function ProductionManager() {
     }, [activeTextTarget, activeField]);
 
     const filteredProductionOrders = useMemo(() => {
-        const term = searchTerm.toLowerCase();
+        const searchTerm = normalizeFilterValue(productionRecordFilters.search);
+        const statusFilter = normalizeFilterValue(productionRecordFilters.status);
+        const typeFilter = normalizeFilterValue(productionRecordFilters.productionType);
+        const userFilter = String(productionRecordFilters.userId || "");
+        const fromDate = parseFilterDate(productionRecordFilters.dateFrom);
+        const toDate = parseFilterDate(productionRecordFilters.dateTo, true);
         return productionOrders.filter(order => {
             // Search filter
-            const matchesSearch = !term || (
-                String(order.production_order_id).includes(term) ||
-                order.issued_by?.username?.toLowerCase().includes(term) ||
-                order.color_name?.toLowerCase().includes(term) ||
-                order.color_code?.toLowerCase().includes(term) ||
-                order.batch?.batch_number?.toLowerCase().includes(term) ||
-                order.batch_number?.toLowerCase().includes(term) ||
-                order.batch_id?.toString().toLowerCase().includes(term) ||
-                order.status?.toLowerCase().includes(term) ||
-                order.material_name?.toLowerCase().includes(term) ||
-                order.ruler_type?.toLowerCase().includes(term) ||
-                order.notes?.toLowerCase().includes(term) ||
-                order.type_item?.toLowerCase().includes(term)
+            const matchesSearch = !searchTerm || (
+                String(order.production_order_id || "").toLowerCase().includes(searchTerm) ||
+                normalizeFilterValue(getRecordUserName(order)).includes(searchTerm) ||
+                normalizeFilterValue(order.color_name).includes(searchTerm) ||
+                normalizeFilterValue(order.color_code).includes(searchTerm) ||
+                normalizeFilterValue(order.batch?.batch_number).includes(searchTerm) ||
+                normalizeFilterValue(order.batch_number).includes(searchTerm) ||
+                normalizeFilterValue(order.batch_id).includes(searchTerm) ||
+                normalizeFilterValue(order.status).includes(searchTerm) ||
+                normalizeFilterValue(order.material_name).includes(searchTerm) ||
+                normalizeFilterValue(order.ruler_type).includes(searchTerm) ||
+                normalizeFilterValue(order.notes).includes(searchTerm) ||
+                normalizeFilterValue(order.type_item).includes(searchTerm)
             );
 
             // Status filter
-            const matchesStatus = !statusFilter || String(order.status || "").toLowerCase() === String(statusFilter).toLowerCase();
+            const matchesStatus = !statusFilter || normalizeFilterValue(order.status) === statusFilter;
 
             // Type filter
-            const matchesType = !typeFilter || String(order.type_item || "").toLowerCase() === String(typeFilter).toLowerCase();
+            const matchesType = !typeFilter || normalizeFilterValue(order.type_item) === typeFilter;
+
+            // User filter
+            const matchesUser = !userFilter || String(getRecordUserId(order)) === userFilter;
 
             // Width filter
             const matchesWidth = !widthFilter || String(order.width || "").toLowerCase().includes(widthFilter.toLowerCase());
 
             // Width tab filter
             const matchesWidthTab = widthTab === "all" || String(order.width || "") === widthTab;
+            const recordDate = getRecordDate(order);
+            const matchesFromDate = !fromDate || (recordDate && recordDate >= fromDate);
+            const matchesToDate = !toDate || (recordDate && recordDate <= toDate);
 
-            return matchesSearch && matchesStatus && matchesType && matchesWidth && matchesWidthTab;
+            return matchesSearch && matchesStatus && matchesType && matchesUser && matchesWidth && matchesWidthTab && matchesFromDate && matchesToDate;
         });
-    }, [productionOrders, searchTerm, statusFilter, typeFilter, widthFilter, widthTab]);
+    }, [productionOrders, productionRecordFilters, widthFilter, widthTab]);
 
     const filteredPreparerOrders = useMemo(() => {
-        const term = searchTerm.toLowerCase();
+        const searchTerm = normalizeFilterValue(preparerRecordFilters.search);
+        const statusFilter = normalizeFilterValue(preparerRecordFilters.status);
+        const userFilter = String(preparerRecordFilters.userId || "");
+        const fromDate = parseFilterDate(preparerRecordFilters.dateFrom);
+        const toDate = parseFilterDate(preparerRecordFilters.dateTo, true);
         return preparerOrders.filter(order => {
             const orderId = getPreparerOrderId(order);
-            const issuedBy = order?.issued_by?.full_name || order?.issued_by?.username || "";
-            const matchesSearch = !term || (
-                String(orderId || "").toLowerCase().includes(term) ||
-                String(issuedBy).toLowerCase().includes(term) ||
-                String(order.status || "").toLowerCase().includes(term) ||
-                String(order.notes || "").toLowerCase().includes(term)
+            const issuedBy = getRecordUserName(order);
+            const matchesSearch = !searchTerm || (
+                normalizeFilterValue(orderId).includes(searchTerm) ||
+                normalizeFilterValue(issuedBy).includes(searchTerm) ||
+                normalizeFilterValue(order.status).includes(searchTerm) ||
+                normalizeFilterValue(order.notes).includes(searchTerm)
             );
-            const matchesStatus = !statusFilter || String(order.status || "").toLowerCase() === String(statusFilter).toLowerCase();
-            return matchesSearch && matchesStatus;
+            const matchesStatus = !statusFilter || normalizeFilterValue(order.status) === statusFilter;
+            const matchesUser = !userFilter || String(getRecordUserId(order)) === userFilter;
+            const recordDate = getRecordDate(order);
+            const matchesFromDate = !fromDate || (recordDate && recordDate >= fromDate);
+            const matchesToDate = !toDate || (recordDate && recordDate <= toDate);
+            return matchesSearch && matchesStatus && matchesUser && matchesFromDate && matchesToDate;
         });
-    }, [preparerOrders, searchTerm, statusFilter]);
+    }, [preparerOrders, preparerRecordFilters]);
 
     const activeRecordsTab = mainTab === "preparer_history" ? "order-preparer" : "production";
 
@@ -679,7 +723,26 @@ export default function ProductionManager() {
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, statusFilter, typeFilter, widthFilter, widthTab, activeRecordsTab]);
+    }, [productionRecordFilters, preparerRecordFilters, widthFilter, widthTab, activeRecordsTab]);
+
+    const productionUserOptions = useMemo(() => {
+        const source = activeRecordsTab === "production" ? productionOrders : preparerOrders;
+        const usersMap = new Map();
+
+        source.forEach((order) => {
+            const userId = getRecordUserId(order);
+            const userName = getRecordUserName(order);
+
+            if (userId && userName && !usersMap.has(String(userId))) {
+                usersMap.set(String(userId), {
+                    value: String(userId),
+                    label: userName
+                });
+            }
+        });
+
+        return Array.from(usersMap.values());
+    }, [activeRecordsTab, productionOrders, preparerOrders]);
 
     const filteredBatchOptions = useMemo(() => {
         const term = String(batchSearchTerm || "").trim().toLowerCase();
@@ -1046,25 +1109,9 @@ export default function ProductionManager() {
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
                         {/* Header */}
-            <div className={isHeaderVisible ? "h-[88px]" : "h-[36px]"} />
+            <div className="h-[88px]" />
 
-            <div
-                className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
-                    isHeaderVisible ? "top-[60px]" : "top-2"
-                }`}
-            >
-                <Button
-                    type="button"
-                    onClick={() => setIsHeaderVisible((prev) => !prev)}
-                    className="h-10 w-10 rounded-full border-2 border-t-secondary-f bg-primary-f text-white shadow-[0_16px_40px_rgba(16,185,129,0.38)] transition-all duration-200 hover:scale-105 active:scale-95"
-                    title={isHeaderVisible ? "إخفاء الهيدر" : "إظهار الهيدر"}
-                >
-                    {isHeaderVisible ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
-                </Button>
-            </div>
-
-            {isHeaderVisible && (
-                <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-40">
+            <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-40">
                     <div className="flex flex-wrap gap-3">
                         <Button
                             size="lg"
@@ -1104,6 +1151,15 @@ export default function ProductionManager() {
                         </Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                        <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-white/20 bg-white/10">
+                            <div className="text-sm font-bold">
+                                {user?.full_name || user?.username || "-"}
+                            </div>
+                            <div className="h-4 w-px bg-white/30" />
+                            <div className="text-xs font-semibold">
+                                {ROLE_LABELS[user?.role] || user?.role || "-"}
+                            </div>
+                        </div>
                         <NotificationsBell />
                         <Button
                             size="lg"
@@ -1116,25 +1172,6 @@ export default function ProductionManager() {
                         </Button>
                     </div>
                 </div>
-            )}
-
-            {!isHeaderVisible && (
-                <div className="fixed top-0 left-0 right-0 z-30">
-                    <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-1 shadow-sm backdrop-blur">
-                        <div className="min-w-0">
-                            <div className="truncate text-sm font-bold text-secondary-s">
-                                {user?.full_name || user?.username || "-"}
-                            </div>
-                        </div>
-                        <div className="h-10 w-px" />
-                        <div className="min-w-0 text-right">
-                            <div className="truncate text-sm font-bold text-secondary-s">
-                                {ROLE_LABELS[user?.role] || user?.role || "-"}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 {/* Main Content */}
             <div className="flex-1 min-h-0 p-3 overflow-hidden">
                 {statusNotification && (
@@ -1723,18 +1760,59 @@ export default function ProductionManager() {
                             </div>
                         </div>
 
+                        <div className="mb-3">
+                            <DynamicTableFilters
+                                value={activeRecordsTab === "production" ? productionRecordFilters : preparerRecordFilters}
+                                onChange={activeRecordsTab === "production" ? setProductionRecordFilters : setPreparerRecordFilters}
+                                fields={{ material: false }}
+                                resultsCount={activeTotalResults}
+                                totalCount={activeRecordsTab === "production" ? productionOrders.length : preparerOrders.length}
+                                statusOptions={[
+                                    { value: "pending", label: "قيد الانتظار" },
+                                    { value: "preparing", label: "قيد التحضير" },
+                                    { value: "in_progress", label: "قيد التنفيذ" },
+                                    { value: "completed", label: "مكتمل" },
+                                    { value: "cancelled", label: "ملغي" },
+                                ]}
+                                userOptions={productionUserOptions}
+                                texts={{
+                                    searchPlaceholder: "بحث في السجل...",
+                                    userLabel: activeRecordsTab === "production" ? "المنشئ" : "المستخدم",
+                                }}
+                                customFields={activeRecordsTab === "production" ? [
+                                    {
+                                        key: "productionType",
+                                        render: ({ value, onChange, disabled }) => (
+                                            <FilterSelect
+                                                label="النوع"
+                                                value={value || ""}
+                                                onChange={(e) => onChange(e.target.value)}
+                                                options={[
+                                                    { value: "", label: "كل الأنواع" },
+                                                    { value: "machine", label: "مكنة" },
+                                                    { value: "presser", label: "كوي" },
+                                                ]}
+                                                disabled={disabled}
+                                                placeholder="كل الأنواع"
+                                            />
+                                        )
+                                    }
+                                ] : []}
+                            />
+                        </div>
+
                         {/* First row - Search and filters */}
-                        <div className="flex  gap-2 mb-2">
+                        {false && <div className="flex  gap-2 mb-2">
                             <Input
                                 type="text"
                                 placeholder="بحث..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                value={productionRecordFilters.search}
+                                onChange={(e) => setProductionRecordFilters((prev) => ({ ...prev, search: e.target.value }))}
                                 className="h-8 p-6 flex-1 max-w-[400px] text-sm"
                             />
                             <FilterSelect
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
+                                value={productionRecordFilters.status}
+                                onChange={(e) => setProductionRecordFilters((prev) => ({ ...prev, status: e.target.value }))}
                                 options={[
                                     { value: "", label: "كل الحالات" },
                                     { value: "pending", label: "قيد الانتظار" },
@@ -1747,8 +1825,8 @@ export default function ProductionManager() {
                             />
                             {activeRecordsTab === "production" && (
                                 <FilterSelect
-                                    value={typeFilter}
-                                    onChange={(e) => setTypeFilter(e.target.value)}
+                                    value={productionRecordFilters.productionType}
+                                    onChange={(e) => setProductionRecordFilters((prev) => ({ ...prev, productionType: e.target.value }))}
                                     options={[
                                         { value: "", label: "كل الأنواع" },
                                         { value: "machine", label: "مكنة" },
@@ -1758,7 +1836,7 @@ export default function ProductionManager() {
                                 />
                             )}
 
-                        </div>
+                        </div>}
 
                         {/* Second row - Action buttons */}
                         <div className="flex justify-end gap-2">

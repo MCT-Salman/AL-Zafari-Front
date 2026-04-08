@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import SearchInput from "../../components/common/SearchInput";
+import DynamicTableFilters, { dynamicTableFiltersDefaults } from "../../components/common/DynamicTableFilters";
 import LoadingState from "../../components/common/LoadingState";
 import EmptyState from "../../components/common/EmptyState";
 import ResultsCounter from "../../components/common/ResultsCounter";
@@ -32,12 +33,21 @@ export default function InvoiceHistory() {
   const [loading, setLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [invoiceFilters, setInvoiceFilters] = useState(dynamicTableFiltersDefaults);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deletingInvoices, setDeletingInvoices] = useState(false);
+  const getInvoiceStatusKey = (invoice) => {
+    const totalNum = parseFloat(invoice?.total_amount) || 0;
+    const paidNum = parseFloat(invoice?.paid_amount) || 0;
+    if (totalNum === 0) return "";
+    if (paidNum >= totalNum) return "paid";
+    if (paidNum === 0) return "unpaid";
+    return "partial";
+  };
 
   // Load invoices
   const loadInvoices = async (params = {}) => {
@@ -66,26 +76,63 @@ export default function InvoiceHistory() {
 
   // Enhanced search functionality
   const filteredInvoices = useMemo(() => {
-    if (!searchTerm) return invoices;
-    const term = searchTerm.toLowerCase();
-    return invoices.filter(inv =>
-      String(inv.invoice_id).includes(term) ||
-      inv.customer?.name?.toLowerCase().includes(term) ||
-      inv.customer?.phone?.toLowerCase().includes(term) ||
-      (inv.order_id && String(inv.order_id).includes(term)) ||
-      (inv.issued_at && new Date(inv.issued_at).toLocaleDateString('en-US').includes(term)) ||
-      (inv.total_amount && String(inv.total_amount).includes(term)) ||
-      (inv.paid_amount && String(inv.paid_amount).includes(term)) ||
-      (inv.remaining_amount && String(inv.remaining_amount).includes(term)) ||
-      (inv.notes && inv.notes.toLowerCase().includes(term)) ||
-      (inv.status && inv.status.toLowerCase().includes(term))
-    );
-  }, [invoices, searchTerm]);
+    const normalize = (value) => String(value || "").toLowerCase().trim();
+    const searchValue = normalize(invoiceFilters.search || searchTerm);
+    const statusFilter = normalize(invoiceFilters.status);
+    const userFilter = String(invoiceFilters.userId || "");
+    const fromDate = invoiceFilters.dateFrom ? new Date(`${invoiceFilters.dateFrom}T00:00:00`) : null;
+    const toDate = invoiceFilters.dateTo ? new Date(`${invoiceFilters.dateTo}T23:59:59.999`) : null;
+
+    return invoices.filter((inv) => {
+      const issuedDate = inv?.issued_at ? new Date(inv.issued_at) : null;
+      const invoiceUser = invoiceApi.getUserFromInvoice(inv);
+      const userId = invoiceUser?.id ?? invoiceUser?.user_id ?? "";
+      const paymentStatus = invoiceApi.getPaymentStatus(inv.total_amount, inv.paid_amount);
+
+      const matchesSearch = !searchValue || (
+        normalize(inv.invoice_id).includes(searchValue) ||
+        normalize(inv.customer?.name).includes(searchValue) ||
+        normalize(inv.customer?.phone).includes(searchValue) ||
+        normalize(inv.order_id).includes(searchValue) ||
+        normalize(invoiceApi.getFormattedDate(inv.issued_at)).includes(searchValue) ||
+        normalize(inv.total_amount).includes(searchValue) ||
+        normalize(inv.paid_amount).includes(searchValue) ||
+        normalize(inv.remaining_amount).includes(searchValue) ||
+        normalize(inv.notes).includes(searchValue) ||
+        normalize(inv.status).includes(searchValue) ||
+        normalize(paymentStatus?.label).includes(searchValue) ||
+        normalize(invoiceApi.formatUserInfo(invoiceUser)).includes(searchValue)
+      );
+
+      const matchesStatus = !statusFilter || getInvoiceStatusKey(inv) === statusFilter;
+      const matchesUser = !userFilter || String(userId) === userFilter;
+      const matchesFromDate = !fromDate || (issuedDate && !Number.isNaN(issuedDate.getTime()) && issuedDate >= fromDate);
+      const matchesToDate = !toDate || (issuedDate && !Number.isNaN(issuedDate.getTime()) && issuedDate <= toDate);
+
+      return matchesSearch && matchesStatus && matchesUser && matchesFromDate && matchesToDate;
+    });
+  }, [invoices, invoiceFilters, searchTerm]);
+
+  const invoiceUserOptions = useMemo(() => {
+    const usersMap = new Map();
+    (Array.isArray(invoices) ? invoices : []).forEach((inv) => {
+      const user = invoiceApi.getUserFromInvoice(inv);
+      const userId = user?.id ?? user?.user_id ?? "";
+      const userName = invoiceApi.formatUserInfo(user);
+      if (userId && userName && !usersMap.has(String(userId))) {
+        usersMap.set(String(userId), {
+          value: String(userId),
+          label: userName
+        });
+      }
+    });
+    return Array.from(usersMap.values());
+  }, [invoices]);
 
   // Reset page when search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, invoiceFilters]);
 
   // Reset page when rows per page changes
   useEffect(() => {
@@ -289,6 +336,24 @@ export default function InvoiceHistory() {
 
         {/* Search and Filters */}
         <div className="space-y-4 mb-6">
+          <DynamicTableFilters
+            value={invoiceFilters}
+            onChange={setInvoiceFilters}
+            fields={{ material: false }}
+            resultsCount={filteredInvoices.length}
+            totalCount={invoices.length}
+            statusOptions={[
+              { value: "paid", label: "مدفوعة" },
+              { value: "partial", label: "مدفوعة جزئياً" },
+              { value: "unpaid", label: "غير مدفوعة" },
+            ]}
+            userOptions={invoiceUserOptions}
+            texts={{
+              searchPlaceholder: "بحث في سجل الفواتير...",
+              userLabel: "المستخدم",
+            }}
+          />
+
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="flex items-center gap-2">
               {selectedInvoices.length > 0 && (
@@ -335,7 +400,7 @@ export default function InvoiceHistory() {
             </div>
           ) : paginatedInvoices.length === 0 ? (
             <div className="p-8">
-              <EmptyState message={searchTerm ? "لا توجد نتائج مطابقة للبحث" : "لا توجد فواتير"} />
+              <EmptyState message={invoiceFilters.search ? "لا توجد نتائج مطابقة للبحث" : "لا توجد فواتير"} />
             </div>
           ) : (
             <>

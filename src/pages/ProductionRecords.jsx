@@ -8,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import FilterSelect from "../components/common/FilterSelect";
+import DynamicTableFilters from "../components/common/DynamicTableFilters";
 import StyledDialog from "../components/common/StyledDialog";
 import PaginationControls from "../components/common/PaginationControls";
 import ResultsCounter from "../components/common/ResultsCounter";
@@ -97,6 +98,8 @@ export default function ProductionRecords({ embedded = false }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [widthFilter, setWidthFilter] = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(20); // فلتر العرض
     const [activeNav, setActiveNav] = useState("records"); // "create" | "history" | "records"
@@ -271,8 +274,18 @@ export default function ProductionRecords({ embedded = false }) {
     const filteredData = useMemo(() => {
         const data = productionData[activeTab] || [];
         const term = searchTerm.toLowerCase();
+        const fromDate = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+        const toDate = dateTo ? new Date(`${dateTo}T23:59:59.999`) : null;
 
         return data.filter(item => {
+            const rawDate =
+                item?.created_at
+                || item?.productionOrder?.created_at
+                || item?.production_order?.created_at
+                || item?.updated_at
+                || null;
+            const itemDate = rawDate ? new Date(rawDate) : null;
+
             // Search filter
             const matchesSearch = !term || (
                 String(item.production_order_item_id).includes(term) ||
@@ -294,9 +307,12 @@ export default function ProductionRecords({ embedded = false }) {
             // Width filter
             const matchesWidth = !widthFilter || String(item.width || "").toLowerCase().includes(String(widthFilter).toLowerCase());
 
-            return matchesSearch && matchesStatus && matchesWidth;
+            const matchesFromDate = !fromDate || (itemDate && !Number.isNaN(itemDate.getTime()) && itemDate >= fromDate);
+            const matchesToDate = !toDate || (itemDate && !Number.isNaN(itemDate.getTime()) && itemDate <= toDate);
+
+            return matchesSearch && matchesStatus && matchesWidth && matchesFromDate && matchesToDate;
         });
-    }, [productionData, activeTab, searchTerm, statusFilter, widthFilter]);
+    }, [productionData, activeTab, searchTerm, statusFilter, widthFilter, dateFrom, dateTo]);
 
     // Pagination logic
     const totalPages = Math.ceil(filteredData.length / rowsPerPage);
@@ -307,7 +323,7 @@ export default function ProductionRecords({ embedded = false }) {
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, statusFilter, widthFilter, activeTab]);
+    }, [searchTerm, statusFilter, widthFilter, dateFrom, dateTo, activeTab]);
 
     const handleViewItem = (item) => {
         console.log('Viewing item:', item); // Debug log
@@ -539,7 +555,65 @@ export default function ProductionRecords({ embedded = false }) {
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-wrap gap-3 mb-4 p-3 bg-white rounded-lg border">
+                <div className="mb-4">
+                    <DynamicTableFilters
+                        value={{
+                            search: searchTerm,
+                            status: statusFilter,
+                            width: widthFilter,
+                            dateFrom,
+                            dateTo,
+                        }}
+                        onChange={(nextFilters) => {
+                            setSearchTerm(nextFilters.search || "");
+                            setStatusFilter(nextFilters.status || "");
+                            setWidthFilter(nextFilters.width || "");
+                            setDateFrom(nextFilters.dateFrom || "");
+                            setDateTo(nextFilters.dateTo || "");
+                        }}
+                        fields={{
+                            user: false,
+                            material: false,
+                        }}
+                        statusOptions={STATUS_OPTIONS}
+                        texts={{
+                            searchPlaceholder: "بحث...",
+                        }}
+                        resultsCount={filteredData.length}
+                        totalCount={(productionData[activeTab] || []).length}
+                        customFields={[
+                            {
+                                key: "width",
+                                render: ({ value, onChange, disabled }) => (
+                                    <FilterSelect
+                                        label="العرض"
+                                        value={value || ""}
+                                        onChange={(e) => onChange(e.target.value)}
+                                        options={[
+                                            { value: "", label: "جميع الأعراض" },
+                                            { value: "22", label: "22" },
+                                            { value: "44", label: "44" },
+                                            { value: "66", label: "66" },
+                                        ]}
+                                        disabled={disabled}
+                                        placeholder="العرض"
+                                    />
+                                ),
+                            },
+                        ]}
+                        actions={
+                            <Button
+                                variant="outline"
+                                onClick={handleRefreshData}
+                                className="px-4 py-2"
+                            >
+                                <RefreshCw className="w-4 h-4 ml-2" />
+                                تحديث
+                            </Button>
+                        }
+                    />
+                </div>
+                {false && <div className="flex flex-wrap gap-3 mb-4 p-3 bg-white rounded-lg border">
                     <div className="flex-1 min-w-[200px]">
                         <div className="relative">
                             <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -584,7 +658,7 @@ export default function ProductionRecords({ embedded = false }) {
                         <RefreshCw className="w-4 h-4 ml-2" />
                         تحديث
                     </Button>
-                </div>
+                </div>}
 
                 {/* Statistics Cards */}
                 {renderStatisticsCards()}

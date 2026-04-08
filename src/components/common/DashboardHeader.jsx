@@ -98,14 +98,14 @@ export default function DashboardHeader({
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => navigate("/orders")}
-                className={getNavButtonClass(location.pathname === "/orders")}
+                onClick={() => navigate("/sales?tab=create")}
+                className={getNavButtonClass(location.pathname === "/sales" || location.pathname === "/orders")}
               >
                 <ShoppingCart className="w-5 h-5 ml-2" />
                 الطلبات
               </Button>
             )}
-            {!hideOrderPreparer && (
+            {/* {!hideOrderPreparer && (
               <Button
                 size="lg"
                 variant="outline"
@@ -115,7 +115,7 @@ export default function DashboardHeader({
                 <ShoppingCart className="w-5 h-5 ml-2" />
                 طلب انتاج
               </Button>
-            )}
+            )} */}
             {!hideCustomersAndInvoices && (
               <>
                 <Button

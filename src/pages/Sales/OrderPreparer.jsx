@@ -15,6 +15,7 @@ import { useExport } from "../../hooks/useExport";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import FilterSelect from "../../components/common/FilterSelect";
+import DynamicTableFilters, { dynamicTableFiltersDefaults } from "../../components/common/DynamicTableFilters";
 import StyledDialog from "../../components/common/StyledDialog";
 import PaginationControls from "../../components/common/PaginationControls";
 import ResultsCounter from "../../components/common/ResultsCounter";
@@ -69,6 +70,7 @@ export default function OrderPreparer() {
     // Pagination states for orders records table (orders tab)
     const [ordersRecordsPage, setOrdersRecordsPage] = useState(1);
     const [ordersRecordsRowsPerPage, setOrdersRecordsRowsPerPage] = useState(20);
+    const [ordersRecordsFilters, setOrdersRecordsFilters] = useState(dynamicTableFiltersDefaults);
 
     // Customer State
     const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -105,6 +107,28 @@ export default function OrderPreparer() {
     const [ordersRecordsLoading, setOrdersRecordsLoading] = useState(false);
     const [ordersLoading, setOrdersLoading] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const ordersApi = orderApi;
+
+    // Helper functions from orderApi
+    const getOrderStatus = (order) => ordersApi.getOrderStatus(order);
+    const getFormattedDate = (order) => ordersApi.getFormattedDate(order);
+    const formatCurrency = (amount) => ordersApi.formatCurrency(amount);
+    const getStatusBadge = (status) => ordersApi.getStatusBadge(status);
+    const getSalesUserName = (order) => ordersApi.getSalesUserName(order);
+    const getCustomerName = (order) => ordersApi.getCustomerName(order);
+    const getCustomerPhone = (order) => ordersApi.getCustomerPhone(order);
+    const getCustomerCity = (order) => ordersApi.getCustomerCity(order);
+    const getCustomerAddress = (order) => ordersApi.getCustomerAddress(order);
+    const formatCustomerInfo = (order) => ordersApi.formatCustomerInfo(order);
+    const calculateOrderTotal = (items) => ordersApi.calculateOrderTotal(items);
+    const getOrderId = (order) => order?.order_id ?? order?.Sales_order_id ?? order?.sales_order_id ?? order?.id ?? null;
+    const buildMaterialFilterKey = (materialId, materialName = "") => {
+        if (materialId !== null && materialId !== undefined && String(materialId).trim() !== "") {
+            return `id:${String(materialId)}`;
+        }
+        const normalizedName = String(materialName || "").trim().toLowerCase();
+        return normalizedName ? `name:${normalizedName}` : "";
+    };
 
     // Filtered orders for display
     const filteredOrders = useMemo(() => {
@@ -138,10 +162,56 @@ export default function OrderPreparer() {
     const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
 
     // Pagination logic for orders records table
-    const ordersRecordsTotalPages = Math.ceil(ordersRecords.length / ordersRecordsRowsPerPage) || 1;
+    const filteredOrdersRecords = useMemo(() => {
+        const safeOrders = Array.isArray(ordersRecords) ? ordersRecords : [];
+        const normalize = (value) => String(value || "").toLowerCase().trim();
+        const searchTerm = normalize(ordersRecordsFilters.search);
+        const statusFilter = normalize(ordersRecordsFilters.status);
+        const userFilter = String(ordersRecordsFilters.userId || "");
+        const fromDate = ordersRecordsFilters.dateFrom ? new Date(`${ordersRecordsFilters.dateFrom}T00:00:00`) : null;
+        const toDate = ordersRecordsFilters.dateTo ? new Date(`${ordersRecordsFilters.dateTo}T23:59:59.999`) : null;
+
+        return safeOrders.filter((order) => {
+            const orderDate = order?.created_at ? new Date(order.created_at) : null;
+            const salesUserId = order?.sales_user_id ?? order?.sales?.id ?? order?.sales?.user_id ?? "";
+            const matchesSearch = !searchTerm || (
+                normalize(getOrderId(order)).includes(searchTerm) ||
+                normalize(getFormattedDate(order)).includes(searchTerm) ||
+                normalize(getCustomerName(order)).includes(searchTerm) ||
+                normalize(getCustomerPhone(order)).includes(searchTerm) ||
+                normalize(order.notes).includes(searchTerm) ||
+                normalize(order.status).includes(searchTerm) ||
+                normalize(getSalesUserName(order)).includes(searchTerm) ||
+                normalize(order.count_items ?? order.items?.length ?? 0).includes(searchTerm)
+            );
+            const matchesStatus = !statusFilter || normalize(order.status) === statusFilter;
+            const matchesUser = !userFilter || String(salesUserId) === userFilter;
+            const matchesFromDate = !fromDate || (orderDate && !Number.isNaN(orderDate.getTime()) && orderDate >= fromDate);
+            const matchesToDate = !toDate || (orderDate && !Number.isNaN(orderDate.getTime()) && orderDate <= toDate);
+
+            return matchesSearch && matchesStatus && matchesUser && matchesFromDate && matchesToDate;
+        });
+    }, [ordersRecords, ordersRecordsFilters, getFormattedDate, getOrderId, getCustomerName, getCustomerPhone, getSalesUserName]);
+
+    const ordersRecordsUserOptions = useMemo(() => {
+        const usersMap = new Map();
+        (Array.isArray(ordersRecords) ? ordersRecords : []).forEach((order) => {
+            const userId = order?.sales_user_id ?? order?.sales?.id ?? order?.sales?.user_id ?? "";
+            const userName = getSalesUserName(order);
+            if (userId && userName && !usersMap.has(String(userId))) {
+                usersMap.set(String(userId), {
+                    value: String(userId),
+                    label: userName
+                });
+            }
+        });
+        return Array.from(usersMap.values());
+    }, [ordersRecords, getSalesUserName]);
+
+    const ordersRecordsTotalPages = Math.ceil(filteredOrdersRecords.length / ordersRecordsRowsPerPage) || 1;
     const ordersRecordsStartIndex = (ordersRecordsPage - 1) * ordersRecordsRowsPerPage;
     const ordersRecordsEndIndex = ordersRecordsStartIndex + ordersRecordsRowsPerPage;
-    const paginatedOrdersRecords = ordersRecords.slice(ordersRecordsStartIndex, ordersRecordsEndIndex);
+    const paginatedOrdersRecords = filteredOrdersRecords.slice(ordersRecordsStartIndex, ordersRecordsEndIndex);
 
     // Reset page when filters change
     useEffect(() => {
@@ -150,7 +220,7 @@ export default function OrderPreparer() {
 
     useEffect(() => {
         setOrdersRecordsPage(1);
-    }, [ordersRecordsRowsPerPage, ordersRecords.length]);
+    }, [ordersRecordsRowsPerPage, filteredOrdersRecords.length, ordersRecordsFilters]);
 
     const [orderDetails, setOrderDetails] = useState(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
@@ -190,6 +260,7 @@ export default function OrderPreparer() {
     // Pagination states for production history table
     const [productionHistoryPage, setProductionHistoryPage] = useState(1);
     const [productionHistoryRowsPerPage, setProductionHistoryRowsPerPage] = useState(20);
+    const [productionHistoryFilters, setProductionHistoryFilters] = useState(dynamicTableFiltersDefaults);
 
     // QR Generation Dialog State with quantity editing
     const [qrGenDialog, setQrGenDialog] = useState({
@@ -303,8 +374,6 @@ export default function OrderPreparer() {
     const isOrderPreparer = true;
     const showOrderSwitch = true;
 
-    const ordersApi = orderApi;
-
     const isQrQuantityChanged = useMemo(() => {
         const current = String(qrGenDialog.quantity ?? "");
         const original = String(qrGenDialog.item?.quantity ?? "");
@@ -333,20 +402,6 @@ export default function OrderPreparer() {
             { wch: 28 },
         ],
     });
-
-    // Helper functions from orderApi
-    const getOrderStatus = (order) => ordersApi.getOrderStatus(order);
-    const getFormattedDate = (order) => ordersApi.getFormattedDate(order);
-    const formatCurrency = (amount) => ordersApi.formatCurrency(amount);
-    const getStatusBadge = (status) => ordersApi.getStatusBadge(status);
-    const getSalesUserName = (order) => ordersApi.getSalesUserName(order);
-    const getCustomerName = (order) => ordersApi.getCustomerName(order);
-    const getCustomerPhone = (order) => ordersApi.getCustomerPhone(order);
-    const getCustomerCity = (order) => ordersApi.getCustomerCity(order);
-    const getCustomerAddress = (order) => ordersApi.getCustomerAddress(order);
-    const formatCustomerInfo = (order) => ordersApi.formatCustomerInfo(order);
-    const calculateOrderTotal = (items) => ordersApi.calculateOrderTotal(items);
-    const getOrderId = (order) => order?.order_id ?? order?.Sales_order_id ?? order?.sales_order_id ?? order?.id ?? null;
 
     const TYPE_OPTIONS = [
         { value: TypeItem.Machine, label: "مكنة" },
@@ -517,13 +572,65 @@ export default function OrderPreparer() {
 
     useEffect(() => {
         setProductionHistoryPage(1);
-    }, [productionHistoryRowsPerPage, productionHistoryOrders.length]);
+    }, [productionHistoryRowsPerPage, productionHistoryOrders.length, productionHistoryFilters]);
 
     // Pagination logic for production history table
-    const productionHistoryTotalPages = Math.ceil(productionHistoryOrders.length / productionHistoryRowsPerPage);
+    const filteredProductionHistoryOrders = useMemo(() => {
+        const safeOrders = Array.isArray(productionHistoryOrders) ? productionHistoryOrders : [];
+        const normalize = (value) => String(value || "").toLowerCase().trim();
+        const searchTerm = normalize(productionHistoryFilters.search);
+        const statusFilter = normalize(productionHistoryFilters.status);
+        const materialFilter = String(productionHistoryFilters.materialId || "");
+        const fromDate = productionHistoryFilters.dateFrom ? new Date(`${productionHistoryFilters.dateFrom}T00:00:00`) : null;
+        const toDate = productionHistoryFilters.dateTo ? new Date(`${productionHistoryFilters.dateTo}T23:59:59.999`) : null;
+
+        return safeOrders.filter((order) => {
+            const orderDate = order?.order_date ? new Date(order.order_date) : (order?.created_at ? new Date(order.created_at) : null);
+            const materialId = order?.material_id ?? order?.material?.material_id ?? null;
+            const materialName = order?.material_name ?? order?.material?.material_name ?? "";
+            const matchesSearch = !searchTerm || (
+                normalize(order.material_name).includes(searchTerm) ||
+                normalize(order.width).includes(searchTerm) ||
+                normalize(order.color_code).includes(searchTerm) ||
+                normalize(order.color_name).includes(searchTerm) ||
+                normalize(order.type_item).includes(searchTerm) ||
+                normalize(order.quantity).includes(searchTerm) ||
+                normalize(order.ruler_name).includes(searchTerm) ||
+                normalize(order.thickness).includes(searchTerm) ||
+                normalize(order.batch_number).includes(searchTerm) ||
+                normalize(order.status).includes(searchTerm) ||
+                normalize(order.order_id).includes(searchTerm) ||
+                normalize(order.sales_order_id).includes(searchTerm)
+            );
+            const matchesStatus = !statusFilter || normalize(order.status) === statusFilter;
+            const matchesMaterial = !materialFilter || buildMaterialFilterKey(materialId, materialName) === materialFilter;
+            const matchesFromDate = !fromDate || (orderDate && !Number.isNaN(orderDate.getTime()) && orderDate >= fromDate);
+            const matchesToDate = !toDate || (orderDate && !Number.isNaN(orderDate.getTime()) && orderDate <= toDate);
+
+            return matchesSearch && matchesStatus && matchesMaterial && matchesFromDate && matchesToDate;
+        });
+    }, [productionHistoryOrders, productionHistoryFilters]);
+
+    const productionHistoryMaterialOptions = useMemo(() => {
+        const materialMap = new Map();
+        (Array.isArray(productionHistoryOrders) ? productionHistoryOrders : []).forEach((order) => {
+            const materialId = order?.material_id ?? order?.material?.material_id ?? null;
+            const materialName = order?.material_name ?? order?.material?.material_name ?? "";
+            const materialKey = buildMaterialFilterKey(materialId, materialName);
+            if (materialKey && !materialMap.has(materialKey)) {
+                materialMap.set(materialKey, {
+                    value: materialKey,
+                    label: materialName || `#${materialId}`
+                });
+            }
+        });
+        return Array.from(materialMap.values());
+    }, [productionHistoryOrders]);
+
+    const productionHistoryTotalPages = Math.ceil(filteredProductionHistoryOrders.length / productionHistoryRowsPerPage) || 1;
     const productionHistoryStartIndex = (productionHistoryPage - 1) * productionHistoryRowsPerPage;
     const productionHistoryEndIndex = productionHistoryStartIndex + productionHistoryRowsPerPage;
-    const paginatedProductionHistoryOrders = productionHistoryOrders.slice(productionHistoryStartIndex, productionHistoryEndIndex);
+    const paginatedProductionHistoryOrders = filteredProductionHistoryOrders.slice(productionHistoryStartIndex, productionHistoryEndIndex);
 
 
 
@@ -3426,8 +3533,29 @@ export default function OrderPreparer() {
                                             </Button>
                                         </div>
 
+                                        <div className="mb-3">
+                                            <DynamicTableFilters
+                                                value={productionHistoryFilters}
+                                                onChange={setProductionHistoryFilters}
+                                                fields={{ user: false }}
+                                                resultsCount={filteredProductionHistoryOrders.length}
+                                                totalCount={productionHistoryOrders.length}
+                                                statusOptions={[
+                                                    { value: "pending", label: "قيد الانتظار" },
+                                                    { value: "outofwarehouse", label: "اخراج من المستودع" },
+                                                    { value: "completed", label: "مكتمل" },
+                                                    { value: "cancelled", label: "ملغي" },
+                                                ]}
+                                                materialOptions={productionHistoryMaterialOptions}
+                                                texts={{
+                                                    searchPlaceholder: "بحث في سجل طلبات الانتاج...",
+                                                    userLabel: "المبيعات",
+                                                }}
+                                            />
+                                        </div>
+
                                         <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]">
-                                            {productionHistoryOrders.length > 0 ? (
+                                            {filteredProductionHistoryOrders.length > 0 ? (
                                                 <table className="w-full text-sm">
                                                     <thead className="bg-gray-100 sticky top-0 z-10">
                                                         <tr>
@@ -3496,13 +3624,13 @@ export default function OrderPreparer() {
                                         </div>
 
                                         {/* Pagination Controls for Production History */}
-                                        {productionHistoryOrders.length > 0 && (
+                                        {filteredProductionHistoryOrders.length > 0 && (
                                             <div className="flex-shrink-0 p-2 border-t bg-gray-50">
                                                 <div className="flex items-center justify-between">
                                                     <ResultsCounter
                                                         currentPage={productionHistoryPage}
                                                         rowsPerPage={productionHistoryRowsPerPage}
-                                                        totalResults={productionHistoryOrders.length}
+                                                        totalResults={filteredProductionHistoryOrders.length}
                                                     />
                                                     <div className="flex items-center gap-2">
                                                         <RowsPerPageSelector
@@ -5989,7 +6117,7 @@ export default function OrderPreparer() {
 
                                 <div className="flex justify-between items-center mb-1 flex-shrink-0">
 
-                                    <h2 className="font-bold text-lg">سجل طلبات Orders</h2>
+                                    <h2 className="font-bold text-lg">سجل طلبات المبيعات</h2>
 
                                     <div className="flex items-center gap-2">
 
@@ -6015,6 +6143,27 @@ export default function OrderPreparer() {
 
                                     </div>
 
+                                </div>
+
+                                <div className="mb-3">
+                                    <DynamicTableFilters
+                                        value={ordersRecordsFilters}
+                                        onChange={setOrdersRecordsFilters}
+                                        fields={{ material: false }}
+                                        resultsCount={filteredOrdersRecords.length}
+                                        totalCount={ordersRecords.length}
+                                        statusOptions={[
+                                            { value: "pending", label: "قيد الانتظار" },
+                                            { value: "outofwarehouse", label: "اخراج من المستودع" },
+                                            { value: "completed", label: "مكتمل" },
+                                            { value: "cancelled", label: "ملغي" },
+                                        ]}
+                                        userOptions={ordersRecordsUserOptions}
+                                        texts={{
+                                            searchPlaceholder: "بحث في سجل طلبات المبيعات...",
+                                            userLabel: "المبيعات",
+                                        }}
+                                    />
                                 </div>
 
 
@@ -6053,7 +6202,7 @@ export default function OrderPreparer() {
 
                                                 <tr><td colSpan="7" className="p-6"><LoadingState /></td></tr>
 
-                                            ) : ordersRecords.length === 0 ? (
+                                            ) : filteredOrdersRecords.length === 0 ? (
 
                                                 <tr>
 
@@ -6179,7 +6328,7 @@ export default function OrderPreparer() {
                                         currentPage={ordersRecordsPage}
                                         totalPages={ordersRecordsTotalPages}
                                         rowsPerPage={ordersRecordsRowsPerPage}
-                                        totalResults={ordersRecords.length}
+                                        totalResults={filteredOrdersRecords.length}
                                     />
                                     <div className="flex items-center gap-2">
                                         <RowsPerPageSelector

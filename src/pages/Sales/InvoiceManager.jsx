@@ -1502,6 +1502,7 @@ export default function InvoiceManager() {
             <DashboardHeader
                 isHeaderVisible={isHeaderVisible}
                 setIsHeaderVisible={setIsHeaderVisible}
+                hideHeaderToggle={true}
                 hideOrderPreparer={true}
                 customersLabel="الزبائن"
                 invoicesLabel="إضافة فاتورة"

@@ -5675,7 +5675,7 @@ export default function OrderPreparer() {
 
                             <div className="flex justify-between items-center mb-1 flex-shrink-0">
 
-                                <h2 className="font-bold text-lg">سجل طلبات Orders</h2>
+                                <h2 className="font-bold text-lg">سجل طلبات المبيعات</h2>
 
                                 <div className="flex items-center gap-2">
 

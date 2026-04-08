@@ -15,6 +15,7 @@ import { useExport } from "../../hooks/useExport";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import FilterSelect from "../../components/common/FilterSelect";
+import DynamicTableFilters, { dynamicTableFiltersDefaults } from "../../components/common/DynamicTableFilters";
 import StyledDialog from "../../components/common/StyledDialog";
 import PaginationControls from "../../components/common/PaginationControls";
 import ResultsCounter from "../../components/common/ResultsCounter";
@@ -57,8 +58,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     const [loadingCustomers, setLoadingCustomers] = useState(false);
 
     // History filters
-    const [historySearchTerm, setHistorySearchTerm] = useState("");
-    const [historyStatusFilter, setHistoryStatusFilter] = useState("");
+    const [historyFilters, setHistoryFilters] = useState(dynamicTableFiltersDefaults);
     const [selectedOrders, setSelectedOrders] = useState([]);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [deletingOrders, setDeletingOrders] = useState(false);
@@ -100,31 +100,124 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     const [orders, setOrders] = useState([]);
     const [ordersLoading, setOrdersLoading] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const ordersApi = orderApi;
+
+    // Helper functions from orderApi
+    const getOrderStatus = (order) => ordersApi.getOrderStatus(order);
+    const getFormattedDate = (order) => ordersApi.getFormattedDate(order);
+    const formatCurrency = (amount) => ordersApi.formatCurrency(amount);
+    const getStatusBadge = (status) => ordersApi.getStatusBadge(status);
+    const getSalesUserName = (order) => ordersApi.getSalesUserName(order);
+    const getCustomerName = (order) => ordersApi.getCustomerName(order);
+    const getCustomerPhone = (order) => ordersApi.getCustomerPhone(order);
+    const getCustomerCity = (order) => ordersApi.getCustomerCity(order);
+    const getCustomerAddress = (order) => ordersApi.getCustomerAddress(order);
+    const formatCustomerInfo = (order) => ordersApi.formatCustomerInfo(order);
+    const calculateOrderTotal = (items) => ordersApi.calculateOrderTotal(items);
+    const getOrderId = (order) => order?.order_id ?? order?.Sales_order_id ?? order?.sales_order_id ?? order?.id ?? null;
+    const getSalesUserId = (order) => order?.sales_user_id ?? order?.sales?.id ?? order?.sales?.user_id ?? order?.sales?.sales_user_id ?? "";
+    const getOrderMaterialNames = (order) =>
+        Array.isArray(order?.items)
+            ? order.items
+                .map((item) => item?.material_name ?? item?.material?.material_name ?? "")
+                .filter(Boolean)
+            : [];
+    const buildMaterialFilterKey = (materialId, materialName = "") => {
+        if (materialId !== null && materialId !== undefined && String(materialId).trim() !== "") {
+            return `id:${String(materialId)}`;
+        }
+
+        const normalizedName = String(materialName || "").trim().toLowerCase();
+        return normalizedName ? `name:${normalizedName}` : "";
+    };
+    const extractOrderDetailsPayload = (response) => {
+        const directData = getApiData(response, null);
+        const candidates = [
+            directData,
+            directData?.order,
+            directData?.data,
+            response?.data,
+            response?.data?.order,
+        ].filter((candidate) => candidate && typeof candidate === "object");
+
+        const base =
+            candidates.find((candidate) =>
+                candidate?.order_id
+                || candidate?.Sales_order_id
+                || candidate?.sales_order_id
+                || Array.isArray(candidate?.items)
+                || candidate?.customer
+                || candidate?.sales
+            ) || directData;
+
+        if (!base || typeof base !== "object") return null;
+
+        return {
+            ...base,
+            customer: base.customer || directData?.customer || response?.data?.customer || null,
+            sales: base.sales || directData?.sales || response?.data?.sales || null,
+            items:
+                (Array.isArray(base.items) && base.items)
+                || (Array.isArray(directData?.items) && directData.items)
+                || (Array.isArray(response?.data?.items) && response.data.items)
+                || [],
+        };
+    };
+    const collectSearchableValues = (input) => {
+        if (input === null || input === undefined) return [];
+        if (input instanceof Date) return [input.toISOString()];
+        if (Array.isArray(input)) {
+            return input.flatMap((item) => collectSearchableValues(item));
+        }
+        if (typeof input === "object") {
+            return Object.values(input).flatMap((value) => collectSearchableValues(value));
+        }
+        return [String(input)];
+    };
+    const parseOrderDate = (order) => {
+        if (!order?.created_at) return null;
+        const parsed = new Date(order.created_at);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
 
     // Filtered orders for display
     const filteredOrders = useMemo(() => {
         const safeOrders = Array.isArray(orders) ? orders : [];
+        const normalize = (value) => String(value || "").toLowerCase().trim();
+        const searchTerm = normalize(historyFilters.search);
+        const fromDate = historyFilters.dateFrom ? new Date(`${historyFilters.dateFrom}T00:00:00`) : null;
+        const toDate = historyFilters.dateTo ? new Date(`${historyFilters.dateTo}T23:59:59.999`) : null;
+
         return safeOrders.filter(order => {
-            const term = String(historySearchTerm || "").toLowerCase().trim();
-            const matchesSearch = !term || (
-                String(getOrderId(order) || "").toLowerCase().includes(term) ||
-                String(order.customer_name || "").toLowerCase().includes(term) ||
-                String(order.phone || "").toLowerCase().includes(term) ||
-                (order.customer?.name && String(order.customer.name).toLowerCase().includes(term)) ||
-                (order.customer?.phone && String(order.customer.phone).toLowerCase().includes(term)) ||
-                (order.notes && String(order.notes).toLowerCase().includes(term)) ||
-                (order.total_amount && String(order.total_amount).toLowerCase().includes(term)) ||
-                (order.paid_amount && String(order.paid_amount).toLowerCase().includes(term)) ||
-                (order.remaining_amount && String(order.remaining_amount).toLowerCase().includes(term)) ||
-                (order.sales?.full_name && String(order.sales.full_name).toLowerCase().includes(term)) ||
-                (order.sales?.username && String(order.sales.username).toLowerCase().includes(term)) ||
-                (order.status && String(order.status).toLowerCase().includes(term)) ||
-                (order.created_at && new Date(order.created_at).toLocaleDateString('en-US').includes(term))
+            const orderDate = parseOrderDate(order);
+            const materialNames = getOrderMaterialNames(order).join(" ");
+            const searchableText = collectSearchableValues({
+                ...order,
+                order_id_display: getOrderId(order),
+                formatted_date: getFormattedDate(order),
+                customer_name_display: getCustomerName(order),
+                customer_phone_display: getCustomerPhone(order),
+                customer_city_display: getCustomerCity(order),
+                customer_address_display: getCustomerAddress(order),
+                sales_name_display: getSalesUserName(order),
+                material_names_display: materialNames,
+            }).join(" ");
+            const matchesSearch = !searchTerm || normalize(searchableText).includes(searchTerm);
+            const matchesStatus = !historyFilters.status || normalize(order.status) === normalize(historyFilters.status);
+            const matchesUser = !historyFilters.userId || String(getSalesUserId(order)) === String(historyFilters.userId);
+            const matchesMaterial = !historyFilters.materialId || (
+                Array.isArray(order?.items) && order.items.some((item) => {
+                    const itemMaterialId = item?.material_id ?? item?.material?.material_id ?? null;
+                    const itemMaterialName = item?.material_name ?? item?.material?.material_name ?? "";
+                    return buildMaterialFilterKey(itemMaterialId, itemMaterialName) === String(historyFilters.materialId);
+                })
             );
-            const matchesStatus = !historyStatusFilter || String(order.status || "").toLowerCase() === String(historyStatusFilter).toLowerCase();
-            return matchesSearch && matchesStatus;
+            const matchesFromDate = !fromDate || (orderDate && orderDate >= fromDate);
+            const matchesToDate = !toDate || (orderDate && orderDate <= toDate);
+
+            return matchesSearch && matchesStatus && matchesUser && matchesMaterial && matchesFromDate && matchesToDate;
         });
-    }, [orders, historySearchTerm, historyStatusFilter]);
+    }, [orders, historyFilters]);
 
     // Pagination logic for orders history table
     const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
@@ -135,7 +228,60 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [historySearchTerm, historyStatusFilter]);
+    }, [historyFilters]);
+
+    const historyUserOptions = useMemo(() => {
+        const usersMap = new Map();
+
+        (Array.isArray(orders) ? orders : []).forEach((order) => {
+            const userId = getSalesUserId(order);
+            const userName = getSalesUserName(order);
+
+            if (userId && userName && !usersMap.has(String(userId))) {
+                usersMap.set(String(userId), {
+                    value: String(userId),
+                    label: userName
+                });
+            }
+        });
+
+        return Array.from(usersMap.values());
+    }, [orders]);
+
+    const historyMaterialOptions = useMemo(() => {
+        const materialsMap = new Map();
+
+        (Array.isArray(materials) ? materials : []).forEach((material) => {
+            const materialId = material?.material_id;
+            const materialName = material?.material_name || "";
+            const optionKey = buildMaterialFilterKey(materialId, materialName);
+            if (!optionKey) return;
+
+            materialsMap.set(optionKey, {
+                value: optionKey,
+                label: materialName || `#${materialId}`
+            });
+        });
+
+        (Array.isArray(orders) ? orders : []).forEach((order) => {
+            (Array.isArray(order?.items) ? order.items : []).forEach((item) => {
+                const materialId = item?.material_id ?? item?.material?.material_id;
+                const materialName = item?.material_name ?? item?.material?.material_name;
+
+                const optionKey = buildMaterialFilterKey(materialId, materialName);
+                if (!optionKey) return;
+
+                if (!materialsMap.has(optionKey)) {
+                    materialsMap.set(optionKey, {
+                        value: optionKey,
+                        label: materialName || `#${materialId}`
+                    });
+                }
+            });
+        });
+
+        return Array.from(materialsMap.values());
+    }, [materials, orders]);
 
     const [orderDetails, setOrderDetails] = useState(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
@@ -181,7 +327,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     });
 
     const [savingQrQuantity, setSavingQrQuantity] = useState(false);
-    const ordersApi = orderApi;
 
     const isQrQuantityChanged = useMemo(() => {
         const current = String(qrGenDialog.quantity ?? "");
@@ -211,20 +356,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
             { wch: 28 },
         ],
     });
-
-    // Helper functions from orderApi
-    const getOrderStatus = (order) => ordersApi.getOrderStatus(order);
-    const getFormattedDate = (order) => ordersApi.getFormattedDate(order);
-    const formatCurrency = (amount) => ordersApi.formatCurrency(amount);
-    const getStatusBadge = (status) => ordersApi.getStatusBadge(status);
-    const getSalesUserName = (order) => ordersApi.getSalesUserName(order);
-    const getCustomerName = (order) => ordersApi.getCustomerName(order);
-    const getCustomerPhone = (order) => ordersApi.getCustomerPhone(order);
-    const getCustomerCity = (order) => ordersApi.getCustomerCity(order);
-    const getCustomerAddress = (order) => ordersApi.getCustomerAddress(order);
-    const formatCustomerInfo = (order) => ordersApi.formatCustomerInfo(order);
-    const calculateOrderTotal = (items) => ordersApi.calculateOrderTotal(items);
-    const getOrderId = (order) => order?.order_id ?? order?.Sales_order_id ?? order?.sales_order_id ?? order?.id ?? null;
 
     const TYPE_OPTIONS = [
         { value: TypeItem.Machine, label: "مكنة" },
@@ -589,8 +720,36 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
             const data = getApiData(response, []) || [];
 
             const nextOrders = Array.isArray(data) ? data : (Array.isArray(data?.orders) ? data.orders : []);
+            const enrichedOrders = await Promise.all(
+                nextOrders.map(async (order) => {
+                    const orderId = getOrderId(order);
 
-            setOrders(nextOrders);
+                    if (!orderId || (Array.isArray(order?.items) && order.items.length > 0)) {
+                        return order;
+                    }
+
+                    try {
+                        const detailsResponse = await ordersApi.getOrderById(orderId);
+                        const detailsData = extractOrderDetailsPayload(detailsResponse);
+
+                        if (!detailsData || typeof detailsData !== "object") {
+                            return order;
+                        }
+
+                        return {
+                            ...order,
+                            ...detailsData,
+                            sales: detailsData.sales || order.sales,
+                            customer: detailsData.customer || order.customer,
+                            items: Array.isArray(detailsData.items) ? detailsData.items : order.items,
+                        };
+                    } catch (detailsError) {
+                        return order;
+                    }
+                })
+            );
+
+            setOrders(enrichedOrders);
 
         } catch (error) {
 
@@ -5730,44 +5889,27 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
-                            <div className="flex flex-col sm:flex-row gap-2 mb-2">
-
-                                <Input
-
-                                    value={historySearchTerm}
-
-                                    onChange={(e) => setHistorySearchTerm(e.target.value)}
-
-                                    placeholder="بحث في الطلبات ..."
-
-                                    className="h-10 py-6"
-
-                                />
-
-                                <FilterSelect
-
-                                    label=""
-
-                                    value={historyStatusFilter}
-
-                                    onChange={(e) => setHistoryStatusFilter(e.target.value)}
-
-                                    options={[
-
-                                        { value: "", label: "كل الحالات" },
-
+                            <div className="mb-3">
+                                <DynamicTableFilters
+                                    value={historyFilters}
+                                    onChange={setHistoryFilters}
+                                    fields={{ material: false }}
+                                    resultsCount={filteredOrders.length}
+                                    totalCount={orders.length}
+                                    statusOptions={[
                                         { value: "pending", label: "قيد الانتظار" },
-
                                         { value: "outofwarehouse", label: "اخراج من المستودع" },
-
                                         { value: "completed", label: "مكتمل" },
-
                                         { value: "cancelled", label: "ملغي" },
-
                                     ]}
-
+                                    userOptions={historyUserOptions}
+                                    materialOptions={historyMaterialOptions}
+                                    texts={{
+                                        searchPlaceholder: "بحث عام في سجل الطلبات...",
+                                        userLabel: "مندوب المبيعات",
+                                        allUsersLabel: "كل المستخدمين",
+                                    }}
                                 />
-
                             </div>
 
 
