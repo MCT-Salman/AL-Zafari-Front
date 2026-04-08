@@ -1,5 +1,6 @@
 // src\api\axiosConfig.js
 import axios from 'axios';
+import { isLoggingOut } from '@/utils/authSession';
 
 const baseURL = import.meta.env.VITE_API_URL;
 
@@ -16,6 +17,10 @@ const axiosInstance = axios.create({
 // طلب interceptor لإضافة التوكن
 axiosInstance.interceptors.request.use(
   (config) => {
+    if (isLoggingOut()) {
+      return Promise.reject(new axios.Cancel("Logout in progress"));
+    }
+
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -46,6 +51,10 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   async (error) => {
+    if (axios.isCancel(error) || isLoggingOut()) {
+      return Promise.reject(error);
+    }
+
     // console.error('API Response Error:', {
     //   status: error.response?.status,
     //   url: error.config?.url,
@@ -70,7 +79,7 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config;
 
     // تجديد التوكن إذا كان منتهي الصلاحية
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isLoggingOut()) {
       originalRequest._retry = true;
       
       try {

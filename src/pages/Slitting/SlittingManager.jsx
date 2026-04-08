@@ -1456,13 +1456,28 @@ export default function SlittingManager() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setOrdersTab("current")}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium ${ordersTab === "current" ? "bg-orange-100 text-orange-700" : "text-gray-600 hover:bg-gray-100"}`}
+                  className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+                    ordersTab === "current"
+                      ? "bg-yellow-100 border-yellow-300 text-yellow-800 hover:bg-yellow-100 hover:border-yellow-300 hover:text-yellow-800"
+                      : "text-yellow-700 border-yellow-200 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-800"
+                  }`}
                 >
-                  قيد الانتظار ({currentOrders.length})
+                  <span className="inline-flex items-center gap-2">
+                    قيد الانتظار
+                    {currentOrders.length > 0 && (
+                      <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">
+                        {currentOrders.length}
+                      </span>
+                    )}
+                  </span>
                 </button>
                 <button
                   onClick={() => setOrdersTab("completed")}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium ${ordersTab === "completed" ? "bg-green-100 text-green-700" : "text-gray-600 hover:bg-gray-100"}`}
+                  className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+                    ordersTab === "completed"
+                      ? "bg-green-50 border-green-300 text-green-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                      : "text-green-600 border-green-200 hover:bg-green-50 hover:border-green-300 hover:text-green-700"
+                  }`}
                 >
                   المكتملة ({completedOrders.length})
                 </button>

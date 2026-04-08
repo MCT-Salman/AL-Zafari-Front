@@ -8,6 +8,17 @@ import ProductionManager from "./pages/Production/ProductionManager";
 import ProductionDashboard from "./pages/Production/ProductionDashboard";
 import ProductionRecords from "./pages/ProductionRecords";
 import InvoiceManager from "./pages/Sales/InvoiceManager";
+import { isLoggingOut } from "./utils/authSession";
+
+let toastErrorGuardInstalled = false;
+if (!toastErrorGuardInstalled) {
+  const originalToastError = toast.error.bind(toast);
+  toast.error = (...args) => {
+    if (isLoggingOut()) return;
+    return originalToastError(...args);
+  };
+  toastErrorGuardInstalled = true;
+}
 
 const MainLayout = lazy(() => import("@/components/Layout/MainLayout"));
 const Login = lazy(() => import("@/pages/Login"));

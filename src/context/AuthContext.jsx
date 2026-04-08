@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { authApi } from "@/api/authApi";
+import { toast } from "react-hot-toast";
+import { setLoggingOutFlag } from "@/utils/authSession";
 
 // AuthContext | سياق المصادقة
 export const AuthContext = createContext();
@@ -16,6 +18,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    setLoggingOutFlag(false);
     // Check for stored auth on mount
     const stored = localStorage.getItem("auth");
     const token = localStorage.getItem("accessToken");
@@ -34,6 +37,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
+      setLoggingOutFlag(false);
       const response = await authApi.login({ username, password });
 
       // Support both payload shapes:
@@ -64,6 +68,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     // caller is responsible for any confirmation dialog
+    setLoggingOutFlag(true);
+    toast.dismiss();
     try {
       await authApi.logout();
     } catch (error) {

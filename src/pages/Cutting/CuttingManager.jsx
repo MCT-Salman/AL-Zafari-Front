@@ -115,6 +115,7 @@ export default function CuttingManager() {
   const [orderItems, setOrderItems] = useState([]);
   const [pendingCompleteItem, setPendingCompleteItem] = useState(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const normalizeDecimal = (value) => String(value ?? "").replace(",", ".");
   const toNumber = (value) => {
@@ -168,6 +169,11 @@ export default function CuttingManager() {
   const getStatusBadge = (status) => {
     return orderStatusConfig[status] || { label: status || "غير محدد", className: "bg-gray-100 text-gray-700" };
   };
+
+  const pendingOrdersCount = useMemo(
+    () => orders.filter((o) => String(o.status || "").toLowerCase() === ProductionStatus.pending).length,
+    [orders]
+  );
 
   const colorOptions = useMemo(() => {
     return colors.map(c => ({
@@ -848,7 +854,7 @@ export default function CuttingManager() {
           </div>
           <div className="flex items-center gap-2">
             <NotificationsBell />
-            <Button size="lg" variant="outline" onClick={() => { logout(); navigate("/login"); }} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
+            <Button size="lg" variant="outline" onClick={() => setShowLogoutDialog(true)} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
               <ArrowRight className="w-4 h-4 ml-2 rotate-180" />تسجيل الخروج
             </Button>
           </div>
@@ -1167,15 +1173,22 @@ export default function CuttingManager() {
                 <Button 
                   variant={ordersTab === "current" ? "default" : "outline"}
                   size="sm" 
-                  className={ordersTab === "current" ? "bg-blue-50 border-blue-300 text-blue-700" : "text-blue-600 border-blue-200 hover:bg-blue-50"} 
+                  className={ordersTab === "current" ? "bg-yellow-100 border-yellow-300 text-yellow-800 hover:bg-yellow-100 hover:border-yellow-300 hover:text-yellow-800" : "text-yellow-700 border-yellow-200 hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-800"} 
                   onClick={() => setOrdersTab("current")}
                 >
-                  قيد الانتظار
+                  <span className="inline-flex items-center gap-2">
+                    قيد الانتظار
+                    {pendingOrdersCount > 0 && (
+                      <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">
+                        {pendingOrdersCount}
+                      </span>
+                    )}
+                  </span>
                 </Button>
                 <Button 
                   variant={ordersTab === "completed" ? "default" : "outline"}
                   size="sm" 
-                  className={ordersTab === "completed" ? "bg-green-50 border-green-300 text-green-700" : "text-green-600 border-green-200 hover:bg-green-50"} 
+                  className={ordersTab === "completed" ? "bg-green-50 border-green-300 text-green-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700" : "text-green-600 border-green-200 hover:bg-green-50 hover:border-green-300 hover:text-green-700"} 
                   onClick={() => setOrdersTab("completed")}
                 >
                   المكتملة
@@ -1349,6 +1362,20 @@ export default function CuttingManager() {
           </Card>
         </div>
       </div>
+
+      <StyledDialog
+        isOpen={showLogoutDialog}
+        onOpenChange={setShowLogoutDialog}
+        title="تسجيل الخروج"
+        onCancel={() => setShowLogoutDialog(false)}
+        onConfirm={() => {
+          logout();
+          navigate("/login");
+        }}
+        confirmLabel="تسجيل الخروج"
+        cancelLabel="إلغاء"
+        confirmVariant="destructive"
+      />
 
       <StyledDialog isOpen={showOrderDetails} onOpenChange={setShowOrderDetails} title={`تفاصيل الطلب ${selectedOrder?.production_order_id ? `#${selectedOrder.production_order_id}` : ""}`} contentClassName="max-w-[95vw] w-full" onCancel={() => setShowOrderDetails(false)} onConfirm={() => setShowOrderDetails(false)} confirmLabel="إغلاق" showCancel={false}>
         {selectedOrder && (
