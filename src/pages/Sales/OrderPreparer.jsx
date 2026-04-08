@@ -183,8 +183,13 @@ export default function OrderPreparer() {
 
     // Production orders state for order-preparer
     const [productionOrders, setProductionOrders] = useState([]);
+    const [productionHistoryOrders, setProductionHistoryOrders] = useState([]);
     const [productionLoading, setProductionLoading] = useState(false);
     const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
+
+    // Pagination states for production history table
+    const [productionHistoryPage, setProductionHistoryPage] = useState(1);
+    const [productionHistoryRowsPerPage, setProductionHistoryRowsPerPage] = useState(20);
 
     // QR Generation Dialog State with quantity editing
     const [qrGenDialog, setQrGenDialog] = useState({
@@ -241,15 +246,23 @@ export default function OrderPreparer() {
     // Load production orders from API
     const loadProductionOrders = async () => {
         try {
-            const response = await productionApi.getProductionOrders();
-            // Transform the data to match the local structure
-            const transformedOrders = response.data.map(order => ({
-                ...order,
-                material_name: order.material?.material_name || '',
-                color_code: order.color?.color_code || '',
-                ruler_name: order.ruler?.ruler_name || ''
-            }));
-            setProductionOrders(transformedOrders);
+            const response = await salesApi.getSalesOrders();
+            const data = getApiData(response, {});
+            const orders = Array.isArray(data) ? data : (Array.isArray(data?.orders) ? data.orders : []);
+            // Transform the data to match the local structure - extract items from orders
+            const transformedOrders = orders.flatMap(order => 
+                (order.items || []).map(item => ({
+                    ...item,
+                    order_id: order.Sales_order_id,
+                    order_date: order.created_at,
+                    material_name: item.material_name || '',
+                    color_code: item.color_code || '',
+                    ruler_name: item.ruler_type || item.ruler_name || '',
+                    batch_number: item.batch_number || '',
+                    status: order.status || item.status
+                }))
+            );
+            setProductionHistoryOrders(transformedOrders);
             toast.success("تم تحديث قائمة طلبات الإنتاج");
         } catch (error) {
             console.error("Error loading production orders:", error);
@@ -498,6 +511,24 @@ export default function OrderPreparer() {
 
     useEffect(() => {
 
+        if (viewMode === "production" && productionSubTab === "production_history") loadProductionOrders();
+
+    }, [viewMode, productionSubTab]);
+
+    useEffect(() => {
+        setProductionHistoryPage(1);
+    }, [productionHistoryRowsPerPage, productionHistoryOrders.length]);
+
+    // Pagination logic for production history table
+    const productionHistoryTotalPages = Math.ceil(productionHistoryOrders.length / productionHistoryRowsPerPage);
+    const productionHistoryStartIndex = (productionHistoryPage - 1) * productionHistoryRowsPerPage;
+    const productionHistoryEndIndex = productionHistoryStartIndex + productionHistoryRowsPerPage;
+    const paginatedProductionHistoryOrders = productionHistoryOrders.slice(productionHistoryStartIndex, productionHistoryEndIndex);
+
+
+
+    useEffect(() => {
+
         if (qrPreview.open) {
 
             setQrPreview((prev) => ({ ...prev, open: false }));
@@ -562,6 +593,8 @@ export default function OrderPreparer() {
             ]);
 
             console.log("[OrderPreparer] All APIs succeeded");
+            console.log("[OrderPreparer] Colors loaded:", getApiData(colorRes, []).length);
+            console.log("[OrderPreparer] PriceColors loaded:", getApiData(priceRes, []).length);
             setMaterials(getApiData(matRes, []) || []);
             setRulers(getApiData(rulerRes, []) || []);
             setColors(getApiData(colorRes, []) || []);
@@ -1368,6 +1401,74 @@ export default function OrderPreparer() {
 
     }, [formData.material_id, materials, selectedMaterial]);
 
+    // QR specific material checks
+    const qrSelectedMaterial = useMemo(() => {
+
+        if (!qrFormData.material_id) return null;
+
+        return materials.find(m => String(m.material_id) === String(qrFormData.material_id)) || null;
+
+    }, [qrFormData.material_id, materials]);
+
+    const qrIsSelectedMaterialBoard = useMemo(() => {
+
+        if (!qrFormData.material_id) return false;
+
+        const selectedMaterial = qrSelectedMaterial;
+
+        const materialName = selectedMaterial?.material_name?.toLowerCase() || "";
+
+        const boardKeywords = ["لوح", "ألواح", "board", "boards", "لوحة", "الواح"];
+
+        return boardKeywords.some(keyword => materialName.includes(keyword));
+
+    }, [qrFormData.material_id, materials, qrSelectedMaterial]);
+
+    const qrIsSelectedMaterialPvc = useMemo(() => {
+
+        if (!qrFormData.material_id) return false;
+
+        const materialName = qrSelectedMaterial?.material_name?.toLowerCase() || "";
+
+        return materialName.includes("pvc");
+
+    }, [qrFormData.material_id, materials, qrSelectedMaterial]);
+
+    const qrMaterialBorderClass = useMemo(() => {
+
+        const name = String(qrSelectedMaterial?.material_name || "").toLowerCase();
+
+        if (!name) return "border-gray-200";
+
+        if (name.includes("pvc")) return "border-blue-500";
+
+        if (name.includes("فوم")) return "border-green-400";
+
+        if (name.includes("ديكور")) return "border-purple-600";
+
+        return "border-orange-500";
+
+    }, [qrSelectedMaterial?.material_name]);
+
+    // Filter materials for QR section - same as order-preparer
+    const qrFilteredMaterials = useMemo(() => {
+        if (!isOrderPreparer) return materials;
+        return materials.filter(m => {
+            const materialName = m.material_name?.toLowerCase() || "";
+            return materialName.includes("pvc");
+        });
+    }, [materials, isOrderPreparer]);
+
+    // Auto-select first PVC material for QR section
+    useEffect(() => {
+        if (isOrderPreparer && qrFilteredMaterials.length > 0 && !qrFormData.material_id) {
+            setQrFormData(prev => ({
+                ...prev,
+                material_id: String(qrFilteredMaterials[0].material_id)
+            }));
+        }
+    }, [isOrderPreparer, qrFilteredMaterials, qrFormData.material_id]);
+
     const getMaterialConstantLabel = useCallback((material, type) => {
 
         const values = material?.constant_values || [];
@@ -1414,9 +1515,19 @@ export default function OrderPreparer() {
 
         const filteredColors = colors.filter(c => String(c.ruler_id) === String(formData.ruler_id));
 
+        console.log("[availablePricedColors] Filtered colors by ruler:", filteredColors.length);
+
+        console.log("[availablePricedColors] PriceColors available:", priceColors?.length || 0);
+
+        console.log("[availablePricedColors] isSelectedMaterialBoard:", isSelectedMaterialBoard);
+
+        console.log("[availablePricedColors] formData.width:", formData.width);
+
 
 
         if (!priceColors || priceColors.length === 0) {
+
+            console.log("[availablePricedColors] No priceColors, returning all filtered colors");
 
             return filteredColors;
 
@@ -1426,7 +1537,7 @@ export default function OrderPreparer() {
 
         if (isSelectedMaterialBoard) {
 
-            return filteredColors.filter(color =>
+            const pricedColors = filteredColors.filter(color =>
 
                 priceColors.some(pc =>
 
@@ -1438,17 +1549,31 @@ export default function OrderPreparer() {
 
             );
 
+            console.log("[availablePricedColors] Board material, priced colors found:", pricedColors.length);
+
+            // If no priced colors found for board, return all colors
+
+            return pricedColors.length > 0 ? pricedColors : filteredColors;
+
         }
 
 
 
-        if (!formData.width) return [];
+        if (!formData.width) {
+
+            console.log("[availablePricedColors] No width specified, returning all filtered colors");
+
+            return filteredColors; // Return all colors if no width specified
+
+        }
 
         const targetWidth = Number(formData.width);
 
+        console.log("[availablePricedColors] Target width:", targetWidth);
 
 
-        return filteredColors.filter(color => {
+
+        const pricedColors = filteredColors.filter(color => {
 
             return priceColors.some(pc =>
 
@@ -1467,6 +1592,12 @@ export default function OrderPreparer() {
             );
 
         });
+
+        console.log("[availablePricedColors] Priced colors for width found:", pricedColors.length);
+
+        // If no priced colors found for specific width, return all colors
+
+        return pricedColors.length > 0 ? pricedColors : filteredColors;
 
     }, [formData.ruler_id, formData.width, formData.type_item, isSelectedMaterialBoard, isSelectedMaterialPvc, colors, priceColors]);
 
@@ -2823,134 +2954,79 @@ export default function OrderPreparer() {
 
 
             if (response.success && response.data) {
-
                 // البيانات الكاملة موجودة في response.data
-
                 setOrderDetails(response.data);
-
             } else {
-
                 toast.error("فشل في جلب تفاصيل الطلب");
-
             }
-
         } catch (error) {
-
             console.error("Error fetching order details:", error);
-
             toast.error("حدث خطأ في جلب تفاصيل الطلب");
-
         } finally {
-
             setLoadingDetails(false);
-
         }
-
     };
 
-
+    const handleViewProductionOrderDetails = (item) => {
+        // For production history items, we can show a simple dialog with item details
+        // Since it's a single item, we'll set it as orderDetails with a single item
+        const mockOrder = {
+            Sales_order_id: item.order_id,
+            status: item.status,
+            created_at: item.order_date,
+            items: [item],
+            notes: item.notes || ''
+        };
+        setOrderDetails(mockOrder);
+    };
 
     // Multiple delete functions
-
     const handleSelectOrder = (orderId) => {
-
         setSelectedOrders(prev =>
-
             prev.includes(orderId)
-
                 ? prev.filter(id => id !== orderId)
-
                 : [...prev, orderId]
-
         );
-
     };
-
-
 
     const handleSelectAllOrders = () => {
-
         if (selectedOrders.length === filteredOrders.length) {
-
             setSelectedOrders([]);
-
         } else {
-
             setSelectedOrders(filteredOrders.map(order => getOrderId(order)));
-
         }
-
     };
-
-
 
     const handleDeleteSelectedOrders = async () => {
-
         if (selectedOrders.length === 0) {
-
             toast.error("يرجى تحديد طلب واحد على الأقل");
-
             return;
-
         }
-
         setShowDeleteDialog(true);
-
     };
-
-
 
     const confirmDeleteSelectedOrders = async () => {
-
         try {
-
             setDeletingOrders(true);
-
-
-
             // Debug: Log selected orders
-
             console.log('Selected orders to delete:', selectedOrders);
-
             console.log('Selected orders types:', selectedOrders.map(id => typeof id));
-
-
-
             const response = await ordersApi.deleteMultipleOrders(selectedOrders);
-
-
-
             if (response.success) {
-
                 toast.success("تم حذف الطلبات بنجاح");
-
                 await loadOrders();
-
                 setSelectedOrders([]);
-
                 setShowDeleteDialog(false);
-
             } else {
-
                 toast.error(response.message || "فشل في حذف الطلبات");
-
             }
-
         } catch (error) {
-
             console.error("Error deleting orders:", error);
-
             toast.error(error.message || "حدث خطأ في حذف الطلبات");
-
         } finally {
-
             setDeletingOrders(false);
-
         }
-
     };
-
-
 
     const clearAllItems = () => {
         if (orderItems.length > 0) {
@@ -3080,6 +3156,62 @@ export default function OrderPreparer() {
             label: c.color_name + " (" + c.color_code + ")"
         }));
     }, [availablePricedColors]);
+
+    // QR Color options for select
+    const qrColorOptions = useMemo(() => {
+        if (!qrFormData.ruler_id) return [];
+
+        const filteredColors = colors.filter(c => String(c.ruler_id) === String(qrFormData.ruler_id));
+
+        if (!priceColors || priceColors.length === 0) {
+            return filteredColors.map(c => ({
+                value: String(c.color_id),
+                label: c.color_name + " (" + c.color_code + ")"
+            }));
+        }
+
+        if (qrIsSelectedMaterialBoard) {
+            const pricedColors = filteredColors.filter(color =>
+                priceColors.some(pc =>
+                    String(pc.color_id) === String(color.color_id) &&
+                    (!qrIsSelectedMaterialPvc || pc.type_item === qrFormData.type_item)
+                )
+            );
+            // If no priced colors found for board, return all colors
+            const colorsToUse = pricedColors.length > 0 ? pricedColors : filteredColors;
+            return colorsToUse.map(c => ({
+                value: String(c.color_id),
+                label: c.color_name + " (" + c.color_code + ")"
+            }));
+        }
+
+        if (!qrFormData.width) {
+            return filteredColors.map(c => ({
+                value: String(c.color_id),
+                label: c.color_name + " (" + c.color_code + ")"
+            }));
+        }
+
+        const targetWidth = Number(qrFormData.width);
+
+        const pricedColors = filteredColors.filter(color => {
+            return priceColors.some(pc =>
+                String(pc.color_id) === String(color.color_id) &&
+                (!isSelectedMaterialPvc || pc.type_item === qrFormData.type_item) &&
+                (pc.price_color_By === PriceColorBy.isByMeter22 && targetWidth === 22 ||
+                    pc.price_color_By === PriceColorBy.isByMeter44 && targetWidth === 44 ||
+                    pc.price_color_By === PriceColorBy.isByMeter66 && targetWidth === 66 ||
+                    pc.price_color_By === PriceColorBy.isByBlanck)
+            );
+        });
+
+        // If no priced colors found for specific width, return all colors
+        const colorsToUse = pricedColors.length > 0 ? pricedColors : filteredColors;
+        return colorsToUse.map(c => ({
+            value: String(c.color_id),
+            label: c.color_name + " (" + c.color_code + ")"
+        }));
+    }, [qrFormData.ruler_id, qrFormData.width, qrFormData.type_item, isSelectedMaterialBoard, isSelectedMaterialPvc, colors, priceColors]);
 
     // Batch options for select
     const batchOptions = useMemo(() => {
@@ -3295,7 +3427,7 @@ export default function OrderPreparer() {
                                         </div>
 
                                         <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]">
-                                            {productionOrders.length > 0 ? (
+                                            {productionHistoryOrders.length > 0 ? (
                                                 <table className="w-full text-sm">
                                                     <thead className="bg-gray-100 sticky top-0 z-10">
                                                         <tr>
@@ -3307,13 +3439,13 @@ export default function OrderPreparer() {
                                                             <th className="p-2 text-right border-b">المسطرة</th>
                                                             <th className="p-2 text-center border-b">السماكة</th>
                                                             <th className="p-2 text-center border-b">الطبخة</th>
-                                                            <th className="p-2 text-center border-b">إجراء</th>
+                                                            <th className="p-2 text-center border-b">الإجراءات</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {productionOrders.map((order, index) => (
-                                                            <tr key={order.id} className="border-b hover:bg-gray-50">
-                                                                <td className="p-2 font-medium">{order.material_name}</td>
+                                                        {paginatedProductionHistoryOrders.map((order, index) => (
+                                                            <tr key={order.sales_order_item_id || order.id} className="border-b hover:bg-gray-50">
+                                                                <td className="p-2 font-medium">{order.material_name || "-"}</td>
                                                                 <td className="p-2 text-center">{order.width || "-"}</td>
                                                                 <td className="p-2">
                                                                     <div className="flex items-center justify-center gap-1">
@@ -3321,7 +3453,7 @@ export default function OrderPreparer() {
                                                                             className="w-4 h-4 rounded border border-gray-300"
                                                                             style={{ backgroundColor: order.color_code }}
                                                                         />
-                                                                        <span className="text-xs">{order.color_code}</span>
+                                                                        <span className="text-xs">{order.color_code || "-"}</span>
                                                                     </div>
                                                                 </td>
                                                                 <td className="p-2 text-center">
@@ -3329,23 +3461,23 @@ export default function OrderPreparer() {
                                                                 </td>
                                                                 <td className="p-2 text-center font-bold">{order.quantity} م</td>
                                                                 <td className="p-2">{order.ruler_name || "-"}</td>
-                                                                <td className="p-2 text-center">{order.thickness || "0.6"}</td>
+                                                                <td className="p-2 text-center">{order.thickness || "-"}</td>
                                                                 <td className="p-2 text-center">{order.batch_number || "-"}</td>
                                                                 <td className="p-2 text-center">
                                                                     <div className="flex items-center justify-center gap-2">
                                                                         <button
-                                                                            onClick={() => handleEditProductionOrder(order)}
+                                                                            onClick={() => openQrGenDialog(order)}
                                                                             className="text-blue-600 hover:text-blue-800 text-sm"
-                                                                            title="تعديل الطلب"
+                                                                            title="توليد QR"
                                                                         >
-                                                                            <Edit className="w-4 h-4" />
+                                                                            <QrCode className="w-4 h-4" />
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => setProductionOrders(prev => prev.filter(item => item.id !== order.id))}
-                                                                            className="text-red-600 hover:text-red-800 text-sm"
-                                                                            title="حذف الطلب"
+                                                                            onClick={() => handleViewProductionOrderDetails(order)}
+                                                                            className="text-green-600 hover:text-green-800 text-sm"
+                                                                            title="عرض التفاصيل"
                                                                         >
-                                                                            <Trash2 className="w-4 h-4" />
+                                                                            <Eye className="w-4 h-4" />
                                                                         </button>
                                                                     </div>
                                                                 </td>
@@ -3362,6 +3494,30 @@ export default function OrderPreparer() {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* Pagination Controls for Production History */}
+                                        {productionHistoryOrders.length > 0 && (
+                                            <div className="flex-shrink-0 p-2 border-t bg-gray-50">
+                                                <div className="flex items-center justify-between">
+                                                    <ResultsCounter
+                                                        currentPage={productionHistoryPage}
+                                                        rowsPerPage={productionHistoryRowsPerPage}
+                                                        totalResults={productionHistoryOrders.length}
+                                                    />
+                                                    <div className="flex items-center gap-2">
+                                                        <RowsPerPageSelector
+                                                            rowsPerPage={productionHistoryRowsPerPage}
+                                                            onRowsPerPageChange={setProductionHistoryRowsPerPage}
+                                                        />
+                                                        <PaginationControls
+                                                            currentPage={productionHistoryPage}
+                                                            totalPages={productionHistoryTotalPages}
+                                                            onPageChange={setProductionHistoryPage}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </Card>
                                 </>
                             ) : (
@@ -6053,7 +6209,7 @@ export default function OrderPreparer() {
                                         <Card className="flex-1 p-2 flex flex-col">
                                             <Label className="font-bold text-sm mb-1 block">المادة</Label>
                                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
-                                                {materials.map(m => (
+                                                {(Array.isArray(isOrderPreparer ? qrFilteredMaterials : materials) ? (isOrderPreparer ? qrFilteredMaterials : materials) : []).map(m => (
                                                     <button
                                                         key={m.material_id}
                                                         onClick={() => setQrFormData(prev => ({ ...prev, material_id: String(m.material_id) }))}
@@ -6063,8 +6219,14 @@ export default function OrderPreparer() {
                                                         flex items-center justify-center p-2
                                                         ${String(qrFormData.material_id) === String(m.material_id)
                                                                 ? "border-primary-f bg-secondary-f text-white shadow-lg"
-                                                                : "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
-                                                            }
+                                                                : isOrderPreparer
+
+                                                                    ? "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
+
+                                                                    : "border-gray-300 bg-white hover:border-secondary-s"
+
+                                                                }
+
                                                     `}
                                                         title={m.material_name}
                                                     >
@@ -6149,7 +6311,7 @@ export default function OrderPreparer() {
                                     </div>
 
                                     {/* العمود الأوسط - حقول الإدخال */}
-                                    <div className={`flex flex-col gap-2 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-1 ${materialBorderClass}`}>
+                                    <div className={`flex flex-col gap-2 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-1 ${qrMaterialBorderClass}`}>
 
                                         {/* شريط التقدم للتعديل */}
 
@@ -6350,15 +6512,21 @@ export default function OrderPreparer() {
 
                                             <Label className="font-bold text-sm mb-1 block">المسطرة</Label>
 
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            {(() => {
+                                                const availableRulers = qrFormData.material_id
+                                                    ? rulers.filter(r => String(r.material_id) === String(qrFormData.material_id))
+                                                    : [];
 
-                                                {availableRulers.length === 0 ? (
+                                                return (
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 
-                                                    <span className="text-gray-400 text-sm col-span-3 text-center p-2">اختر المادة أولاً</span>
+                                                        {availableRulers.length === 0 ? (
 
-                                                ) : (
+                                                            <span className="text-gray-400 text-sm col-span-3 text-center p-2">اختر المادة أولاً</span>
 
-                                                    availableRulers.map(r => (
+                                                        ) : (
+
+                                                            availableRulers.map(r => (
 
                                                         <button
 
@@ -6395,6 +6563,8 @@ export default function OrderPreparer() {
                                                 )}
 
                                             </div>
+                                            );
+                                            })()}
 
                                         </div>
 
@@ -6451,7 +6621,7 @@ export default function OrderPreparer() {
 
                                                         showSelectedImage={true}
 
-                                                        options={colorOptions}
+                                                        options={qrColorOptions}
 
                                                         placeholder={
 
@@ -6463,9 +6633,9 @@ export default function OrderPreparer() {
 
                                                                     ? "اختر العرض أولاً"
 
-                                                                    : colorOptions.length === 0
+                                                                    : qrColorOptions.length === 0
 
-                                                                        ? "لا توجد ألوان مسعرة"
+                                                                        ? "لا توجد ألوان متاحة"
 
                                                                         : "اختر اللون"
 
@@ -6980,12 +7150,12 @@ export default function OrderPreparer() {
                                                                 <td className="p-3 text-right">{localItem.material_name}</td>
                                                                 <td className="p-3 text-right">{localItem.ruler_name}</td>
                                                                 <td className="p-3 text-right">
-                                                                    <span className="inline-block px-2 py-1 rounded text-white text-xs" style={{ background: localItem.color_code || "#999" }}>
+                                                                    <span className="inline-block px-2 py-1 rounded text-primary-f text-xs font-medium" style={{ backgroundColor: localItem.color_code || 'var(--color-primary)' }}>
                                                                         {localItem.color_name}
                                                                     </span>
                                                                 </td>
                                                                 <td className="p-3 text-right">
-                                                                    <span className="font-mono text-xs">{localItem.color_code || "-"}</span>
+                                                                    <span className="font-mono text-xs text-primary-f font-medium">{localItem.color_code || "-"}</span>
                                                                 </td>
                                                                 <td className="p-3 text-right">{localItem.width ?? "-"}</td>
                                                                 <td className="p-3 text-right">{localItem.thickness ?? "-"}</td>
@@ -7049,139 +7219,72 @@ export default function OrderPreparer() {
                 )}
 
                 <StyledDialog
-
                     isOpen={qrPreview.open}
-
                     onOpenChange={(open) => setQrPreview((prev) => ({ ...prev, open }))}
-
                     title={qrPreview.title || "QR"}
-
                     onCancel={() => setQrPreview((prev) => ({ ...prev, open: false }))}
-
                     cancelLabel="إغلاق"
-
                     showFooter={false}
-
                 >
-
                     <div className="space-y-3">
-
                         <div className="flex items-center justify-center">
-
                             {qrPreview.url ? (
-
                                 <img src={qrPreview.url} alt="qr" className="h-80 w-80 border rounded" />
-
                             ) : null}
-
                         </div>
-
                         <div className="bg-gray-50 rounded-lg p-3 text-lg font-bold" dir="rtl" style={{ textAlign: "right" }}>
-
                             {qrPreview.footerText || ""}
-
                         </div>
-
                         <div className="flex items-center justify-center gap-2">
-
                             <Button
-
                                 size="sm"
-
                                 className="bg-secondary-s hover:brightness-110 text-white"
-
                                 onClick={() => printQr(qrPreview.url, qrPreview.title, qrPreview.footerText, 'rtl')}
-
                                 disabled={!qrPreview.url}
-
                             >
-
                                 طباعة
-
                             </Button>
-
                         </div>
-
                     </div>
-
                 </StyledDialog>
-
-
 
                 <StyledDialog
-
                     isOpen={orderQrPreview.open}
-
                     onOpenChange={(open) => setOrderQrPreview((prev) => ({ ...prev, open }))}
-
                     title="QR للطلب"
-
                     onCancel={() => setOrderQrPreview((prev) => ({ ...prev, open: false }))}
-
                     cancelLabel="إغلاق"
-
                     showFooter={false}
-
                 >
-
                     <div className="space-y-3">
-
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-
+                        {/* <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="bg-gray-50 rounded-lg p-2">
-
                                 عدد العناصر: <span className="font-bold">{orderQrPreview.itemsCount}</span>
-
                             </div>
-
                             <div className="bg-gray-50 rounded-lg p-2">
-
                                 إجمالي الكمية: <span className="font-bold">{orderQrPreview.totalQuantity} م</span>
-
                             </div>
-
-                        </div>
-
+                        </div> */}
                         <div className="flex items-center justify-center">
-
                             {orderQrPreview.qrUrl ? (
-
                                 <img src={orderQrPreview.qrUrl} alt="order-qr" className="h-72 w-72 border rounded" />
-
                             ) : null}
-
                         </div>
-
                         <div className="flex items-center justify-center gap-2">
-
                             <Button
-
                                 size="sm"
-
                                 className="bg-secondary-s hover:brightness-110 text-white"
-
                                 onClick={() => printQr(orderQrPreview.qrUrl, "QR للطلب", orderQrPreview.footerText, "rtl")}
-
                                 disabled={!orderQrPreview.qrUrl}
-
                             >
-
                                 طباعة
-
                             </Button>
-
                         </div>
-
                     </div>
-
                 </StyledDialog>
-
-
 
                 {/* QR Generation Dialog with Quantity Editing */}
-
                 <StyledDialog
-
                     isOpen={qrGenDialog.open}
 
                     onOpenChange={(open) => { if (!open) closeQrGenDialog(); }}
