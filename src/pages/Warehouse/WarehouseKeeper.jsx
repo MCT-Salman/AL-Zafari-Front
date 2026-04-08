@@ -838,9 +838,11 @@ export default function WarehouseKeeper() {
             : batches.find((b) => String(b.batch_number).trim() === String(item.batch_number).trim())?.batch_id;
         console.log("[fillSalesOrderForm] batchId:", batchId);
 
-        // Use quantity as length (quantity is the length value)
-        const lengthValue = item.quantity || item.length;
+        // Use length and quantity separately
+        const lengthValue = item.length;
+        const quantityValue = item.quantity;
         console.log("[fillSalesOrderForm] lengthValue:", lengthValue);
+        console.log("[fillSalesOrderForm] quantityValue:", quantityValue);
 
         // Fill sales form and clear production form
         setSalesForm({
@@ -851,6 +853,7 @@ export default function WarehouseKeeper() {
             length: lengthValue ? String(lengthValue) : "",
             width: item.width ? String(item.width) : FIXED_WIDTH,
             thickness: item.thickness ? String(item.thickness) : "",
+            quantity: quantityValue ? String(quantityValue) : "",
             destination: MovementDestination.slitting,
             carton_count: "",
             notes: item.notes || ""
@@ -1149,22 +1152,23 @@ export default function WarehouseKeeper() {
                 <table className="w-full border-collapse min-w-[1000px]">
                     <thead className="bg-gray-100 sticky top-0 z-50">
                         <tr>
-                            {["#", "المادة", "اللون", "العرض", "الكمية", "الطبخة", "الحالة", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
+                            {["#", "المادة", "اللون", "العرض", "الطول", "الكمية", "الطبخة", "الحالة", "التوقيت", "الملاحظات", "الإجراءات"].map((h) => (
                                 <th key={h} className="px-1 py-2 text-center border-b text-sm whitespace-nowrap min-w-[70px] bg-gray-100">{h}</th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
                         {loadingSalesOrders ? (
-                            <tr><td colSpan="10" className="p-6"><LoadingState /></td></tr>
+                            <tr><td colSpan="11" className="p-6"><LoadingState /></td></tr>
                         ) : rows.length === 0 ? (
-                            <tr><td colSpan="10" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات مبيعات</td></tr>
+                            <tr><td colSpan="11" className="p-8 text-center text-gray-400"><AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />لا توجد طلبات مبيعات</td></tr>
                         ) : rows.map(({ order, item }, index) => {
                             const statusBadge = statusMap[order.status] || { label: order.status, className: "bg-gray-100 text-gray-800" };
                             const colorName = item?.color_name || item?.color?.color_name || "-";
                             const colorCode = item?.color_code || item?.color?.color_code || "";
                             const materialName = item?.material_name || item?.material?.material_name || "-";
                             const width = item?.width ?? "-";
+                            const length = item?.length ?? "-";
                             const quantity = item?.quantity ?? "-";
                             const batchNumber = item?.batch_number || item?.batch?.batch_number || "-";
                             return (
@@ -1175,6 +1179,7 @@ export default function WarehouseKeeper() {
                                         <span className="text-xs">{colorName}{colorCode ? ` (${colorCode})` : ""}</span>
                                     </td>
                                     <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">{width}</td>
+                                    <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">{length}</td>
                                     <td className="px-1 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[60px]">{quantity}</td>
                                     <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">{batchNumber}</td>
                                     <td className="px-3 py-2 align-middle text-center text-sm whitespace-nowrap min-w-[80px]">
@@ -1566,15 +1571,16 @@ export default function WarehouseKeeper() {
                                     <div className="">
                                         {/* <h4 className="font-medium text-sm mb-3 text-gray-700">إدخال مخرج جديد</h4> */}
                                         <div className="space-y-4">
-                                            <div className="grid grid-cols-5 gap-1">
+                                            <div className="grid grid-cols-6 gap-1">
                                                 <div><Label className={'mb-1'}>المسطرة</Label><FilterSelect value={outputForm.ruler_id} onChange={(e) => setOutputForm((p) => ({ ...p, ruler_id: e.target.value, color_id: "" }))} searchValue={selectSearch.ruler} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, ruler: value }))} onInputFocus={() => setCurrentInput("select:ruler")} options={availableRulers.map((r) => ({ value: String(r.ruler_id), label: r.ruler_name }))} placeholder="اختر المسطرة" disabled={!outputForm.material_id} /></div>
                                                 <div><Label className={'mb-1'}>اللون</Label><FilterSelect value={outputForm.color_id} onChange={(e) => setOutputForm((p) => ({ ...p, color_id: e.target.value }))} searchValue={selectSearch.color} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, color: value }))} onInputFocus={() => setCurrentInput("select:color")} options={colorOptions} placeholder={!outputForm.ruler_id ? "اختر المسطرة أولاً" : "اختر اللون"} disabled={!outputForm.ruler_id} /></div>
                                                 <div><Label className={'mb-1'}>الطبخة</Label><FilterSelect value={outputForm.batch_id} onChange={(e) => setOutputForm((p) => ({ ...p, batch_id: e.target.value }))} searchValue={selectSearch.batch} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, batch: value }))} onInputFocus={() => setCurrentInput("select:batch")} options={batchOptions} placeholder="اختر الطبخة" disabled={!outputForm.material_id} /></div>
                                                 <div><Label className={'mb-1'}>العرض</Label><Input type="text" className={`h-13`} value={outputForm.width} onChange={(e) => setOutputForm((p) => ({ ...p, width: e.target.value }))} onFocus={() => setCurrentInput("width")} placeholder="العرض" /></div>
+                                                <div><Label className={'mb-1'}>الطول</Label><Input type="text" className={`h-13`} value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} onFocus={() => setCurrentInput("length")} placeholder="الطول" /></div>
                                                 <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} searchValue={selectSearch.thickness} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, thickness: value }))} onInputFocus={() => setCurrentInput("select:thickness")} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-1">
-                                                <div><Label className={'mb-1'}>الكمية</Label><Input type="text" className={`h-13`} value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} onFocus={() => setCurrentInput("length")} placeholder="الكمية" /></div>
+                                                <div><Label className={'mb-1'}>الكمية</Label><Input type="text" className={`h-13`} value={outputForm.quantity} onChange={(e) => setOutputForm((p) => ({ ...p, quantity: e.target.value }))} onFocus={() => setCurrentInput("quantity")} placeholder="الكمية" /></div>
                                                 <div className="col-span-1"><Label className={'mb-1'}>ملاحظات</Label><Input className={`h-13`} value={outputForm.notes} onChange={(e) => setOutputForm((p) => ({ ...p, notes: e.target.value }))} onFocus={() => setCurrentInput("notes")} placeholder="ملاحظات اختيارية" /></div>
                                             </div>
                                             <Button onClick={handleOutputSubmit} className="w-full h-13 bg-green-600 hover:bg-green-700"><Check className="w-5 h-5 ml-2" />حفظ مخرج المبيعات</Button>

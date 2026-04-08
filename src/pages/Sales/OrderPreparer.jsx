@@ -21,7 +21,7 @@ import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
-import { ShoppingCart, Plus, History, Trash2, Eye, RotateCcw, Check, Users, EyeOff, Home, LogOut, X, AlertCircle,  Edit, Save, Download, ChevronLeft, ChevronRight, UserPlus, User, UserX, FileText, Palette, Printer } from "lucide-react";
+import { ShoppingCart, Plus, History, Trash2, Eye, RotateCcw, Check, Users, EyeOff, Home, LogOut, X, AlertCircle, Edit, Save, Download, ChevronLeft, ChevronRight, UserPlus, User, UserX, FileText, Palette, Printer, QrCode } from "lucide-react";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
 import toast from "react-hot-toast";
@@ -34,7 +34,8 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").r
 export default function OrderPreparer() {
     const navigate = useNavigate();
     const { logout, user } = useAuth();
-    const [viewMode, setViewMode] = useState("orders"); // create | history | colors | orders
+    const [viewMode, setViewMode] = useState("sales_orders"); // sales_orders | generate_qr | production
+    const [productionSubTab, setProductionSubTab] = useState("production_request"); // production_request | production_history
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [showPreview, setShowPreview] = useState(false);
@@ -195,6 +196,97 @@ export default function OrderPreparer() {
     });
 
     const [savingQrQuantity, setSavingQrQuantity] = useState(false);
+
+    // QR Form State for generate_qr page
+    const [qrFormData, setQrFormData] = useState({
+        material_id: "",
+        ruler_id: "",
+        color_id: "",
+        color_code: "",
+        color_name: "",
+        batch_id: "",
+        batch_number: "",
+        width: "",
+        thickness: "",
+        quantity: "",
+        type_item: ""
+    });
+
+    const [generatedQr, setGeneratedQr] = useState({
+        url: "",
+        data: ""
+    });
+
+    // QR Numpad state
+    const [qrActiveField, setQrActiveField] = useState("quantity");
+
+    const handleQrNumpadPress = (key) => {
+        setQrFormData(prev => {
+            const currentValue = String(prev[qrActiveField] || "");
+            let newValue;
+
+            if (key === "clear") {
+                newValue = "";
+            } else if (key === ".") {
+                // Only add decimal point if not already present
+                newValue = currentValue.includes(".") ? currentValue : currentValue + ".";
+            } else {
+                newValue = currentValue + key;
+            }
+
+            return { ...prev, [qrActiveField]: newValue };
+        });
+    };
+
+    // Load production orders from API
+    const loadProductionOrders = async () => {
+        try {
+            const response = await productionApi.getProductionOrders();
+            // Transform the data to match the local structure
+            const transformedOrders = response.data.map(order => ({
+                ...order,
+                material_name: order.material?.material_name || '',
+                color_code: order.color?.color_code || '',
+                ruler_name: order.ruler?.ruler_name || ''
+            }));
+            setProductionOrders(transformedOrders);
+            toast.success("تم تحديث قائمة طلبات الإنتاج");
+        } catch (error) {
+            console.error("Error loading production orders:", error);
+            toast.error("فشل في تحميل طلبات الإنتاج");
+        }
+    };
+
+    const generateQrFromForm = () => {
+        const typeLabel = formatTypeItemString(qrFormData.type_item);
+
+        const material = materials.find(m => String(m.material_id) === String(qrFormData.material_id));
+        const ruler = rulers.find(r => String(r.ruler_id) === String(qrFormData.ruler_id));
+
+        const values = [
+            material?.material_name || "",
+            ruler?.ruler_name || "",
+            qrFormData.color_code || "",
+            qrFormData.width || "",
+            "100", // length default
+            qrFormData.thickness || "",
+            qrFormData.quantity || "",
+            qrFormData.batch_number || "",
+            typeLabel || "",
+            user?.user_id || user?.id || user?.employee_id || ""
+        ];
+
+        const qrData = values.join('|');
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+
+        setGeneratedQr({
+            url: qrUrl,
+            data: qrData
+        });
+
+        toast.success("تم توليد QR بنجاح");
+    };
+
     const isOrderPreparer = true;
     const showOrderSwitch = true;
 
@@ -392,13 +484,13 @@ export default function OrderPreparer() {
 
     useEffect(() => {
 
-        if (viewMode === "history") loadOrders();
+        if (viewMode === "generate_qr") loadOrders();
 
     }, [viewMode]);
 
     useEffect(() => {
 
-        if (viewMode === "orders") loadOrdersRecords();
+        if (viewMode === "sales_orders") loadOrdersRecords();
 
     }, [viewMode]);
 
@@ -441,11 +533,11 @@ export default function OrderPreparer() {
     const loadInitialData = async () => {
         try {
             setLoading(true);
-            
+
             console.log("[OrderPreparer] Starting loadInitialData...");
             console.log("[OrderPreparer] API URL:", import.meta.env.VITE_API_URL);
             console.log("[OrderPreparer] Token exists:", !!localStorage.getItem('accessToken'));
-            
+
             const [matRes, rulerRes, colorRes, batchRes, priceRes] = await Promise.all([
                 materialApi.getMaterials().catch(err => {
                     console.error("[OrderPreparer] Materials API failed:", err);
@@ -3106,7 +3198,7 @@ export default function OrderPreparer() {
     }, [isOrderPreparer, filteredMaterials, formData.material_id]);
 
 
-    if (loading && viewMode === "create" && materials.length === 0) {
+    if (loading && viewMode === "production" && materials.length === 0) {
         return (
             <div className="h-screen flex items-center justify-center">
                 <LoadingState />
@@ -3123,113 +3215,180 @@ export default function OrderPreparer() {
                 setIsHeaderVisible={setIsHeaderVisible}
                 hideCustomersAndInvoices={true}
                 hideHeaderToggle={true}
+                leftContent={(
+                    <>
+                        <button
+                            onClick={() => setViewMode("sales_orders")}
+                            className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${viewMode === "sales_orders"
+                                ? "bg-white text-primary-f border-white shadow"
+                                : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                                }`}
+                        >
+                            سجل طلبات المبيعات
+                        </button>
+                        <button
+                            onClick={() => setViewMode("generate_qr")}
+                            className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${viewMode === "generate_qr"
+                                ? "bg-white text-primary-f border-white shadow"
+                                : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                                }`}
+                        >
+                            توليد QR
+                        </button>
+                        <button
+                            onClick={() => setViewMode("production")}
+                            className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${viewMode === "production"
+                                ? "bg-white text-primary-f border-white shadow"
+                                : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                                }`}
+                        >
+                            انتاج
+                        </button>
+                    </>
+                )}
             />
 
             <div className="flex-1 min-h-0 overflow-hidden">
 
-                {/* Tabs Navigation - WhatsApp Style (Sticky) */}
-
-                <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white mt-2 mx-2 rounded-t-lg shadow-sm px-2 py-2">
-
-                    <button
-
-                        onClick={() => setViewMode("orders")}
-
-                        className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "orders"
-                            ? "bg-primary-f text-white border-primary-f shadow"
-                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                            }`}
-
-                    >
-
-                        طلبات orders
-
-                    </button>
-
-                    <button
-
-                        onClick={() => setViewMode("history")}
-
-                        className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "history"
-                            ? "bg-primary-f text-white border-primary-f shadow"
-                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                            }`}
-
-                    >
-
-                        سجل الطلبات
-
-                        
-                    </button>
-
-                    {showOrderSwitch && (
-
+                {/* Sub-tabs for Production page */}
+                {viewMode === "production" && (
+                    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white mt-2 mx-2 rounded-t-lg shadow-sm px-2 py-2">
                         <button
-
-                            onClick={() => setViewMode("create")}
-
-                            className={`flex-1 min-w-[160px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "create"
+                            onClick={() => setProductionSubTab("production_request")}
+                            className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${productionSubTab === "production_request"
                                 ? "bg-primary-f text-white border-primary-f shadow"
                                 : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
                                 }`}
-
                         >
-
-                            {isOrderPreparer ? "توليد QR" : "المواد"}
-
-                            
+                            طلب انتاج
                         </button>
-
-                    )}
-
-                    <button
-
-                        onClick={() => setViewMode("colors")}
-
-                        className={`flex-1 min-w-[160px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "colors"
-                            ? "bg-primary-f text-white border-primary-f shadow"
-                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                            }`}
-
-                    >
-
-                        {isOrderPreparer ? "طلب انتاج" : "الشركات المكافئة"}
-
-                        
-                    </button>
-
-                </div>
+                        <button
+                            onClick={() => setProductionSubTab("production_history")}
+                            className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${productionSubTab === "production_history"
+                                ? "bg-primary-f text-white border-primary-f shadow"
+                                : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                                }`}
+                        >
+                            سجل طلبات الانتاج
+                        </button>
+                    </div>
+                )}
 
                 <div className="flex-1 min-h-0 flex flex-col">
-                {viewMode === "colors" ? (
+                    {viewMode === "production" ? (
+                        isOrderPreparer ? (
+                            productionSubTab === "production_history" ? (
+                                <>
+                                    {/* سجل طلبات الانتاج */}
+                                    <Card className="flex flex-col h-full min-h-0 overflow-auto p-2">
+                                        <div className="flex justify-between items-center mb-1 flex-shrink-0">
+                                            <h2 className="font-bold text-lg">سجل طلبات الانتاج</h2>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => loadProductionOrders()}
+                                                className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
+                                            >
+                                                <RotateCcw className="w-4 h-4 ml-1" />
+                                                تحديث
+                                            </Button>
+                                        </div>
 
-                    isOrderPreparer ? (
+                                        <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]">
+                                            {productionOrders.length > 0 ? (
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-gray-100 sticky top-0 z-10">
+                                                        <tr>
+                                                            <th className="p-2 text-right border-b">المادة</th>
+                                                            <th className="p-2 text-center border-b">العرض</th>
+                                                            <th className="p-2 text-right border-b">اللون</th>
+                                                            <th className="p-2 text-center border-b">النوع</th>
+                                                            <th className="p-2 text-center border-b">الكمية</th>
+                                                            <th className="p-2 text-right border-b">المسطرة</th>
+                                                            <th className="p-2 text-center border-b">السماكة</th>
+                                                            <th className="p-2 text-center border-b">الطبخة</th>
+                                                            <th className="p-2 text-center border-b">إجراء</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {productionOrders.map((order, index) => (
+                                                            <tr key={order.id} className="border-b hover:bg-gray-50">
+                                                                <td className="p-2 font-medium">{order.material_name}</td>
+                                                                <td className="p-2 text-center">{order.width || "-"}</td>
+                                                                <td className="p-2">
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        <div
+                                                                            className="w-4 h-4 rounded border border-gray-300"
+                                                                            style={{ backgroundColor: order.color_code }}
+                                                                        />
+                                                                        <span className="text-xs">{order.color_code}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-2 text-center">
+                                                                    {formatTypeItem(order.type_item)}
+                                                                </td>
+                                                                <td className="p-2 text-center font-bold">{order.quantity} م</td>
+                                                                <td className="p-2">{order.ruler_name || "-"}</td>
+                                                                <td className="p-2 text-center">{order.thickness || "0.6"}</td>
+                                                                <td className="p-2 text-center">{order.batch_number || "-"}</td>
+                                                                <td className="p-2 text-center">
+                                                                    <div className="flex items-center justify-center gap-2">
+                                                                        <button
+                                                                            onClick={() => handleEditProductionOrder(order)}
+                                                                            className="text-blue-600 hover:text-blue-800 text-sm"
+                                                                            title="تعديل الطلب"
+                                                                        >
+                                                                            <Edit className="w-4 h-4" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => setProductionOrders(prev => prev.filter(item => item.id !== order.id))}
+                                                                            className="text-red-600 hover:text-red-800 text-sm"
+                                                                            title="حذف الطلب"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full text-gray-400">
+                                                    <div className="text-center">
+                                                        <History className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                                                        <p className="text-lg">لا توجد طلبات إنتاج سابقة</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Card>
+                                </>
+                            ) : (
+                                <div className="h-full min-h-0 px-2 pb-2">
+                                    <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-2 h-full min-h-0">
 
-                        <div className="h-full min-h-0 px-2 pb-2">
+                                        {/* العمود الأيمن - المواد والأرقام */}
 
-                            <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-2 h-full min-h-0">
+                                        <div className="flex flex-col gap-2 h-full min-h-0 overflow-auto">
 
-                                {/* العمود الأيمن - المواد والأرقام */}
+                                            {/* أزرار المواد */}
 
-                                <div className="flex flex-col gap-2 h-full min-h-0 overflow-auto">
+                                            <Card className="flex-1 p-2 flex flex-col">
 
-                                    {/* أزرار المواد */}
+                                                <Label className="font-bold text-sm mb-1 block">المادة</Label>
 
-                                    <Card className="flex-1 p-2 flex flex-col">
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
 
-                                        <Label className="font-bold text-sm mb-1 block">المادة</Label>
+                                                    {(Array.isArray(isOrderPreparer ? filteredMaterials : materials) ? (isOrderPreparer ? filteredMaterials : materials) : []).map(m => (
 
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
+                                                        <button
 
-                                            {(Array.isArray(isOrderPreparer ? filteredMaterials : materials) ? (isOrderPreparer ? filteredMaterials : materials) : []).map(m => (
+                                                            key={m.material_id}
 
-                                                <button
+                                                            onClick={() => handleFieldChange("material_id", String(m.material_id))}
 
-                                                    key={m.material_id}
-
-                                                    onClick={() => handleFieldChange("material_id", String(m.material_id))}
-
-                                                    className={`
+                                                            className={`
 
                                                         aspect-square rounded-xl border-3 text-lg sm:text-xl font-bold 
 
@@ -3239,273 +3398,273 @@ export default function OrderPreparer() {
 
                                                         ${String(formData.material_id) === String(m.material_id)
 
-                                                            ? "border-primary-f bg-secondary-f text-white shadow-lg"
+                                                                    ? "border-primary-f bg-secondary-f text-white shadow-lg"
 
-                                                            : isOrderPreparer
+                                                                    : isOrderPreparer
 
-                                                                ? "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
+                                                                        ? "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
 
-                                                                : "border-gray-300 bg-white hover:border-secondary-s"
+                                                                        : "border-gray-300 bg-white hover:border-secondary-s"
 
-                                                        }
+                                                                }
 
                                                     `}
 
-                                                    title={m.material_name}
+                                                            title={m.material_name}
 
-                                                >
+                                                        >
 
-                                                    <span className="line-clamp-2 text-center">{m.material_name}</span>
+                                                            <span className="line-clamp-2 text-center">{m.material_name}</span>
 
-                                                </button>
+                                                        </button>
 
-                                            ))}
-
-                                        </div>
-
-                                    </Card>
-
-
-
-                                    {/* الأرقام */}
-
-                                    <Card className="flex-[3] flex flex-col p-2 max-h-[560px] overflow-auto">
-
-                                        <div className="flex-shrink-1 mb-1">
-
-                                            <div className="bg-gray-100 rounded-lg py-2 px-3">
-
-                                                <div className="text-xs text-gray-500 mb-0.5">
-
-                                                    {numpadMode === "colorSearch" ? "كود اللون" :
-
-                                                        activeField === "quantity" ? "الكمية" :
-
-                                                            activeField === "width" ? "العرض" : "القيمة"}
+                                                    ))}
 
                                                 </div>
 
-                                                <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
+                                            </Card>
 
-                                                    {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
+
+
+                                            {/* الأرقام */}
+
+                                            <Card className="flex-[3] flex flex-col p-2 max-h-[560px] overflow-auto">
+
+                                                <div className="flex-shrink-1 mb-1">
+
+                                                    <div className="bg-gray-100 rounded-lg py-2 px-3">
+
+                                                        <div className="text-xs text-gray-500 mb-0.5">
+
+                                                            {numpadMode === "colorSearch" ? "كود اللون" :
+
+                                                                activeField === "quantity" ? "الكمية" :
+
+                                                                    activeField === "width" ? "العرض" : "القيمة"}
+
+                                                        </div>
+
+                                                        <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
+
+                                                            {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
+
+                                                        </div>
+
+                                                    </div>
 
                                                 </div>
 
-                                            </div>
+
+
+                                                {/* أزرار الأرقام */}
+
+                                                <div className="flex-1 grid grid-rows-4 gap-1 min-h-0">
+
+                                                    <div className="grid grid-cols-3 gap-1">
+
+                                                        {["9", "8", "7"].map(key => (
+
+                                                            <button
+
+                                                                key={key}
+
+                                                                onClick={() => handleNumpadPress(key)}
+
+                                                                className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+
+                                                            >
+
+                                                                {key}
+
+                                                            </button>
+
+                                                        ))}
+
+                                                    </div>
+
+                                                    <div className="grid grid-cols-3 gap-1">
+
+                                                        {["6", "5", "4"].map(key => (
+
+                                                            <button
+
+                                                                key={key}
+
+                                                                onClick={() => handleNumpadPress(key)}
+
+                                                                className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+
+                                                            >
+
+                                                                {key}
+
+                                                            </button>
+
+                                                        ))}
+
+                                                    </div>
+
+                                                    <div className="grid grid-cols-3 gap-1">
+
+                                                        {["3", "2", "1"].map(key => (
+
+                                                            <button
+
+                                                                key={key}
+
+                                                                onClick={() => handleNumpadPress(key)}
+
+                                                                className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+
+                                                            >
+
+                                                                {key}
+
+                                                            </button>
+
+                                                        ))}
+
+                                                    </div>
+
+                                                    <div className="grid grid-cols-3 gap-1">
+
+                                                        <button
+
+                                                            onClick={() => handleNumpadPress(".")}
+
+                                                            className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+
+                                                        >
+
+                                                            .
+
+                                                        </button>
+
+                                                        <button
+
+                                                            onClick={() => handleNumpadPress("0")}
+
+                                                            className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+
+                                                        >
+
+                                                            0
+
+                                                        </button>
+
+                                                        <button
+
+                                                            onClick={() => handleNumpadPress("clear")}
+
+                                                            className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-xl font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+
+                                                        >
+
+                                                            مسح
+
+                                                        </button>
+
+                                                    </div>
+
+                                                </div>
+
+                                            </Card>
 
                                         </div>
 
 
 
-                                        {/* أزرار الأرقام */}
+                                        {/* العمود الأوسط - العناصر الإضافية */}
 
-                                        <div className="flex-1 grid grid-rows-4 gap-1 min-h-0">
+                                        <div className={`flex flex-col gap-2 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-1 ${materialBorderClass}`}>
 
-                                            <div className="grid grid-cols-3 gap-1">
+                                            {/* شريط التقدم للتعديل */}
 
-                                                {["9", "8", "7"].map(key => (
+                                            {editingItemId && (
+
+                                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">
+
+                                                    <span className="text-blue-700 text-sm font-medium">
+
+                                                        <Edit className="w-4 h-4 inline ml-1" />
+
+                                                        جاري تعديل العنصر
+
+                                                    </span>
 
                                                     <button
 
-                                                        key={key}
+                                                        onClick={cancelEdit}
 
-                                                        onClick={() => handleNumpadPress(key)}
-
-                                                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+                                                        className="text-blue-600 hover:text-blue-800 text-sm font-bold"
 
                                                     >
 
-                                                        {key}
+                                                        إلغاء
 
                                                     </button>
 
-                                                ))}
+                                                </div>
 
-                                            </div>
+                                            )}
 
-                                            <div className="grid grid-cols-3 gap-1">
 
-                                                {["6", "5", "4"].map(key => (
 
-                                                    <button
+                                            {formData.material_id && !isSelectedMaterialPvc && (
 
-                                                        key={key}
+                                                <div className="bg-primary-s border border-primary-f/20 text-secondary-f text-sm p-3 rounded-lg">
 
-                                                        onClick={() => handleNumpadPress(key)}
+                                                    <div className="font-bold mb-2">معلومات الأبعاد</div>
 
-                                                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
 
-                                                    >
+                                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
 
-                                                        {key}
+                                                            <div className="text-xs text-secondary-t">الطول</div>
 
-                                                    </button>
+                                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "height")}</div>
 
-                                                ))}
+                                                        </div>
 
-                                            </div>
+                                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
 
-                                            <div className="grid grid-cols-3 gap-1">
+                                                            <div className="text-xs text-secondary-t">العرض</div>
 
-                                                {["3", "2", "1"].map(key => (
+                                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "width")}</div>
 
-                                                    <button
+                                                        </div>
 
-                                                        key={key}
+                                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
 
-                                                        onClick={() => handleNumpadPress(key)}
+                                                            <div className="text-xs text-secondary-t">السماكة</div>
 
-                                                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+                                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "thickness")}</div>
 
-                                                    >
+                                                        </div>
 
-                                                        {key}
-
-                                                    </button>
-
-                                                ))}
-
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-1">
-
-                                                <button
-
-                                                    onClick={() => handleNumpadPress(".")}
-
-                                                    className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
-
-                                                >
-
-                                                    .
-
-                                                </button>
-
-                                                <button
-
-                                                    onClick={() => handleNumpadPress("0")}
-
-                                                    className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
-
-                                                >
-
-                                                    0
-
-                                                </button>
-
-                                                <button
-
-                                                    onClick={() => handleNumpadPress("clear")}
-
-                                                    className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-xl font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
-
-                                                >
-
-                                                    مسح
-
-                                                </button>
-
-                                            </div>
-
-                                        </div>
-
-                                    </Card>
-
-                                </div>
-
-
-
-                                {/* العمود الأوسط - العناصر الإضافية */}
-
-                                <div className={`flex flex-col gap-2 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-1 ${materialBorderClass}`}>
-
-                                    {/* شريط التقدم للتعديل */}
-
-                                    {editingItemId && (
-
-                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">
-
-                                            <span className="text-blue-700 text-sm font-medium">
-
-                                                <Edit className="w-4 h-4 inline ml-1" />
-
-                                                جاري تعديل العنصر
-
-                                            </span>
-
-                                            <button
-
-                                                onClick={cancelEdit}
-
-                                                className="text-blue-600 hover:text-blue-800 text-sm font-bold"
-
-                                            >
-
-                                                إلغاء
-
-                                            </button>
-
-                                        </div>
-
-                                    )}
-
-
-
-                                    {formData.material_id && !isSelectedMaterialPvc && (
-
-                                        <div className="bg-primary-s border border-primary-f/20 text-secondary-f text-sm p-3 rounded-lg">
-
-                                            <div className="font-bold mb-2">معلومات الأبعاد</div>
-
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-
-                                                <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
-
-                                                    <div className="text-xs text-secondary-t">الطول</div>
-
-                                                    <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "height")}</div>
+                                                    </div>
 
                                                 </div>
 
-                                                <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
-
-                                                    <div className="text-xs text-secondary-t">العرض</div>
-
-                                                    <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "width")}</div>
-
-                                                </div>
-
-                                                <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
-
-                                                    <div className="text-xs text-secondary-t">السماكة</div>
-
-                                                    <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "thickness")}</div>
-
-                                                </div>
-
-                                            </div>
-
-                                        </div>
-
-                                    )}
+                                            )}
 
 
 
-                                    {isSelectedMaterialPvc && (
+                                            {isSelectedMaterialPvc && (
 
-                                        <div className="flex-shrink-0 p-2 border-b-2 border-dashed border-gray-300">
+                                                <div className="flex-shrink-0 p-2 border-b-2 border-dashed border-gray-300">
 
-                                            <div className="grid grid-cols-2 gap-3">
+                                                    <div className="grid grid-cols-2 gap-3">
 
-                                                {TYPE_OPTIONS.map(t => (
+                                                        {TYPE_OPTIONS.map(t => (
 
-                                                    <button
+                                                            <button
 
-                                                        key={t.value}
+                                                                key={t.value}
 
-                                                        onClick={() => handleFieldChange("type_item", t.value)}
+                                                                onClick={() => handleFieldChange("type_item", t.value)}
 
-                                                        className={`
+                                                                className={`
 
                                                             rounded-xl border-3 text-base font-medium
 
@@ -3515,62 +3674,62 @@ export default function OrderPreparer() {
 
                                                             ${formData.type_item === t.value
 
-                                                                ? "border-primary-f bg-primary-f text-white shadow-lg"
+                                                                        ? "border-primary-f bg-primary-f text-white shadow-lg"
 
-                                                                : "border-gray-300 bg-white hover:border-primary-f"
+                                                                        : "border-gray-300 bg-white hover:border-primary-f"
 
-                                                            }
+                                                                    }
 
                                                         `}
 
-                                                    >
+                                                            >
 
-                                                        {t.label}
+                                                                {t.label}
 
-                                                    </button>
+                                                            </button>
 
-                                                ))}
+                                                        ))}
 
-                                            </div>
+                                                    </div>
 
-                                        </div>
+                                                </div>
 
-                                    )}
+                                            )}
 
 
 
-                                    <div className="space-y-2">
+                                            <div className="space-y-2">
 
-                                        {/* أولاً: العرض على سطر واحد */}
-                                        <div>
+                                                {/* أولاً: العرض على سطر واحد */}
+                                                <div>
 
-                                            <Label className="font-bold text-sm mb-1 block">العرض</Label>
+                                                    <Label className="font-bold text-sm mb-1 block">العرض</Label>
 
-                                            {widthValues.length > 1 ? (
+                                                    {widthValues.length > 1 ? (
 
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 
-                                                    {widthOptions.map(w => (
+                                                            {widthOptions.map(w => (
 
-                                                        <button
+                                                                <button
 
-                                                            key={w.value}
+                                                                    key={w.value}
 
-                                                            onClick={() => {
+                                                                    onClick={() => {
 
-                                                                console.log("Width clicked:", w.value, typeof w.value);
+                                                                        console.log("Width clicked:", w.value, typeof w.value);
 
-                                                                console.log("Current formData.width:", formData.width, typeof formData.width);
+                                                                        console.log("Current formData.width:", formData.width, typeof formData.width);
 
-                                                                console.log("isSelectedMaterialBoard:", isSelectedMaterialBoard);
+                                                                        console.log("isSelectedMaterialBoard:", isSelectedMaterialBoard);
 
-                                                                console.log("widthValues:", widthValues);
+                                                                        console.log("widthValues:", widthValues);
 
-                                                                handleFieldChange("width", w.value);
+                                                                        handleFieldChange("width", w.value);
 
-                                                            }}
+                                                                    }}
 
-                                                            className={`
+                                                                    className={`
 
                                                                 rounded-xl border-3 text-base font-medium
 
@@ -3580,74 +3739,74 @@ export default function OrderPreparer() {
 
                                                                 ${String(formData.width) === String(w.value)
 
-                                                                    ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+                                                                            ? "border-secondary-s bg-secondary-s text-white shadow-lg"
 
-                                                                    : "border-gray-300 bg-white hover:border-secondary-s"
+                                                                            : "border-gray-300 bg-white hover:border-secondary-s"
 
-                                                                }
+                                                                        }
 
                                                             `}
 
-                                                            disabled={widthValues.length === 0}
+                                                                    disabled={widthValues.length === 0}
 
-                                                        >
+                                                                >
 
-                                                            {w.label}
+                                                                    {w.label}
 
-                                                        </button>
+                                                                </button>
 
-                                                    ))}
+                                                            ))}
+
+                                                        </div>
+
+                                                    ) : (
+
+                                                        <Input
+
+                                                            type="number"
+
+                                                            value={formData.width}
+
+                                                            onChange={(e) => handleFieldChange("width", e.target.value)}
+
+                                                            onClick={() => {
+
+                                                                setActiveField("width");
+
+                                                                setNumpadMode("quantity");
+
+                                                            }}
+
+                                                            className="h-9 text-base text-center font-bold bg-gray-100"
+
+                                                            placeholder={widthValues.length === 1 ? widthValues[0].label : "0"}
+
+                                                            disabled={!isSelectedMaterialBoard}
+
+                                                        />
+
+                                                    )}
 
                                                 </div>
 
-                                            ) : (
-
-                                                <Input
-
-                                                    type="number"
-
-                                                    value={formData.width}
-
-                                                    onChange={(e) => handleFieldChange("width", e.target.value)}
-
-                                                    onClick={() => {
-
-                                                        setActiveField("width");
-
-                                                        setNumpadMode("quantity");
-
-                                                    }}
-
-                                                    className="h-9 text-base text-center font-bold bg-gray-100"
-
-                                                    placeholder={widthValues.length === 1 ? widthValues[0].label : "0"}
-
-                                                    disabled={!isSelectedMaterialBoard}
-
-                                                />
-
-                                            )}
-
-                                        </div>
 
 
+                                                {/* ثانياً: المسطرة على سطر واحد */}
+                                                <div>
 
-                                        {/* ثانياً: المسطرة على سطر واحد */}
-                                        <div>
+                                                    <Label className="font-bold text-sm mb-1 block">المسطرة</Label>
 
-                                            <Label className="font-bold text-sm mb-1 block">المسطرة</Label>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                        {rulerOptions.map(r => (
 
-                                                {rulerOptions.map(r => (
+                                                            <button
 
-                                                    <button
+                                                                key={r.value}
 
-                                                        key={r.value}
+                                                                onClick={() => handleFieldChange("ruler_id", r.value)}
 
-                                                        onClick={() => handleFieldChange("ruler_id", r.value)}
-
-                                                        className={`
+                                                                className={`
 
                                                             rounded-xl border-3 text-base font-medium
 
@@ -3657,505 +3816,504 @@ export default function OrderPreparer() {
 
                                                             ${formData.ruler_id === r.value
 
-                                                                ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+                                                                        ? "border-secondary-s bg-secondary-s text-white shadow-lg"
 
-                                                                : "border-gray-300 bg-white hover:border-secondary-s"
+                                                                        : "border-gray-300 bg-white hover:border-secondary-s"
 
-                                                            }
+                                                                    }
 
                                                         `}
 
-                                                        disabled={!formData.material_id}
+                                                                disabled={!formData.material_id}
 
-                                                    >
+                                                            >
 
-                                                        {r.label}
+                                                                {r.label}
 
-                                                    </button>
-
-                                                ))}
-
-                                            </div>
-
-                                        </div>
-
-
-
-                                        {/* ثالثاً: اللون select */}
-                                        <div>
-
-                                            <Label className="font-bold text-sm mb-1 block">اللون</Label>
-
-                                            <FilterSelect
-
-                                                value={formData.color_id ? String(formData.color_id) : ""}
-
-                                                onChange={(e) => handleFieldChange("color_id", e.target.value)}
-
-                                                disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
-
-                                                searchValue={colorSearchCode}
-
-                                                onSearchValueChange={(v) => setColorSearchCode(v)}
-
-                                                options={colorOptions}
-
-                                                placeholder="اختر اللون"
-
-                                                className="w-full text-sm"
-
-                                            />
-
-                                        </div>
-
-
-
-                                        {/* رابعاً: الكمية - السماكة - رقم الطبخة على سطر واحد */}
-                                        <div className="grid grid-cols-3 gap-2">
-
-                                            <div>
-
-                                                <Label className="font-bold text-sm mb-1 block">الكمية</Label>
-
-                                                <Input
-
-                                                    type="number"
-
-                                                    value={formData.quantity}
-
-                                                    onChange={(e) => handleFieldChange("quantity", e.target.value)}
-
-                                                    onClick={() => {
-
-                                                        setActiveField("quantity");
-
-                                                        setNumpadMode("quantity");
-
-                                                    }}
-
-                                                    className="h-9 text-base text-center font-bold bg-gray-100"
-
-                                                    placeholder="0"
-
-                                                />
-
-                                            </div>
-
-
-
-                                            <div>
-
-                                                <Label className="font-bold text-sm mb-1 block">السماكة</Label>
-
-                                                {thicknessValues.length > 1 ? (
-
-                                                    <FilterSelect
-
-                                                        value={formData.thickness ? String(formData.thickness) : ""}
-
-                                                        onChange={(e) => handleFieldChange("thickness", e.target.value)}
-
-                                                        options={thicknessOptions}
-
-                                                        placeholder="السماكة"
-
-                                                        className="w-full text-sm"
-
-                                                    />
-
-                                                ) : (
-
-                                                    <Input
-
-                                                        type="number"
-
-                                                        value={formData.thickness}
-
-                                                        onChange={(e) => handleFieldChange("thickness", e.target.value)}
-
-                                                        onClick={() => {
-
-                                                            setActiveField("thickness");
-
-                                                            setNumpadMode("quantity");
-
-                                                        }}
-
-                                                        className="h-9 text-base text-center font-bold bg-gray-100"
-
-                                                        placeholder={thicknessValues.length === 1 ? thicknessValues[0].label : "0.6"}
-
-                                                        step="0.1"
-
-                                                    />
-
-                                                )}
-
-                                            </div>
-
-
-
-                                            <div>
-
-                                                <Label className="font-bold text-sm mb-1 block">رقم الطبخة</Label>
-
-                                                <FilterSelect
-
-                                                    value={formData.batch_id ? String(formData.batch_id) : ""}
-
-                                                    onChange={(e) => handleFieldChange("batch_id", e.target.value)}
-
-                                                    disabled={!isSelectedMaterialBoard && !formData.width}
-
-                                                    searchValue={batchSearchTerm}
-
-                                                    onSearchValueChange={(v) => setBatchSearchTerm(v)}
-
-                                                    options={batchOptions}
-
-                                                    placeholder="اختر الطبخة"
-
-                                                    className="w-full text-sm"
-
-                                                />
-
-                                            </div>
-
-                                        </div>
-
-
-
-                                        {/* خامساً: الملاحظات */}
-
-                                        <div>
-
-                                            <Label className="font-bold text-sm mb-1 block">الملاحظات</Label>
-
-                                            <Input
-
-                                                value={formData.notes}
-
-                                                onChange={(e) => handleFieldChange("notes", e.target.value)}
-
-                                                placeholder="ملاحظات..."
-
-                                                className="h-12 text-base"
-
-                                            />
-
-                                        </div>
-
-
-
-                                        {/* سادساً: زر التعديل أو الإضافة */}
-
-                                        {editingItemId ? (
-
-                                            <div className="mt-auto pt-1 flex gap-2">
-
-                                                <Button
-
-                                                    onClick={cancelEdit}
-
-                                                    size="sm"
-
-                                                    variant="outline"
-
-                                                    className="flex-1 h-10 text-base font-bold touch-manipulation active:scale-95 transition-transform"
-
-                                                >
-
-                                                    <X className="w-4 h-4 ml-2" />
-
-                                                    إلغاء
-
-                                                </Button>
-
-                                                <Button
-
-                                                    onClick={handleUpdateProductionOrder}
-
-                                                    size="sm"
-
-                                                    className="flex-1 h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform bg-green-600 hover:bg-green-700"
-
-                                                >
-
-                                                    <Check className="w-4 h-4 ml-2" />
-
-                                                    تأكيد
-
-                                                </Button>
-
-                                            </div>
-
-                                        ) : (
-
-                                            <div className="mt-auto pt-1">
-
-                                                <Button
-
-                                                    onClick={handleAddProductionOrder}
-
-                                                    size="sm"
-
-                                                    className="w-full h-12 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform bg-orange-600 hover:bg-orange-700"
-
-                                                    disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
-
-                                                >
-
-                                                    <Plus className="w-5 h-5 ml-2" />
-
-                                                    إضافة لطلب الإنتاج
-
-                                                </Button>
-
-                                            </div>
-
-                                        )}
-
-                                    </div>
-
-                                </div>
-
-
-
-                                {/* العمود الأيسر - قائمة طلبات الإنتاج */}
-
-                                <div className="flex flex-col gap-3 h-full min-h-0 overflow-auto">
-
-                                    <Card className="flex flex-col h-full min-h-0 overflow-hidden">
-
-                                        {/* رأس القائمة مع أزرار التحكم */}
-
-                                        <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
-
-                                            <div className="flex items-center gap-2">
-
-                                                <span className="font-bold text-lg">طلبات الإنتاج</span>
-
-                                                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs">
-
-                                                    {productionOrders.length}
-
-                                                </span>
-
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-
-                                                <Button
-
-                                                    size="sm"
-
-                                                    variant="outline"
-
-                                                    onClick={handleSendProductionOrders}
-
-                                                    disabled={productionLoading || productionOrders.length === 0}
-
-                                                    className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
-
-                                                >
-
-                                                    {productionLoading ? "جاري الإرسال..." : "إرسال للإنتاج"}
-
-                                                </Button>
-
-                                            </div>
-
-                                        </div>
-
-
-
-                                        {/* جدول طلبات الإنتاج */}
-
-                                        <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]">
-
-                                            {productionOrders.length > 0 ? (
-
-                                                <table className="w-full text-sm">
-
-                                                    <thead className="bg-gray-100 sticky top-0 z-10">
-
-                                                        <tr>
-
-                                                            <th className="p-2 text-right border-b">المادة</th>
-
-                                                            <th className="p-2 text-center border-b">العرض</th>
-
-                                                            <th className="p-2 text-right border-b">اللون</th>
-
-                                                            <th className="p-2 text-center border-b">النوع</th>
-
-                                                            <th className="p-2 text-center border-b">الكمية</th>
-
-                                                            <th className="p-2 text-right border-b">المسطرة</th>
-
-                                                            <th className="p-2 text-center border-b">السماكة</th>
-
-                                                            <th className="p-2 text-center border-b">الطبخة</th>
-
-                                                            <th className="p-2 text-center border-b">إجراء</th>
-
-                                                        </tr>
-
-                                                    </thead>
-
-                                                    <tbody>
-
-                                                        {productionOrders.map((order, index) => (
-
-                                                            <tr key={order.id} className="border-b hover:bg-gray-50">
-
-                                                                <td className="p-2 font-medium">{order.material_name}</td>
-
-                                                                <td className="p-2 text-center">{order.width || "-"}</td>
-
-                                                                <td className="p-2">
-
-                                                                    <div className="flex items-center justify-center gap-1">
-
-                                                                        <div
-
-                                                                            className="w-4 h-4 rounded border border-gray-300"
-
-                                                                            style={{ backgroundColor: order.color_code }}
-
-                                                                        />
-
-                                                                        <span className="text-xs">{order.color_code}</span>
-
-                                                                    </div>
-
-                                                                </td>
-
-                                                                <td className="p-2 text-center">
-
-                                                                    {formatTypeItem(order.type_item)}
-
-                                                                </td>
-
-                                                                <td className="p-2 text-center font-bold">{order.quantity} م</td>
-
-                                                                <td className="p-2">{order.ruler_name || "-"}</td>
-
-                                                                <td className="p-2 text-center">{order.thickness || "0.6"}</td>
-
-                                                                <td className="p-2 text-center">{order.batch_number || "-"}</td>
-
-                                                                <td className="p-2 text-center">
-
-                                                                    <div className="flex items-center justify-center gap-2">
-
-                                                                        <button
-
-                                                                            onClick={() => handleEditProductionOrder(order)}
-
-                                                                            className="text-blue-600 hover:text-blue-800 text-sm"
-
-                                                                            title="تعديل الطلب"
-
-                                                                        >
-
-                                                                            <Edit className="w-4 h-4" />
-
-                                                                        </button>
-
-                                                                        <button
-
-                                                                            onClick={() => setProductionOrders(prev => prev.filter(item => item.id !== order.id))}
-
-                                                                            className="text-red-600 hover:text-red-800 text-sm"
-
-                                                                            title="حذف الطلب"
-
-                                                                        >
-
-                                                                            <Trash2 className="w-4 h-4" />
-
-                                                                        </button>
-
-                                                                    </div>
-
-                                                                </td>
-
-                                                            </tr>
+                                                            </button>
 
                                                         ))}
-
-                                                    </tbody>
-
-                                                </table>
-
-                                            ) : (
-
-                                                <div className="flex items-center justify-center h-full text-gray-400">
-
-                                                    <div className="text-center">
-
-                                                        <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-lg flex items-center justify-center">
-
-                                                            <Plus className="w-8 h-8 text-gray-400" />
-
-                                                        </div>
-
-                                                        <p className="text-lg">لا توجد طلبات إنتاج</p>
-
-                                                        <p className="text-sm mt-2">قم بإضافة طلبات لإرسالها للإنتاج</p>
 
                                                     </div>
 
                                                 </div>
 
-                                            )}
+
+
+                                                {/* ثالثاً: اللون select */}
+                                                <div>
+
+                                                    <Label className="font-bold text-sm mb-1 block">اللون</Label>
+
+                                                    <FilterSelect
+
+                                                        value={formData.color_id ? String(formData.color_id) : ""}
+
+                                                        onChange={(e) => handleFieldChange("color_id", e.target.value)}
+
+                                                        disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
+
+                                                        searchValue={colorSearchCode}
+
+                                                        onSearchValueChange={(v) => setColorSearchCode(v)}
+
+                                                        options={colorOptions}
+
+                                                        placeholder="اختر اللون"
+
+                                                        className="w-full text-sm"
+
+                                                    />
+
+                                                </div>
+
+
+
+                                                {/* رابعاً: الكمية - السماكة - رقم الطبخة على سطر واحد */}
+                                                <div className="grid grid-cols-3 gap-2">
+
+                                                    <div>
+
+                                                        <Label className="font-bold text-sm mb-1 block">الكمية</Label>
+
+                                                        <Input
+
+                                                            type="number"
+
+                                                            value={formData.quantity}
+
+                                                            onChange={(e) => handleFieldChange("quantity", e.target.value)}
+
+                                                            onClick={() => {
+
+                                                                setActiveField("quantity");
+
+                                                                setNumpadMode("quantity");
+
+                                                            }}
+
+                                                            className="h-9 text-base text-center font-bold bg-gray-100"
+
+                                                            placeholder="0"
+
+                                                        />
+
+                                                    </div>
+
+
+
+                                                    <div>
+
+                                                        <Label className="font-bold text-sm mb-1 block">السماكة</Label>
+
+                                                        {thicknessValues.length > 1 ? (
+
+                                                            <FilterSelect
+
+                                                                value={formData.thickness ? String(formData.thickness) : ""}
+
+                                                                onChange={(e) => handleFieldChange("thickness", e.target.value)}
+
+                                                                options={thicknessOptions}
+
+                                                                placeholder="السماكة"
+
+                                                                className="w-full text-sm"
+
+                                                            />
+
+                                                        ) : (
+
+                                                            <Input
+
+                                                                type="number"
+
+                                                                value={formData.thickness}
+
+                                                                onChange={(e) => handleFieldChange("thickness", e.target.value)}
+
+                                                                onClick={() => {
+
+                                                                    setActiveField("thickness");
+
+                                                                    setNumpadMode("quantity");
+
+                                                                }}
+
+                                                                className="h-9 text-base text-center font-bold bg-gray-100"
+
+                                                                placeholder={thicknessValues.length === 1 ? thicknessValues[0].label : "0.6"}
+
+                                                                step="0.1"
+
+                                                            />
+
+                                                        )}
+
+                                                    </div>
+
+
+
+                                                    <div>
+
+                                                        <Label className="font-bold text-sm mb-1 block">رقم الطبخة</Label>
+
+                                                        <FilterSelect
+
+                                                            value={formData.batch_id ? String(formData.batch_id) : ""}
+
+                                                            onChange={(e) => handleFieldChange("batch_id", e.target.value)}
+
+                                                            disabled={!isSelectedMaterialBoard && !formData.width}
+
+                                                            searchValue={batchSearchTerm}
+
+                                                            onSearchValueChange={(v) => setBatchSearchTerm(v)}
+
+                                                            options={batchOptions}
+
+                                                            placeholder="اختر الطبخة"
+
+                                                            className="w-full text-sm"
+
+                                                        />
+
+                                                    </div>
+
+                                                </div>
+
+
+
+                                                {/* خامساً: الملاحظات */}
+
+                                                <div>
+
+                                                    <Label className="font-bold text-sm mb-1 block">الملاحظات</Label>
+
+                                                    <Input
+
+                                                        value={formData.notes}
+
+                                                        onChange={(e) => handleFieldChange("notes", e.target.value)}
+
+                                                        placeholder="ملاحظات..."
+
+                                                        className="h-12 text-base"
+
+                                                    />
+
+                                                </div>
+
+
+
+                                                {/* سادساً: زر التعديل أو الإضافة */}
+
+                                                {editingItemId ? (
+
+                                                    <div className="mt-auto pt-1 flex gap-2">
+
+                                                        <Button
+
+                                                            onClick={cancelEdit}
+
+                                                            size="sm"
+
+                                                            variant="outline"
+
+                                                            className="flex-1 h-10 text-base font-bold touch-manipulation active:scale-95 transition-transform"
+
+                                                        >
+
+                                                            <X className="w-4 h-4 ml-2" />
+
+                                                            إلغاء
+
+                                                        </Button>
+
+                                                        <Button
+
+                                                            onClick={handleUpdateProductionOrder}
+
+                                                            size="sm"
+
+                                                            className="flex-1 h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform bg-green-600 hover:bg-green-700"
+
+                                                        >
+
+                                                            <Check className="w-4 h-4 ml-2" />
+
+                                                            تأكيد
+
+                                                        </Button>
+
+                                                    </div>
+
+                                                ) : (
+
+                                                    <div className="mt-auto pt-1">
+
+                                                        <Button
+
+                                                            onClick={handleAddProductionOrder}
+
+                                                            size="sm"
+
+                                                            className="w-full h-12 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform bg-orange-600 hover:bg-orange-700"
+
+                                                            disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
+
+                                                        >
+
+                                                            <Plus className="w-5 h-5 ml-2" />
+
+                                                            إضافة لطلب الإنتاج
+
+                                                        </Button>
+
+                                                    </div>
+
+                                                )}
+
+                                            </div>
 
                                         </div>
 
-                                    </Card>
+
+
+                                        {/* العمود الأيسر - قائمة طلبات الإنتاج */}
+
+                                        <div className="flex flex-col gap-3 h-full min-h-0 overflow-auto">
+
+                                            <Card className="flex flex-col h-full min-h-0 overflow-hidden">
+
+                                                {/* رأس القائمة مع أزرار التحكم */}
+
+                                                <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
+
+                                                    <div className="flex items-center gap-2">
+
+                                                        <span className="font-bold text-lg">طلبات الإنتاج</span>
+
+                                                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs">
+
+                                                            {productionOrders.length}
+
+                                                        </span>
+
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+
+                                                        <Button
+
+                                                            size="sm"
+
+                                                            variant="outline"
+
+                                                            onClick={handleSendProductionOrders}
+
+                                                            disabled={productionLoading || productionOrders.length === 0}
+
+                                                            className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+
+                                                        >
+
+                                                            {productionLoading ? "جاري الإرسال..." : "إرسال للإنتاج"}
+
+                                                        </Button>
+
+                                                    </div>
+
+                                                </div>
+
+
+
+                                                {/* جدول طلبات الإنتاج */}
+
+                                                <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]">
+
+                                                    {productionOrders.length > 0 ? (
+
+                                                        <table className="w-full text-sm">
+
+                                                            <thead className="bg-gray-100 sticky top-0 z-10">
+
+                                                                <tr>
+
+                                                                    <th className="p-2 text-right border-b">المادة</th>
+
+                                                                    <th className="p-2 text-center border-b">العرض</th>
+
+                                                                    <th className="p-2 text-right border-b">اللون</th>
+
+                                                                    <th className="p-2 text-center border-b">النوع</th>
+
+                                                                    <th className="p-2 text-center border-b">الكمية</th>
+
+                                                                    <th className="p-2 text-right border-b">المسطرة</th>
+
+                                                                    <th className="p-2 text-center border-b">السماكة</th>
+
+                                                                    <th className="p-2 text-center border-b">الطبخة</th>
+
+                                                                    <th className="p-2 text-center border-b">إجراء</th>
+
+                                                                </tr>
+
+                                                            </thead>
+
+                                                            <tbody>
+
+                                                                {productionOrders.map((order, index) => (
+
+                                                                    <tr key={order.id} className="border-b hover:bg-gray-50">
+
+                                                                        <td className="p-2 font-medium">{order.material_name}</td>
+
+                                                                        <td className="p-2 text-center">{order.width || "-"}</td>
+
+                                                                        <td className="p-2">
+
+                                                                            <div className="flex items-center justify-center gap-1">
+
+                                                                                <div
+
+                                                                                    className="w-4 h-4 rounded border border-gray-300"
+
+                                                                                    style={{ backgroundColor: order.color_code }}
+
+                                                                                />
+
+                                                                                <span className="text-xs">{order.color_code}</span>
+
+                                                                            </div>
+
+                                                                        </td>
+
+                                                                        <td className="p-2 text-center">
+
+                                                                            {formatTypeItem(order.type_item)}
+
+                                                                        </td>
+
+                                                                        <td className="p-2 text-center font-bold">{order.quantity} م</td>
+
+                                                                        <td className="p-2">{order.ruler_name || "-"}</td>
+
+                                                                        <td className="p-2 text-center">{order.thickness || "0.6"}</td>
+
+                                                                        <td className="p-2 text-center">{order.batch_number || "-"}</td>
+
+                                                                        <td className="p-2 text-center">
+
+                                                                            <div className="flex items-center justify-center gap-2">
+
+                                                                                <button
+
+                                                                                    onClick={() => handleEditProductionOrder(order)}
+
+                                                                                    className="text-blue-600 hover:text-blue-800 text-sm"
+
+                                                                                    title="تعديل الطلب"
+
+                                                                                >
+
+                                                                                    <Edit className="w-4 h-4" />
+
+                                                                                </button>
+
+                                                                                <button
+
+                                                                                    onClick={() => setProductionOrders(prev => prev.filter(item => item.id !== order.id))}
+
+                                                                                    className="text-red-600 hover:text-red-800 text-sm"
+
+                                                                                    title="حذف الطلب"
+
+                                                                                >
+
+                                                                                    <Trash2 className="w-4 h-4" />
+
+                                                                                </button>
+
+                                                                            </div>
+
+                                                                        </td>
+
+                                                                    </tr>
+
+                                                                ))}
+                                                            </tbody>
+
+                                                        </table>
+
+                                                    ) : (
+
+                                                        <div className="flex items-center justify-center h-full text-gray-400">
+
+                                                            <div className="text-center">
+
+                                                                <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-lg flex items-center justify-center">
+
+                                                                    <Plus className="w-8 h-8 text-gray-400" />
+
+                                                                </div>
+
+                                                                <p className="text-lg">لا توجد طلبات إنتاج</p>
+
+                                                                <p className="text-sm mt-2">قم بإضافة طلبات لإرسالها للإنتاج</p>
+
+                                                            </div>
+
+                                                        </div>
+
+                                                    )}
+
+                                                </div>
+
+                                            </Card>
+
+                                        </div>
+
+                                    </div>
 
                                 </div>
 
+                            )) : (
+
+                            <div className="h-full min-h-0">
+
+                                <ColorsReadOnly />
+
                             </div>
 
-                        </div>
+                        )
 
-                    ) : (
+                    ) : viewMode === "create" ? (
 
-                        <div className="h-full min-h-0">
+                        <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-2 h-full min-h-0 px-2 pb-2">
 
-                            <ColorsReadOnly />
+                            {/* العمود الأيمن - المواد والأرقام */}
 
-                        </div>
+                            <div className="flex flex-col gap-2 h-full min-h-0 overflow-auto">
 
-                    )
+                                {/* أزرار المواد */}
 
-                ) : viewMode === "create" ? (
+                                <Card className="flex-1 p-2 flex flex-col">
 
-                    <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-2 h-full min-h-0 px-2 pb-2">
+                                    <Label className="font-bold text-sm mb-1 block">المادة</Label>
 
-                        {/* العمود الأيمن - المواد والأرقام */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
 
-                        <div className="flex flex-col gap-2 h-full min-h-0 overflow-auto">
+                                        {(Array.isArray(isOrderPreparer ? filteredMaterials : materials) ? (isOrderPreparer ? filteredMaterials : materials) : []).map(m => (
 
-                            {/* أزرار المواد */}
+                                            <button
 
-                            <Card className="flex-1 p-2 flex flex-col">
+                                                key={m.material_id}
 
-                                <Label className="font-bold text-sm mb-1 block">المادة</Label>
+                                                onClick={() => handleFieldChange("material_id", String(m.material_id))}
 
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
-
-                                    {(Array.isArray(isOrderPreparer ? filteredMaterials : materials) ? (isOrderPreparer ? filteredMaterials : materials) : []).map(m => (
-
-                                        <button
-
-                                            key={m.material_id}
-
-                                            onClick={() => handleFieldChange("material_id", String(m.material_id))}
-
-                                            className={`
+                                                className={`
 
                                                 aspect-square rounded-xl border-3 text-lg sm:text-xl font-bold 
 
@@ -4165,45 +4323,45 @@ export default function OrderPreparer() {
 
                                                 ${String(formData.material_id) === String(m.material_id)
 
-                                                    ? "border-primary-f bg-secondary-f text-white shadow-lg"
+                                                        ? "border-primary-f bg-secondary-f text-white shadow-lg"
 
-                                                    : isOrderPreparer
+                                                        : isOrderPreparer
 
-                                                        ? "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
+                                                            ? "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
 
-                                                        : "border-gray-300 bg-white hover:border-secondary-s"
+                                                            : "border-gray-300 bg-white hover:border-secondary-s"
 
-                                                }
+                                                    }
 
                                             `}
 
-                                            title={m.material_name}
+                                                title={m.material_name}
 
-                                        >
+                                            >
 
-                                            <span className="line-clamp-2 text-center">{m.material_name}</span>
+                                                <span className="line-clamp-2 text-center">{m.material_name}</span>
 
-                                        </button>
+                                            </button>
 
-                                    ))}
+                                        ))}
 
-                                </div>
+                                    </div>
 
-                            </Card>
-
-
+                                </Card>
 
 
 
 
 
-                            {/* الأرقام */}
 
-                            <Card className="flex-[3] flex flex-col p-2 min-h-0 overflow-auto">
 
-                                <div className="flex-shrink-0 mb-1">
+                                {/* الأرقام */}
 
-                                    {/* <div className="flex gap-2 mb-2">
+                                <Card className="flex-[3] flex flex-col p-2 min-h-0 overflow-auto">
+
+                                    <div className="flex-shrink-0 mb-1">
+
+                                        {/* <div className="flex gap-2 mb-2">
 
                                         <button
 
@@ -4273,241 +4431,241 @@ export default function OrderPreparer() {
 
 
 
-                                    <div className="bg-gray-100 rounded-lg py-2 px-3">
+                                        <div className="bg-gray-100 rounded-lg py-2 px-3">
 
-                                        <div className="text-xs text-gray-500 mb-0.5">
+                                            <div className="text-xs text-gray-500 mb-0.5">
 
-                                            {numpadMode === "colorSearch" ? "كود اللون" :
+                                                {numpadMode === "colorSearch" ? "كود اللون" :
 
-                                                activeField === "quantity" ? "الكمية" :
+                                                    activeField === "quantity" ? "الكمية" :
 
-                                                    activeField === "width" ? "العرض" : "القيمة"}
+                                                        activeField === "width" ? "العرض" : "القيمة"}
 
-                                        </div>
+                                            </div>
 
-                                        <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
+                                            <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
 
-                                            {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
+                                                {numpadMode === "colorSearch" ? colorSearchCode || "0" : (formData[activeField] || "0")}
+
+                                            </div>
 
                                         </div>
 
                                     </div>
 
-                                </div>
 
 
+                                    {/* أزرار الأرقام */}
 
-                                {/* أزرار الأرقام */}
+                                    <div className="flex-1 grid grid-rows-4 gap-1 min-h-0">
 
-                                <div className="flex-1 grid grid-rows-4 gap-1 min-h-0">
+                                        <div className="grid grid-cols-3 gap-1">
 
-                                    <div className="grid grid-cols-3 gap-1">
+                                            {["7", "8", "9"].map(key => (
 
-                                        {["7", "8", "9"].map(key => (
+                                                <button
+
+                                                    key={key}
+
+                                                    onClick={() => handleNumpadPress(key)}
+
+                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+
+                                                >
+
+                                                    {key}
+
+                                                </button>
+
+                                            ))}
+
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-1">
+
+                                            {["4", "5", "6"].map(key => (
+
+                                                <button
+
+                                                    key={key}
+
+                                                    onClick={() => handleNumpadPress(key)}
+
+                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+
+                                                >
+
+                                                    {key}
+
+                                                </button>
+
+                                            ))}
+
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-1">
+
+                                            {["1", "2", "3"].map(key => (
+
+                                                <button
+
+                                                    key={key}
+
+                                                    onClick={() => handleNumpadPress(key)}
+
+                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+
+                                                >
+
+                                                    {key}
+
+                                                </button>
+
+                                            ))}
+
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-1">
 
                                             <button
 
-                                                key={key}
-
-                                                onClick={() => handleNumpadPress(key)}
+                                                onClick={() => handleNumpadPress(".")}
 
                                                 className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
 
                                             >
 
-                                                {key}
+                                                .
 
                                             </button>
 
-                                        ))}
-
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-1">
-
-                                        {["4", "5", "6"].map(key => (
-
                                             <button
 
-                                                key={key}
-
-                                                onClick={() => handleNumpadPress(key)}
+                                                onClick={() => handleNumpadPress("0")}
 
                                                 className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
 
                                             >
 
-                                                {key}
+                                                0
 
                                             </button>
 
-                                        ))}
-
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-1">
-
-                                        {["1", "2", "3"].map(key => (
-
                                             <button
 
-                                                key={key}
+                                                onClick={() => handleNumpadPress("clear")}
 
-                                                onClick={() => handleNumpadPress(key)}
-
-                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-lg font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
 
                                             >
 
-                                                {key}
+                                                مسح
 
                                             </button>
 
-                                        ))}
+                                        </div>
 
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-1">
+                                </Card>
+
+                            </div>
+
+
+
+                            {/* العمود الأوسط - العناصر الإضافية */}
+
+                            <div className={`flex flex-col gap-2 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-1 ${materialBorderClass}`}>
+
+                                {/* شريط التقدم للتعديل */}
+
+                                {editingItemId && (
+
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">
+
+                                        <span className="text-blue-700 text-sm font-medium">
+
+                                            <Edit className="w-4 h-4 inline ml-1" />
+
+                                            جاري تعديل العنصر
+
+                                        </span>
 
                                         <button
 
-                                            onClick={() => handleNumpadPress(".")}
+                                            onClick={cancelEdit}
 
-                                            className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
-
-                                        >
-
-                                            .
-
-                                        </button>
-
-                                        <button
-
-                                            onClick={() => handleNumpadPress("0")}
-
-                                            className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                            className="text-blue-600 hover:text-blue-800 text-sm font-bold"
 
                                         >
 
-                                            0
-
-                                        </button>
-
-                                        <button
-
-                                            onClick={() => handleNumpadPress("clear")}
-
-                                            className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-lg font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
-
-                                        >
-
-                                            مسح
+                                            إلغاء
 
                                         </button>
 
                                     </div>
 
-                                </div>
-
-                            </Card>
-
-                        </div>
+                                )}
 
 
 
-                        {/* العمود الأوسط - العناصر الإضافية */}
+                                {formData.material_id && !isSelectedMaterialPvc && (
 
-                        <div className={`flex flex-col gap-2 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-1 ${materialBorderClass}`}>
+                                    <div className="bg-primary-s border border-primary-f/20 text-secondary-f text-sm p-3 rounded-lg">
 
-                            {/* شريط التقدم للتعديل */}
+                                        <div className="font-bold mb-2">معلومات الأبعاد</div>
 
-                            {editingItemId && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
 
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">
+                                            <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
 
-                                    <span className="text-blue-700 text-sm font-medium">
+                                                <div className="text-xs text-secondary-t">الطول</div>
 
-                                        <Edit className="w-4 h-4 inline ml-1" />
+                                                <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "height")}</div>
 
-                                        جاري تعديل العنصر
+                                            </div>
 
-                                    </span>
+                                            <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
 
-                                    <button
+                                                <div className="text-xs text-secondary-t">العرض</div>
 
-                                        onClick={cancelEdit}
+                                                <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "width")}</div>
 
-                                        className="text-blue-600 hover:text-blue-800 text-sm font-bold"
+                                            </div>
 
-                                    >
+                                            <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
 
-                                        إلغاء
+                                                <div className="text-xs text-secondary-t">السماكة</div>
 
-                                    </button>
+                                                <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "thickness")}</div>
 
-                                </div>
-
-                            )}
-
-
-
-                            {formData.material_id && !isSelectedMaterialPvc && (
-
-                                <div className="bg-primary-s border border-primary-f/20 text-secondary-f text-sm p-3 rounded-lg">
-
-                                    <div className="font-bold mb-2">معلومات الأبعاد</div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-
-                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
-
-                                            <div className="text-xs text-secondary-t">الطول</div>
-
-                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "height")}</div>
-
-                                        </div>
-
-                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
-
-                                            <div className="text-xs text-secondary-t">العرض</div>
-
-                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "width")}</div>
-
-                                        </div>
-
-                                        <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
-
-                                            <div className="text-xs text-secondary-t">السماكة</div>
-
-                                            <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "thickness")}</div>
+                                            </div>
 
                                         </div>
 
                                     </div>
 
-                                </div>
-
-                            )}
+                                )}
 
 
 
-                            {isSelectedMaterialPvc && (
+                                {isSelectedMaterialPvc && (
 
-                                <div className="flex-shrink-0 p-2 border-b-2 border-dashed border-gray-300">
+                                    <div className="flex-shrink-0 p-2 border-b-2 border-dashed border-gray-300">
 
-                                    {/* <Label className="font-bold text-sm mb-2 block">نوع الطلب</Label> */}
+                                        {/* <Label className="font-bold text-sm mb-2 block">نوع الطلب</Label> */}
 
-                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-2 gap-2">
 
-                                        {TYPE_OPTIONS.map(t => (
+                                            {TYPE_OPTIONS.map(t => (
 
-                                            <button
+                                                <button
 
-                                                key={t.value}
+                                                    key={t.value}
 
-                                                onClick={() => handleFieldChange("type_item", t.value)}
+                                                    onClick={() => handleFieldChange("type_item", t.value)}
 
-                                                className={`
+                                                    className={`
 
                                                     rounded-2xl border-3 text-lg font-bold
 
@@ -4517,55 +4675,55 @@ export default function OrderPreparer() {
 
                                                     ${formData.type_item === t.value
 
-                                                        ? "border-primary-f bg-primary-f text-white shadow-lg"
+                                                            ? "border-primary-f bg-primary-f text-white shadow-lg"
 
-                                                        : "border-gray-300 bg-white hover:border-secondary-s"
+                                                            : "border-gray-300 bg-white hover:border-secondary-s"
 
-                                                    }
+                                                        }
 
                                                 `}
 
-                                            >
+                                                >
 
-                                                {t.label}
+                                                    {t.label}
 
-                                            </button>
+                                                </button>
 
-                                        ))}
+                                            ))}
+
+                                        </div>
 
                                     </div>
 
-                                </div>
-
-                            )}
+                                )}
 
 
 
-                            {formData.material_id && !isSelectedMaterialBoard && (
+                                {formData.material_id && !isSelectedMaterialBoard && (
 
-                                <div className="p-2 border-b-2 border-dashed border-gray-300">
+                                    <div className="p-2 border-b-2 border-dashed border-gray-300">
 
-                                    <Label className="font-bold text-sm mb-2 block">
+                                        <Label className="font-bold text-sm mb-2 block">
 
-                                        العرض
+                                            العرض
 
-                                        {loadingWidths && <span className="mr-2 text-gray-500 text-xs">جاري التحميل...</span>}
+                                            {loadingWidths && <span className="mr-2 text-gray-500 text-xs">جاري التحميل...</span>}
 
-                                    </Label>
+                                        </Label>
 
-                                    {widthValues.length > 0 ? (
+                                        {widthValues.length > 0 ? (
 
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 
-                                            {widthValues.map(w => (
+                                                {widthValues.map(w => (
 
-                                                <button
+                                                    <button
 
-                                                    key={w.id}
+                                                        key={w.id}
 
-                                                    onClick={() => handleFieldChange("width", w.value)}
+                                                        onClick={() => handleFieldChange("width", w.value)}
 
-                                                    className={`
+                                                        className={`
 
                                                         rounded-xl border-3 text-base font-medium
 
@@ -4575,65 +4733,65 @@ export default function OrderPreparer() {
 
                                                         ${formData.width === w.value
 
-                                                            ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+                                                                ? "border-secondary-s bg-secondary-s text-white shadow-lg"
 
-                                                            : "border-gray-300 bg-white hover:border-secondary-s"
+                                                                : "border-gray-300 bg-white hover:border-secondary-s"
 
-                                                        }
+                                                            }
 
                                                     `}
 
-                                                >
+                                                    >
 
-                                                    {w.value}
+                                                        {w.value}
 
-                                                </button>
+                                                    </button>
 
-                                            ))}
-
-                                        </div>
-
-                                    ) : (
-
-                                        !loadingWidths && (
-
-                                            <div className="text-center p-3 text-gray-400 text-sm border-2 border-dashed border-gray-300 rounded-xl">
-
-                                                لا توجد قيم عرض
+                                                ))}
 
                                             </div>
 
-                                        )
+                                        ) : (
 
-                                    )}
+                                            !loadingWidths && (
 
-                                </div>
+                                                <div className="text-center p-3 text-gray-400 text-sm border-2 border-dashed border-gray-300 rounded-xl">
 
-                            )}
+                                                    لا توجد قيم عرض
+
+                                                </div>
+
+                                            )
+
+                                        )}
+
+                                    </div>
+
+                                )}
 
 
 
-                            <div className="p-2 border-b-2 border-dashed border-gray-300">
+                                <div className="p-2 border-b-2 border-dashed border-gray-300">
 
-                                <Label className="font-bold text-sm mb-1 block">المسطرة</Label>
+                                    <Label className="font-bold text-sm mb-1 block">المسطرة</Label>
 
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 
-                                    {availableRulers.length === 0 ? (
+                                        {availableRulers.length === 0 ? (
 
-                                        <span className="text-gray-400 text-sm col-span-3 text-center p-2">اختر المادة أولاً</span>
+                                            <span className="text-gray-400 text-sm col-span-3 text-center p-2">اختر المادة أولاً</span>
 
-                                    ) : (
+                                        ) : (
 
-                                        availableRulers.map(r => (
+                                            availableRulers.map(r => (
 
-                                            <button
+                                                <button
 
-                                                key={r.ruler_id}
+                                                    key={r.ruler_id}
 
-                                                onClick={() => handleFieldChange("ruler_id", String(r.ruler_id))}
+                                                    onClick={() => handleFieldChange("ruler_id", String(r.ruler_id))}
 
-                                                className={`
+                                                    className={`
 
                                                     rounded-xl border-3 text-base font-medium
 
@@ -4643,167 +4801,111 @@ export default function OrderPreparer() {
 
                                                     ${String(formData.ruler_id) === String(r.ruler_id)
 
-                                                        ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+                                                            ? "border-secondary-s bg-secondary-s text-white shadow-lg"
 
-                                                        : "border-gray-300 bg-white hover:border-secondary-s"
+                                                            : "border-gray-300 bg-white hover:border-secondary-s"
 
-                                                    }
+                                                        }
 
                                                 `}
 
-                                            >
+                                                >
 
-                                                {r.ruler_name}
+                                                    {r.ruler_name}
 
-                                            </button>
+                                                </button>
 
-                                        ))
+                                            ))
 
-                                    )}
-
-                                </div>
-
-                            </div>
-
-
-
-                            <div className="p-2 border-b-2 border-dashed border-gray-300">
-
-                                <div className="grid grid-cols-[1fr_100px] gap-2 items-end">
-
-                                    <div>
-
-                                        <Label className="font-bold text-sm mb-2 block">
-
-                                            اللون
-
-                                            {numpadMode === "colorSearch" && colorSearchCode && (
-
-                                                <span className="mr-2 text-secondary-s text-xs">(بحث: {colorSearchCode})</span>
-
-                                            )}
-
-                                        </Label>
-
-                                        <FilterSelect
-
-                                            value={formData.color_id ? String(formData.color_id) : ""}
-
-                                            onChange={(e) => handleFieldChange("color_id", e.target.value)}
-
-                                            disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
-
-                                            searchValue={colorSearchCode}
-
-                                            onSearchValueChange={(v) => setColorSearchCode(v)}
-
-                                            onInputFocus={() => {
-
-                                                setNumpadMode("text");
-
-                                                setActiveTextTarget("color_search");
-
-                                            }}
-
-                                            keepOpen={activeTextTarget === "color_search"}
-
-                                            showSelectedImage={true}
-
-                                            options={colorOptions}
-
-                                            placeholder={
-
-                                                !formData.ruler_id
-
-                                                    ? "اختر المسطرة أولاً"
-
-                                                    : (!isSelectedMaterialBoard && !formData.width)
-
-                                                        ? "اختر العرض أولاً"
-
-                                                        : colorOptions.length === 0
-
-                                                            ? "لا توجد ألوان مسعرة"
-
-                                                            : "اختر اللون"
-
-                                            }
-
-                                            className="w-full text-sm"
-
-                                        />
+                                        )}
 
                                     </div>
 
                                 </div>
 
-                            </div>
 
 
+                                <div className="p-2 border-b-2 border-dashed border-gray-300">
 
-                            <div className="p-2 border-b-2 border-dashed border-gray-300">
+                                    <div className="grid grid-cols-[1fr_100px] gap-2 items-end">
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                        <div>
 
-                                    <div>
+                                            <Label className="font-bold text-sm mb-2 block">
 
-                                        <Label className="font-bold text-sm mb-1 block">الكمية</Label>
+                                                اللون
 
-                                        <div className="flex items-center gap-2">
+                                                {numpadMode === "colorSearch" && colorSearchCode && (
 
-                                            <Input
+                                                    <span className="mr-2 text-secondary-s text-xs">(بحث: {colorSearchCode})</span>
 
-                                                type="number"
+                                                )}
 
-                                                value={formData.quantity}
-
-                                                onChange={(e) => handleFieldChange("quantity", e.target.value)}
-
-                                                onClick={() => {
-
-                                                    setActiveField("quantity");
-
-                                                    setNumpadMode("quantity");
-
-                                                }}
-
-                                                className={`h-12 text-lg text-center font-bold flex-1 ${activeField === "quantity" ? "ring-2 ring-blue-400" : ""
-
-                                                    }`}
-
-                                                placeholder="0"
-
-                                            />
-
-                                            <span className="text-base font-bold text-gray-600 whitespace-nowrap">متر</span>
-
-                                        </div>
-
-                                    </div>
-
-
-
-                                    <div>
-
-                                        <Label className="font-bold text-sm mb-1 block">السماكة</Label>
-
-                                        {thicknessValues.length > 1 ? (
+                                            </Label>
 
                                             <FilterSelect
 
-                                                value={formData.thickness ? String(formData.thickness) : ""}
+                                                value={formData.color_id ? String(formData.color_id) : ""}
 
-                                                onChange={(e) => handleFieldChange("thickness", e.target.value)}
+                                                onChange={(e) => handleFieldChange("color_id", e.target.value)}
 
-                                                options={thicknessOptions}
+                                                disabled={!formData.ruler_id || (!isSelectedMaterialBoard && !formData.width)}
 
-                                                placeholder="اختر السماكة"
+                                                searchValue={colorSearchCode}
+
+                                                onSearchValueChange={(v) => setColorSearchCode(v)}
+
+                                                onInputFocus={() => {
+
+                                                    setNumpadMode("text");
+
+                                                    setActiveTextTarget("color_search");
+
+                                                }}
+
+                                                keepOpen={activeTextTarget === "color_search"}
+
+                                                showSelectedImage={true}
+
+                                                options={colorOptions}
+
+                                                placeholder={
+
+                                                    !formData.ruler_id
+
+                                                        ? "اختر المسطرة أولاً"
+
+                                                        : (!isSelectedMaterialBoard && !formData.width)
+
+                                                            ? "اختر العرض أولاً"
+
+                                                            : colorOptions.length === 0
+
+                                                                ? "لا توجد ألوان مسعرة"
+
+                                                                : "اختر اللون"
+
+                                                }
 
                                                 className="w-full text-sm"
 
                                             />
 
-                                        ) : (
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+
+
+                                <div className="p-2 border-b-2 border-dashed border-gray-300">
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+
+                                        <div>
+
+                                            <Label className="font-bold text-sm mb-1 block">الكمية</Label>
 
                                             <div className="flex items-center gap-2">
 
@@ -4811,75 +4913,155 @@ export default function OrderPreparer() {
 
                                                     type="number"
 
-                                                    value={formData.thickness}
+                                                    value={formData.quantity}
 
-                                                    onChange={(e) => handleFieldChange("thickness", e.target.value)}
+                                                    onChange={(e) => handleFieldChange("quantity", e.target.value)}
 
-                                                    className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
+                                                    onClick={() => {
 
-                                                    placeholder={thicknessValues.length === 1 ? thicknessValues[0].label : "0.6"}
+                                                        setActiveField("quantity");
 
-                                                    step="0.1"
+                                                        setNumpadMode("quantity");
 
-                                                    readOnly={thicknessValues.length === 1}
+                                                    }}
 
-                                                    disabled={thicknessValues.length === 1}
+                                                    className={`h-12 text-lg text-center font-bold flex-1 ${activeField === "quantity" ? "ring-2 ring-blue-400" : ""
+
+                                                        }`}
+
+                                                    placeholder="0"
 
                                                 />
 
-                                                <span className="text-base font-bold text-gray-600 whitespace-nowrap">مم</span>
+                                                <span className="text-base font-bold text-gray-600 whitespace-nowrap">متر</span>
 
                                             </div>
 
-                                        )}
+                                        </div>
+
+
+
+                                        <div>
+
+                                            <Label className="font-bold text-sm mb-1 block">السماكة</Label>
+
+                                            {thicknessValues.length > 1 ? (
+
+                                                <FilterSelect
+
+                                                    value={formData.thickness ? String(formData.thickness) : ""}
+
+                                                    onChange={(e) => handleFieldChange("thickness", e.target.value)}
+
+                                                    options={thicknessOptions}
+
+                                                    placeholder="اختر السماكة"
+
+                                                    className="w-full text-sm"
+
+                                                />
+
+                                            ) : (
+
+                                                <div className="flex items-center gap-2">
+
+                                                    <Input
+
+                                                        type="number"
+
+                                                        value={formData.thickness}
+
+                                                        onChange={(e) => handleFieldChange("thickness", e.target.value)}
+
+                                                        className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
+
+                                                        placeholder={thicknessValues.length === 1 ? thicknessValues[0].label : "0.6"}
+
+                                                        step="0.1"
+
+                                                        readOnly={thicknessValues.length === 1}
+
+                                                        disabled={thicknessValues.length === 1}
+
+                                                    />
+
+                                                    <span className="text-base font-bold text-gray-600 whitespace-nowrap">مم</span>
+
+                                                </div>
+
+                                            )}
+
+                                        </div>
+
+
+
+                                        <div >
+
+                                            <Label className="font-bold text-sm mb-1 block">رقم الطبخة</Label>
+
+                                            <FilterSelect
+
+                                                value={formData.batch_id ? String(formData.batch_id) : ""}
+
+                                                onChange={(e) => handleFieldChange("batch_id", e.target.value)}
+
+                                                disabled={!isSelectedMaterialBoard && !formData.width}
+
+                                                searchValue={batchSearchTerm}
+
+                                                onSearchValueChange={(v) => setBatchSearchTerm(v)}
+
+                                                onInputFocus={() => {
+
+                                                    setNumpadMode("text");
+
+                                                    setActiveTextTarget("batch_search");
+
+                                                }}
+
+                                                keepOpen={activeTextTarget === "batch_search"}
+
+                                                options={filteredBatchOptions}
+
+                                                placeholder={
+
+                                                    (!isSelectedMaterialBoard && !formData.width)
+
+                                                        ? "اختر العرض أولاً"
+
+                                                        : filteredBatchOptions.length === 0
+
+                                                            ? "لا توجد طبخات"
+
+                                                            : "اختر الطبخة"
+
+                                                }
+
+                                                className="w-full text-sm"
+
+                                            />
+
+                                        </div>
 
                                     </div>
 
+                                </div>
 
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
 
-                                    <div >
+                                    <div className="md:col-span-2">
 
-                                        <Label className="font-bold text-sm mb-1 block">رقم الطبخة</Label>
+                                        <Label className="font-bold text-sm mb-1 block">الملاحظات</Label>
 
-                                        <FilterSelect
+                                        <Input
 
-                                            value={formData.batch_id ? String(formData.batch_id) : ""}
+                                            value={formData.notes}
 
-                                            onChange={(e) => handleFieldChange("batch_id", e.target.value)}
+                                            onChange={(e) => handleFieldChange("notes", e.target.value)}
 
-                                            disabled={!isSelectedMaterialBoard && !formData.width}
+                                            placeholder="ملاحظات إضافية للعنصر..."
 
-                                            searchValue={batchSearchTerm}
-
-                                            onSearchValueChange={(v) => setBatchSearchTerm(v)}
-
-                                            onInputFocus={() => {
-
-                                                setNumpadMode("text");
-
-                                                setActiveTextTarget("batch_search");
-
-                                            }}
-
-                                            keepOpen={activeTextTarget === "batch_search"}
-
-                                            options={filteredBatchOptions}
-
-                                            placeholder={
-
-                                                (!isSelectedMaterialBoard && !formData.width)
-
-                                                    ? "اختر العرض أولاً"
-
-                                                    : filteredBatchOptions.length === 0
-
-                                                        ? "لا توجد طبخات"
-
-                                                        : "اختر الطبخة"
-
-                                            }
-
-                                            className="w-full text-sm"
+                                            className="h-9 text-sm"
 
                                         />
 
@@ -4887,125 +5069,101 @@ export default function OrderPreparer() {
 
                                 </div>
 
-                            </div>
+                                <div className="mt-auto pt-1">
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                                    <div className="flex gap-2">
 
-                                <div className="md:col-span-2">
+                                        {editingItemId && (
 
-                                    <Label className="font-bold text-sm mb-1 block">الملاحظات</Label>
+                                            <button
 
-                                    <Input
+                                                onClick={cancelEdit}
 
-                                        value={formData.notes}
+                                                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors h-10"
 
-                                        onChange={(e) => handleFieldChange("notes", e.target.value)}
+                                            >
 
-                                        placeholder="ملاحظات إضافية للعنصر..."
+                                                إلغاء
 
-                                        className="h-9 text-sm"
-
-                                    />
-
-                                </div>
-
-                            </div>
-
-                            <div className="mt-auto pt-1">
-
-                                <div className="flex gap-2">
-
-                                    {editingItemId && (
-
-                                        <button
-
-                                            onClick={cancelEdit}
-
-                                            className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors h-10"
-
-                                        >
-
-                                            إلغاء
-
-                                        </button>
-
-                                    )}
-
-                                    <Button
-
-                                        onClick={isOrderPreparer ? handleGenerateQrDirectly : addOrUpdateItem}
-
-                                        size="sm"
-
-                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : isOrderPreparer ? 'bg-purple-600 hover:bg-purple-700' : 'bg-primary-f hover:bg-secondary-f'
-
-                                            }`}
-
-                                        disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
-
-                                    >
-
-                                        {editingItemId ? (
-
-                                            <>
-
-                                                <Save className="w-5 h-5 ml-2" />
-
-                                                تحديث العنصر
-
-                                            </>
-
-                                        ) : (
-
-                                            <>
-
-                                                {isOrderPreparer ? (
-
-                                                    <>
-
-                                                        <Plus className="w-5 h-5 ml-2" />
-
-                                                        توليد رمز QR
-
-                                                    </>
-
-                                                ) : (
-
-                                                    <>
-
-                                                        <Plus className="w-5 h-5 ml-2" />
-
-                                                        إضافة للطلب
-
-                                                    </>
-
-                                                )}
-
-                                            </>
+                                            </button>
 
                                         )}
 
-                                    </Button>
+                                        <Button
+
+                                            onClick={isOrderPreparer ? handleGenerateQrDirectly : addOrUpdateItem}
+
+                                            size="sm"
+
+                                            className={`${editingItemId ? 'flex-1' : 'w-full'} h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : isOrderPreparer ? 'bg-purple-600 hover:bg-purple-700' : 'bg-primary-f hover:bg-secondary-f'
+
+                                                }`}
+
+                                            disabled={!formData.color_id || !formData.quantity || (!isSelectedMaterialBoard && !formData.width)}
+
+                                        >
+
+                                            {editingItemId ? (
+
+                                                <>
+
+                                                    <Save className="w-5 h-5 ml-2" />
+
+                                                    تحديث العنصر
+
+                                                </>
+
+                                            ) : (
+
+                                                <>
+
+                                                    {isOrderPreparer ? (
+
+                                                        <>
+
+                                                            <Plus className="w-5 h-5 ml-2" />
+
+                                                            توليد رمز QR
+
+                                                        </>
+
+                                                    ) : (
+
+                                                        <>
+
+                                                            <Plus className="w-5 h-5 ml-2" />
+
+                                                            إضافة للطلب
+
+                                                        </>
+
+                                                    )}
+
+                                                </>
+
+                                            )}
+
+                                        </Button>
+
+                                    </div>
 
                                 </div>
 
                             </div>
 
-                        </div>
 
 
+                            {/* العمود الأيسر - جدول المواد للمعاينة فقط */}
 
-                        {/* العمود الأيسر - جدول المواد للمعاينة فقط */}
+                            <div className="flex flex-col gap-3 h-full min-h-0 overflow-auto">
 
-                        <div className="flex flex-col gap-3 h-full min-h-0 overflow-auto">
+                                {isOrderPreparer ? (
 
-                            {isOrderPreparer ? (
+                                    <Card className="flex flex-col h-full min-h-0 overflow-auto">
 
-                                <Card className="flex flex-col h-full min-h-0 overflow-auto">
+                                        {/* رأس العرض مع أزرار التحكم */}
 
-                                    {/* رأس العرض مع أزرار التحكم */}
-
-                                    {/* <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
+                                        {/* <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
 
                                         <div className="flex items-center gap-2">
 
@@ -5043,265 +5201,265 @@ export default function OrderPreparer() {
 
 
 
-                                    {/* عرض QR */}
+                                        {/* عرض QR */}
 
-                                    <div className="flex-1 flex items-center justify-center p-4">
+                                        <div className="flex-1 flex items-center justify-center p-4">
 
-                                        {orderQrPreview.qrUrl ? (
+                                            {orderQrPreview.qrUrl ? (
 
-                                            <div className="text-center space-y-4">
+                                                <div className="text-center space-y-4">
 
-                                                <div className="bg-white p-4 rounded-lg shadow-lg border-2 border-gray-200">
+                                                    <div className="bg-white p-4 rounded-lg shadow-lg border-2 border-gray-200">
 
-                                                    <img
+                                                        <img
 
-                                                        src={orderQrPreview.qrUrl}
+                                                            src={orderQrPreview.qrUrl}
 
-                                                        alt="order-qr"
+                                                            alt="order-qr"
 
-                                                        className="h-64 w-64 mx-auto border rounded"
+                                                            className="h-64 w-64 mx-auto border rounded"
 
-                                                    />
+                                                        />
+
+                                                    </div>
+
+                                                    <div className="space-y-2">
+
+                                                        <div className="grid grid-cols-2 gap-2 text-sm max-w-xs mx-auto">
+
+                                                            <div className="bg-gray-50 rounded-lg p-2">
+
+                                                                عدد العناصر: <span className="font-bold">{orderQrPreview.itemsCount || orderItems.length}</span>
+
+                                                            </div>
+
+                                                            <div className="bg-gray-50 rounded-lg p-2">
+
+                                                                إجمالي الكمية: <span className="font-bold">{orderQrPreview.totalQuantity || orderItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)} م</span>
+
+                                                            </div>
+
+                                                        </div>
+
+                                                        <div className="flex items-center justify-center gap-2">
+
+                                                            <Button
+
+                                                                size="sm"
+
+                                                                className="bg-secondary-s hover:brightness-110 text-white"
+
+                                                                onClick={() => printQr(orderQrPreview.qrUrl, "QR للطلب", orderQrPreview.footerText, "rtl")}
+
+                                                                disabled={!orderQrPreview.qrUrl}
+
+                                                            >
+
+                                                                <Printer className="w-4 h-4 ml-1" />
+
+                                                                طباعة
+
+                                                            </Button>
+
+                                                            <Button
+
+                                                                size="sm"
+
+                                                                variant="outline"
+
+                                                                onClick={() => setOrderQrPreview(prev => ({ ...prev, open: true }))}
+
+                                                            >
+
+                                                                <Eye className="w-4 h-4 ml-1" />
+
+                                                                معاينة
+
+                                                            </Button>
+
+                                                        </div>
+
+                                                    </div>
 
                                                 </div>
+
+                                            ) : (
+
+                                                <div className="text-center text-gray-400">
+
+                                                    <div className="mb-4">
+
+                                                        <div className="w-32 h-32 mx-auto bg-gray-200 rounded-lg flex items-center justify-center">
+
+                                                            <span className="text-4xl text-gray-400">QR</span>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                    <p className="text-lg">قم بإضافة عناصر لتوليد QR</p>
+
+                                                    <p className="text-sm mt-2">سيتم عرض رمز QR هنا تلقائياً</p>
+
+                                                </div>
+
+                                            )}
+
+                                        </div>
+
+                                    </Card>
+
+                                ) : (
+
+                                    <>
+
+                                        {showPreview && orderItems.length > 0 && (
+
+                                            <StyledDialog
+
+                                                isOpen={showPreview}
+
+                                                onOpenChange={setShowPreview}
+
+                                                title="تفاصيل الطلب قبل الحفظ"
+
+                                                onCancel={() => setShowPreview(false)}
+
+                                                onConfirm={handleConfirmSave}
+
+                                                confirmLabel="تأكيد الحفظ"
+
+                                                cancelLabel="إلغاء"
+
+                                                confirmVariant="default"
+
+                                                isLoading={loading}
+
+                                            >
 
                                                 <div className="space-y-2">
 
-                                                    <div className="grid grid-cols-2 gap-2 text-sm max-w-xs mx-auto">
+                                                    {/* معلومات الزبون في المعاينة */}
+
+                                                    {customerOption === "existing" && selectedCustomer && (
+
+                                                        <div className="bg-blue-50 p-2 rounded-lg">
+
+                                                            <div className="text-xs text-secondary-f font-bold">الزبون:</div>
+
+                                                            <div className="text-sm">{customerApi.formatCustomerInfo(selectedCustomer)}</div>
+
+                                                        </div>
+
+                                                    )}
+
+                                                    {customerOption === "new" && newCustomer.name && (
+
+                                                        <div className="bg-green-50 p-2 rounded-lg">
+
+                                                            <div className="text-xs text-primary-f font-bold">زبون جديد:</div>
+
+                                                            <div className="text-sm">{newCustomer.name} - {formatPhoneNumber(newCustomer.phone)}</div>
+
+                                                        </div>
+
+                                                    )}
+
+
+
+                                                    <div className="grid grid-cols-2 gap-3 text-sm">
 
                                                         <div className="bg-gray-50 rounded-lg p-2">
 
-                                                            عدد العناصر: <span className="font-bold">{orderQrPreview.itemsCount || orderItems.length}</span>
+                                                            عدد العناصر: <span className="font-bold">{orderItems.length}</span>
 
                                                         </div>
 
                                                         <div className="bg-gray-50 rounded-lg p-2">
 
-                                                            إجمالي الكمية: <span className="font-bold">{orderQrPreview.totalQuantity || orderItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)} م</span>
+                                                            إجمالي الكمية: <span className="font-bold">{totalPreviewQuantity} م</span>
 
                                                         </div>
 
                                                     </div>
 
-                                                    <div className="flex items-center justify-center gap-2">
 
-                                                        <Button
 
-                                                            size="sm"
+                                                    <div className="max-h-64 overflow-y-auto border rounded-lg">
 
-                                                            className="bg-secondary-s hover:brightness-110 text-white"
+                                                        <table className="w-full text-sm">
 
-                                                            onClick={() => printQr(orderQrPreview.qrUrl, "QR للطلب", orderQrPreview.footerText, "rtl")}
+                                                            <thead className="bg-gray-100 sticky top-0">
 
-                                                            disabled={!orderQrPreview.qrUrl}
+                                                                <tr>
 
-                                                        >
+                                                                    <th className="p-2 text-right border-b">المادة</th>
 
-                                                            <Printer className="w-4 h-4 ml-1" />
+                                                                    <th className="p-2 text-center border-b">العرض</th>
 
-                                                            طباعة
+                                                                    <th className="p-2 text-right border-b">اللون</th>
 
-                                                        </Button>
+                                                                    <th className="p-2 text-center border-b">النوع</th>
 
-                                                        <Button
+                                                                    <th className="p-2 text-center border-b">الكمية</th>
 
-                                                            size="sm"
+                                                                    <th className="p-2 text-right border-b">المسطرة</th>
 
-                                                            variant="outline"
+                                                                    <th class2="p-2 text-center border-b">السماكة</th>
 
-                                                            onClick={() => setOrderQrPreview(prev => ({ ...prev, open: true }))}
-
-                                                        >
-
-                                                            <Eye className="w-4 h-4 ml-1" />
-
-                                                            معاينة
-
-                                                        </Button>
-
-                                                    </div>
-
-                                                </div>
-
-                                            </div>
-
-                                        ) : (
-
-                                            <div className="text-center text-gray-400">
-
-                                                <div className="mb-4">
-
-                                                    <div className="w-32 h-32 mx-auto bg-gray-200 rounded-lg flex items-center justify-center">
-
-                                                        <span className="text-4xl text-gray-400">QR</span>
-
-                                                    </div>
-
-                                                </div>
-
-                                                <p className="text-lg">قم بإضافة عناصر لتوليد QR</p>
-
-                                                <p className="text-sm mt-2">سيتم عرض رمز QR هنا تلقائياً</p>
-
-                                            </div>
-
-                                        )}
-
-                                    </div>
-
-                                </Card>
-
-                            ) : (
-
-                                <>
-
-                                    {showPreview && orderItems.length > 0 && (
-
-                                        <StyledDialog
-
-                                            isOpen={showPreview}
-
-                                            onOpenChange={setShowPreview}
-
-                                            title="تفاصيل الطلب قبل الحفظ"
-
-                                            onCancel={() => setShowPreview(false)}
-
-                                            onConfirm={handleConfirmSave}
-
-                                            confirmLabel="تأكيد الحفظ"
-
-                                            cancelLabel="إلغاء"
-
-                                            confirmVariant="default"
-
-                                            isLoading={loading}
-
-                                        >
-
-                                            <div className="space-y-2">
-
-                                                {/* معلومات الزبون في المعاينة */}
-
-                                                {customerOption === "existing" && selectedCustomer && (
-
-                                                    <div className="bg-blue-50 p-2 rounded-lg">
-
-                                                        <div className="text-xs text-secondary-f font-bold">الزبون:</div>
-
-                                                        <div className="text-sm">{customerApi.formatCustomerInfo(selectedCustomer)}</div>
-
-                                                    </div>
-
-                                                )}
-
-                                                {customerOption === "new" && newCustomer.name && (
-
-                                                    <div className="bg-green-50 p-2 rounded-lg">
-
-                                                        <div className="text-xs text-primary-f font-bold">زبون جديد:</div>
-
-                                                        <div className="text-sm">{newCustomer.name} - {formatPhoneNumber(newCustomer.phone)}</div>
-
-                                                    </div>
-
-                                                )}
-
-
-
-                                                <div className="grid grid-cols-2 gap-3 text-sm">
-
-                                                    <div className="bg-gray-50 rounded-lg p-2">
-
-                                                        عدد العناصر: <span className="font-bold">{orderItems.length}</span>
-
-                                                    </div>
-
-                                                    <div className="bg-gray-50 rounded-lg p-2">
-
-                                                        إجمالي الكمية: <span className="font-bold">{totalPreviewQuantity} م</span>
-
-                                                    </div>
-
-                                                </div>
-
-
-
-                                                <div className="max-h-64 overflow-y-auto border rounded-lg">
-
-                                                    <table className="w-full text-sm">
-
-                                                        <thead className="bg-gray-100 sticky top-0">
-
-                                                            <tr>
-
-                                                                <th className="p-2 text-right border-b">المادة</th>
-
-                                                                <th className="p-2 text-center border-b">العرض</th>
-
-                                                                <th className="p-2 text-right border-b">اللون</th>
-
-                                                                <th className="p-2 text-center border-b">النوع</th>
-
-                                                                <th className="p-2 text-center border-b">الكمية</th>
-
-                                                                <th className="p-2 text-right border-b">المسطرة</th>
-
-                                                                <th class2="p-2 text-center border-b">السماكة</th>
-
-                                                                <th className="p-2 text-center border-b">الطبخة</th>
-
-                                                            </tr>
-
-                                                        </thead>
-
-                                                        <tbody>
-
-                                                            {orderItems.map(item => (
-
-                                                                <tr key={item.id} className="border-b">
-
-                                                                    <td className="p-2">{item.material_name}</td>
-
-                                                                    <td className="p-2 text-center">{item.width || "-"}</td>
-
-                                                                    <td className="p-2">{item.color_name}</td>
-
-                                                                    <td className="p-2 text-center">
-
-                                                                        {formatTypeItem(item.type_item)}
-
-                                                                    </td>
-
-                                                                    <td className="p-2 text-center font-bold">{item.quantity} م</td>
-
-                                                                    <td className="p-2">{item.ruler_name}</td>
-
-                                                                    <td className="p-2 text-center">{item.thickness || "0.6"}</td>
-
-                                                                    <td className="p-2 text-center">{item.batch_number || "-"}</td>
+                                                                    <th className="p-2 text-center border-b">الطبخة</th>
 
                                                                 </tr>
 
-                                                            ))}
+                                                            </thead>
 
-                                                        </tbody>
+                                                            <tbody>
 
-                                                    </table>
+                                                                {orderItems.map(item => (
+
+                                                                    <tr key={item.id} className="border-b">
+
+                                                                        <td className="p-2">{item.material_name}</td>
+
+                                                                        <td className="p-2 text-center">{item.width || "-"}</td>
+
+                                                                        <td className="p-2">{item.color_name}</td>
+
+                                                                        <td className="p-2 text-center">
+
+                                                                            {formatTypeItem(item.type_item)}
+
+                                                                        </td>
+
+                                                                        <td className="p-2 text-center font-bold">{item.quantity} م</td>
+
+                                                                        <td className="p-2">{item.ruler_name}</td>
+
+                                                                        <td className="p-2 text-center">{item.thickness || "0.6"}</td>
+
+                                                                        <td className="p-2 text-center">{item.batch_number || "-"}</td>
+
+                                                                    </tr>
+
+                                                                ))}
+
+                                                            </tbody>
+
+                                                        </table>
+
+                                                    </div>
 
                                                 </div>
 
-                                            </div>
+                                            </StyledDialog>
 
-                                        </StyledDialog>
-
-                                    )}
+                                        )}
 
 
 
-                                    {/* زر إلغاء التعديل بجانب زر الحفظ */}
+                                        {/* زر إلغاء التعديل بجانب زر الحفظ */}
 
-                                    {/* {editingItemId && (
+                                        {/* {editingItemId && (
 
                                 <div className="flex gap-2 justify-center mt-2">
 
@@ -5323,838 +5481,497 @@ export default function OrderPreparer() {
 
 
 
-                                    <Card className="flex flex-col h-full min-h-0 overflow-auto">
+                                        <Card className="flex flex-col h-full min-h-0 overflow-auto">
 
-                                        {/* رأس الجدول مع أزرار التحكم */}
+                                            {/* رأس الجدول مع أزرار التحكم */}
 
-                                        <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
+                                            <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
 
-                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2">
 
-                                                <span className="font-bold text-lg">العناصر: {orderItems.length}</span>
+                                                    <span className="font-bold text-lg">العناصر: {orderItems.length}</span>
 
-                                                {isOrderPreparer && (
+                                                    {isOrderPreparer && (
 
-                                                    <Button
+                                                        <Button
 
-                                                        size="sm"
+                                                            size="sm"
 
-                                                        variant="outline"
+                                                            variant="outline"
 
-                                                        onClick={handleGenerateOrderQr}
+                                                            onClick={handleGenerateOrderQr}
 
-                                                        className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
-
-                                                    >
-
-                                                        QR
-
-                                                    </Button>
-
-                                                )}
-
-                                                {orderItems.length > 0 && (
-
-                                                    <>
-
-
-
-                                                        <button
-
-                                                            onClick={clearAllItems}
-
-                                                            className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform flex items-center gap-1"
-
-                                                            title="مسح جميع العناصر"
+                                                            className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
 
                                                         >
 
-                                                            <Trash2 className="w-4 h-4" />
+                                                            QR
 
-                                                            <span className="text-xs font-medium">مسح العناصر</span>
-
-                                                        </button>
-
-                                                        <div className="flex gap-1 mr-2">
-
-                                                            <button
-
-                                                                onClick={() => scrollTable('right')}
-
-                                                                className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform"
-
-                                                                title="التمرير لليسار"
-
-                                                            >
-
-                                                                <ChevronRight className="w-4 h-4" />
-
-                                                            </button>
-
-                                                            <button
-
-                                                                onClick={() => scrollTable('left')}
-
-                                                                className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform"
-
-                                                                title="التمرير لليمين"
-
-                                                            >
-
-                                                                <ChevronLeft className="w-4 h-4" />
-
-                                                            </button>
-
-                                                        </div>
-
-                                                    </>
-
-                                                )}
-
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-
-                                                <div className="bg-green-50 px-2 py-1 rounded-lg text-lg">
-
-                                                    إجمالي: <span className="font-bold text-primary-f">{totalPreviewQuantity} م</span>
-
-                                                </div>
-
-                                            </div>
-
-                                        </div>
-
-
-
-                                        {/* الجدول مع التمرير الأفقي والعمودي */}
-
-                                        <div
-
-                                            ref={tableContainerRef}
-
-                                            className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]"
-
-                                            style={{ direction: 'rtl' }}
-
-                                        >
-
-                                            <table className="max-w-[1100px] w-full table-fixed border-collapse">
-
-                                                <thead className="bg-gray-100 sticky top-0 z-10">
-
-                                                    <tr>
-
-                                                        <th className="p-1 text-right border-b w-[50px]">المادة</th>
-
-                                                        <th className="p-1 text-center border-b w-[55px]">العرض</th>
-
-                                                        <th className="p-1 text-right border-b w-[50px]">اللون</th>
-
-                                                        <th className="p-1 text-center border-b w-[45px]">النوع</th>
-
-                                                        <th className="p-1 text-center border-b w-[55px]">الكمية</th>
-
-                                                        <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
-
-                                                        <th className="p-1 text-center border-b w-[70px]">السماكة</th>
-
-                                                        <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
-
-                                                        <th className="p-1 text-center border-b w-[80px]">الإجراءات</th>
-
-                                                    </tr>
-
-                                                </thead>
-
-                                                <tbody>
-
-                                                    {orderItems.map(item => (
-
-                                                        <tr
-
-                                                            key={item.id}
-
-                                                            className={`border-b hover:bg-gray-50 cursor-pointer transition-colors ${editingItemId === item.id ? 'bg-blue-50 border-blue-300' : ''
-
-                                                                }`}
-
-                                                            onClick={() => handleEditItem(item)}
-
-                                                        >
-
-                                                            <td className="p-1 break-words text-sm" title={item.material_name}>
-
-                                                                {item.material_name}
-
-                                                            </td>
-
-                                                            <td className="p-1 text-center text-sm">
-
-                                                                {item.width || "-"}
-
-                                                            </td>
-
-                                                            <td className="p-1 break-words text-sm font-mono" title={item.color_code}>
-
-                                                                {item.color_code}
-
-                                                            </td>
-
-                                                            <td className="p-1 text-center text-sm">
-
-                                                                {formatTypeItem(item.type_item)}
-
-                                                            </td>
-
-                                                            <td className="p-1 text-center font-bold text-sm">
-
-                                                                {item.quantity} م
-
-                                                            </td>
-
-                                                            <td className="p-1 break-words text-sm" title={item.ruler_name}>
-
-                                                                {item.ruler_name}
-
-                                                            </td>
-
-                                                            <td className="p-1 text-center text-sm">
-
-                                                                {item.thickness || ""} مم
-
-                                                            </td>
-
-                                                            <td className="p-1 text-center text-sm" title={item.batch_number}>
-
-                                                                {item.batch_number || "-"}
-
-                                                            </td>
-
-                                                            <td className="p-1 text-center">
-
-                                                                <div className="flex items-center justify-center gap-1">
-
-                                                                    {editingItemId === item.id && (
-
-                                                                        <span className="text-blue-600 text-xs ml-1">
-
-                                                                            <Edit className="w-3 h-3 inline" />
-
-                                                                        </span>
-
-                                                                    )}
-
-                                                                    <button
-
-                                                                        onClick={(e) => {
-
-                                                                            e.stopPropagation();
-
-                                                                            removeItem(item.id);
-
-                                                                        }}
-
-                                                                        className="text-secondary-s hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
-
-                                                                        title="حذف"
-
-                                                                    >
-
-                                                                        <Trash2 className="w-4 h-4" />
-
-                                                                    </button>
-
-                                                                </div>
-
-                                                            </td>
-
-                                                        </tr>
-
-                                                    ))}
-
-                                                    {orderItems.length === 0 && (
-
-                                                        <tr>
-
-                                                            <td colSpan="8" className="p-8 text-center text-primary-f">
-
-                                                                <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-
-                                                                <span className="text-sm">لا توجد عناصر مضافة</span>
-
-                                                                <p className="text-xs mt-1">اضغط على العناصر في اليمين لإضافتها</p>
-
-                                                            </td>
-
-                                                        </tr>
+                                                        </Button>
 
                                                     )}
 
-                                                </tbody>
-
-                                            </table>
-
-                                        </div>
-
-                                        <div className="flex justify-end pt-2">
-
-                                            {isOrderPreparer ? (
-
-                                                <Button
-
-                                                    size="lg"
-
-                                                    onClick={handleGenerateOrderQr}
-
-                                                    disabled={orderItems.length === 0}
-
-                                                    className="h-12 bg-purple-600 hover:bg-purple-700 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
-
-                                                >
-
-                                                    <Printer className="w-4 h-4 ml-2" />
-
-                                                    توليد وطباعة QR
-
-                                                </Button>
-
-                                            ) : (
-
-                                                <Button
-
-                                                    size="lg"
-
-                                                    onClick={() => setShowPreview(true)}
-
-                                                    disabled={loading || orderItems.length === 0}
-
-                                                    className="h-12 bg-secondary-s hover:brightness-110 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
-
-                                                >
-
-                                                    {loading ? (
-
-                                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-
-                                                    ) : (
+                                                    {orderItems.length > 0 && (
 
                                                         <>
 
-                                                            <Check className="w-4 h-4 ml-2" />
 
-                                                            {isOrderPreparer ? "توليد QR" : "حفظ"}
+
+                                                            <button
+
+                                                                onClick={clearAllItems}
+
+                                                                className="bg-red-500 hover:bg-red-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform flex items-center gap-1"
+
+                                                                title="مسح جميع العناصر"
+
+                                                            >
+
+                                                                <Trash2 className="w-4 h-4" />
+
+                                                                <span className="text-xs font-medium">مسح العناصر</span>
+
+                                                            </button>
+
+                                                            <div className="flex gap-1 mr-2">
+
+                                                                <button
+
+                                                                    onClick={() => scrollTable('right')}
+
+                                                                    className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform"
+
+                                                                    title="التمرير لليسار"
+
+                                                                >
+
+                                                                    <ChevronRight className="w-4 h-4" />
+
+                                                                </button>
+
+                                                                <button
+
+                                                                    onClick={() => scrollTable('left')}
+
+                                                                    className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-lg touch-manipulation active:scale-95 transition-transform"
+
+                                                                    title="التمرير لليمين"
+
+                                                                >
+
+                                                                    <ChevronLeft className="w-4 h-4" />
+
+                                                                </button>
+
+                                                            </div>
 
                                                         </>
 
                                                     )}
 
-                                                </Button>
+                                                </div>
 
-                                            )}
+                                                <div className="flex items-center gap-2">
 
-                                        </div>
+                                                    <div className="bg-green-50 px-2 py-1 rounded-lg text-lg">
 
-                                    </Card>
+                                                        إجمالي: <span className="font-bold text-primary-f">{totalPreviewQuantity} م</span>
 
-                                </>
+                                                    </div>
 
-                            )}
+                                                </div>
 
-                        </div>
+                                            </div>
 
-                    </div>
 
-                ) : viewMode === "orders" ? (
 
-                    <>
+                                            {/* الجدول مع التمرير الأفقي والعمودي */}
 
-                        {/* وضع طلبات Orders */}
+                                            <div
 
-                        <Card className="flex flex-col h-full min-h-0 overflow-auto p-2">
+                                                ref={tableContainerRef}
 
-                            <div className="flex justify-between items-center mb-1 flex-shrink-0">
+                                                className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]"
 
-                                <h2 className="font-bold text-lg">سجل طلبات Orders</h2>
+                                                style={{ direction: 'rtl' }}
 
-                                <div className="flex items-center gap-2">
+                                            >
 
-                                    <Button
+                                                <table className="max-w-[1100px] w-full table-fixed border-collapse">
 
-                                        size="sm"
+                                                    <thead className="bg-gray-100 sticky top-0 z-10">
 
-                                        variant="outline"
+                                                        <tr>
 
-                                        onClick={loadOrdersRecords}
+                                                            <th className="p-1 text-right border-b w-[50px]">المادة</th>
 
-                                        disabled={ordersRecordsLoading}
+                                                            <th className="p-1 text-center border-b w-[55px]">العرض</th>
 
-                                        className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
+                                                            <th className="p-1 text-right border-b w-[50px]">اللون</th>
 
-                                    >
+                                                            <th className="p-1 text-center border-b w-[45px]">النوع</th>
 
-                                        <RotateCcw className="w-4 h-4 ml-1" />
+                                                            <th className="p-1 text-center border-b w-[55px]">الكمية</th>
 
-                                        تحديث
+                                                            <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
 
-                                    </Button>
+                                                            <th className="p-1 text-center border-b w-[70px]">السماكة</th>
 
-                                </div>
+                                                            <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
 
-                            </div>
+                                                            <th className="p-1 text-center border-b w-[80px]">الإجراءات</th>
 
+                                                        </tr>
 
+                                                    </thead>
 
-                            {/* جدول طلبات Orders */}
+                                                    <tbody>
 
-                            <div className="flex-1 overflow-y-auto overflow-x-auto xl:overflow-x-hidden min-h-0 border rounded-lg bg-white max-h-[50vh] min-[1366px]:min-h-[40vh]">
+                                                        {orderItems.map(item => (
 
-                                <table className="min-w-[1200px] w-full table-fixed border-collapse">
+                                                            <tr
 
-                                    <thead className="bg-gray-100 sticky top-0 z-20">
+                                                                key={item.id}
 
-                                        <tr>
+                                                                className={`border-b hover:bg-gray-50 cursor-pointer transition-colors ${editingItemId === item.id ? 'bg-blue-50 border-blue-300' : ''
 
-                                            <th className="p-2 text-right border-b w-10">#</th>
+                                                                    }`}
 
-                                            <th className="p-2 text-right border-b w-20">التاريخ</th>
-
-                                            <th className="p-2 text-center border-b w-10">العناصر</th>
-
-                                            <th className="p-2 text-center border-b w-20">الزبون</th>
-
-                                            <th className="p-2 text-center border-b w-32">ملاحظات</th>
-
-                                            <th className="p-2 text-center border-b w-15">الحالة</th>
-
-                                            <th className="p-2 text-center border-b w-20">عرض</th>
-
-                                        </tr>
-
-                                    </thead>
-
-                                    <tbody>
-
-                                        {ordersRecordsLoading ? (
-
-                                            <tr><td colSpan="7" className="p-6"><LoadingState /></td></tr>
-
-                                        ) : ordersRecords.length === 0 ? (
-
-                                            <tr>
-
-                                                <td colSpan="7" className="p-8 text-center text-gray-400">
-
-                                                    <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-
-                                                    لا توجد طلبات
-
-                                                </td>
-
-                                            </tr>
-
-                                        ) : (
-
-                                            paginatedOrdersRecords.map((order, index) => {
-
-                                                const statusBadge = getStatusBadge(order.status);
-
-                                                return (
-
-                                                    <tr key={order.order_id || order.id || index} className="border-b hover:bg-gray-50">
-
-                                                        <td className="p-2 font-medium text-sm">#{ordersRecordsStartIndex + index + 1}</td>
-
-                                                        <td className="p-2 text-sm">{getFormattedDate(order)}</td>
-
-                                                        <td className="p-2 text-center">
-
-                                                            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
-
-                                                                {order.count_items ?? order.items?.length ?? 0}
-
-                                                            </span>
-
-                                                        </td>
-
-                                                        <td className="p-2 text-center">
-
-                                                            {order.customer ? (
-
-                                                                <div className="text-sm">
-
-                                                                    <div className="font-medium">{order.customer.name}</div>
-
-                                                                    <div className="text-gray-500 text-xs" dir="ltr">{order.customer.phone}</div>
-
-                                                                </div>
-
-                                                            ) : (
-
-                                                                <span className="text-gray-400 text-xs">بدون زبون</span>
-
-                                                            )}
-
-                                                        </td>
-
-                                                        <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
-
-                                                            {order.notes || "-"}
-
-                                                        </td>
-
-                                                        <td className="p-2 text-center">
-
-                                                            <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
-
-                                                                {statusBadge.label}
-
-                                                            </span>
-
-                                                        </td>
-
-                                                        <td className="p-2 text-center">
-
-                                                            <Button
-
-                                                                size="sm"
-
-                                                                variant="outline"
-
-                                                                className="h-8 px-2 text-xs touch-manipulation active:scale-95 transition-transform hover:bg-primary-f hover:text-white"
-
-                                                                onClick={() => handleViewOrderDetails(order)}
-
-                                                                disabled={loadingDetails}
+                                                                onClick={() => handleEditItem(item)}
 
                                                             >
 
-                                                                {loadingDetails ? (
+                                                                <td className="p-1 break-words text-sm" title={item.material_name}>
 
-                                                                    <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin ml-1" />
+                                                                    {item.material_name}
 
-                                                                ) : (
+                                                                </td>
 
-                                                                    <Eye className="w-3 h-3 ml-1" />
+                                                                <td className="p-1 text-center text-sm">
 
-                                                                )}
+                                                                    {item.width || "-"}
 
-                                                                عرض
+                                                                </td>
 
-                                                            </Button>
+                                                                <td className="p-1 break-words text-sm font-mono" title={item.color_code}>
 
-                                                        </td>
+                                                                    {item.color_code}
 
-                                                    </tr>
+                                                                </td>
 
-                                                );
+                                                                <td className="p-1 text-center text-sm">
 
-                                            })
+                                                                    {formatTypeItem(item.type_item)}
 
-                                        )}
+                                                                </td>
 
-                                    </tbody>
+                                                                <td className="p-1 text-center font-bold text-sm">
 
-                                </table>
+                                                                    {item.quantity} م
+
+                                                                </td>
+
+                                                                <td className="p-1 break-words text-sm" title={item.ruler_name}>
+
+                                                                    {item.ruler_name}
+
+                                                                </td>
+
+                                                                <td className="p-1 text-center text-sm">
+
+                                                                    {item.thickness || ""} مم
+
+                                                                </td>
+
+                                                                <td className="p-1 text-center text-sm" title={item.batch_number}>
+
+                                                                    {item.batch_number || "-"}
+
+                                                                </td>
+
+                                                                <td className="p-1 text-center">
+
+                                                                    <div className="flex items-center justify-center gap-1">
+
+                                                                        {editingItemId === item.id && (
+
+                                                                            <span className="text-blue-600 text-xs ml-1">
+
+                                                                                <Edit className="w-3 h-3 inline" />
+
+                                                                            </span>
+
+                                                                        )}
+
+                                                                        <button
+
+                                                                            onClick={(e) => {
+
+                                                                                e.stopPropagation();
+
+                                                                                removeItem(item.id);
+
+                                                                            }}
+
+                                                                            className="text-secondary-s hover:bg-red-50 p-1.5 rounded-lg touch-manipulation active:scale-95 transition-transform"
+
+                                                                            title="حذف"
+
+                                                                        >
+
+                                                                            <Trash2 className="w-4 h-4" />
+
+                                                                        </button>
+
+                                                                    </div>
+
+                                                                </td>
+
+                                                            </tr>
+
+                                                        ))}
+
+                                                        {orderItems.length === 0 && (
+
+                                                            <tr>
+
+                                                                <td colSpan="8" className="p-8 text-center text-primary-f">
+
+                                                                    <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+
+                                                                    <span className="text-sm">لا توجد عناصر مضافة</span>
+
+                                                                    <p className="text-xs mt-1">اضغط على العناصر في اليمين لإضافتها</p>
+
+                                                                </td>
+
+                                                            </tr>
+
+                                                        )}
+
+                                                    </tbody>
+
+                                                </table>
+
+                                            </div>
+
+                                            <div className="flex justify-end pt-2">
+
+                                                {isOrderPreparer ? (
+
+                                                    <Button
+
+                                                        size="lg"
+
+                                                        onClick={handleGenerateOrderQr}
+
+                                                        disabled={orderItems.length === 0}
+
+                                                        className="h-12 bg-purple-600 hover:bg-purple-700 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
+
+                                                    >
+
+                                                        <Printer className="w-4 h-4 ml-2" />
+
+                                                        توليد وطباعة QR
+
+                                                    </Button>
+
+                                                ) : (
+
+                                                    <Button
+
+                                                        size="lg"
+
+                                                        onClick={() => setShowPreview(true)}
+
+                                                        disabled={loading || orderItems.length === 0}
+
+                                                        className="h-12 bg-secondary-s hover:brightness-110 text-base px-6 text-white touch-manipulation active:scale-95 transition-transform"
+
+                                                    >
+
+                                                        {loading ? (
+
+                                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+
+                                                        ) : (
+
+                                                            <>
+
+                                                                <Check className="w-4 h-4 ml-2" />
+
+                                                                {isOrderPreparer ? "توليد QR" : "حفظ"}
+
+                                                            </>
+
+                                                        )}
+
+                                                    </Button>
+
+                                                )}
+
+                                            </div>
+
+                                        </Card>
+
+                                    </>
+
+                                )}
 
                             </div>
 
-                            {/* Pagination Controls */}
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-2 bg-gray-50 border-t">
-                                <ResultsCounter
-                                    currentPage={ordersRecordsPage}
-                                    totalPages={ordersRecordsTotalPages}
-                                    rowsPerPage={ordersRecordsRowsPerPage}
-                                    totalResults={ordersRecords.length}
-                                />
-                                <div className="flex items-center gap-2">
-                                    <RowsPerPageSelector
-                                        value={ordersRecordsRowsPerPage}
-                                        onChange={setOrdersRecordsRowsPerPage}
-                                    />
-                                    <PaginationControls
-                                        currentPage={ordersRecordsPage}
-                                        totalPages={ordersRecordsTotalPages}
-                                        onPageChange={setOrdersRecordsPage}
-                                    />
-                                </div>
-                            </div>
+                        </div>
 
-                        </Card>
+                    ) : viewMode === "sales_orders" ? (
 
-                    </>
+                        <>
 
-                ) : (
+                            {/* وضع طلبات Orders */}
 
-                    <>
+                            <Card className="flex flex-col h-full min-h-0 overflow-auto p-2">
 
-                        {/* وضع السجل */}
+                                <div className="flex justify-between items-center mb-1 flex-shrink-0">
 
-                        <Card className="flex flex-col h-full min-h-0 overflow-auto p-2">
+                                    <h2 className="font-bold text-lg">سجل طلبات Orders</h2>
 
-                            <div className="flex justify-between items-center mb-1 flex-shrink-0">
-
-                                <h2 className="font-bold text-lg">سجل الطلبات</h2>
-
-                                <div className="flex items-center gap-2">
-
-                                    {selectedOrders.length > 0 && (
+                                    <div className="flex items-center gap-2">
 
                                         <Button
 
                                             size="sm"
 
-                                            variant="destructive"
+                                            variant="outline"
 
-                                            onClick={handleDeleteSelectedOrders}
+                                            onClick={loadOrdersRecords}
 
-                                            className="px-4 py-2 text-sm"
+                                            disabled={ordersRecordsLoading}
+
+                                            className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
 
                                         >
 
-                                            <Trash2 className="w-4 h-4 ml-1" />
+                                            <RotateCcw className="w-4 h-4 ml-1" />
 
-                                            حذف المحدد ({selectedOrders.length})
+                                            تحديث
 
                                         </Button>
 
-                                    )}
-
-                                    <Button
-
-                                        size="sm"
-
-                                        variant="outline"
-
-                                        onClick={loadOrders}
-
-                                        disabled={ordersLoading}
-
-                                        className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
-
-                                    >
-
-                                        <RotateCcw className="w-4 h-4 ml-1" />
-
-                                        تحديث
-
-                                    </Button>
-
-                                    <Button
-
-                                        size="sm"
-
-                                        variant="outline"
-
-                                        onClick={handleExportOrders}
-
-                                        disabled={exportingOrders || orders.length === 0}
-
-                                        className="px-4 py-2 text-sm"
-
-                                    >
-
-                                        <Download className="w-4 h-4 ml-1" />
-
-                                        {exportingOrders ? "جارٍ التصدير..." : "تصدير Excel"}
-
-                                    </Button>
+                                    </div>
 
                                 </div>
 
-                            </div>
 
 
+                                {/* جدول طلبات Orders */}
 
-                            <div className="flex flex-col sm:flex-row gap-2 mb-2">
+                                <div className="flex-1 overflow-y-auto overflow-x-auto xl:overflow-x-hidden min-h-0 border rounded-lg bg-white max-h-[50vh] min-[1366px]:min-h-[40vh]">
 
-                                <Input
+                                    <table className="min-w-[1200px] w-full table-fixed border-collapse">
 
-                                    value={historySearchTerm}
-
-                                    onChange={(e) => setHistorySearchTerm(e.target.value)}
-
-                                    placeholder="بحث في الطلبات ..."
-
-                                    className="h-10 py-6"
-
-                                />
-
-                                <FilterSelect
-
-                                    label=""
-
-                                    value={historyStatusFilter}
-
-                                    onChange={(e) => setHistoryStatusFilter(e.target.value)}
-
-                                    options={[
-
-                                        { value: "", label: "كل الحالات" },
-
-                                        { value: "pending", label: "قيد الانتظار" },
-
-                                        { value: "outofwarehouse", label: "اخراج من المستودع" },
-
-                                        { value: "completed", label: "مكتمل" },
-
-                                        { value: "cancelled", label: "ملغي" },
-
-                                    ]}
-
-                                />
-
-                            </div>
-
-
-
-                            {/* جدول السجل مع التمرير */}
-
-                            <div className="flex-1 overflow-y-auto overflow-x-auto xl:overflow-x-hidden min-h-0 border rounded-lg bg-white max-h-[50vh] min-[1366px]:min-h-[40vh]">
-
-                                <table className="min-w-[1400px] w-full table-fixed border-collapse">
-
-                                    <thead className="bg-gray-100 sticky top-0 z-20">
-
-                                        <tr>
-
-                                            <th className="p-2 text-center border-b w-12">
-
-                                                <input
-
-                                                    type="checkbox"
-
-                                                    checked={selectedOrders.length === paginatedOrders.length && paginatedOrders.length > 0 && selectedOrders.length > 0}
-
-                                                    onChange={handleSelectAllOrders}
-
-                                                    className="w-4 h-4 text-primary-f border-gray-300 rounded focus:ring-primary-f"
-
-                                                />
-
-                                            </th>
-
-                                            <th className="p-2 text-right border-b w-10">#</th>
-
-                                            <th className="p-2 text-right border-b w-20">التاريخ</th>
-
-                                            <th className="p-2 text-center border-b w-10">العناصر</th>
-
-                                            <th className="p-2 text-center border-b w-10">المبيعات</th>
-
-                                            <th className="p-2 text-center border-b w-20">الزبون</th>
-
-                                            <th className="p-2 text-center border-b w-32">ملاحظات</th>
-
-                                            <th className="p-2 text-center border-b w-15">الحالة</th>
-
-                                            <th className="p-2 text-center border-b w-20">عرض</th>
-
-                                        </tr>
-
-                                    </thead>
-
-                                    <tbody>
-
-                                        {ordersLoading ? (
-
-                                            <tr><td colSpan="10" className="p-6"><LoadingState /></td></tr>
-
-                                        ) : filteredOrders.length === 0 ? (
+                                        <thead className="bg-gray-100 sticky top-0 z-20">
 
                                             <tr>
 
-                                                <td colSpan="10" className="p-8 text-center text-gray-400">
+                                                <th className="p-2 text-right border-b w-10">#</th>
 
-                                                    <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                <th className="p-2 text-right border-b w-20">التاريخ</th>
 
-                                                    لا توجد طلبات
+                                                <th className="p-2 text-center border-b w-10">العناصر</th>
 
-                                                </td>
+                                                <th className="p-2 text-center border-b w-20">الزبون</th>
+
+                                                <th className="p-2 text-center border-b w-32">ملاحظات</th>
+
+                                                <th className="p-2 text-center border-b w-15">الحالة</th>
+
+                                                <th className="p-2 text-center border-b w-20">عرض</th>
 
                                             </tr>
 
-                                        ) : (
+                                        </thead>
 
-                                            paginatedOrders.map((order, index) => {
+                                        <tbody>
 
-                                                const statusBadge = getStatusBadge(order.status);
+                                            {ordersRecordsLoading ? (
 
-                                                return (
+                                                <tr><td colSpan="7" className="p-6"><LoadingState /></td></tr>
 
-                                                    <tr key={getOrderId(order)} className="border-b hover:bg-gray-50">
+                                            ) : ordersRecords.length === 0 ? (
 
-                                                        <td className="p-2 text-center">
+                                                <tr>
 
-                                                            <input
+                                                    <td colSpan="7" className="p-8 text-center text-gray-400">
 
-                                                                type="checkbox"
+                                                        <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
 
-                                                                checked={selectedOrders.includes(getOrderId(order))}
+                                                        لا توجد طلبات
 
-                                                                onChange={() => handleSelectOrder(getOrderId(order))}
+                                                    </td>
 
-                                                                className="w-4 h-4 text-primary-f border-gray-300 rounded focus:ring-primary-f"
+                                                </tr>
 
-                                                            />
+                                            ) : (
 
-                                                        </td>
+                                                paginatedOrdersRecords.map((order, index) => {
 
-                                                        <td className="p-2 font-medium text-sm">#{startIndex + index + 1}</td>
+                                                    const statusBadge = getStatusBadge(order.status);
 
-                                                        <td className="p-2 text-sm">{getFormattedDate(order)}</td>
+                                                    return (
 
-                                                        <td className="p-2 text-center">
+                                                        <tr key={order.order_id || order.id || index} className="border-b hover:bg-gray-50">
 
-                                                            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+                                                            <td className="p-2 font-medium text-sm">#{ordersRecordsStartIndex + index + 1}</td>
 
-                                                                {order.count_items ?? order.items?.length ?? 0}
+                                                            <td className="p-2 text-sm">{getFormattedDate(order)}</td>
 
-                                                            </span>
+                                                            <td className="p-2 text-center">
 
-                                                        </td>
+                                                                <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
 
-                                                        <td className="p-2 text-center text-sm">{getSalesUserName(order)}</td>
+                                                                    {order.count_items ?? order.items?.length ?? 0}
 
-                                                        <td className="p-2 text-center">
+                                                                </span>
 
-                                                            {order.customer ? (
+                                                            </td>
 
-                                                                <div className="text-sm">
+                                                            <td className="p-2 text-center">
 
-                                                                    <div className="font-medium">{order.customer.name}</div>
+                                                                {order.customer ? (
 
-                                                                    <div className="text-gray-500 text-xs" dir="ltr">{order.customer.phone}</div>
+                                                                    <div className="text-sm">
 
-                                                                </div>
+                                                                        <div className="font-medium">{order.customer.name}</div>
 
-                                                            ) : (
+                                                                        <div className="text-gray-500 text-xs" dir="ltr">{order.customer.phone}</div>
 
-                                                                <span className="text-gray-400 text-xs">بدون زبون</span>
+                                                                    </div>
 
-                                                            )}
+                                                                ) : (
 
-                                                        </td>
+                                                                    <span className="text-gray-400 text-xs">بدون زبون</span>
 
-                                                        <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
+                                                                )}
 
-                                                            {order.notes || "-"}
+                                                            </td>
 
-                                                        </td>
+                                                            <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
 
-                                                        <td className="p-2 text-center">
+                                                                {order.notes || "-"}
 
-                                                            <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
+                                                            </td>
 
-                                                                {statusBadge.label}
+                                                            <td className="p-2 text-center">
 
-                                                            </span>
+                                                                <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
 
-                                                        </td>
+                                                                    {statusBadge.label}
 
-                                                        <td className="p-2 text-center">
+                                                                </span>
 
-                                                            <div className="flex items-center justify-center gap-2">
+                                                            </td>
+
+                                                            <td className="p-2 text-center">
 
                                                                 <Button
 
@@ -6184,98 +6001,820 @@ export default function OrderPreparer() {
 
                                                                 </Button>
 
-                                                                <Button
+                                                            </td>
 
-                                                                    size="sm"
+                                                        </tr>
 
-                                                                    variant="outline"
+                                                    );
 
-                                                                    className="h-8 px-2 text-xs touch-manipulation active:scale-95 transition-transform hover:bg-secondary-s hover:text-white"
+                                                })
 
-                                                                    onClick={() => handleEditOrderFromHistory(order)}
+                                            )}
 
-                                                                    disabled={loadingDetails}
+                                        </tbody>
 
-                                                                >
-
-                                                                    <Edit className="w-3 h-3 ml-1" />
-
-                                                                    تعديل
-
-                                                                </Button>
-
-                                                            </div>
-
-                                                        </td>
-
-                                                    </tr>
-
-                                                );
-
-                                            })
-
-                                        )}
-
-                                    </tbody>
-
-                                </table>
-
-                            </div>
-
-
-
-                            {/* Pagination Controls */}
-
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-2 bg-gray-50 border-t">
-
-                                <ResultsCounter
-
-                                    currentPage={currentPage}
-
-                                    totalPages={totalPages}
-
-                                    rowsPerPage={rowsPerPage}
-
-                                    totalResults={filteredOrders.length}
-
-                                />
-
-                                <div className="flex items-center gap-2">
-
-                                    <RowsPerPageSelector
-
-                                        value={rowsPerPage}
-
-                                        onChange={setRowsPerPage}
-
-                                    />
-
-                                    <PaginationControls
-
-                                        currentPage={currentPage}
-
-                                        totalPages={totalPages}
-
-                                        onPageChange={setCurrentPage}
-
-                                    />
+                                    </table>
 
                                 </div>
 
+                                {/* Pagination Controls */}
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-2 bg-gray-50 border-t">
+                                    <ResultsCounter
+                                        currentPage={ordersRecordsPage}
+                                        totalPages={ordersRecordsTotalPages}
+                                        rowsPerPage={ordersRecordsRowsPerPage}
+                                        totalResults={ordersRecords.length}
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <RowsPerPageSelector
+                                            value={ordersRecordsRowsPerPage}
+                                            onChange={setOrdersRecordsRowsPerPage}
+                                        />
+                                        <PaginationControls
+                                            currentPage={ordersRecordsPage}
+                                            totalPages={ordersRecordsTotalPages}
+                                            onPageChange={setOrdersRecordsPage}
+                                        />
+                                    </div>
+                                </div>
+
+                            </Card>
+
+                        </>
+
+                    ) : viewMode === "generate_qr" ? (
+                        <>
+                            {/* صفحة توليد QR - نفس تصميم طلب الانتاج */}
+                            <div className="h-full min-h-0 px-2 pb-2">
+                                <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-2 h-full min-h-0">
+                                    {/* العمود الأيمن - المواد والأرقام */}
+                                    <div className="flex flex-col gap-2 h-full min-h-0 overflow-auto">
+                                        {/* أزرار المواد */}
+                                        <Card className="flex-1 p-2 flex flex-col">
+                                            <Label className="font-bold text-sm mb-1 block">المادة</Label>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
+                                                {materials.map(m => (
+                                                    <button
+                                                        key={m.material_id}
+                                                        onClick={() => setQrFormData(prev => ({ ...prev, material_id: String(m.material_id) }))}
+                                                        className={`
+                                                        aspect-square rounded-xl border-3 text-lg sm:text-xl font-bold 
+                                                        transition-all touch-manipulation hover:scale-105 active:scale-95
+                                                        flex items-center justify-center p-2
+                                                        ${String(qrFormData.material_id) === String(m.material_id)
+                                                                ? "border-primary-f bg-secondary-f text-white shadow-lg"
+                                                                : "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
+                                                            }
+                                                    `}
+                                                        title={m.material_name}
+                                                    >
+                                                        <span className="line-clamp-2 text-center">{m.material_name}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </Card>
+
+                                        {/* الأرقام */}
+                                        <Card className="flex-[3] flex flex-col p-2 max-h-[560px] overflow-auto">
+                                            <div className="flex-shrink-1 mb-1">
+                                                <div className="bg-gray-100 rounded-lg py-2 px-3">
+                                                    <div className="text-xs text-gray-500 mb-0.5">
+                                                        {qrActiveField === "quantity" ? "الكمية" :
+                                                            qrActiveField === "width" ? "العرض" :
+                                                                qrActiveField === "thickness" ? "السماكة" : "القيمة"}
+                                                    </div>
+                                                    <div className="text-2xl font-mono font-bold text-gray-800 text-center truncate leading-tight">
+                                                        {qrFormData[qrActiveField] || "0"}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* أزرار الأرقام */}
+                                            <div className="flex-1 grid grid-rows-4 gap-1 min-h-0">
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    {["9", "8", "7"].map(key => (
+                                                        <button
+                                                            key={key}
+                                                            onClick={() => handleQrNumpadPress(key)}
+                                                            className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+                                                        >
+                                                            {key}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    {["6", "5", "4"].map(key => (
+                                                        <button
+                                                            key={key}
+                                                            onClick={() => handleQrNumpadPress(key)}
+                                                            className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+                                                        >
+                                                            {key}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    {["3", "2", "1"].map(key => (
+                                                        <button
+                                                            key={key}
+                                                            onClick={() => handleQrNumpadPress(key)}
+                                                            className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+                                                        >
+                                                            {key}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    <button
+                                                        onClick={() => handleQrNumpadPress(".")}
+                                                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+                                                    >
+                                                        .
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleQrNumpadPress("0")}
+                                                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+                                                    >
+                                                        0
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleQrNumpadPress("clear")}
+                                                        className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-xl font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
+                                                    >
+                                                        مسح
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    </div>
+
+                                    {/* العمود الأوسط - حقول الإدخال */}
+                                    <div className={`flex flex-col gap-2 h-full min-h-0 overflow-y-auto border-4 rounded-xl p-1 ${materialBorderClass}`}>
+
+                                        {/* شريط التقدم للتعديل */}
+
+                                        {editingItemId && (
+
+                                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">
+
+                                                <span className="text-blue-700 text-sm font-medium">
+
+                                                    <Edit className="w-4 h-4 inline ml-1" />
+
+                                                    جاري تعديل العنصر
+
+                                                </span>
+
+                                                <button
+
+                                                    onClick={cancelEdit}
+
+                                                    className="text-blue-600 hover:text-blue-800 text-sm font-bold"
+
+                                                >
+
+                                                    إلغاء
+
+                                                </button>
+
+                                            </div>
+
+                                        )}
+
+
+
+
+                                        {qrFormData.material_id && !isSelectedMaterialPvc && (
+
+                                            <div className="bg-primary-s border border-primary-f/20 text-secondary-f text-sm p-3 rounded-lg">
+
+                                                <div className="font-bold mb-2">معلومات الأبعاد</div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+
+                                                    <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
+
+                                                        <div className="text-xs text-secondary-t">الطول</div>
+
+                                                        <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "height")}</div>
+
+                                                    </div>
+
+                                                    <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
+
+                                                        <div className="text-xs text-secondary-t">العرض</div>
+
+                                                        <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "width")}</div>
+
+                                                    </div>
+
+                                                    <div className="bg-white/80 rounded-md px-3 py-2 border border-primary-f/10 text-center">
+
+                                                        <div className="text-xs text-secondary-t">السماكة</div>
+
+                                                        <div className="font-semibold">{getMaterialConstantLabel(selectedMaterial, "thickness")}</div>
+
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+
+                                        )}
+
+
+
+                                        {isSelectedMaterialPvc && (
+
+                                            <div className="flex-shrink-0 p-2 border-b-2 border-dashed border-gray-300">
+
+                                                {/* <Label className="font-bold text-sm mb-2 block">نوع الطلب</Label> */}
+
+                                                <div className="grid grid-cols-2 gap-2">
+
+                                                    {TYPE_OPTIONS.map(t => (
+
+                                                        <button
+
+                                                            key={t.value}
+
+                                                            onClick={() => setQrFormData(prev => ({ ...prev, type_item: t.value }))}
+
+                                                            className={`
+                               
+                                                                                   rounded-2xl border-3 text-lg font-bold
+                               
+                                                                                   transition-all touch-manipulation hover:scale-105 active:scale-95
+                               
+                                                                                   flex items-center justify-center px-4 py-3 min-h-[56px]
+                               
+                                                                                   ${qrFormData.type_item === t.value
+
+                                                                    ? "border-primary-f bg-primary-f text-white shadow-lg"
+
+                                                                    : "border-gray-300 bg-white hover:border-secondary-s"
+
+                                                                }
+                               
+                                                                               `}
+
+                                                        >
+
+                                                            {t.label}
+
+                                                        </button>
+
+                                                    ))}
+
+                                                </div>
+
+                                            </div>
+
+                                        )}
+
+
+
+                                        {qrFormData.material_id && !isSelectedMaterialBoard && (
+
+                                            <div className="p-2 border-b-2 border-dashed border-gray-300">
+
+                                                <Label className="font-bold text-sm mb-2 block">
+
+                                                    العرض
+
+                                                    {loadingWidths && <span className="mr-2 text-gray-500 text-xs">جاري التحميل...</span>}
+
+                                                </Label>
+
+                                                {widthValues.length > 0 ? (
+
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+
+                                                        {widthValues.map(w => (
+
+                                                            <button
+
+                                                                key={w.id}
+
+                                                                onClick={() => setQrFormData(prev => ({ ...prev, width: w.value }))}
+
+                                                                className={`
+                               
+                                                                                       rounded-xl border-3 text-base font-medium
+                               
+                                                                                       transition-all touch-manipulation hover:scale-105 active:scale-95
+                               
+                                                                                       flex items-center justify-center p-2
+                               
+                                                                                       ${qrFormData.width === w.value
+
+                                                                        ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+
+                                                                        : "border-gray-300 bg-white hover:border-secondary-s"
+
+                                                                    }
+                               
+                                                                                   `}
+
+                                                            >
+
+                                                                {w.value}
+
+                                                            </button>
+
+                                                        ))}
+
+                                                    </div>
+
+                                                ) : (
+
+                                                    !loadingWidths && (
+
+                                                        <div className="text-center p-3 text-gray-400 text-sm border-2 border-dashed border-gray-300 rounded-xl">
+
+                                                            لا توجد قيم عرض
+
+                                                        </div>
+
+                                                    )
+
+                                                )}
+
+                                            </div>
+
+                                        )}
+
+
+
+                                        <div className="p-2 border-b-2 border-dashed border-gray-300">
+
+                                            <Label className="font-bold text-sm mb-1 block">المسطرة</Label>
+
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+
+                                                {availableRulers.length === 0 ? (
+
+                                                    <span className="text-gray-400 text-sm col-span-3 text-center p-2">اختر المادة أولاً</span>
+
+                                                ) : (
+
+                                                    availableRulers.map(r => (
+
+                                                        <button
+
+                                                            key={r.ruler_id}
+
+                                                            onClick={() => setQrFormData(prev => ({ ...prev, ruler_id: String(r.ruler_id) }))}
+
+                                                            className={`
+                               
+                                                                                   rounded-xl border-3 text-base font-medium
+                               
+                                                                                   transition-all touch-manipulation hover:scale-105 active:scale-95
+                               
+                                                                                   flex items-center justify-center p-2
+                               
+                                                                                   ${String(qrFormData.ruler_id) === String(r.ruler_id)
+
+                                                                    ? "border-secondary-s bg-secondary-s text-white shadow-lg"
+
+                                                                    : "border-gray-300 bg-white hover:border-secondary-s"
+
+                                                                }
+                               
+                                                                               `}
+
+                                                        >
+
+                                                            {r.ruler_name}
+
+                                                        </button>
+
+                                                    ))
+
+                                                )}
+
+                                            </div>
+
+                                        </div>
+
+
+
+                                        <div className="p-2 border-b-2 border-dashed border-gray-300">
+
+                                            <div className="grid grid-cols-[1fr_100px] gap-2 items-end">
+
+                                                <div>
+
+                                                    <Label className="font-bold text-sm mb-2 block">
+
+                                                        اللون
+
+                                                        {numpadMode === "colorSearch" && colorSearchCode && (
+
+                                                            <span className="mr-2 text-secondary-s text-xs">(بحث: {colorSearchCode})</span>
+
+                                                        )}
+
+                                                    </Label>
+
+                                                    <FilterSelect
+
+                                                        value={qrFormData.color_id ? String(qrFormData.color_id) : ""}
+
+                                                        onChange={(e) => {
+                                                            const colorId = e.target.value;
+                                                            const selectedColor = colors.find(c => String(c.color_id) === String(colorId));
+                                                            setQrFormData(prev => ({ 
+                                                                ...prev, 
+                                                                color_id: colorId,
+                                                                color_code: selectedColor?.color_code || "",
+                                                                color_name: selectedColor?.color_name || ""
+                                                            }));
+                                                        }}
+
+                                                        disabled={!qrFormData.ruler_id || (!isSelectedMaterialBoard && !qrFormData.width)}
+
+                                                        searchValue={colorSearchCode}
+
+                                                        onSearchValueChange={(v) => setColorSearchCode(v)}
+
+                                                        onInputFocus={() => {
+
+                                                            setNumpadMode("text");
+
+                                                            setActiveTextTarget("color_search");
+
+                                                        }}
+
+                                                        keepOpen={activeTextTarget === "color_search"}
+
+                                                        showSelectedImage={true}
+
+                                                        options={colorOptions}
+
+                                                        placeholder={
+
+                                                            !qrFormData.ruler_id
+
+                                                                ? "اختر المسطرة أولاً"
+
+                                                                : (!isSelectedMaterialBoard && !qrFormData.width)
+
+                                                                    ? "اختر العرض أولاً"
+
+                                                                    : colorOptions.length === 0
+
+                                                                        ? "لا توجد ألوان مسعرة"
+
+                                                                        : "اختر اللون"
+
+                                                        }
+
+                                                        className="w-full text-sm"
+
+                                                    />
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+
+
+                                        <div className="p-2 border-b-2 border-dashed border-gray-300">
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+
+                                                <div>
+
+                                                    <Label className="font-bold text-sm mb-1 block">الكمية</Label>
+
+                                                    <div className="flex items-center gap-2">
+
+                                                        <Input
+
+                                                            type="number"
+
+                                                            value={qrFormData.quantity}
+
+                                                            onChange={(e) => setQrFormData(prev => ({ ...prev, quantity: e.target.value }))}
+
+                                                            onClick={() => {
+
+                                                                setQrActiveField("quantity");
+
+                                                            }}
+
+                                                            className={`h-12 text-lg text-center font-bold flex-1 ${qrActiveField === "quantity" ? "ring-2 ring-blue-400" : ""
+
+                                                                }`}
+
+                                                            placeholder="0"
+
+                                                        />
+
+                                                        <span className="text-base font-bold text-gray-600 whitespace-nowrap">متر</span>
+
+                                                    </div>
+
+                                                </div>
+
+
+
+
+                                                <div>
+
+                                                    <Label className="font-bold text-sm mb-1 block">السماكة</Label>
+
+                                                    {thicknessValues.length > 1 ? (
+
+                                                        <FilterSelect
+
+                                                            value={qrFormData.thickness ? String(qrFormData.thickness) : ""}
+
+                                                            onChange={(e) => setQrFormData(prev => ({ ...prev, thickness: e.target.value }))}
+
+                                                            options={thicknessOptions}
+
+                                                            placeholder="اختر السماكة"
+
+                                                            className="w-full text-sm"
+
+                                                        />
+
+                                                    ) : (
+
+                                                        <div className="flex items-center gap-2">
+
+                                                            <Input
+
+                                                                type="number"
+
+                                                                value={qrFormData.thickness}
+
+                                                                onChange={(e) => setQrFormData(prev => ({ ...prev, thickness: e.target.value }))}
+
+                                                                onClick={() => {
+
+                                                                    setQrActiveField("thickness");
+
+                                                                }}
+
+                                                                className="h-12 text-lg text-center font-bold flex-1 bg-gray-100"
+
+                                                                placeholder={thicknessValues.length === 1 ? thicknessValues[0].label : "0.6"}
+
+                                                                step="0.1"
+
+                                                                readOnly={thicknessValues.length === 1}
+
+                                                                disabled={thicknessValues.length === 1}
+
+                                                            />
+
+                                                            <span className="text-base font-bold text-gray-600 whitespace-nowrap">مم</span>
+
+                                                        </div>
+
+                                                    )}
+
+                                                </div>
+
+
+
+
+                                                <div >
+
+                                                    <Label className="font-bold text-sm mb-1 block">رقم الطبخة</Label>
+
+                                                    <FilterSelect
+
+                                                        value={qrFormData.batch_id ? String(qrFormData.batch_id) : ""}
+
+                                                        onChange={(e) => {
+                                                            const batchId = e.target.value;
+                                                            const selectedBatch = batches.find(b => String(b.batch_id) === String(batchId));
+                                                            setQrFormData(prev => ({ 
+                                                                ...prev, 
+                                                                batch_id: batchId,
+                                                                batch_number: selectedBatch?.batch_number || ""
+                                                            }));
+                                                        }}
+
+                                                        disabled={!isSelectedMaterialBoard && !qrFormData.width}
+
+                                                        searchValue={batchSearchTerm}
+
+                                                        onSearchValueChange={(v) => setBatchSearchTerm(v)}
+
+                                                        onInputFocus={() => {
+
+                                                            setNumpadMode("text");
+
+                                                            setActiveTextTarget("batch_search");
+
+                                                        }}
+
+                                                        keepOpen={activeTextTarget === "batch_search"}
+
+                                                        options={filteredBatchOptions}
+
+                                                        placeholder={
+
+                                                            (!isSelectedMaterialBoard && !qrFormData.width)
+
+                                                                ? "اختر العرض أولاً"
+
+                                                                : filteredBatchOptions.length === 0
+
+                                                                    ? "لا توجد طبخات"
+
+                                                                    : "اختر الطبخة"
+
+                                                        }
+
+                                                        className="w-full text-sm"
+
+                                                    />
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+
+                                            <div className="md:col-span-2">
+
+                                                <Label className="font-bold text-sm mb-1 block">الملاحظات</Label>
+
+                                                <Input
+
+                                                    value={qrFormData.notes}
+
+                                                    onChange={(e) => setQrFormData(prev => ({ ...prev, notes: e.target.value }))}
+
+                                                    placeholder="ملاحظات إضافية للعنصر..."
+
+                                                    className="h-9 text-sm"
+
+                                                />
+
+                                            </div>
+
+                                        </div>
+
+                                        <div className="mt-auto pt-1">
+
+                                            <div className="flex gap-2">
+
+                                                {editingItemId && (
+
+                                                    <button
+
+                                                        onClick={cancelEdit}
+
+                                                        className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors h-10"
+
+                                                    >
+
+                                                        إلغاء
+
+                                                    </button>
+
+                                                )}
+
+                                                <Button
+
+                                                    onClick={generateQrFromForm}
+
+                                                    size="sm"
+
+                                                    className={`${editingItemId ? 'flex-1' : 'w-full'} h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700'
+
+                                                        }`}
+
+                                                    disabled={!qrFormData.color_id || !qrFormData.quantity || (!isSelectedMaterialBoard && !qrFormData.width)}
+
+                                                >
+
+                                                    {editingItemId ? (
+
+                                                        <>
+
+                                                            <Save className="w-5 h-5 ml-2" />
+
+                                                            تحديث العنصر
+
+                                                        </>
+
+                                                    ) : (
+
+                                                        <>
+
+                                                            <Plus className="w-5 h-5 ml-2" />
+
+                                                            توليد رمز QR
+
+                                                        </>
+
+                                                    )}
+
+                                                </Button>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                    {/* العمود الأيسر - قائمة QR المُولدة */}
+                                    <div className="flex flex-col gap-3 h-full min-h-0 overflow-auto">
+                                        <Card className="flex flex-col h-full min-h-0 overflow-hidden">
+                                            {/* رأس القائمة */}
+                                            <div className="flex justify-between items-center p-2 border-b bg-gray-50 flex-shrink-0">
+                                                <span className="font-bold text-lg">QR المُولد</span>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        setQrFormData({
+                                                            material_id: "",
+                                                            ruler_id: "",
+                                                            color_id: "",
+                                                            color_code: "",
+                                                            color_name: "",
+                                                            batch_id: "",
+                                                            batch_number: "",
+                                                            width: "",
+                                                            thickness: "",
+                                                            quantity: "",
+                                                            type_item: ""
+                                                        });
+                                                        setGeneratedQr({ url: "", data: "" });
+                                                    }}
+                                                    className="text-sm"
+                                                >
+                                                    <X className="w-4 h-4 ml-1" />
+                                                    مسح الكل
+                                                </Button>
+                                            </div>
+
+                                            {/* معاينة QR */}
+                                            <div className="flex-1 overflow-y-auto p-2">
+                                                {generatedQr.url ? (
+                                                    <div className="text-center space-y-4">
+                                                        <img
+                                                            src={generatedQr.url}
+                                                            alt="QR Code"
+                                                            className="w-48 h-48 mx-auto border rounded-lg shadow-sm"
+                                                        />
+                                                        <div className="bg-white p-3 rounded-lg border text-sm">
+                                                            <p className="font-mono break-all text-gray-600 text-xs">{generatedQr.data}</p>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                onClick={() => printQr(generatedQr.url, "QR Code", generatedQr.data, 'rtl')}
+                                                                className="flex-1 bg-secondary-s hover:brightness-110 text-white"
+                                                                size="sm"
+                                                            >
+                                                                <Printer className="w-4 h-4 ml-1" />
+                                                                طباعة
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                onClick={() => setGeneratedQr({ url: "", data: "" })}
+                                                                size="sm"
+                                                            >
+                                                                <X className="w-4 h-4 ml-1" />
+                                                                مسح
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center text-gray-400 py-8">
+                                                        <QrCode className="w-24 h-24 mx-auto mb-4 opacity-30" />
+                                                        <p>املأ البيانات واضغط "توليد QR"</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </Card>
+                                    </div>
+                                </div>
                             </div>
+                        </>
 
-
-
-                            {/* نافذة تفاصيل الطلب */}
-
-                            {/* نافذة تفاصيل الطلب */}
-
-
-                        </Card>
-
-                    </>
-
-                )}
+                    ) : (
+                        <div className="flex-1 flex items-center justify-center text-gray-400">
+                            <div className="text-center">
+                                <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                                <p className="text-lg">اختر أحد الأقسام من الأعلى</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
 
@@ -6318,20 +6857,6 @@ export default function OrderPreparer() {
                                         <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusBadge(orderDetails.status).className}`}>
                                             {getStatusBadge(orderDetails.status).label}
                                         </span>
-                                    </div>
-                                </div>
-
-                                <div className="bg-gray-50 p-3 rounded-lg border">
-                                    <div className="text-xs text-gray-500">تعديل الحالة</div>
-                                    <div className="mt-1">
-                                        <FilterSelect
-                                            value={orderDetails.status}
-                                            onChange={(e) => handleUpdateOrderStatus(e.target.value)}
-                                            disabled={updatingOrderStatus}
-                                            options={Object.values(OrderStatus).map((s) => ({ value: s, label: getStatusLabel(s) }))}
-                                            placeholder="اختر الحالة..."
-                                            className="w-full"
-                                        />
                                     </div>
                                 </div>
                             </div>
@@ -6904,67 +7429,34 @@ export default function OrderPreparer() {
                                                 employeeId: user?.user_id || user?.id || user?.employee_id || ""
 
                                             });
-
                                             closeQrGenDialog();
-
                                         }}
-
                                     >
-
                                         فتح في نافذة منفصلة
-
                                     </Button>
-
                                 </div>
-
                             </div>
-
                         )}
-
-
-
                         {/* ملاحظات */}
-
                         <div className="text-xs text-gray-500 bg-yellow-50 p-2 rounded border border-yellow-200">
-
                             <span className="font-bold">ملاحظة:</span> عند تعديل الكمية، سيتم تحديث QR تلقائياً. يمكنك الطباعة أو فتح QR في نافذة منفصلة.
-
                         </div>
-
                     </div>
-
                 </StyledDialog>
-
-
-
                 {/* Delete Confirmation Dialog */}
-
                 <StyledDialog
-
                     isOpen={showDeleteDialog}
-
                     onOpenChange={setShowDeleteDialog}
-
                     title="تأكيد الحذف"
-
                     description={`هل أنت متأكد من حذف ${selectedOrders.length} طلب؟ لا يمكن التراجع عن هذا الإجراء. سيتم حذف جميع الطلبات المحددة بشكل نهائي.`}
-
                     onCancel={() => setShowDeleteDialog(false)}
-
                     onConfirm={confirmDeleteSelectedOrders}
-
                     cancelLabel="إلغاء"
-
                     confirmLabel={deletingOrders ? "جاري الحذف..." : `حذف (${selectedOrders.length})`}
-
                     isLoading={deletingOrders}
-
                     confirmVariant="destructive"
-
                 />
-
             </div>
-
         </div>
     );
 }

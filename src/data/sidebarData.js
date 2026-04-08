@@ -14,7 +14,7 @@ export const sideData = [
     { id: 22, title: 'الفواتير', link: '/invoice', logo: Receipt, role: 'cashier' },
     // Sales only items - Order Preparer only sees dashboard and order preparer
     // { id: 16, title: 'لوحة التحكم', link: '/order-preparer-dashboard', logo: Home, role: 'sales' },
-    { id: 15, title: 'مجهز الطلبات', link: '/order-preparer', logo: ShoppingCart, role: 'sales' },
+    { id: 15, title: 'طلب انتاج', link: '/order-preparer', logo: ShoppingCart, role: 'sales' },
     { id: 10, title: 'مدير الإنتاج', link: '/production', logo: User, role: 'production_manager' },
     { id: 13, title: 'إدارة المستودع', link: '/warehouse', logo: Package, role: 'Warehouse_Keeper' },
 ]

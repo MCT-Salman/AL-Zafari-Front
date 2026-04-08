@@ -535,7 +535,7 @@ export default function OrderPreparerPage() {
         <div className="min-h-screen bg-gray-50" dir="rtl">
             {/* Header */}
             <DashboardHeader
-                title="مجهز الطلبات"
+                title="طلب انتاج"
                 user={user}
                 onLogout={logout}
                 isVisible={isHeaderVisible}

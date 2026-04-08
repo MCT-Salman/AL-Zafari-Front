@@ -108,7 +108,7 @@ export default function ProductionRecords() {
         sales: "مبيعات",
         production_manager: "مدير الإنتاج",
         warehouse_keeper: "أمين المستودع",
-        order_preparer: "مجهز الطلبات",
+        order_preparer: "طلب انتاج",
         production: "الإنتاج"
     };
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);

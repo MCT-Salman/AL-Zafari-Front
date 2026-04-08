@@ -55,7 +55,9 @@ const DefaultRoute = () => {
               ? "/sales"
               : user?.role === 'sales'
                 ? "/order-preparer"
-                : "/dashboard";
+                : user?.role === 'Warehouse_Keeper'
+                  ? "/warehouse"
+                  : "/dashboard";
   return <Navigate to={target} replace />;
 };
 
@@ -68,6 +70,7 @@ const DashboardSwitcher = () => {
   if (user?.role === 'Dissection_Technician') return <Navigate to="/slitting" replace />;
   if (user?.role === 'Cutting_Technician') return <Navigate to="/cutting" replace />;
   if (user?.role === 'Gluing_Technician') return <Navigate to="/gluing" replace />;
+  if (user?.role === 'Warehouse_Keeper') return <Navigate to="/warehouse" replace />;
   return <Dashboard />;
 };
 
@@ -224,7 +227,7 @@ const App = () => {
           zIndex: 9999,
         }}
         toastOptions={{
-          duration: Infinity,
+          duration: 5000,
 
           style: {
             direction: 'rtl',

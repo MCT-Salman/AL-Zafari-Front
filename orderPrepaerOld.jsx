@@ -1,4 +1,4 @@
-﻿// src\pages\Sales\SimpleOrderCreation.jsx
+// OrderPreparer.jsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardHeader from "../../components/common/DashboardHeader";
@@ -31,10 +31,10 @@ import ColorsReadOnly from "./ColorsReadOnly";
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
 
-export default function SimpleOrderCreation({ variant = "orders" }) {
+export default function OrderPreparer() {
     const navigate = useNavigate();
     const { logout, user } = useAuth();
-    const [viewMode, setViewMode] = useState("create"); // create | history | colors
+    const [viewMode, setViewMode] = useState("orders"); // create | history | colors | orders
     const [loading, setLoading] = useState(false);
     const [isHeaderVisible, setIsHeaderVisible] = useState(true);
     const [showPreview, setShowPreview] = useState(false);
@@ -65,6 +65,9 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     // Pagination states for orders history table
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(20);
+    // Pagination states for orders records table (orders tab)
+    const [ordersRecordsPage, setOrdersRecordsPage] = useState(1);
+    const [ordersRecordsRowsPerPage, setOrdersRecordsRowsPerPage] = useState(20);
 
     // Customer State
     const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -97,6 +100,8 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
     const [orderItems, setOrderItems] = useState([]);
     const [orders, setOrders] = useState([]);
+    const [ordersRecords, setOrdersRecords] = useState([]);
+    const [ordersRecordsLoading, setOrdersRecordsLoading] = useState(false);
     const [ordersLoading, setOrdersLoading] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -131,10 +136,20 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     const endIndex = startIndex + rowsPerPage;
     const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
 
+    // Pagination logic for orders records table
+    const ordersRecordsTotalPages = Math.ceil(ordersRecords.length / ordersRecordsRowsPerPage) || 1;
+    const ordersRecordsStartIndex = (ordersRecordsPage - 1) * ordersRecordsRowsPerPage;
+    const ordersRecordsEndIndex = ordersRecordsStartIndex + ordersRecordsRowsPerPage;
+    const paginatedOrdersRecords = ordersRecords.slice(ordersRecordsStartIndex, ordersRecordsEndIndex);
+
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
     }, [historySearchTerm, historyStatusFilter]);
+
+    useEffect(() => {
+        setOrdersRecordsPage(1);
+    }, [ordersRecordsRowsPerPage, ordersRecords.length]);
 
     const [orderDetails, setOrderDetails] = useState(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
@@ -180,8 +195,8 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
     });
 
     const [savingQrQuantity, setSavingQrQuantity] = useState(false);
-    const isOrdersPage = variant === "orders";
-    const showOrderSwitch = isOrdersPage;
+    const isOrderPreparer = true;
+    const showOrderSwitch = true;
 
     const ordersApi = orderApi;
 
@@ -279,6 +294,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
             setOrderDetails((prev) => (prev ? { ...prev, status: nextStatus } : prev));
 
             setOrders((prev) => prev.map((o) => (getOrderId(o) === getOrderId(orderDetails) ? { ...o, status: nextStatus } : o)));
+            setOrdersRecords((prev) => prev.map((o) => (getOrderId(o) === getOrderId(orderDetails) ? { ...o, status: nextStatus } : o)));
 
             toast.success("تم تحديث الحالة");
 
@@ -301,7 +317,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
         return orderItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
     }, [orderItems]);
-
 
 
 
@@ -381,6 +396,12 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
     }, [viewMode]);
 
+    useEffect(() => {
+
+        if (viewMode === "orders") loadOrdersRecords();
+
+    }, [viewMode]);
+
 
 
     useEffect(() => {
@@ -418,51 +439,51 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
     const loadInitialData = async () => {
-
         try {
-
             setLoading(true);
-
+            
+            console.log("[OrderPreparer] Starting loadInitialData...");
+            console.log("[OrderPreparer] API URL:", import.meta.env.VITE_API_URL);
+            console.log("[OrderPreparer] Token exists:", !!localStorage.getItem('accessToken'));
+            
             const [matRes, rulerRes, colorRes, batchRes, priceRes] = await Promise.all([
-
-                materialApi.getMaterials(),
-
-                rulerApi.getRulers(),
-
-                colorApi.getColors(),
-
-                batchApi.getBatches(),
-
-                priceColorApi.getPriceColors(),
-
+                materialApi.getMaterials().catch(err => {
+                    console.error("[OrderPreparer] Materials API failed:", err);
+                    throw err;
+                }),
+                rulerApi.getRulers().catch(err => {
+                    console.error("[OrderPreparer] Rulers API failed:", err);
+                    throw err;
+                }),
+                colorApi.getColors().catch(err => {
+                    console.error("[OrderPreparer] Colors API failed:", err);
+                    throw err;
+                }),
+                batchApi.getBatches().catch(err => {
+                    console.error("[OrderPreparer] Batches API failed:", err);
+                    throw err;
+                }),
+                priceColorApi.getPriceColors().catch(err => {
+                    console.error("[OrderPreparer] PriceColors API failed:", err);
+                    throw err;
+                }),
             ]);
 
-
-
+            console.log("[OrderPreparer] All APIs succeeded");
             setMaterials(getApiData(matRes, []) || []);
-
             setRulers(getApiData(rulerRes, []) || []);
-
             setColors(getApiData(colorRes, []) || []);
-
             setBatches(getApiData(batchRes, []) || []);
-
             setPriceColors(getApiData(priceRes, []) || []);
 
-
-
         } catch (error) {
-
-            // console.error("Error loading data:", error);
-
-            toast.error("فشل في تحميل البيانات");
-
+            console.error("[OrderPreparer] Error loading initial data:", error);
+            console.error("[OrderPreparer] Error message:", error?.message);
+            console.error("[OrderPreparer] Error response:", error?.response);
+            toast.error("فشل في تحميل البيانات: " + (error?.message || "خطأ غير معروف"));
         } finally {
-
             setLoading(false);
-
         }
-
     };
 
 
@@ -595,6 +616,20 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
         }
 
+    };
+
+    const loadOrdersRecords = async () => {
+        try {
+            setOrdersRecordsLoading(true);
+            const response = await orderApi.getOrders();
+            const data = getApiData(response, []) || [];
+            const nextOrders = Array.isArray(data) ? data : (Array.isArray(data?.orders) ? data.orders : []);
+            setOrdersRecords(nextOrders);
+        } catch (error) {
+            toast.error("فشل في تحميل سجل الطلبات");
+        } finally {
+            setOrdersRecordsLoading(false);
+        }
     };
 
 
@@ -749,7 +784,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
             `عدد العناصر:${orderItems.length}`,
 
-            `الكمية الإجمالية:${totalPreviewQuantity}${totalQuantityUnitLabel}`,
+            `إجمالي الكمية:${totalPreviewQuantity} م`,
 
             "العناصر:",
 
@@ -1241,22 +1276,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
     }, [formData.material_id, materials, selectedMaterial]);
 
-    const getItemQuantityUnit = useCallback((item) => {
-        const direct = item?.quantity_unit;
-        if (direct) return direct;
-        const materialName = String(item?.material_name || item?.material?.material_name || "").toLowerCase();
-        return materialName.includes("pvc") ? "متر" : "قطعة";
-    }, []);
-
-    const quantityUnitLabel = isSelectedMaterialPvc ? "متر" : "قطعة";
-    const hasMixedQuantityUnits = useMemo(() => {
-        const units = new Set(orderItems.map((it) => getItemQuantityUnit(it)));
-        return units.size > 1;
-    }, [orderItems, getItemQuantityUnit]);
-    const totalQuantityUnitLabel = hasMixedQuantityUnits ? "" : ` ${quantityUnitLabel}`;
-
-
-
     const getMaterialConstantLabel = useCallback((material, type) => {
 
         const values = material?.constant_values || [];
@@ -1270,28 +1289,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
         return pick.label || `${pick.value ?? ""} ${pick.unit || ""}`.trim();
 
     }, []);
-
-    const getMaterialConstantValue = useCallback((material, type) => {
-        const values = material?.constant_values || [];
-        const candidates = values.filter(v => v.type === type);
-        const pick = candidates.find(v => v.isDefault) || candidates[0];
-        if (!pick) return null;
-        const raw = pick.value ?? pick.label ?? "";
-        const num = Number(raw);
-        if (Number.isFinite(num)) return num;
-        const match = String(raw).match(/[\d.]+/);
-        return match ? Number(match[0]) : null;
-    }, []);
-
-
-    useEffect(() => {
-        if (!selectedMaterial || isSelectedMaterialPvc) return;
-        const widthVal = getMaterialConstantValue(selectedMaterial, "width");
-        if (widthVal != null) {
-            setFormData((prev) => ({ ...prev, width: String(widthVal) }));
-        }
-    }, [selectedMaterial, isSelectedMaterialPvc, getMaterialConstantValue]);
-
 
 
 
@@ -1699,9 +1696,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
-        const widthFromConst = !isSelectedMaterialPvc ? getMaterialConstantValue(selectedMaterial, "width") : null;
-        const lengthFromConst = !isSelectedMaterialPvc ? getMaterialConstantValue(selectedMaterial, "height") : null;
-
         const newItemBase = {
 
             id: editingItemId || Date.now(),
@@ -1716,14 +1710,13 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
             batch_id: formData.batch_id,
 
-            width: !isSelectedMaterialPvc && widthFromConst != null ? String(widthFromConst) : formData.width,
+            width: formData.width,
 
-            length: !isSelectedMaterialPvc && lengthFromConst != null ? Number(lengthFromConst) : 100,
+            length: 100,
 
             thickness: formData.thickness,
 
             quantity: formData.quantity,
-            quantity_unit: isSelectedMaterialPvc ? "م" : "قطعة",
 
             notes: formData.notes,
 
@@ -1853,7 +1846,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
         const qrUrl = getOrderQrUrl(qrData);
 
-        const footerText = `عدد العناصر: ${orderItems.length} | الكمية الإجمالية: ${totalPreviewQuantity}${totalQuantityUnitLabel}`;
+        const footerText = `عدد العناصر: ${orderItems.length} | إجمالي الكمية: ${totalPreviewQuantity} م`;
 
         setOrderQrPreview({
 
@@ -1937,7 +1930,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
         const qrUrl = getOrderQrUrl(qrData);
 
-        const footerText = `المادة: ${material?.material_name} | الكمية: ${formData.quantity} ${quantityUnitLabel}`;
+        const footerText = `مادة: ${material?.material_name} | كمية: ${formData.quantity} م`;
 
 
 
@@ -3095,22 +3088,22 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
     // Filter materials for order-preparer - only show PVC materials
     const filteredMaterials = useMemo(() => {
-        if (!false) return materials;
+        if (!isOrderPreparer) return materials;
         return materials.filter(m => {
             const materialName = m.material_name?.toLowerCase() || "";
             return materialName.includes("pvc");
         });
-    }, [materials, false]);
+    }, [materials, isOrderPreparer]);
 
     // Auto-select first PVC material for order-preparer
     useEffect(() => {
-        if (false && filteredMaterials.length > 0 && !formData.material_id) {
+        if (isOrderPreparer && filteredMaterials.length > 0 && !formData.material_id) {
             setFormData(prev => ({
                 ...prev,
                 material_id: String(filteredMaterials[0].material_id)
             }));
         }
-    }, [false, filteredMaterials, formData.material_id]);
+    }, [isOrderPreparer, filteredMaterials, formData.material_id]);
 
 
     if (loading && viewMode === "create" && materials.length === 0) {
@@ -3128,6 +3121,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
             <DashboardHeader
                 isHeaderVisible={isHeaderVisible}
                 setIsHeaderVisible={setIsHeaderVisible}
+                hideCustomersAndInvoices={true}
                 hideHeaderToggle={true}
             />
 
@@ -3137,25 +3131,20 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                 <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white mt-2 mx-2 rounded-t-lg shadow-sm px-2 py-2">
 
-                    {showOrderSwitch && (
+                    <button
 
-                        <button
+                        onClick={() => setViewMode("orders")}
 
-                            onClick={() => setViewMode("create")}
+                        className={`flex-1 min-w-[140px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "orders"
+                            ? "bg-primary-f text-white border-primary-f shadow"
+                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                            }`}
 
-                            className={`flex-1 min-w-[160px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "create"
-                                ? "bg-primary-f text-white border-primary-f shadow"
-                                : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                                }`}
+                    >
 
-                        >
+                        طلبات orders
 
-                            {false ? "توليد QR" : "المواد"}
-
-                            
-                        </button>
-
-                    )}
+                    </button>
 
                     <button
 
@@ -3173,6 +3162,26 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                         
                     </button>
 
+                    {showOrderSwitch && (
+
+                        <button
+
+                            onClick={() => setViewMode("create")}
+
+                            className={`flex-1 min-w-[160px] py-2 px-4 text-sm font-semibold transition-all rounded-lg border ${viewMode === "create"
+                                ? "bg-primary-f text-white border-primary-f shadow"
+                                : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                                }`}
+
+                        >
+
+                            {isOrderPreparer ? "توليد QR" : "المواد"}
+
+                            
+                        </button>
+
+                    )}
+
                     <button
 
                         onClick={() => setViewMode("colors")}
@@ -3184,7 +3193,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                     >
 
-                        {false ? "طلب انتاج" : "الشركات المكافئة"}
+                        {isOrderPreparer ? "طلب انتاج" : "الشركات المكافئة"}
 
                         
                     </button>
@@ -3194,7 +3203,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                 <div className="flex-1 min-h-0 flex flex-col">
                 {viewMode === "colors" ? (
 
-                    false ? (
+                    isOrderPreparer ? (
 
                         <div className="h-full min-h-0 px-2 pb-2">
 
@@ -3212,7 +3221,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
 
-                                            {(Array.isArray(false ? filteredMaterials : materials) ? (false ? filteredMaterials : materials) : []).map(m => (
+                                            {(Array.isArray(isOrderPreparer ? filteredMaterials : materials) ? (isOrderPreparer ? filteredMaterials : materials) : []).map(m => (
 
                                                 <button
 
@@ -3232,7 +3241,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             ? "border-primary-f bg-secondary-f text-white shadow-lg"
 
-                                                            : false
+                                                            : isOrderPreparer
 
                                                                 ? "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
 
@@ -3260,9 +3269,9 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                     {/* الأرقام */}
 
-                                    <Card className="flex-[3] flex flex-col p-2 min-h-0 overflow-auto">
+                                    <Card className="flex-[3] flex flex-col p-2 max-h-[560px] overflow-auto">
 
-                                        <div className="flex-shrink-0 mb-1">
+                                        <div className="flex-shrink-1 mb-1">
 
                                             <div className="bg-gray-100 rounded-lg py-2 px-3">
 
@@ -3294,7 +3303,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             <div className="grid grid-cols-3 gap-1">
 
-                                                {["7", "8", "9"].map(key => (
+                                                {["9", "8", "7"].map(key => (
 
                                                     <button
 
@@ -3302,7 +3311,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         onClick={() => handleNumpadPress(key)}
 
-                                                        className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
 
                                                     >
 
@@ -3316,7 +3325,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             <div className="grid grid-cols-3 gap-1">
 
-                                                {["4", "5", "6"].map(key => (
+                                                {["6", "5", "4"].map(key => (
 
                                                     <button
 
@@ -3324,7 +3333,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         onClick={() => handleNumpadPress(key)}
 
-                                                        className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
 
                                                     >
 
@@ -3338,7 +3347,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             <div className="grid grid-cols-3 gap-1">
 
-                                                {["1", "2", "3"].map(key => (
+                                                {["3", "2", "1"].map(key => (
 
                                                     <button
 
@@ -3346,7 +3355,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         onClick={() => handleNumpadPress(key)}
 
-                                                        className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                        className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
 
                                                     >
 
@@ -3364,7 +3373,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     onClick={() => handleNumpadPress(".")}
 
-                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                    className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
 
                                                 >
 
@@ -3376,7 +3385,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     onClick={() => handleNumpadPress("0")}
 
-                                                    className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                    className="bg-white border-2 border-gray-300 rounded-lg text-2xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
 
                                                 >
 
@@ -3388,7 +3397,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     onClick={() => handleNumpadPress("clear")}
 
-                                                    className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-lg font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                    className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-xl font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-16"
 
                                                 >
 
@@ -3706,7 +3715,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             <div>
 
-                                                <Label className="font-bold text-sm mb-1 block">{`الكمية`}</Label>
+                                                <Label className="font-bold text-sm mb-1 block">الكمية</Label>
 
                                                 <Input
 
@@ -3830,7 +3839,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                 placeholder="ملاحظات..."
 
-                                                className="h-9 text-sm"
+                                                className="h-12 text-base"
 
                                             />
 
@@ -3916,7 +3925,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                 <div className="flex flex-col gap-3 h-full min-h-0 overflow-auto">
 
-                                    <Card className="flex flex-col h-full min-h-0 overflow-auto">
+                                    <Card className="flex flex-col h-full min-h-0 overflow-hidden">
 
                                         {/* رأس القائمة مع أزرار التحكم */}
 
@@ -4028,7 +4037,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                 </td>
 
-                                                                <td className="p-2 text-center font-bold">{order.quantity} {getItemQuantityUnit(order)}</td>
+                                                                <td className="p-2 text-center font-bold">{order.quantity} م</td>
 
                                                                 <td className="p-2">{order.ruler_name || "-"}</td>
 
@@ -4138,7 +4147,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-fr">
 
-                                    {(Array.isArray(false ? filteredMaterials : materials) ? (false ? filteredMaterials : materials) : []).map(m => (
+                                    {(Array.isArray(isOrderPreparer ? filteredMaterials : materials) ? (isOrderPreparer ? filteredMaterials : materials) : []).map(m => (
 
                                         <button
 
@@ -4158,7 +4167,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     ? "border-primary-f bg-secondary-f text-white shadow-lg"
 
-                                                    : false
+                                                    : isOrderPreparer
 
                                                         ? "border-blue-300 bg-blue-50 text-blue-700 hover:border-blue-400 hover:bg-blue-100"
 
@@ -4738,7 +4747,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                     <div>
 
-                                        <Label className="font-bold text-sm mb-1 block">{`الكمية`}</Label>
+                                        <Label className="font-bold text-sm mb-1 block">الكمية</Label>
 
                                         <div className="flex items-center gap-2">
 
@@ -4766,7 +4775,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             />
 
-                                            <span className="text-base font-bold text-gray-600 whitespace-nowrap">{quantityUnitLabel}</span>
+                                            <span className="text-base font-bold text-gray-600 whitespace-nowrap">متر</span>
 
                                         </div>
 
@@ -4924,11 +4933,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                     <Button
 
-                                        onClick={false ? handleGenerateQrDirectly : addOrUpdateItem}
+                                        onClick={isOrderPreparer ? handleGenerateQrDirectly : addOrUpdateItem}
 
                                         size="sm"
 
-                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : false ? 'bg-purple-600 hover:bg-purple-700' : 'bg-primary-f hover:bg-secondary-f'
+                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : isOrderPreparer ? 'bg-purple-600 hover:bg-purple-700' : 'bg-primary-f hover:bg-secondary-f'
 
                                             }`}
 
@@ -4950,7 +4959,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             <>
 
-                                                {false ? (
+                                                {isOrderPreparer ? (
 
                                                     <>
 
@@ -4990,7 +4999,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-auto">
 
-                            {false ? (
+                            {isOrderPreparer ? (
 
                                 <Card className="flex flex-col h-full min-h-0 overflow-auto">
 
@@ -5058,7 +5067,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                 <div className="space-y-2">
 
-                                                    {/* <div className="grid grid-cols-2 gap-2 text-sm max-w-xs mx-auto">
+                                                    <div className="grid grid-cols-2 gap-2 text-sm max-w-xs mx-auto">
 
                                                         <div className="bg-gray-50 rounded-lg p-2">
 
@@ -5068,18 +5077,24 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         <div className="bg-gray-50 rounded-lg p-2">
 
-                                                            الكمية الإجمالية: <span className="font-bold">{orderQrPreview.totalQuantity || orderItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)}{totalQuantityUnitLabel}</span>
+                                                            إجمالي الكمية: <span className="font-bold">{orderQrPreview.totalQuantity || orderItems.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)} م</span>
 
                                                         </div>
 
-                                                    </div> */}
+                                                    </div>
 
                                                     <div className="flex items-center justify-center gap-2">
+
                                                         <Button
+
                                                             size="sm"
+
                                                             className="bg-secondary-s hover:brightness-110 text-white"
+
                                                             onClick={() => printQr(orderQrPreview.qrUrl, "QR للطلب", orderQrPreview.footerText, "rtl")}
+
                                                             disabled={!orderQrPreview.qrUrl}
+
                                                         >
 
                                                             <Printer className="w-4 h-4 ml-1" />
@@ -5194,7 +5209,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
 
 
-                                                {/* <div className="grid grid-cols-2 gap-3 text-sm">
+                                                <div className="grid grid-cols-2 gap-3 text-sm">
 
                                                     <div className="bg-gray-50 rounded-lg p-2">
 
@@ -5204,11 +5219,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     <div className="bg-gray-50 rounded-lg p-2">
 
-                                                        الكمية الإجمالية: <span className="font-bold">{totalPreviewQuantity}{totalQuantityUnitLabel}</span>
+                                                        إجمالي الكمية: <span className="font-bold">{totalPreviewQuantity} م</span>
 
                                                     </div>
 
-                                                </div> */}
+                                                </div>
 
 
 
@@ -5258,7 +5273,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                                     </td>
 
-                                                                    <td className="p-2 text-center font-bold">{item.quantity} {getItemQuantityUnit(item)}</td>
+                                                                    <td className="p-2 text-center font-bold">{item.quantity} م</td>
 
                                                                     <td className="p-2">{item.ruler_name}</td>
 
@@ -5318,7 +5333,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                 <span className="font-bold text-lg">العناصر: {orderItems.length}</span>
 
-                                                {false && (
+                                                {isOrderPreparer && (
 
                                                     <Button
 
@@ -5494,7 +5509,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             <td className="p-1 text-center font-bold text-sm">
 
-                                                                {item.quantity} {getItemQuantityUnit(item)}
+                                                                {item.quantity} م
 
                                                             </td>
 
@@ -5584,7 +5599,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         <div className="flex justify-end pt-2">
 
-                                            {false ? (
+                                            {isOrderPreparer ? (
 
                                                 <Button
 
@@ -5628,7 +5643,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             <Check className="w-4 h-4 ml-2" />
 
-                                                            {false ? "توليد QR" : "حفظ"}
+                                                            {isOrderPreparer ? "توليد QR" : "حفظ"}
 
                                                         </>
 
@@ -5650,13 +5665,232 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                     </div>
 
+                ) : viewMode === "orders" ? (
+
+                    <>
+
+                        {/* وضع طلبات Orders */}
+
+                        <Card className="flex flex-col h-full min-h-0 overflow-auto p-2">
+
+                            <div className="flex justify-between items-center mb-1 flex-shrink-0">
+
+                                <h2 className="font-bold text-lg">سجل طلبات Orders</h2>
+
+                                <div className="flex items-center gap-2">
+
+                                    <Button
+
+                                        size="sm"
+
+                                        variant="outline"
+
+                                        onClick={loadOrdersRecords}
+
+                                        disabled={ordersRecordsLoading}
+
+                                        className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white border-secondary-s hover:brightness-110 touch-manipulation active:scale-95 transition-transform"
+
+                                    >
+
+                                        <RotateCcw className="w-4 h-4 ml-1" />
+
+                                        تحديث
+
+                                    </Button>
+
+                                </div>
+
+                            </div>
+
+
+
+                            {/* جدول طلبات Orders */}
+
+                            <div className="flex-1 overflow-y-auto overflow-x-auto xl:overflow-x-hidden min-h-0 border rounded-lg bg-white max-h-[50vh] min-[1366px]:min-h-[40vh]">
+
+                                <table className="min-w-[1200px] w-full table-fixed border-collapse">
+
+                                    <thead className="bg-gray-100 sticky top-0 z-20">
+
+                                        <tr>
+
+                                            <th className="p-2 text-right border-b w-10">#</th>
+
+                                            <th className="p-2 text-right border-b w-20">التاريخ</th>
+
+                                            <th className="p-2 text-center border-b w-10">العناصر</th>
+
+                                            <th className="p-2 text-center border-b w-20">الزبون</th>
+
+                                            <th className="p-2 text-center border-b w-32">ملاحظات</th>
+
+                                            <th className="p-2 text-center border-b w-15">الحالة</th>
+
+                                            <th className="p-2 text-center border-b w-20">عرض</th>
+
+                                        </tr>
+
+                                    </thead>
+
+                                    <tbody>
+
+                                        {ordersRecordsLoading ? (
+
+                                            <tr><td colSpan="7" className="p-6"><LoadingState /></td></tr>
+
+                                        ) : ordersRecords.length === 0 ? (
+
+                                            <tr>
+
+                                                <td colSpan="7" className="p-8 text-center text-gray-400">
+
+                                                    <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+
+                                                    لا توجد طلبات
+
+                                                </td>
+
+                                            </tr>
+
+                                        ) : (
+
+                                            paginatedOrdersRecords.map((order, index) => {
+
+                                                const statusBadge = getStatusBadge(order.status);
+
+                                                return (
+
+                                                    <tr key={order.order_id || order.id || index} className="border-b hover:bg-gray-50">
+
+                                                        <td className="p-2 font-medium text-sm">#{ordersRecordsStartIndex + index + 1}</td>
+
+                                                        <td className="p-2 text-sm">{getFormattedDate(order)}</td>
+
+                                                        <td className="p-2 text-center">
+
+                                                            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+
+                                                                {order.count_items ?? order.items?.length ?? 0}
+
+                                                            </span>
+
+                                                        </td>
+
+                                                        <td className="p-2 text-center">
+
+                                                            {order.customer ? (
+
+                                                                <div className="text-sm">
+
+                                                                    <div className="font-medium">{order.customer.name}</div>
+
+                                                                    <div className="text-gray-500 text-xs" dir="ltr">{order.customer.phone}</div>
+
+                                                                </div>
+
+                                                            ) : (
+
+                                                                <span className="text-gray-400 text-xs">بدون زبون</span>
+
+                                                            )}
+
+                                                        </td>
+
+                                                        <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
+
+                                                            {order.notes || "-"}
+
+                                                        </td>
+
+                                                        <td className="p-2 text-center">
+
+                                                            <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
+
+                                                                {statusBadge.label}
+
+                                                            </span>
+
+                                                        </td>
+
+                                                        <td className="p-2 text-center">
+
+                                                            <Button
+
+                                                                size="sm"
+
+                                                                variant="outline"
+
+                                                                className="h-8 px-2 text-xs touch-manipulation active:scale-95 transition-transform hover:bg-primary-f hover:text-white"
+
+                                                                onClick={() => handleViewOrderDetails(order)}
+
+                                                                disabled={loadingDetails}
+
+                                                            >
+
+                                                                {loadingDetails ? (
+
+                                                                    <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin ml-1" />
+
+                                                                ) : (
+
+                                                                    <Eye className="w-3 h-3 ml-1" />
+
+                                                                )}
+
+                                                                عرض
+
+                                                            </Button>
+
+                                                        </td>
+
+                                                    </tr>
+
+                                                );
+
+                                            })
+
+                                        )}
+
+                                    </tbody>
+
+                                </table>
+
+                            </div>
+
+                            {/* Pagination Controls */}
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-2 bg-gray-50 border-t">
+                                <ResultsCounter
+                                    currentPage={ordersRecordsPage}
+                                    totalPages={ordersRecordsTotalPages}
+                                    rowsPerPage={ordersRecordsRowsPerPage}
+                                    totalResults={ordersRecords.length}
+                                />
+                                <div className="flex items-center gap-2">
+                                    <RowsPerPageSelector
+                                        value={ordersRecordsRowsPerPage}
+                                        onChange={setOrdersRecordsRowsPerPage}
+                                    />
+                                    <PaginationControls
+                                        currentPage={ordersRecordsPage}
+                                        totalPages={ordersRecordsTotalPages}
+                                        onPageChange={setOrdersRecordsPage}
+                                    />
+                                </div>
+                            </div>
+
+                        </Card>
+
+                    </>
+
                 ) : (
 
                     <>
 
                         {/* وضع السجل */}
 
-                        <Card className="flex flex-col flex-1 min-h-0 overflow-hidden p-2">
+                        <Card className="flex flex-col h-full min-h-0 overflow-auto p-2">
 
                             <div className="flex justify-between items-center mb-1 flex-shrink-0">
 
@@ -5778,7 +6012,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                             <div className="flex-1 overflow-y-auto overflow-x-auto xl:overflow-x-hidden min-h-0 border rounded-lg bg-white max-h-[50vh] min-[1366px]:min-h-[40vh]">
 
-                                <table className="min-w-[1400px] xl:min-w-0 w-full table-fixed xl:table-auto border-collapse">
+                                <table className="min-w-[1400px] w-full table-fixed border-collapse">
 
                                     <thead className="bg-gray-100 sticky top-0 z-20">
 
@@ -5886,7 +6120,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             {order.customer ? (
 
-                                                                <div className="text-sm xl:whitespace-normal xl:break-words">
+                                                                <div className="text-sm">
 
                                                                     <div className="font-medium">{order.customer.name}</div>
 
@@ -5902,7 +6136,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         </td>
 
-                                                        <td className="p-2 text-center max-w-[150px] xl:max-w-none truncate xl:whitespace-normal xl:break-words text-sm" title={order.notes}>
+                                                        <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
 
                                                             {order.notes || "-"}
 
@@ -6036,509 +6270,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                             {/* نافذة تفاصيل الطلب */}
 
-                            {orderDetails && (
-
-                                <StyledDialog
-
-                                    isOpen={Boolean(orderDetails)}
-
-                                    onOpenChange={(open) => { if (!open) setOrderDetails(null); }}
-
-                                    title={`تفاصيل الطلب ${getOrderId(orderDetails) ? `#${getOrderId(orderDetails)}` : 'بدون طلب'}`}
-
-                                    onCancel={() => setOrderDetails(null)}
-
-                                    cancelLabel="إغلاق"
-
-                                    showFooter={false}
-
-                                    className="w-[98vw] max-w-[1800px]"
-
-                                >
-
-                                    <div className="space-y-4 p-1">
-
-                                        {/* معلومات أساسية للطلب - استخدم orderDetails مباشرة */}
-
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-
-                                            <div className="bg-gray-50 p-3 rounded-lg border">
-
-                                                <div className="text-xs text-gray-500">رقم الطلب</div>
-
-                                                <div className="font-bold text-base">{getOrderId(orderDetails) ? `#${getOrderId(orderDetails)}` : 'بدون طلب'}</div>
-
-                                            </div>
-
-
-
-                                            <div className="bg-gray-50 p-3 rounded-lg border">
-
-                                                <div className="text-xs text-gray-500">تاريخ الإنشاء</div>
-
-                                                <div className="font-bold text-sm">
-
-                                                    {new Date(orderDetails.created_at).toLocaleDateString('en-US', {
-
-                                                        year: 'numeric',
-
-                                                        month: 'short',
-
-                                                        day: 'numeric',
-
-                                                        hour: '2-digit',
-
-                                                        minute: '2-digit'
-
-                                                    })}
-
-                                                </div>
-
-                                            </div>
-
-
-
-                                            <div className="bg-gray-50 p-3 rounded-lg border">
-
-                                                <div className="text-xs text-gray-500">الحالة</div>
-
-                                                <div className="mt-1">
-
-                                                    <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusBadge(orderDetails.status).className}`}>
-
-                                                        {getStatusBadge(orderDetails.status).label}
-
-                                                    </span>
-
-                                                </div>
-
-                                            </div>
-
-
-
-                                            {!false ? <div className="bg-gray-50 p-3 rounded-lg border">
-
-                                                <div className="text-xs text-gray-500">تعديل الحالة</div>
-
-                                                <div className="mt-1">
-
-                                                    <FilterSelect
-
-                                                        value={orderDetails.status}
-
-                                                        onChange={(e) => handleUpdateOrderStatus(e.target.value)}
-
-                                                        disabled={updatingOrderStatus}
-
-                                                        options={Object.values(OrderStatus).map((s) => ({ value: s, label: getStatusLabel(s) }))}
-
-                                                        placeholder="اختر الحالة..."
-
-                                                        className="w-full"
-
-                                                    />
-
-                                                </div>
-
-                                            </div>
-                                                : ""
-                                            }
-
-
-
-                                        </div>
-
-
-
-                                        {/* معلومات الزبون */}
-
-                                        {orderDetails.customer && (
-
-                                            <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-200">
-
-                                                <h4 className="font-bold text-blue-700 mb-2 text-sm flex items-center gap-2">
-
-                                                    <span>معلومات الزبون</span>
-
-                                                    <span className="text-xs bg-blue-200 px-2 py-0.5 rounded-full">
-
-                                                        {orderDetails.customer.customer_type === 'customer' ? 'زبون' : 'مورد'}
-
-                                                    </span>
-
-                                                </h4>
-
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-
-                                                    <div>
-
-                                                        <div className="text-xs text-gray-600">الاسم</div>
-
-                                                        <div className="font-medium text-sm">{orderDetails.customer.name}</div>
-
-                                                    </div>
-
-                                                    <div>
-
-                                                        <div className="text-xs text-gray-600">رقم الهاتف</div>
-
-                                                        <div className="font-medium text-sm text-right" dir="ltr">{orderDetails.customer.phone}</div>
-
-                                                    </div>
-
-                                                    <div>
-
-                                                        <div className="text-xs text-gray-600">المدينة</div>
-
-                                                        <div className="font-medium text-sm">{orderDetails.customer.city || 'غير محدد'}</div>
-
-                                                    </div>
-
-                                                    <div>
-
-                                                        <div className="text-xs text-gray-600">العنوان</div>
-
-                                                        <div className="font-medium text-sm">{orderDetails.customer.address || 'غير محدد'}</div>
-
-                                                    </div>
-
-
-
-                                                </div>
-
-                                            </div>
-
-                                        )}
-
-
-
-                                        {/* معلومات مندوب المبيعات */}
-
-                                        {orderDetails.sales && (
-
-                                            <div className="bg-green-50/50 p-3 rounded-lg border border-green-200">
-
-                                                <h4 className="font-bold text-green-700 mb-2 text-sm">مندوب المبيعات</h4>
-
-                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-
-                                                    <div>
-
-                                                        <div className="text-xs text-gray-600">الاسم</div>
-
-                                                        <div className="font-medium text-sm">{orderDetails.sales.full_name}</div>
-
-                                                    </div>
-
-                                                    <div>
-
-                                                        <div className="text-xs text-gray-600">اسم المستخدم</div>
-
-                                                        <div className="font-medium text-sm">{orderDetails.sales.username}</div>
-
-                                                    </div>
-
-                                                    <div>
-
-                                                        <div className="text-xs text-gray-600">رقم الموظف</div>
-
-                                                        <div className="font-medium text-sm">#{orderDetails.sales_user_id}</div>
-
-                                                    </div>
-
-                                                </div>
-
-                                            </div>
-
-                                        )}
-
-
-
-                                        {/* ملاحظات الطلب */}
-
-                                        {orderDetails.notes && (
-
-                                            <div className="bg-yellow-50/50 p-3 rounded-lg border border-yellow-200">
-
-                                                <h4 className="font-bold text-yellow-700 mb-1 text-sm">ملاحظات الطلب</h4>
-
-                                                <div className="text-sm">{orderDetails.notes}</div>
-
-                                            </div>
-
-                                        )}
-
-
-
-                                        {/* عناصر الطلب */}
-
-                                        {orderDetails.items && orderDetails.items.length > 0 ? (
-
-                                            <div>
-{/* 
-                                                <div className="flex items-center justify-between mb-2">
-
-                                                    <h4 className="font-bold text-base flex items-center gap-2">
-
-                                                        <span>عناصر الطلب</span>
-
-                                                        <span className="text-xs bg-gray-200 px-2 py-1 rounded-full">
-
-                                                            {orderDetails.items.length} عنصر
-
-                                                        </span>
-
-                                                    </h4>
-
-                                                    <div className="text-sm bg-gray-100 px-3 py-1 rounded-lg">
-
-                                                        عدد العناصر: <span className="font-bold">{orderDetails.count_items}</span>
-
-                                                    </div>
-
-                                                </div> */}
-
-
-
-                                                <div className="border rounded-lg overflow-hidden">
-
-                                                    <div className="overflow-x-auto">
-
-                                                        <table className="max-w-[1200px] w-full text-sm">
-
-                                                            <thead className="bg-gray-100">
-
-                                                                <tr>
-
-                                                                    <th className="p-3 text-right">#</th>
-
-                                                                    <th className="p-3 text-right">المادة</th>
-
-                                                                    <th className="p-3 text-center">النوع</th>
-
-                                                                    <th className="p-3 text-center">اللون</th>
-
-                                                                    <th className="p-3 text-center">المسطرة</th>
-
-                                                                    <th className="p-3 text-center">الأبعاد (عرض × سماكة)</th>
-
-                                                                    <th className="p-3 text-center">الكمية</th>
-
-                                                                    <th className="p-3 text-center">رقم الطبخة</th>
-
-                                                                    <th className="p-3 text-center">QR</th>
-
-                                                                    {/* <th className="p-3 text-center">طباعة</th> */}
-
-                                                                    <th className="p-3 text-center">ملاحظات</th>
-
-                                                                </tr>
-
-                                                            </thead>
-
-                                                            <tbody>
-
-                                                                {orderDetails.items.map((item, index) => {
-
-                                                                    const rawColorId = item.color_id ?? item.color?.color_id ?? item.colorId ?? null;
-
-                                                                    const resolvedColor = rawColorId
-
-                                                                        ? colors.find((c) => String(c.color_id) === String(rawColorId))
-
-                                                                        : null;
-
-                                                                    const rawRulerId = item.ruler_id ?? item.ruler?.ruler_id ?? item.rulerId ?? resolvedColor?.ruler_id ?? null;
-
-                                                                    const resolvedRuler = rawRulerId
-
-                                                                        ? rulers.find((r) => String(r.ruler_id) === String(rawRulerId))
-
-                                                                        : null;
-
-                                                                    const resolvedRulerName = item.ruler_name ?? item.ruler?.ruler_name ?? item.ruler_type ?? resolvedRuler?.ruler_name ?? "-";
-
-
-
-                                                                    const localItem = {
-
-                                                                        id: `${getOrderId(orderDetails)}-${index + 1}`,
-
-                                                                        order_id: getOrderId(orderDetails),
-
-                                                                        order_item_id: item.order_item_id ?? item.orderItemId ?? item.id ?? null,
-
-                                                                        material_name: item.material_name,
-
-                                                                        ruler_name: resolvedRulerName,
-
-                                                                        color_name: item.color_name,
-
-                                                                        color_code: item.color_code,
-
-                                                                        width: item.width,
-
-                                                                        thickness: item.thickness,
-
-                                                                        quantity: item.quantity,
-
-                                                                        batch_number: item.batch_number,
-
-                                                                        type_item: item.type_item ?? item.order_type ?? item.typeItem ?? null,
-
-                                                                    };
-
-                                                                    return (
-
-                                                                        <tr key={index} className="border-t hover:bg-gray-50">
-
-                                                                            <td className="p-3 text-center font-medium">{index + 1}</td>
-
-                                                                            <td className="p-3 font-medium">{item.material_name || 'غير محدد'}</td>
-
-                                                                            <td className="p-3 text-center">
-
-                                                                                <span className={`px-2 py-1 rounded-full text-xs ${item.type_item
-
-                                                                                    ? 'bg-purple-100 text-purple-700'
-
-                                                                                    : 'bg-gray-100 text-gray-600'
-
-                                                                                    }`}>
-
-                                                                                    {formatTypeItem(item.type_item)}
-
-                                                                                </span>
-
-                                                                            </td>
-
-                                                                            <td className="p-3 text-center">
-
-                                                                                <span className="flex flex-col"> {item.color_name || '-'}</span>
-
-                                                                                <span className="px-2 py-1 rounded-full text-xs  text-purple-700">{item.color_code || '-'}</span>
-
-                                                                            </td>
-
-                                                                            <td className="p-3 text-center">{resolvedRulerName}</td>
-
-                                                                            <td className="p-3 text-center">
-
-                                                                                {item.width || '-'} × {item.thickness || ''}
-
-                                                                            </td>
-
-                                                                            <td className="p-3 text-center font-bold">{item.quantity} {getItemQuantityUnit(item)}</td>
-
-                                                                            <td className="p-3 text-center font-mono text-xs">{item.batch_number || '-'}</td>
-
-                                                                            <td className="p-3 text-center">
-
-                                                                                <Button
-
-                                                                                    size="sm"
-
-                                                                                    variant="outline"
-
-                                                                                    onClick={() => openQrGenDialog(localItem)}
-
-                                                                                    className="h-8 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
-
-                                                                                >
-
-                                                                                    توليد QR
-
-                                                                                </Button>
-
-                                                                            </td>
-
-                                                                            {/* <td className="p-3 text-center">
-
-                                                                            <Button
-
-                                                                                size="sm"
-
-                                                                                variant="outline"
-
-                                                                                onClick={() => printOrderItemReceipt(localItem, orderDetails)}
-
-                                                                                className="h-8 px-2 text-xs bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-
-                                                                            >
-
-                                                                                <Printer className="w-4 h-4 ml-1" />
-
-                                                                                طباعة
-
-                                                                            </Button>
-
-                                                                        </td> */}
-
-                                                                            <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
-
-                                                                                {item.notes || '-'}
-
-                                                                            </td>
-
-                                                                        </tr>
-
-                                                                    );
-
-                                                                })}
-
-                                                            </tbody>
-
-                                                        </table>
-
-                                                    </div>
-
-                                                </div>
-
-
-
-                                                {/* ملاحظات العناصر المنفصلة */}
-
-                                                {orderDetails.items.some(item => item.notes) && (
-
-                                                    <div className="mt-3 space-y-2">
-
-                                                        <h5 className="font-bold text-sm text-gray-600">ملاحظات العناصر:</h5>
-
-                                                        {orderDetails.items.map((item, index) => (
-
-                                                            item.notes && (
-
-                                                                <div key={index} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-sm">
-
-                                                                    <span className="font-bold">العنصر {index + 1}:</span> {item.notes}
-
-                                                                </div>
-
-                                                            )
-
-                                                        ))}
-
-                                                    </div>
-
-                                                )}
-
-                                            </div>
-
-                                        ) : (
-
-                                            <div className="text-center py-8 text-gray-400 border rounded-lg">
-
-                                                لا يوجد عناصر في هذا الطلب
-
-                                            </div>
-
-                                        )}
-
-                                    </div>
-
-                                </StyledDialog>
-
-                            )}
 
                         </Card>
 
@@ -6548,6 +6279,249 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                 </div>
 
 
+
+                {/* نافذة تفاصيل الطلب */}
+                {orderDetails && (
+                    <StyledDialog
+                        isOpen={Boolean(orderDetails)}
+                        onOpenChange={(open) => { if (!open) setOrderDetails(null); }}
+                        title={`تفاصيل الطلب ${getOrderId(orderDetails) ? `#${getOrderId(orderDetails)}` : 'بدون طلب'}`}
+                        onCancel={() => setOrderDetails(null)}
+                        cancelLabel="إغلاق"
+                        showFooter={false}
+                        className="w-[98vw] max-w-[1800px]"
+                    >
+                        <div className="space-y-4 p-1">
+                            {/* معلومات أساسية للطلب - استخدم orderDetails مباشرة */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                <div className="bg-gray-50 p-3 rounded-lg border">
+                                    <div className="text-xs text-gray-500">رقم الطلب</div>
+                                    <div className="font-bold text-base">{getOrderId(orderDetails) ? `#${getOrderId(orderDetails)}` : 'بدون طلب'}</div>
+                                </div>
+
+                                <div className="bg-gray-50 p-3 rounded-lg border">
+                                    <div className="text-xs text-gray-500">تاريخ الإنشاء</div>
+                                    <div className="font-bold text-sm">
+                                        {new Date(orderDetails.created_at).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 p-3 rounded-lg border">
+                                    <div className="text-xs text-gray-500">الحالة</div>
+                                    <div className="mt-1">
+                                        <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusBadge(orderDetails.status).className}`}>
+                                            {getStatusBadge(orderDetails.status).label}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 p-3 rounded-lg border">
+                                    <div className="text-xs text-gray-500">تعديل الحالة</div>
+                                    <div className="mt-1">
+                                        <FilterSelect
+                                            value={orderDetails.status}
+                                            onChange={(e) => handleUpdateOrderStatus(e.target.value)}
+                                            disabled={updatingOrderStatus}
+                                            options={Object.values(OrderStatus).map((s) => ({ value: s, label: getStatusLabel(s) }))}
+                                            placeholder="اختر الحالة..."
+                                            className="w-full"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* معلومات الزبون */}
+                            {orderDetails.customer && (
+                                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-200">
+                                    <h4 className="font-bold text-blue-700 mb-2 text-sm flex items-center gap-2">
+                                        <span>معلومات الزبون</span>
+                                        <span className="text-xs bg-blue-200 px-2 py-0.5 rounded-full">
+                                            {orderDetails.customer.customer_type === 'customer' ? 'زبون' : 'مورد'}
+                                        </span>
+                                    </h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                        <div>
+                                            <div className="text-xs text-gray-500">الاسم</div>
+                                            <div className="font-medium text-sm">{orderDetails.customer.name}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">الهاتف</div>
+                                            <div className="font-medium text-sm text-right" dir="ltr">{orderDetails.customer.phone}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">المدينة</div>
+                                            <div className="font-medium text-sm">{orderDetails.customer.city || 'غير محدد'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">العنوان</div>
+                                            <div className="font-medium text-sm">{orderDetails.customer.address || 'غير محدد'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* معلومات المبيعات */}
+                            {orderDetails.sales && (
+                                <div className="bg-green-50/50 p-3 rounded-lg border border-green-200">
+                                    <h4 className="font-bold text-green-700 mb-2 text-sm">معلومات المبيعات</h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                                        <div>
+                                            <div className="text-xs text-gray-500">الموظف</div>
+                                            <div className="font-medium text-sm">{orderDetails.sales.full_name}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">اسم المستخدم</div>
+                                            <div className="font-medium text-sm">{orderDetails.sales.username}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">رقم المستخدم</div>
+                                            <div className="font-medium text-sm">#{orderDetails.sales_user_id}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ملاحظات الطلب */}
+                            {orderDetails.notes && (
+                                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                                    <h4 className="font-bold text-yellow-700 mb-2 text-sm">ملاحظات الطلب</h4>
+                                    <div className="text-sm">{orderDetails.notes}</div>
+                                </div>
+                            )}
+
+                            {/* عناصر الطلب */}
+                            {orderDetails.items && orderDetails.items.length > 0 ? (
+                                <div className="space-y-2">
+                                    {/* <div className="flex items-center justify-between">
+                                        <h4 className="font-bold text-sm text-gray-700">
+                                            عناصر الطلب
+                                        </h4>
+                                        <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                            {orderDetails.items.length} عنصر
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm text-gray-600">
+                                        <div>
+                                            عدد العناصر: <span className="font-bold">{orderDetails.count_items}</span>
+                                        </div>
+                                        <div>
+                                            إجمالي الكمية: <span className="font-bold">{calculateOrderTotal(orderDetails.items)} م</span>
+                                        </div>
+                                    </div> */}
+
+                                    <div className="border rounded-lg overflow-visible">
+                                        <div>
+                                            <table className="w-full text-sm">
+                                                <thead className="bg-gray-50 sticky top-0 z-10">
+                                                    <tr>
+                                                        <th className="p-2 text-right">#</th>
+                                                        <th className="p-2 text-right">المادة</th>
+                                                        <th className="p-2 text-right">المسطرة</th>
+                                                        <th className="p-2 text-right">اللون</th>
+                                                        <th className="p-2 text-right">الكود</th>
+                                                        <th className="p-2 text-right">العرض</th>
+                                                        <th className="p-2 text-right">السماكة</th>
+                                                        <th className="p-2 text-right">الكمية</th>
+                                                        <th className="p-2 text-right">الدفعة</th>
+                                                        {isOrderPreparer && (
+                                                            <th className="p-2 text-center">QR</th>
+                                                        )}
+                                                        {/* <th className="p-2 text-center">طباعة</th> */}
+                                                        <th className="p-2 text-center">ملاحظات</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {orderDetails.items.map((item, index) => {
+                                                        const localItem = {
+                                                            ...item,
+                                                            id: `${getOrderId(orderDetails)}-${index + 1}`,
+                                                            order_id: getOrderId(orderDetails),
+                                                            material_name: item.material_name || materials.find(m => String(m.material_id) === String(item.material_id))?.material_name || "-",
+                                                            ruler_name: item.ruler_name || rulers.find(r => String(r.ruler_id) === String(item.ruler_id))?.ruler_name || "-",
+                                                            color_name: item.color_name || colors.find(c => String(c.color_id) === String(item.color_id))?.color_name || "-",
+                                                            color_code: item.color_code || colors.find(c => String(c.color_id) === String(item.color_id))?.color_code || "-",
+                                                            batch_number: item.batch_number || batches.find(b => String(b.batch_id) === String(item.batch_id))?.batch_number || "-",
+                                                            quantity: item.quantity ?? 0
+                                                        };
+                                                        return (
+                                                            <tr key={localItem.id} className="border-t">
+                                                                <td className="p-3 text-right font-bold">{index + 1}</td>
+                                                                <td className="p-3 text-right">{localItem.material_name}</td>
+                                                                <td className="p-3 text-right">{localItem.ruler_name}</td>
+                                                                <td className="p-3 text-right">
+                                                                    <span className="inline-block px-2 py-1 rounded text-white text-xs" style={{ background: localItem.color_code || "#999" }}>
+                                                                        {localItem.color_name}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-3 text-right">
+                                                                    <span className="font-mono text-xs">{localItem.color_code || "-"}</span>
+                                                                </td>
+                                                                <td className="p-3 text-right">{localItem.width ?? "-"}</td>
+                                                                <td className="p-3 text-right">{localItem.thickness ?? "-"}</td>
+                                                                <td className="p-3 text-right font-bold">{localItem.quantity}</td>
+                                                                <td className="p-3 text-right">{localItem.batch_number || "-"}</td>
+                                                                {isOrderPreparer && (
+                                                                    <td className="p-3 text-center">
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() => openQrGenDialog(localItem)}
+                                                                            className="h-8 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                                                                        >
+                                                                            توليد QR
+                                                                        </Button>
+                                                                    </td>
+                                                                )}
+                                                                {/* <td className="p-3 text-center">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() => printOrderItemReceipt(localItem, orderDetails)}
+                                                                    className="h-8 px-2 text-xs bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                                                                >
+                                                                    <Printer className="w-4 h-4 ml-1" />
+                                                                    طباعة
+                                                                </Button>
+                                                            </td> */}
+                                                                <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
+                                                                    {item.notes || '-'}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    {/* ملاحظات العناصر المنفصلة */}
+                                    {orderDetails.items.some(item => item.notes) && (
+                                        <div className="mt-3 space-y-2">
+                                            <h5 className="font-bold text-sm text-gray-600">ملاحظات العناصر:</h5>
+                                            {orderDetails.items.map((item, index) => (
+                                                item.notes && (
+                                                    <div key={index} className="bg-yellow-50 p-2 rounded-lg border border-yellow-200 text-sm">
+                                                        <span className="font-bold">العنصر {index + 1}:</span> {item.notes}
+                                                    </div>
+                                                )
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-gray-400 border rounded-lg">
+                                    لا يوجد عناصر في هذا الطلب
+                                </div>
+                            )}
+                        </div>
+                    </StyledDialog>
+                )}
 
                 <StyledDialog
 
@@ -6627,7 +6601,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                     <div className="space-y-3">
 
-                        {/* <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
 
                             <div className="bg-gray-50 rounded-lg p-2">
 
@@ -6637,11 +6611,11 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                             <div className="bg-gray-50 rounded-lg p-2">
 
-                                الكمية الإجمالية: <span className="font-bold">{orderQrPreview.totalQuantity}{totalQuantityUnitLabel}</span>
+                                إجمالي الكمية: <span className="font-bold">{orderQrPreview.totalQuantity} م</span>
 
                             </div>
 
-                        </div> */}
+                        </div>
 
                         <div className="flex items-center justify-center">
 
@@ -6751,7 +6725,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                         <div className="space-y-2">
 
-                                                <Label className="font-bold">{`الكمية (${qrGenDialog.item?.quantity_unit || quantityUnitLabel})`}</Label>
+                            <Label className="font-bold">الكمية (متر)</Label>
 
                             <div className="flex items-center gap-2">
 
@@ -6791,7 +6765,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                             <div className="text-xs text-gray-400">
 
-                                الكمية الإجمالية: {qrGenDialog.item?.quantity} {qrGenDialog.item?.quantity_unit || quantityUnitLabel}
+                                الكمية الأصلية: {qrGenDialog.item?.quantity} م
 
                             </div>
 
@@ -6833,7 +6807,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         <span className="font-semibold">الكمية:</span>{" "}
 
-                                        <span>{qrGenDialog.quantity || qrGenDialog.item?.quantity || "-"} {qrGenDialog.item?.quantity_unit || quantityUnitLabel}</span>
+                                        <span>{qrGenDialog.quantity || qrGenDialog.item?.quantity || "-"}</span>
 
                                     </div>
 

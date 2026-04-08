@@ -40,7 +40,7 @@ export default function DashboardHeader({
     sales: "مبيعات",
     production_manager: "مدير الإنتاج",
     warehouse_keeper: "أمين المستودع",
-    order_preparer: "مجهز الطلبات",
+    order_preparer: "طلب انتاج",
     production: "الإنتاج"
   };
 
@@ -99,7 +99,7 @@ export default function DashboardHeader({
               className="px-5 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
             >
               <ShoppingCart className="w-5 h-5 ml-2" />
-              مجهز الطلبات
+              طلب انتاج
             </Button>
             {!hideCustomersAndInvoices && (
               <>

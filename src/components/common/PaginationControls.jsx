@@ -18,13 +18,17 @@ import { Button } from '../ui/button';
 const PaginationControls = ({
   currentPage = 1,
   totalPages = 1,
-  onPrevious = () => {},
-  onNext = () => {},
+  onPrevious,
+  onNext,
   onPageChange = () => {},
   disabled = false
 }) => {
   const canGoPrevious = currentPage > 1;
   const canGoNext = currentPage < totalPages;
+
+  // Derive handlers from onPageChange if not provided
+  const handlePrevious = onPrevious || (() => onPageChange(currentPage - 1));
+  const handleNext = onNext || (() => onPageChange(currentPage + 1));
 
   return (
     <div className="flex items-center justify-between gap-4 mt-6 pt-4 border-t-2 border-secondary-f">
@@ -36,7 +40,7 @@ const PaginationControls = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={onPrevious}
+          onClick={handlePrevious}
           disabled={!canGoPrevious || disabled}
           className="flex items-center gap-1"
         >
@@ -75,7 +79,7 @@ const PaginationControls = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canGoNext || disabled}
           className="flex items-center gap-1"
         >

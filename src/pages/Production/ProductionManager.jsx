@@ -97,7 +97,7 @@ export default function ProductionManager() {
         sales: "مبيعات",
         production_manager: "مدير الإنتاج",
         warehouse_keeper: "أمين المستودع",
-        order_preparer: "مجهز الطلبات",
+        order_preparer: "طلب انتاج",
         production: "الإنتاج"
     };
 
@@ -413,7 +413,7 @@ export default function ProductionManager() {
             const orders = Array.isArray(data) ? data : (Array.isArray(data?.orders) ? data.orders : []);
             setPreparerOrders(orders);
         } catch (error) {
-            toast.error("فشل في تحميل طلبات مجهز الطلبات");
+            toast.error("فشل في تحميل طلبات  انتاج");
         } finally {
             setLoadingPreparerOrders(false);
         }
@@ -533,7 +533,7 @@ export default function ProductionManager() {
             setSelectedPreparerOrder(details);
             setShowPreparerOrderDetails(true);
         } catch (error) {
-            toast.error("فشل في جلب تفاصيل طلب مجهز الطلبات");
+            toast.error("فشل في جلب تفاصيل  طلب انتاج");
         } finally {
             setLoadingPreparerDetails(false);
         }
@@ -1696,7 +1696,7 @@ export default function ProductionManager() {
                                             : "bg-gray-100 hover:bg-gray-200 text-gray-700"
                                     }`}
                                 >
-                                    سجل طلبات مجهز الطلبات
+                                    سجل طلبات الانتاج
                                 </button>
                             </div>
                         </div>
@@ -1904,7 +1904,7 @@ export default function ProductionManager() {
                                         <tr>
                                             <td colSpan="7" className="p-8 text-center text-gray-400">
                                                 <AlertCircle className="mx-auto mb-2 h-10 w-10 opacity-50" />
-                                                لا توجد طلبات مجهز الطلبات
+                                                لا توجد طلبات انتاج
                                             </td>
                                         </tr>
                                     ) : (
@@ -2256,7 +2256,7 @@ export default function ProductionManager() {
             <StyledDialog
                 isOpen={showPreparerOrderDetails}
                 onOpenChange={setShowPreparerOrderDetails}
-                title={`تفاصيل طلب مجهز الطلبات #${getPreparerOrderId(selectedPreparerOrder) || "-"}`}
+                title={`تفاصيل طلب انتاج #${getPreparerOrderId(selectedPreparerOrder) || "-"}`}
                 showFooter={false}
                 contentClassName="w-screen max-w-[100vw] max-h-screen p-4"
             >

@@ -211,7 +211,7 @@ export default function OrderPreparerDashboard() {
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
         <PageHeader
-          title="لوحة تحكم مجهز الطلبات"
+          title="لوحة تحكم طلب انتاج"
           subtitle={stats?.date ? `إحصائيات يوم ${formatDate(stats.date)}` : "إحصائيات الطلبات"}
         />
 
