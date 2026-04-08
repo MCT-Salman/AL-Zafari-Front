@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { LogOut, Bell } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { sideData } from "@/data/sidebarData";
@@ -55,17 +55,12 @@ const LayoutContent = () => {
       >
         <Header>
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <Button className="relative cursor-pointer border-none bg-primary-f p-2 shadow-none hover:bg-secondary-f">
-              <Bell size={20} className="text-text-muted" />
-              <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-primary-s bg-red-500"></span>
-            </Button>
-
             <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-secondary-f/25 bg-white/8 px-2.5 py-2 backdrop-blur-sm sm:px-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-secondary-f/20 bg-gradient-to-br from-primary-f to-primary-f/80 font-bold text-white shadow-md">
                 {(user?.username?.[0] || user?.name?.[0] || "U").toUpperCase()}
               </div>
               <div className="min-w-0 text-right leading-tight">
-                <div className="truncate text-sm font-bold text-text-strong">
+                <div className="truncate text-sm font-bold text-white">
                   {user?.full_name || user?.username || user?.name || "مستخدم"}
                 </div>
                 <div className="truncate text-[11px] font-bold text-secondary-f">
