@@ -24,6 +24,10 @@ import LoadingState from "../components/common/LoadingState";
 import PaginationControls from "../components/common/PaginationControls";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import FilterSelect from "../components/common/FilterSelect";
+import { getApiData } from "../utils/api";
+import { dashboardApi } from "../api/dashboardApi";
+import { materialApi } from "../api/materialApi";
 
 // الألوان المتاحة فقط
 const colors = {
@@ -34,40 +38,36 @@ const colors = {
   secondaryT: "#0FAEDD",
   secondaryFo: "#878787"
 };
-
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/api\/?$/, "");
-
-
 // Dashboard page | صفحة لوحة التحكم المحدثة
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [materials, setMaterials] = useState([]);
+  const [selectedMaterialId, setSelectedMaterialId] = useState("");
+  const [materialColorStats, setMaterialColorStats] = useState(null);
+  const [materialStatsLoading, setMaterialStatsLoading] = useState(false);
+  const [materialStatsError, setMaterialStatsError] = useState("");
   const [period, setPeriod] = useState("month");
   const [outputsPage, setOutputsPage] = useState(1);
   const [colorsPage, setColorsPage] = useState(1);
   const [topColorsPage, setTopColorsPage] = useState(1);
+  const [materialColorsPage, setMaterialColorsPage] = useState(1);
+  const [materialTopColorsPage, setMaterialTopColorsPage] = useState(1);
 
   const outputsPageSize = 6;
   const colorsPageSize = 8;
   const topColorsPageSize = 8;
+  const materialColorsPageSize = 8;
+  const materialTopColorsPageSize = 8;
 
   useEffect(() => {
     const loadStats = async () => {
       try {
         setLoading(true);
         setError("");
-        const token = localStorage.getItem("accessToken");
-        const response = await fetch(`${API_BASE_URL}/dashboard/stats?period=${period}`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        const data = await response.json();
-        if (!response.ok || !data?.success) {
-          throw new Error(data?.message || "فشل في تحميل إحصائيات المدير");
-        }
-        setStats(data.data || null);
+        const response = await dashboardApi.getStats(period);
+        setStats(getApiData(response, null));
       } catch (err) {
         setError(err.message || "فشل في تحميل إحصائيات المدير");
       } finally {
@@ -77,6 +77,46 @@ export default function Dashboard() {
 
     loadStats();
   }, [period]);
+
+  useEffect(() => {
+    const loadMaterials = async () => {
+      try {
+        const response = await materialApi.getMaterials();
+        const data = getApiData(response, []);
+        const safeMaterials = Array.isArray(data) ? data : [];
+        setMaterials(safeMaterials);
+        setSelectedMaterialId((prev) => prev || (safeMaterials[0]?.material_id ? String(safeMaterials[0].material_id) : ""));
+      } catch (err) {
+        setMaterials([]);
+      }
+    };
+
+    loadMaterials();
+  }, []);
+
+  useEffect(() => {
+    const loadMaterialColorStats = async () => {
+      if (!selectedMaterialId) {
+        setMaterialColorStats(null);
+        setMaterialStatsError("");
+        return;
+      }
+
+      try {
+        setMaterialStatsLoading(true);
+        setMaterialStatsError("");
+        const response = await dashboardApi.getMaterialColorStats(selectedMaterialId, period);
+        setMaterialColorStats(getApiData(response, null));
+      } catch (err) {
+        setMaterialColorStats(null);
+        setMaterialStatsError(err.message || "فشل في تحميل إحصائيات الألوان حسب المادة");
+      } finally {
+        setMaterialStatsLoading(false);
+      }
+    };
+
+    loadMaterialColorStats();
+  }, [selectedMaterialId, period]);
 
   const mainStats = useMemo(() => {
     const todaySales = stats?.todaySales ?? 0;
@@ -284,6 +324,47 @@ export default function Dashboard() {
     setTopColorsPage(1);
   }, [topColors.length, period]);
 
+  const materialSelectOptions = useMemo(
+    () =>
+      materials.map((material) => ({
+        value: String(material.material_id),
+        label: material.material_name || `مادة ${material.material_id}`,
+      })),
+    [materials]
+  );
+
+  const materialColorSummary = useMemo(() => {
+    const summary = materialColorStats?.summary || {};
+    return [
+      { id: 1, title: "عدد الألوان", value: Number(summary.totalColors || 0).toLocaleString(), unit: "لون", icon: Palette, iconColor: "text-secondary-f", bgColor: "bg-primary-s", borderColor: "border-secondary-f" },
+      { id: 2, title: "إجمالي الكمية", value: Number(summary.totalQuantity || 0).toLocaleString(), unit: "قطعة", icon: Layers, iconColor: "text-secondary-t", bgColor: "bg-primary-s", borderColor: "border-secondary-t" },
+      { id: 3, title: "إجمالي المبلغ", value: Number(summary.totalAmount || 0).toLocaleString(), unit: "ل.س", icon: Wallet, iconColor: "text-primary-f", bgColor: "bg-primary-s", borderColor: "border-primary-f" },
+      { id: 4, title: "إجمالي الطلبات", value: Number(summary.totalOrders || 0).toLocaleString(), unit: "طلب", icon: ShoppingCart, iconColor: "text-secondary-s", bgColor: "bg-primary-s", borderColor: "border-secondary-s" }
+    ];
+  }, [materialColorStats]);
+
+  const materialColorsByColor = useMemo(() => materialColorStats?.byColor || [], [materialColorStats]);
+  const materialTopColors = useMemo(() => materialColorStats?.topColors || [], [materialColorStats]);
+
+  const paginatedMaterialColors = useMemo(() => {
+    const start = (materialColorsPage - 1) * materialColorsPageSize;
+    return materialColorsByColor.slice(start, start + materialColorsPageSize);
+  }, [materialColorsByColor, materialColorsPage]);
+
+  const materialColorsTotalPages = Math.max(1, Math.ceil(materialColorsByColor.length / materialColorsPageSize));
+
+  const paginatedMaterialTopColors = useMemo(() => {
+    const start = (materialTopColorsPage - 1) * materialTopColorsPageSize;
+    return materialTopColors.slice(start, start + materialTopColorsPageSize);
+  }, [materialTopColors, materialTopColorsPage]);
+
+  const materialTopColorsTotalPages = Math.max(1, Math.ceil(materialTopColors.length / materialTopColorsPageSize));
+
+  useEffect(() => {
+    setMaterialColorsPage(1);
+    setMaterialTopColorsPage(1);
+  }, [selectedMaterialId, period, materialColorsByColor.length, materialTopColors.length]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-primary-s flex items-center justify-center">
@@ -321,6 +402,162 @@ export default function Dashboard() {
           </button>
         ))}
       </div>
+
+      <Card className="border-2 border-[#E5E5E5] shadow-lg bg-white overflow-hidden">
+        <div className="h-1.5 w-full" style={{ backgroundColor: colors.secondaryT }} />
+        <CardHeader className="pb-2">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <CardTitle className="text-xl font-black flex items-center gap-2 text-primary-f">
+                <Palette className="w-6 h-6 text-secondary-t" />
+                إحصائيات الألوان حسب المادة
+              </CardTitle>
+              <div className="mt-1 text-sm text-gray-500">
+                اختر مادة لعرض تفاصيل الألوان الخاصة بها خلال الفترة المحددة
+              </div>
+            </div>
+            <div className="w-full max-w-sm">
+              <FilterSelect
+                label="المادة"
+                value={selectedMaterialId}
+                onChange={(event) => setSelectedMaterialId(event.target.value)}
+                options={materialSelectOptions}
+                placeholder="اختر المادة"
+                disabled={materials.length === 0 || materialStatsLoading}
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {materialStatsError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {materialStatsError}
+            </div>
+          )}
+
+          {materialStatsLoading ? (
+            <LoadingState message="جاري تحميل إحصائيات المادة..." />
+          ) : !selectedMaterialId || !materialColorStats ? (
+            <div className="rounded-lg border border-dashed border-gray-300 bg-primary-s p-6 text-center text-sm text-gray-500">
+              اختر مادة لعرض الإحصائيات الخاصة بالألوان
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                {materialColorSummary.map((stat) => (
+                  <StatsCard key={stat.id} {...stat} />
+                ))}
+              </div>
+
+              <Card className="border border-[#E5E5E5] shadow-sm bg-white overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-black flex items-center gap-2 text-primary-f">
+                    <Palette className="w-5 h-5 text-secondary-f" />
+                    تفاصيل ألوان المادة: {materialColorStats?.materialName || "-"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-auto border rounded-lg bg-white">
+                    <table className="w-full text-sm min-w-[900px]">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="p-2 text-center">اللون</th>
+                          <th className="p-2 text-center">عدد الطلبات</th>
+                          <th className="p-2 text-center">إجمالي الكمية</th>
+                          <th className="p-2 text-center">إجمالي المبلغ</th>
+                          <th className="p-2 text-center">قيد الانتظار</th>
+                          <th className="p-2 text-center">قيد التجهيز</th>
+                          <th className="p-2 text-center">مكتمل</th>
+                          <th className="p-2 text-center">ملغي</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedMaterialColors.map((c) => (
+                          <tr key={c.colorId} className="border-t hover:bg-gray-50">
+                            <td className="p-2 text-center font-bold">{c.colorName}</td>
+                            <td className="p-2 text-center">{c.ordersCount}</td>
+                            <td className="p-2 text-center">{c.totalQuantity}</td>
+                            <td className="p-2 text-center">{Number(c.totalAmount || 0).toLocaleString()}</td>
+                            <td className="p-2 text-center">{c.byStatus?.pending?.count || 0}</td>
+                            <td className="p-2 text-center">{c.byStatus?.preparing?.count || 0}</td>
+                            <td className="p-2 text-center">{c.byStatus?.completed?.count || 0}</td>
+                            <td className="p-2 text-center">{c.byStatus?.cancelled?.count || 0}</td>
+                          </tr>
+                        ))}
+                        {paginatedMaterialColors.length === 0 && (
+                          <tr>
+                            <td colSpan="8" className="p-6 text-center text-gray-500">
+                              لا توجد بيانات ألوان لهذه المادة ضمن الفترة المحددة
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {materialColorsByColor.length > materialColorsPageSize && (
+                    <PaginationControls
+                      currentPage={materialColorsPage}
+                      totalPages={materialColorsTotalPages}
+                      onPrevious={() => setMaterialColorsPage((p) => Math.max(1, p - 1))}
+                      onNext={() => setMaterialColorsPage((p) => Math.min(materialColorsTotalPages, p + 1))}
+                      onPageChange={setMaterialColorsPage}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border border-[#E5E5E5] shadow-sm bg-white overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-black flex items-center gap-2 text-primary-f">
+                    <Palette className="w-5 h-5 text-secondary-t" />
+                    أفضل ألوان المادة
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-auto border rounded-lg bg-white">
+                    <table className="w-full text-sm min-w-[800px]">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="p-2 text-center">اللون</th>
+                          <th className="p-2 text-center">عدد الطلبات</th>
+                          <th className="p-2 text-center">إجمالي الكمية</th>
+                          <th className="p-2 text-center">إجمالي المبلغ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedMaterialTopColors.map((c) => (
+                          <tr key={c.colorId} className="border-t hover:bg-gray-50">
+                            <td className="p-2 text-center font-bold">{c.colorName}</td>
+                            <td className="p-2 text-center">{c.ordersCount}</td>
+                            <td className="p-2 text-center">{c.totalQuantity}</td>
+                            <td className="p-2 text-center">{Number(c.totalAmount || 0).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                        {paginatedMaterialTopColors.length === 0 && (
+                          <tr>
+                            <td colSpan="4" className="p-6 text-center text-gray-500">
+                              لا توجد ألوان بارزة لهذه المادة ضمن الفترة المحددة
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {materialTopColors.length > materialTopColorsPageSize && (
+                    <PaginationControls
+                      currentPage={materialTopColorsPage}
+                      totalPages={materialTopColorsTotalPages}
+                      onPrevious={() => setMaterialTopColorsPage((p) => Math.max(1, p - 1))}
+                      onNext={() => setMaterialTopColorsPage((p) => Math.min(materialTopColorsTotalPages, p + 1))}
+                      onPageChange={setMaterialTopColorsPage}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
