@@ -150,7 +150,13 @@ const FilterSelect = ({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className={`h-[52px] w-full rounded-md border border-primary-f bg-primary-s py-2 text-right text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`h-[52px] w-full border border-primary-f bg-primary-s py-2 text-right text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 ${
+            isOpen
+              ? showDropdownAbove
+                ? "rounded-b-md rounded-t-none border-t-0"
+                : "rounded-t-md rounded-b-none border-b-0"
+              : "rounded-md"
+          } ${
             selectedOptionImage ? "pl-16 pr-10" : "pl-10 pr-10"
           }`}
         />
@@ -177,8 +183,10 @@ const FilterSelect = ({
       </div>
 
       {isOpen && !disabled && (
-        <div className={`absolute z-50 w-full overflow-y-auto rounded-md border border-secondary-f/30 bg-primary-s p-1 shadow-md max-h-72 ${
-          showDropdownAbove ? "bottom-full mb-1" : "top-1 mt-1"
+        <div className={`absolute z-50 w-full overflow-y-auto border border-primary-f bg-primary-s p-1 shadow-md max-h-72 ${
+          showDropdownAbove
+            ? "bottom-[calc(100%-1px)] rounded-b-none rounded-t-md"
+            : "top-[calc(100%-1px)] rounded-t-none rounded-b-md"
         }`}>
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option, index) => {

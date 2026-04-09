@@ -2566,9 +2566,9 @@ export default function OrderPreparer() {
 
         try {
 
-            // Switch to production order tab
-
-            setViewMode("colors");
+            // Switch to the production request form tab
+            setViewMode("production");
+            setProductionSubTab("production_request");
 
             // Set the form data with the order details
 
@@ -3459,7 +3459,7 @@ export default function OrderPreparer() {
                         <button
                             onClick={() => setViewMode("sales_orders")}
                             className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${viewMode === "sales_orders"
-                                ? "bg-white text-primary-f border-white shadow"
+                                ? "bg-secondary-s text-primary-s border-secondary-s shadow"
                                 : "bg-white/10 text-white border-white/30 hover:bg-white/20"
                                 }`}
                         >
@@ -3468,7 +3468,7 @@ export default function OrderPreparer() {
                         <button
                             onClick={() => setViewMode("generate_qr")}
                             className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${viewMode === "generate_qr"
-                                ? "bg-white text-primary-f border-white shadow"
+                                ? "bg-secondary-s text-primary-s border-secondary-s shadow"
                                 : "bg-white/10 text-white border-white/30 hover:bg-white/20"
                                 }`}
                         >
@@ -3477,7 +3477,7 @@ export default function OrderPreparer() {
                         <button
                             onClick={() => setViewMode("production")}
                             className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${viewMode === "production"
-                                ? "bg-white text-primary-f border-white shadow"
+                                ? "bg-secondary-s text-primary-s border-secondary-s shadow"
                                 : "bg-white/10 text-white border-white/30 hover:bg-white/20"
                                 }`}
                         >
@@ -3487,7 +3487,7 @@ export default function OrderPreparer() {
                 )}
             />
 
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 h-screen overflow-hidden">
 
                 {/* Sub-tabs for Production page */}
                 {viewMode === "production" && (
@@ -3513,7 +3513,7 @@ export default function OrderPreparer() {
                     </div>
                 )}
 
-                <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex-1 h-[80vh]  flex flex-col">
                     {viewMode === "production" ? (
                         isOrderPreparer ? (
                             productionSubTab === "production_history" ? (
@@ -3554,9 +3554,9 @@ export default function OrderPreparer() {
                                             />
                                         </div>
 
-                                        <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]">
+                                        <div className="flex-1 overflow-y-auto overflow-x-auto">
                                             {filteredProductionHistoryOrders.length > 0 ? (
-                                                <table className="w-full text-sm">
+                                                <table className="w-full text-sm overflow-y-auto">
                                                     <thead className="bg-gray-100 sticky top-0 z-10">
                                                         <tr>
                                                             <th className="p-2 text-right border-b">المادة</th>
@@ -4459,15 +4459,7 @@ export default function OrderPreparer() {
                                                                         <td className="p-2">
 
                                                                             <div className="flex items-center justify-center gap-1">
-
-                                                                                <div
-
-                                                                                    className="w-4 h-4 rounded border border-gray-300"
-
-                                                                                    style={{ backgroundColor: order.color_code }}
-
-                                                                                />
-
+                                                      
                                                                                 <span className="text-xs">{order.color_code}</span>
 
                                                                             </div>
@@ -6170,9 +6162,9 @@ export default function OrderPreparer() {
 
                                 {/* جدول طلبات Orders */}
 
-                                <div className="flex-1 overflow-y-auto overflow-x-auto xl:overflow-x-hidden min-h-0 border rounded-lg bg-white max-h-[50vh] min-[1366px]:min-h-[40vh]">
+                                <div className="flex-1 overflow-y-auto max-h-[350px] border rounded-lg bg-white ">
 
-                                    <table className="min-w-[1200px] w-full table-fixed border-collapse">
+                                    <table className=" w-full table-fixed border-collapse">
 
                                         <thead className="bg-gray-100 sticky top-0 z-20">
 

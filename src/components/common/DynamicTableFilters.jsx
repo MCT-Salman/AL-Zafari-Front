@@ -62,6 +62,9 @@ function DynamicTableFilters({
     ...value,
   };
 
+  const inputClassName =
+    "h-[52px] w-full rounded-md border border-primary-f bg-primary-s px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
+
   const emitChange = (key, nextValue) => {
     if (typeof onChange !== "function") return;
     onChange({
@@ -86,15 +89,19 @@ function DynamicTableFilters({
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
         {mergedFields.search && (
           <div className="xl:col-span-1">
+            <label htmlFor="dynamic-table-filters-search" className="table-filters-label mb-2 block tracking-wide">
+              بحث
+            </label>
             <div className="relative">
               <Search className="table-filters-search-icon pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" />
               <Input
+                id="dynamic-table-filters-search"
                 type="text"
                 value={filters.search}
                 onChange={(event) => emitChange("search", event.target.value)}
                 placeholder={mergedTexts.searchPlaceholder}
                 disabled={disabled}
-                className="pr-10"
+                className={cn(inputClassName, "pr-10")}
               />
             </div>
           </div>
@@ -153,6 +160,7 @@ function DynamicTableFilters({
                 value={filters.dateFrom}
                 onChange={(event) => emitChange("dateFrom", event.target.value)}
                 disabled={disabled}
+                className={inputClassName}
               />
             </div>
 
@@ -165,6 +173,7 @@ function DynamicTableFilters({
                 value={filters.dateTo}
                 onChange={(event) => emitChange("dateTo", event.target.value)}
                 disabled={disabled}
+                className={inputClassName}
               />
             </div>
           </div>

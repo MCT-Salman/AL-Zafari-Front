@@ -208,12 +208,25 @@ export default function OrderPreparerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className=" mx-auto p-6 space-y-6">
         {/* Header */}
         <PageHeader
           title="لوحة تحكم طلب انتاج"
           subtitle={stats?.date ? `إحصائيات يوم ${formatDate(stats.date)}` : "إحصائيات الطلبات"}
         />
+
+        {/* Refresh Button */}
+        <div className="flex justify-end">
+          <button
+            onClick={loadStats}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>تحديث الإحصائيات</span>
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+          </button>
+        </div>
 
         {/* Error Message */}
         {error && (
@@ -385,18 +398,7 @@ export default function OrderPreparerDashboard() {
           </Card>
         </div>
 
-        {/* Refresh Button */}
-        <div className="flex justify-end">
-          <button
-            onClick={loadStats}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>تحديث الإحصائيات</span>
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          </button>
-        </div>
+        
       </div>
     </div>
   );
