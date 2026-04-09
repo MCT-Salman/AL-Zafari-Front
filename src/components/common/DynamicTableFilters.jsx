@@ -191,16 +191,7 @@ function DynamicTableFilters({
         ))}
       </div>
 
-      {showResults && typeof resultsCount === "number" && (
-        <div className="table-filters-results mt-3 flex items-center justify-end">
-          <span className="table-filters-results-badge">
-            {mergedTexts.resultsLabel}: {resultsCount}
-            {typeof totalCount === "number" ? ` ${mergedTexts.resultsFromLabel} ${totalCount}` : ""}
-          </span>
-        </div>
-      )}
-
-      {(resettable || actions) && (
+      {(resettable || actions || (showResults && typeof resultsCount === "number")) && (
         <div className="table-filters-divider mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
           {resettable ? (
             <Button
@@ -216,6 +207,13 @@ function DynamicTableFilters({
           ) : (
             <span />
           )}
+
+          {showResults && typeof resultsCount === "number" ? (
+            <span className="table-filters-results-badge">
+              {mergedTexts.resultsLabel}: {resultsCount}
+              {typeof totalCount === "number" ? ` ${mergedTexts.resultsFromLabel} ${totalCount}` : ""}
+            </span>
+          ) : null}
 
           {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
         </div>

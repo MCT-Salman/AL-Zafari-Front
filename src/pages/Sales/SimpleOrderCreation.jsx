@@ -3283,7 +3283,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
     if (loading && viewMode === "create" && materials.length === 0) {
         return (
-            <div className="h-screen flex items-center justify-center">
+            <div className="h-[80vh] flex items-center justify-center">
                 <LoadingState />
             </div>
         );
@@ -3291,7 +3291,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
     return (
 
-        <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+        <div className={`${viewMode === "colors" ? "h-[90vh]" : "min-h-screen"} flex flex-col bg-gray-50`}>
             {/* Header */}
             <DashboardHeader
                 isHeaderVisible={isHeaderVisible}
@@ -3318,7 +3318,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                 )}
             />
 
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className={`${viewMode === "colors" ? "flex-1 h-[80vh]" : "flex-1 overflow-visible"}`}>
                 {viewMode !== "colors" && (
                     <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white mt-2 mx-2 rounded-t-lg shadow-sm px-2 py-2">
                         <button
@@ -3348,7 +3348,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                     </div>
                 )}
 
-                <div className="flex-1 min-h-0 flex flex-col">
+                <div className={`flex-1 flex flex-col ${viewMode === "colors" ? "min-h-0" : ""}`}>
                 {viewMode === "colors" ? (
 
                     false ? (
@@ -4119,7 +4119,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         {/* جدول طلبات الإنتاج */}
 
-                                        <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]">
+                                        <div className="flex-1 overflow-y-auto overflow-x-auto min-h-[260px]">
 
                                             {productionOrders.length > 0 ? (
 
@@ -4281,7 +4281,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                 ) : viewMode === "create" ? (
 
-                    <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-2 h-full min-h-0 px-2 pb-2">
+                    <div className="grid grid-cols-1 xl:grid-cols-[0.8fr_1.5fr_1.6fr] gap-2 h-[80vh] px-2 pb-2">
 
                         {/* العمود الأيمن - المواد والأرقام */}
 
@@ -4459,7 +4459,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                 onClick={() => handleNumpadPress(key)}
 
-                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-14"
 
                                             >
 
@@ -4481,7 +4481,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                 onClick={() => handleNumpadPress(key)}
 
-                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-14"
 
                                             >
 
@@ -4503,7 +4503,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                 onClick={() => handleNumpadPress(key)}
 
-                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                                className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-14"
 
                                             >
 
@@ -4521,7 +4521,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             onClick={() => handleNumpadPress(".")}
 
-                                            className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                            className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-14"
 
                                         >
 
@@ -4533,7 +4533,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             onClick={() => handleNumpadPress("0")}
 
-                                            className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                            className="bg-white border-2 border-gray-300 rounded-lg text-xl font-bold hover:bg-gray-50 active:bg-gray-200 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-14"
 
                                         >
 
@@ -4545,7 +4545,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             onClick={() => handleNumpadPress("clear")}
 
-                                            className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-lg font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-10"
+                                            className="bg-red-100 text-red-700 border-2 border-red-200 rounded-lg text-lg font-bold hover:bg-red-200 active:bg-red-300 transition-all flex items-center justify-center touch-manipulation active:scale-95 h-14"
 
                                         >
 
@@ -4715,7 +4715,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                     className={`
 
-                                                        rounded-xl border-3 text-base font-medium
+                                                        rounded-xl border-3 text-base font-medium h-14
 
                                                         transition-all touch-manipulation hover:scale-105 active:scale-95
 
@@ -4783,7 +4783,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                 className={`
 
-                                                    rounded-xl border-3 text-base font-medium
+                                                    rounded-xl border-3 text-base font-medium h-14
 
                                                     transition-all touch-manipulation hover:scale-105 active:scale-95
 
@@ -5051,7 +5051,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         placeholder="ملاحظات إضافية للعنصر..."
 
-                                        className="h-9 text-sm"
+                                        className="h-12"
 
                                     />
 
@@ -5085,7 +5085,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                         size="sm"
 
-                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-10 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : false ? 'bg-purple-600 hover:bg-purple-700' : 'bg-primary-f hover:bg-secondary-f'
+                                        className={`${editingItemId ? 'flex-1' : 'w-full'} h-12 text-base font-bold text-white touch-manipulation active:scale-95 transition-transform ${editingItemId ? 'bg-green-600 hover:bg-green-700' : false ? 'bg-purple-600 hover:bg-purple-700' : 'bg-primary-f hover:bg-secondary-f'
 
                                             }`}
 
@@ -5575,7 +5575,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                             ref={tableContainerRef}
 
-                                            className="flex-1 overflow-y-auto overflow-x-auto min-h-0 max-h-[50vh] min-[1366px]:min-h-[40vh]"
+                                            className="flex-1 overflow-y-auto overflow-x-auto min-h-[260px]"
 
                                             style={{ direction: 'rtl' }}
 
@@ -5813,13 +5813,39 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                         {/* وضع السجل */}
 
-                        <Card className="flex flex-col flex-1 min-h-0 overflow-hidden p-2">
+                        <Card className="flex flex-col flex-1 min-h-[70vh] overflow-visible p-2">
 
                             <div className="flex justify-between items-center mb-1 flex-shrink-0">
 
                                 <h2 className="font-bold text-lg">سجل الطلبات</h2>
 
-                                <div className="flex items-center gap-2">
+                               
+
+                            </div>
+
+
+
+                            <div className="mb-3">
+                                <DynamicTableFilters
+                                    value={historyFilters}
+                                    onChange={setHistoryFilters}
+                                    statusOptions={[
+                                        { value: "pending", label: "قيد الانتظار" },
+                                        { value: "outofwarehouse", label: "اخراج من المستودع" },
+                                        { value: "completed", label: "مكتمل" },
+                                        { value: "cancelled", label: "ملغي" },
+                                    ]}
+                                    userOptions={historyUserOptions}
+                                    materialOptions={historyMaterialOptions}
+                                    texts={{
+                                        searchPlaceholder: "بحث عام في سجل الطلبات...",
+                                        userLabel: "مندوب المبيعات",
+                                        allUsersLabel: "كل المستخدمين",
+                                    }}
+                                />
+                                
+                            </div>
+                             <div className="flex items-center gap-2">
 
                                     {selectedOrders.length > 0 && (
 
@@ -5883,40 +5909,21 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                     </Button>
 
+                                    <RowsPerPageSelector
+
+                                        value={rowsPerPage}
+
+                                        onChange={setRowsPerPage}
+
+                                    />
+
                                 </div>
-
-                            </div>
-
-
-
-                            <div className="mb-3">
-                                <DynamicTableFilters
-                                    value={historyFilters}
-                                    onChange={setHistoryFilters}
-                                    fields={{ material: false }}
-                                    resultsCount={filteredOrders.length}
-                                    totalCount={orders.length}
-                                    statusOptions={[
-                                        { value: "pending", label: "قيد الانتظار" },
-                                        { value: "outofwarehouse", label: "اخراج من المستودع" },
-                                        { value: "completed", label: "مكتمل" },
-                                        { value: "cancelled", label: "ملغي" },
-                                    ]}
-                                    userOptions={historyUserOptions}
-                                    materialOptions={historyMaterialOptions}
-                                    texts={{
-                                        searchPlaceholder: "بحث عام في سجل الطلبات...",
-                                        userLabel: "مندوب المبيعات",
-                                        allUsersLabel: "كل المستخدمين",
-                                    }}
-                                />
-                            </div>
 
 
 
                             {/* جدول السجل مع التمرير */}
 
-                            <div className="flex-1 overflow-y-auto overflow-x-auto xl:overflow-x-hidden min-h-0 border rounded-lg bg-white max-h-[50vh] min-[1366px]:min-h-[40vh]">
+                            <div className="flex-1 overflow-y-auto overflow-x-auto xl:overflow-x-hidden  border rounded-lg bg-white">
 
                                 <table className="min-w-[1400px] xl:min-w-0 w-full table-fixed xl:table-auto border-collapse">
 
@@ -6147,14 +6154,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                                 />
 
                                 <div className="flex items-center gap-2">
-
-                                    <RowsPerPageSelector
-
-                                        value={rowsPerPage}
-
-                                        onChange={setRowsPerPage}
-
-                                    />
 
                                     <PaginationControls
 

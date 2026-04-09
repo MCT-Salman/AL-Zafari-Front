@@ -354,7 +354,7 @@ export default function CustomerManagement() {
   ];
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+    <div className="min-h-[80vh] flex flex-col overflow-hidden bg-gray-50">
       <DashboardHeader
         isHeaderVisible={isHeaderVisible}
         setIsHeaderVisible={setIsHeaderVisible}

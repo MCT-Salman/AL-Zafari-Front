@@ -1490,14 +1490,14 @@ export default function InvoiceManager() {
     // Loading state
     if (viewMode === "create" && materials.length === 0 && !invoicesLoading) {
         return (
-            <div className="h-screen flex items-center justify-center">
+            <div className=" flex items-center justify-center">
                 <LoadingState />
             </div>
         );
     }
 
     return (
-        <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+        <div className="h-[95vh] flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
             <DashboardHeader
                 isHeaderVisible={isHeaderVisible}

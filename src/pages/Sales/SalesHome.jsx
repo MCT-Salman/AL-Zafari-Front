@@ -119,7 +119,7 @@ export default function SalesHome() {
       setError("");
 
       const token = localStorage.getItem("accessToken");
-      const response = await fetch(`${API_BASE_URL}/dashboard/sales-stats`, {
+      const response = await fetch(`${API_BASE_URL}/dashboard/cashier-stats`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"

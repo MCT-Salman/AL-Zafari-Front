@@ -1,4 +1,4 @@
-// src\pages\Production\ProductionManager.jsx
+﻿// src\pages\Production\ProductionManager.jsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { productionApi } from "../../api/productionApi";
@@ -260,7 +260,7 @@ export default function ProductionManager() {
             setMainTab("production_process");
             setProcessSubTab('create');
         }
-        
+
         loadInitialData();
     }, [searchParams]);
 
@@ -792,8 +792,8 @@ export default function ProductionManager() {
                 // إضافة النوع
                 if (type === ProductionType.warehouse) {
                     // إذا اخترت المستودع، اجعله وحده وحدد النوع مكنة
-                    const updatedState = { 
-                        ...prev, 
+                    const updatedState = {
+                        ...prev,
                         production_types: [type],
                         type_item: "Machine" // تعيين النوع مكنة كقيمة افتراضية
                     };
@@ -1108,72 +1108,72 @@ export default function ProductionManager() {
 
     return (
         <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
-                        {/* Header */}
+            {/* Header */}
             <div className="h-[88px]" />
 
             <div className="flex flex-wrap items-center justify-between border-b-4 border-secondary-f bg-primary-f text-white gap-4 px-4 py-3 shadow-md fixed top-0 left-0 right-0 z-40">
-                    <div className="flex flex-wrap gap-3">
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => navigate("/production/dashboard")}
-                            className="px-6 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                        >
-                            <Home className="w-5 h-5 ml-2" />
-                            الرئيسية
-                        </Button>
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => setMainTab("preparer_history")}
-                            className={`px-6 py-3 text-base min-w-[150px] touch-manipulation border-2 ${mainTab === "preparer_history"
-                                ? "bg-white text-primary-f border-white shadow"
-                                : "bg-white/10 text-white border-white/30 hover:bg-white/20"
-                                }`}
-                        >
-                            <History className="w-5 h-5 ml-2" />
-                            سجل طلبات انتاج
-                        </Button>
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => {
-                                setMainTab("production_process");
-                                setProcessSubTab("create");
-                            }}
-                            className={`px-6 py-3 text-base min-w-[150px] touch-manipulation border-2 ${mainTab === "production_process"
-                                ? "bg-white text-primary-f border-white shadow"
-                                : "bg-white/10 text-white border-white/30 hover:bg-white/20"
-                                }`}
-                        >
-                            <ShoppingCart className="w-5 h-5 ml-2" />
-                            عملية انتاج
-                        </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-white/20 bg-white/10">
-                            <div className="text-sm font-bold">
-                                {user?.full_name || user?.username || "-"}
-                            </div>
-                            <div className="h-4 w-px bg-white/30" />
-                            <div className="text-xs font-semibold">
-                                {ROLE_LABELS[user?.role] || user?.role || "-"}
-                            </div>
-                        </div>
-                        <NotificationsBell />
-                        <Button
-                            size="lg"
-                            variant="outline"
-                            onClick={() => setShowLogoutDialog(true)}
-                            className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-                        >
-                            <ArrowRight className="w-5 h-5 ml-2 rotate-180" />
-                            تسجيل الخروج
-                        </Button>
-                    </div>
+                <div className="flex flex-wrap gap-3">
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={() => navigate("/production/dashboard")}
+                        className="px-6 py-3 text-base min-w-[100px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                    >
+                        <Home className="w-5 h-5 ml-2" />
+                        الرئيسية
+                    </Button>
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={() => setMainTab("preparer_history")}
+                        className={`px-6 py-3 text-base min-w-[150px] touch-manipulation border-2 ${mainTab === "preparer_history"
+                            ? "bg-white text-primary-f border-white shadow"
+                            : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            }`}
+                    >
+                        <History className="w-5 h-5 ml-2" />
+                        سجل طلبات انتاج
+                    </Button>
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={() => {
+                            setMainTab("production_process");
+                            setProcessSubTab("create");
+                        }}
+                        className={`px-6 py-3 text-base min-w-[150px] touch-manipulation border-2 ${mainTab === "production_process"
+                            ? "bg-white text-primary-f border-white shadow"
+                            : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+                            }`}
+                    >
+                        <ShoppingCart className="w-5 h-5 ml-2" />
+                        عملية انتاج
+                    </Button>
                 </div>
-{/* Main Content */}
-            <div className="flex-1 min-h-0 p-3 overflow-hidden">
+                <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-white/20 bg-white/10">
+                        <div className="text-sm font-bold">
+                            {user?.full_name || user?.username || "-"}
+                        </div>
+                        <div className="h-4 w-px bg-white/30" />
+                        <div className="text-xs font-semibold">
+                            {ROLE_LABELS[user?.role] || user?.role || "-"}
+                        </div>
+                    </div>
+                    <NotificationsBell />
+                    <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={() => setShowLogoutDialog(true)}
+                        className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
+                    >
+                        <ArrowRight className="w-5 h-5 ml-2 rotate-180" />
+                        تسجيل الخروج
+                    </Button>
+                </div>
+            </div>
+            {/* Main Content */}
+            <div className="flex-1 min-h-0 p-3 overflow-y-scroll">
                 {statusNotification && (
                     <div className="mb-3">
                         <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
@@ -1223,7 +1223,7 @@ export default function ProductionManager() {
                     </div>
                 )}
                 {mainTab === "production_process" && processSubTab === "create" ? (
-                    <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_2.2fr_1.6fr] gap-3 h-full min-h-0">
+                    <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_2.2fr_1.6fr] gap-3 h-[80vh]">
                         {/* العمود الأيمن - اختيار المادة ولوحة الأرقام */}
                         <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto">
                             <Card className="p-4">
@@ -1751,7 +1751,7 @@ export default function ProductionManager() {
                     </div>
                 ) : (
                     /* وضع السجل */
-                    <Card className="flex flex-col h-full min-h-0 overflow-hidden p-3">
+                    <Card className="flex flex-col h-[80vh] p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-2 flex-shrink-0 w-full">
                             <div className="font-bold text-base text-gray-800">
                                 {activeRecordsTab === "production"
@@ -1760,7 +1760,7 @@ export default function ProductionManager() {
                             </div>
                         </div>
 
-                        <div className="mb-3">
+                        <div className="">
                             <DynamicTableFilters
                                 value={activeRecordsTab === "production" ? productionRecordFilters : preparerRecordFilters}
                                 onChange={activeRecordsTab === "production" ? setProductionRecordFilters : setPreparerRecordFilters}
@@ -1801,247 +1801,211 @@ export default function ProductionManager() {
                             />
                         </div>
 
-                        {/* First row - Search and filters */}
-                        {false && <div className="flex  gap-2 mb-2">
-                            <Input
-                                type="text"
-                                placeholder="بحث..."
-                                value={productionRecordFilters.search}
-                                onChange={(e) => setProductionRecordFilters((prev) => ({ ...prev, search: e.target.value }))}
-                                className="h-8 p-6 flex-1 max-w-[400px] text-sm"
-                            />
-                            <FilterSelect
-                                value={productionRecordFilters.status}
-                                onChange={(e) => setProductionRecordFilters((prev) => ({ ...prev, status: e.target.value }))}
-                                options={[
-                                    { value: "", label: "كل الحالات" },
-                                    { value: "pending", label: "قيد الانتظار" },
-                                    { value: "preparing", label: "قيد التحضير" },
-                                    { value: "in_progress", label: "قيد التنفيذ" },
-                                    { value: "completed", label: "مكتمل" },
-                                    { value: "cancelled", label: "ملغي" },
-                                ]}
-                                className="h-8 text-sm max-w-[250px]"
-                            />
-                            {activeRecordsTab === "production" && (
-                                <FilterSelect
-                                    value={productionRecordFilters.productionType}
-                                    onChange={(e) => setProductionRecordFilters((prev) => ({ ...prev, productionType: e.target.value }))}
-                                    options={[
-                                        { value: "", label: "كل الأنواع" },
-                                        { value: "machine", label: "مكنة" },
-                                        { value: "presser", label: "كوي" },
-                                    ]}
-                                    className="h-8 text-sm max-w-[250px]"
-                                />
-                            )}
-
-                        </div>}
 
                         {/* Second row - Action buttons */}
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                size="sm"
-                                onClick={() => (activeRecordsTab === "production" ? loadProductionOrders() : loadPreparerOrders())}
-                                className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white"
-                                disabled={activeRecordsTab === "production" ? loadingOrders : loadingPreparerOrders}
-                            >
-                                {(activeRecordsTab === "production" ? loadingOrders : loadingPreparerOrders) ? (
-                                    <RefreshCw className="w-4 h-4 ml-1 animate-spin" />
-                                ) : (
-                                    <RotateCcw className="w-4 h-4 ml-1" />
+                        <div className="flex justify-around gap-2 w-full">
+                            <div className="">
+                                <Button
+                                    size="sm"
+                                    onClick={() => (activeRecordsTab === "production" ? loadProductionOrders() : loadPreparerOrders())}
+                                    className="px-4 py-2 text-sm bg-secondary-s hover:bg-secondary-s/80 text-white"
+                                    disabled={activeRecordsTab === "production" ? loadingOrders : loadingPreparerOrders}
+                                >
+                                    {(activeRecordsTab === "production" ? loadingOrders : loadingPreparerOrders) ? (
+                                        <RefreshCw className="w-4 h-4 ml-1 animate-spin" />
+                                    ) : (
+                                        <RotateCcw className="w-4 h-4 ml-1" />
+                                    )}
+                                    تحديث
+                                </Button>
+                                {activeRecordsTab === "production" && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="px-4 py-2 text-sm"
+                                        onClick={() => {
+                                            handleExportProduction();
+                                        }}
+                                        disabled={exportingProduction || filteredProductionOrders.length === 0}
+                                    >
+                                        <Download className="w-4 h-4 ml-1" />
+                                        {exportingProduction ? "جارٍ التصدير..." : "تصدير Excel"}
+                                    </Button>
                                 )}
-                                تحديث
-                            </Button>
-                            {activeRecordsTab === "production" && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="px-4 py-2 text-sm"
-                                onClick={() => {
-                                    handleExportProduction();
-                                }}
-                                disabled={exportingProduction || filteredProductionOrders.length === 0}
-                            >
-                                <Download className="w-4 h-4 ml-1" />
-                                {exportingProduction ? "جارٍ التصدير..." : "تصدير Excel"}
-                            </Button>
-                        )}
-                            {/* <Button
-                                size="sm"
-                                variant="outline"
-                                className="px-4 py-2 text-sm"
-                                onClick={() => {
-                                    // طباعة
-                                    window.print();
-                                }}
-                            >
-                                <Printer className="w-4 h-4 ml-1" />
-                                طباعة
-                            </Button> */}
+                            </div>
+
+                            <div>
+                                <RowsPerPageSelector
+                                    value={rowsPerPage}
+                                    onChange={setRowsPerPage}
+                                />
+                            </div>
+
+
+                            <div className="">
+                                {/* Width Tabs */}
+                                {activeRecordsTab === "production" && (
+                                    <div className="flex gap-1  flex-wrap">
+                                        {[
+                                            { value: "all", label: "الكل" },
+                                            { value: "22", label: "22" },
+                                            { value: "44", label: "44" },
+                                            { value: "66", label: "66" },
+                                        ].map(tab => (
+                                            <button
+                                                key={tab.value}
+                                                onClick={() => setWidthTab(tab.value)}
+                                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${widthTab === tab.value
+                                                    ? "bg-primary-f text-white"
+                                                    : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                                                    }`}
+                                            >
+                                                عرض {tab.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Width Tabs */}
-                        {activeRecordsTab === "production" && (
-                            <div className="flex gap-1 mb-2 flex-wrap">
-                                {[
-                                    { value: "all", label: "الكل" },
-                                    { value: "22", label: "22" },
-                                    { value: "44", label: "44" },
-                                    { value: "66", label: "66" },
-                                ].map(tab => (
-                                    <button
-                                        key={tab.value}
-                                        onClick={() => setWidthTab(tab.value)}
-                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${widthTab === tab.value
-                                                ? "bg-primary-f text-white"
-                                                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                                            }`}
-                                    >
-                                        عرض {tab.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
                         {/* جدول السجل */}
-                        <div className="flex-1 overflow-auto min-h-0 border rounded-lg bg-white">
+                        <div className="flex-1 overflow-auto min-h-[25vh] -mt-4 border rounded-lg">
                             {activeRecordsTab === "production" ? (
-                                <table className="min-w-[1400px] w-full table-fixed border-collapse">
-                                <thead className="bg-gray-100 sticky top-0 z-20">
-                                    <tr>
-                                        <th className="p-2 text-right border-b w-20">#</th>
-                                        <th className="p-2 text-right border-b w-32">التاريخ</th>
-                                        <th className="p-2 text-right border-b w-32">المنشئ</th>
-                                        <th className="p-2 text-right border-b w-32">اللون</th>
-                                        <th className="p-2 text-center border-b w-24">العرض</th>
-                                        <th className="p-2 text-center border-b w-24">النوع</th>
-                                        <th className="p-2 text-center border-b w-24">السماكة</th>
-                                        <th className="p-2 text-center border-b w-32">رقم الطبخة</th>
-                                        <th className="p-2 text-center border-b w-24">الحالة</th>
-                                        <th className="p-2 text-center border-b w-32">ملاحظات</th>
-                                        <th className="p-2 text-center border-b w-32">الإجراءات</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingOrders ? (
-                                        <tr><td colSpan="11" className="p-6"><LoadingState /></td></tr>
-                                    ) : filteredProductionOrders.length === 0 ? (
+                                <table className="min-w-[1400px] w-full  table-fixed border-collapse">
+                                    <thead className="bg-gray-100 sticky top-0 z-20">
                                         <tr>
-                                            <td colSpan="11" className="p-8 text-center text-gray-400">
-                                                <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                                لا توجد طلبات إنتاج
-                                            </td>
+                                            <th className="p-2 text-right border-b w-20">#</th>
+                                            <th className="p-2 text-right border-b w-32">التاريخ</th>
+                                            <th className="p-2 text-right border-b w-32">المنشئ</th>
+                                            <th className="p-2 text-right border-b w-32">اللون</th>
+                                            <th className="p-2 text-center border-b w-24">العرض</th>
+                                            <th className="p-2 text-center border-b w-24">النوع</th>
+                                            <th className="p-2 text-center border-b w-24">السماكة</th>
+                                            <th className="p-2 text-center border-b w-32">رقم الطبخة</th>
+                                            <th className="p-2 text-center border-b w-24">الحالة</th>
+                                            <th className="p-2 text-center border-b w-32">ملاحظات</th>
+                                            <th className="p-2 text-center border-b w-32">الإجراءات</th>
                                         </tr>
-                                    ) : (
-                                        paginatedProductionOrders.map((order, index) => {
-                                            const statusBadge = productionApi.getStatusBadge(order.status);
-                                            return (
-                                                <tr key={order.production_order_id} className="border-b hover:bg-gray-50">
-                                                    <td className="p-2 font-medium text-sm">#{startIndex + index + 1}</td>
-                                                    <td className="p-2 text-sm">{productionApi.getFormattedDate(order.created_at)}</td>
-                                                    <td className="p-2 text-sm">{productionApi.formatIssuedBy(order.issued_by)}</td>
-                                                    <td className="p-2 text-sm">{order.color_name} ({order.color_code})</td>
-                                                    <td className="p-2 text-center text-sm">{order.width}</td>
-                                                    <td className="p-2 text-center text-sm">
-                                                        {formatTypeItem(order.type_item)}
-                                                    </td>
-                                                    <td className="p-2 text-center text-sm">{order.thickness} مم</td>
-                                                    <td className="p-2 text-center text-sm">{order.batch_number || '-'}</td>
-                                                    <td className="p-2 text-center">
-                                                        <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
-                                                            {statusBadge.label}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
-                                                        {order.notes || '-'}
-                                                    </td>
-                                                    <td className="p-2 text-center">
-                                                        <div className="flex items-center justify-center gap-1">
+                                    </thead>
+                                    <tbody>
+                                        {loadingOrders ? (
+                                            <tr><td colSpan="11" className="p-6"><LoadingState /></td></tr>
+                                        ) : filteredProductionOrders.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="11" className="p-8 text-center text-gray-400">
+                                                    <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                                    لا توجد طلبات إنتاج
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            paginatedProductionOrders.map((order, index) => {
+                                                const statusBadge = productionApi.getStatusBadge(order.status);
+                                                return (
+                                                    <tr key={order.production_order_id} className="border-b hover:bg-gray-50">
+                                                        <td className="p-2 font-medium text-sm">#{startIndex + index + 1}</td>
+                                                        <td className="p-2 text-sm">{productionApi.getFormattedDate(order.created_at)}</td>
+                                                        <td className="p-2 text-sm">{productionApi.formatIssuedBy(order.issued_by)}</td>
+                                                        <td className="p-2 text-sm">{order.color_name} ({order.color_code})</td>
+                                                        <td className="p-2 text-center text-sm">{order.width}</td>
+                                                        <td className="p-2 text-center text-sm">
+                                                            {formatTypeItem(order.type_item)}
+                                                        </td>
+                                                        <td className="p-2 text-center text-sm">{order.thickness} مم</td>
+                                                        <td className="p-2 text-center text-sm">{order.batch_number || '-'}</td>
+                                                        <td className="p-2 text-center">
+                                                            <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
+                                                                {statusBadge.label}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
+                                                            {order.notes || '-'}
+                                                        </td>
+                                                        <td className="p-2 text-center">
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                <button
+                                                                    onClick={() => handleViewOrder(order)}
+                                                                    className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg"
+                                                                    title="عرض التفاصيل"
+                                                                >
+                                                                    <Eye className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteOrder(order)}
+                                                                    className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
+                                                                    title="حذف"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="min-w-[1200px] w-full table-fixed border-collapse">
+                                    <thead className="bg-gray-100 sticky top-0 z-20">
+                                        <tr>
+                                            <th className="p-2 text-right border-b w-20">#</th>
+                                            <th className="p-2 text-right border-b w-40">التاريخ</th>
+                                            <th className="p-2 text-right border-b w-40">المنشئ</th>
+                                            <th className="p-2 text-center border-b w-24">العناصر</th>
+                                            <th className="p-2 text-center border-b w-24">الحالة</th>
+                                            <th className="p-2 text-right border-b">الملاحظات</th>
+                                            <th className="p-2 text-center border-b w-32">الإجراءات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {loadingPreparerOrders ? (
+                                            <tr>
+                                                <td colSpan="7" className="p-6">
+                                                    <LoadingState />
+                                                </td>
+                                            </tr>
+                                        ) : paginatedPreparerOrders.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="7" className="p-8 text-center text-gray-400">
+                                                    <AlertCircle className="mx-auto mb-2 h-10 w-10 opacity-50" />
+                                                    لا توجد طلبات انتاج
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            paginatedPreparerOrders.map((order) => {
+                                                const statusBadge = salesApi.getStatusBadge(order.status);
+                                                return (
+                                                    <tr key={getPreparerOrderId(order)} className="border-b hover:bg-gray-50">
+                                                        <td className="p-2 text-sm">{getPreparerOrderId(order)}</td>
+                                                        <td className="p-2 text-sm">{salesApi.getFormattedDate(order)}</td>
+                                                        <td className="p-2 text-sm">{salesApi.getIssuedBy(order) || "-"}</td>
+                                                        <td className="p-2 text-center text-sm">{order.count_items ?? order.items?.length ?? 0}</td>
+                                                        <td className="p-2 text-center">
+                                                            <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
+                                                                {statusBadge.label}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-2 text-sm">{order.notes || "-"}</td>
+                                                        <td className="p-2 text-center">
                                                             <button
-                                                                onClick={() => handleViewOrder(order)}
+                                                                onClick={() => handleViewPreparerOrder(order)}
                                                                 className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg"
-                                                                title="عرض التفاصيل"
+                                                                title="عرض"
                                                             >
                                                                 <Eye className="w-4 h-4" />
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleDeleteOrder(order)}
-                                                                className="text-red-600 hover:bg-red-50 p-1.5 rounded-lg"
-                                                                title="حذف"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                            ) : (
-                                <table className="min-w-[1200px] w-full table-fixed border-collapse">
-                                <thead className="bg-gray-100 sticky top-0 z-20">
-                                    <tr>
-                                        <th className="p-2 text-right border-b w-20">#</th>
-                                        <th className="p-2 text-right border-b w-40">التاريخ</th>
-                                        <th className="p-2 text-right border-b w-40">المنشئ</th>
-                                        <th className="p-2 text-center border-b w-24">العناصر</th>
-                                        <th className="p-2 text-center border-b w-24">الحالة</th>
-                                        <th className="p-2 text-right border-b">الملاحظات</th>
-                                        <th className="p-2 text-center border-b w-32">الإجراءات</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingPreparerOrders ? (
-                                        <tr>
-                                            <td colSpan="7" className="p-6">
-                                                <LoadingState />
-                                            </td>
-                                        </tr>
-                                    ) : paginatedPreparerOrders.length === 0 ? (
-                                        <tr>
-                                            <td colSpan="7" className="p-8 text-center text-gray-400">
-                                                <AlertCircle className="mx-auto mb-2 h-10 w-10 opacity-50" />
-                                                لا توجد طلبات انتاج
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        paginatedPreparerOrders.map((order) => {
-                                            const statusBadge = salesApi.getStatusBadge(order.status);
-                                            return (
-                                                <tr key={getPreparerOrderId(order)} className="border-b hover:bg-gray-50">
-                                                    <td className="p-2 text-sm">{getPreparerOrderId(order)}</td>
-                                                    <td className="p-2 text-sm">{salesApi.getFormattedDate(order)}</td>
-                                                    <td className="p-2 text-sm">{salesApi.getIssuedBy(order) || "-"}</td>
-                                                    <td className="p-2 text-center text-sm">{order.count_items ?? order.items?.length ?? 0}</td>
-                                                    <td className="p-2 text-center">
-                                                        <span className={`px-2 py-1 rounded-lg text-xs ${statusBadge.className}`}>
-                                                            {statusBadge.label}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-2 text-sm">{order.notes || "-"}</td>
-                                                    <td className="p-2 text-center">
-                                                        <button
-                                                            onClick={() => handleViewPreparerOrder(order)}
-                                                            className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg"
-                                                            title="عرض"
-                                                        >
-                                                            <Eye className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
                             )}
                         </div>
 
                         {/* Pagination Controls */}
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-gray-50 border-t">
+                        <div className="flex flex-col sm:flex-row items-center justify-between  gap-4 p-4 bg-transparent border-t">
                             <ResultsCounter
                                 currentPage={currentPage}
                                 totalPages={activeTotalPages}
@@ -2049,10 +2013,7 @@ export default function ProductionManager() {
                                 totalResults={activeTotalResults}
                             />
                             <div className="flex items-center gap-2">
-                                <RowsPerPageSelector
-                                    value={rowsPerPage}
-                                    onChange={setRowsPerPage}
-                                />
+
                                 <PaginationControls
                                     currentPage={currentPage}
                                     totalPages={activeTotalPages}
@@ -2238,7 +2199,7 @@ export default function ProductionManager() {
                             </table>
                         </div>
 
-                
+
                     </div>
                 </div>
             </StyledDialog>
