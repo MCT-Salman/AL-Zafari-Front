@@ -190,7 +190,7 @@ export default function WarehouseKeeper() {
     const batchOptions = useMemo(
         () => batches
             .filter((b) => !outputForm.material_id || String(b.material_id) === String(outputForm.material_id))
-            .map((b) => ({ value: String(b.batch_id), label: b.batch_number || `دفعة ${b.batch_id}` })),
+            .map((b) => ({ value: String(b.batch_id), label: b.batch_number || `طبخة ${b.batch_id}` })),
         [batches, outputForm.material_id]
     );
     const lengthOptions = useMemo(
@@ -818,11 +818,26 @@ export default function WarehouseKeeper() {
         console.log("[fillSalesOrderForm] Looking for color_code:", item.color_code);
         console.log("[fillSalesOrderForm] Looking for batch_id:", item.batch_id, "or batch_number:", item.batch_number);
 
-        // Find color by color_code (string comparison)
-        const color = colors.find((c) => String(c.color_code).trim() === String(item.color_code).trim());
+        const itemMaterialId = item.material_id || item.material?.material_id || materials.find((m) =>
+            String(m.material_name || "").trim().toLowerCase() === String(item.material_name || "").trim().toLowerCase()
+        )?.material_id;
+
+        const itemRulerId = item.ruler_id || item.ruler?.ruler_id || item.color?.ruler_id || item.color?.ruler?.ruler_id || rulers.find((r) =>
+            String(r.ruler_name || "").trim().toLowerCase() === String(item.ruler_name || "").trim().toLowerCase()
+        )?.ruler_id;
+
+        // Resolve color from item by color_id first, then by matching ruler/material, then by code alone
+        const selectedColor = item.color || colors.find((c) => String(c.color_id) === String(item.color_id));
+        const color = selectedColor || colors.find((c) =>
+            String(c.color_code).trim() === String(item.color_code).trim() &&
+            itemRulerId && String(c.ruler_id) === String(itemRulerId)
+        ) || colors.find((c) =>
+            String(c.color_code).trim() === String(item.color_code).trim() &&
+            itemMaterialId && String(c.ruler?.material_id || c.ruler?.material?.material_id || "") === String(itemMaterialId)
+        ) || colors.find((c) => String(c.color_code).trim() === String(item.color_code).trim());
         console.log("[fillSalesOrderForm] Found color:", color);
 
-        const rulerId = color?.ruler_id || color?.ruler?.ruler_id;
+        const rulerId = itemRulerId || color?.ruler_id || color?.ruler?.ruler_id;
         console.log("[fillSalesOrderForm] rulerId from color:", rulerId);
 
         // Find the actual ruler from rulers array to get material_id
@@ -950,21 +965,8 @@ export default function WarehouseKeeper() {
                 setMovements((prev) => [...newMovements, ...prev]);
             }
 
-            // If this was a sales order input, complete the order
-            if (selectedOrder?.order_id && entryTab === "sales") {
-                await updateSalesOrderStatus(selectedOrder.order_id, "outofwarehouse");
-                // Clear selected order
-                setSelectedOrder(null);
-                setOrderItems([]);
-            }
-
-            // If this was a production order input, complete the item
-            if (activeOrderItem?.production_order_item_id && entryTab === "manual") {
-                await productionApi.updateProductionItemStatus(activeOrderItem.production_order_item_id, ProductionStatus.completed);
-                updateLocalStatus(activeOrderItem.production_order_item_id, ProductionStatus.completed);
-                setActiveOrderItem(null);
-            }
-
+            
+            
             // Clear both forms completely after saving
             setProductionForm(BASE_FORM);
             setSalesForm(BASE_FORM);
@@ -1062,6 +1064,10 @@ export default function WarehouseKeeper() {
             setOutputForm((prev) => ({ ...prev, length: `${prev.length || ""}${value}` }));
             return;
         }
+        if (currentInput === "thickness") {
+            setOutputForm((prev) => ({ ...prev, thickness: `${prev.thickness || ""}${value}` }));
+            return;
+        }
         if (currentInput === "qr") {
             setQrInput((prev) => `${prev || ""}${value}`);
             return;
@@ -1089,6 +1095,10 @@ export default function WarehouseKeeper() {
             setOutputForm((prev) => ({ ...prev, length: String(prev.length || "").slice(0, -1) }));
             return;
         }
+        if (currentInput === "thickness") {
+            setOutputForm((prev) => ({ ...prev, thickness: String(prev.thickness || "").slice(0, -1) }));
+            return;
+        }
         if (currentInput === "qr") {
             setQrInput((prev) => String(prev || "").slice(0, -1));
             return;
@@ -1114,6 +1124,10 @@ export default function WarehouseKeeper() {
         }
         if (currentInput === "length") {
             setOutputForm((prev) => ({ ...prev, length: "" }));
+            return;
+        }
+        if (currentInput === "thickness") {
+            setOutputForm((prev) => ({ ...prev, thickness: "" }));
             return;
         }
         if (currentInput === "qr") {
@@ -1309,17 +1323,10 @@ export default function WarehouseKeeper() {
                             <Package className="w-7 h-7" />
                             <div><h1 className="text-2xl font-bold">إدارة المستودع الخام</h1><p className="text-sm opacity-90">لوحة حركات المستودع الخام</p></div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-1">
-                            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-                                {/* <div className="text-xs opacity-80">اسم المستخدم</div> */}
-                                <div className="text-base font-bold">{user?.full_name || user?.username || "-"}</div>
-                            </div>
-                            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-                                {/* <div className="text-xs opacity-80">الدور</div> */}
-                                <div className="text-base font-bold">{ROLE_LABELS[user?.role] || user?.role}</div>
-                            </div>
-                        </div>
                         <div className="flex items-center gap-2">
+                            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+                                <div className="text-base font-bold">{user?.full_name || user?.username || "-"} | {ROLE_LABELS[user?.role] || user?.role}</div>
+                            </div>
                             <NotificationsBell />
                             <Button size="lg" variant="outline" onClick={() => setShowLogoutDialog(true)} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
                                 <ArrowRight className="w-4 h-4 ml-2 rotate-180" />تسجيل الخروج
@@ -1331,15 +1338,9 @@ export default function WarehouseKeeper() {
 
             {!showHeader && (
                 <div className="flex-shrink-0 text-stone-50">
-                    <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
-                        <div className="min-w-0">
-                            {/* <div className="text-[11px]">اسم المستخدم</div> */}
-                            <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
-                        </div>
-                        <div className="h-10 w-px" />
-                        <div className="min-w-0 text-right">
-                            {/* <div className="text-[11px] ">الدور</div> */}
-                            <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+                    <div className="flex items-center justify-start gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
+                        <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+                            <div className="text-base font-bold">{user?.full_name || user?.username || "-"} | {ROLE_LABELS[user?.role] || user?.role}</div>
                         </div>
                     </div>
                 </div>
@@ -1577,7 +1578,7 @@ export default function WarehouseKeeper() {
                                                 <div><Label className={'mb-1'}>الطبخة</Label><FilterSelect value={outputForm.batch_id} onChange={(e) => setOutputForm((p) => ({ ...p, batch_id: e.target.value }))} searchValue={selectSearch.batch} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, batch: value }))} onInputFocus={() => setCurrentInput("select:batch")} options={batchOptions} placeholder="اختر الطبخة" disabled={!outputForm.material_id} /></div>
                                                 <div><Label className={'mb-1'}>العرض</Label><Input type="text" className={`h-13`} value={outputForm.width} onChange={(e) => setOutputForm((p) => ({ ...p, width: e.target.value }))} onFocus={() => setCurrentInput("width")} placeholder="العرض" /></div>
                                                 <div><Label className={'mb-1'}>الطول</Label><Input type="text" className={`h-13`} value={outputForm.length} onChange={(e) => setOutputForm((p) => ({ ...p, length: e.target.value }))} onFocus={() => setCurrentInput("length")} placeholder="الطول" /></div>
-                                                <div><Label className={'mb-1'}>السماكة</Label>{thicknessValues.length > 1 ? <FilterSelect value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} searchValue={selectSearch.thickness} onSearchValueChange={(value) => setSelectSearch((prev) => ({ ...prev, thickness: value }))} onInputFocus={() => setCurrentInput("select:thickness")} options={thicknessOptions} placeholder="اختر السماكة" /> : <div className="h-13 px-3 flex items-center rounded-md border bg-gray-100 font-bold">{thicknessValues[0]?.label || outputForm.thickness || "-"}</div>}</div>
+                                                <div><Label className={'mb-1'}>السماكة</Label><Input type="text" inputMode="decimal" className={`h-13`} value={outputForm.thickness} onChange={(e) => setOutputForm((p) => ({ ...p, thickness: e.target.value }))} onFocus={() => setCurrentInput("thickness")} placeholder="السماكة" /></div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-1">
                                                 <div><Label className={'mb-1'}>الكمية</Label><Input type="text" className={`h-13`} value={outputForm.quantity} onChange={(e) => setOutputForm((p) => ({ ...p, quantity: e.target.value }))} onFocus={() => setCurrentInput("quantity")} placeholder="الكمية" /></div>
@@ -1828,7 +1829,42 @@ export default function WarehouseKeeper() {
             </StyledDialog>
 
             <StyledDialog isOpen={showMovementDetails} onOpenChange={(open) => { setShowMovementDetails(open); if (!open) setSelectedMovement(null); }} title={`تفاصيل الحركة ${selectedMovement?.movement_id ? `#${selectedMovement.movement_id}` : ""}`} contentClassName="max-w-3xl w-full" onCancel={() => setShowMovementDetails(false)} onConfirm={() => setShowMovementDetails(false)} confirmLabel="إغلاق" showCancel={false}>
-                {selectedMovement && <div className="space-y-3 text-sm"><div><span className="text-gray-500">اللون:</span> <span className="font-medium">{selectedMovement.color?.color_name || "-"}</span></div><div><span className="text-gray-500">المسطرة:</span> <span className="font-medium">{selectedMovement.color?.ruler?.ruler_name || "-"}</span></div><div><span className="text-gray-500">المادة:</span> <span className="font-medium">{selectedMovement.color?.ruler?.material?.material_name || pvcMaterial?.material_name || "PVC"}</span></div><div><span className="text-gray-500">الطبخة:</span> <span className="font-medium">{selectedMovement.batch?.batch_number || "-"}</span></div><div><span className="text-gray-500">الأبعاد:</span> <span className="font-medium">{selectedMovement.length || "-"} × {selectedMovement.width || FIXED_WIDTH} × {selectedMovement.thickness || "-"}</span></div><div><span className="text-gray-500">الوجهة:</span> <span className="font-medium">{formatDestination(selectedMovement.destination)}</span></div><div><span className="text-gray-500">الملاحظات:</span> <span className="font-medium">{selectedMovement.notes || "-"}</span></div></div>}
+                {selectedMovement && (
+                    <div className="overflow-x-auto text-sm">
+                        <table className="w-full table-auto border-collapse border border-gray-200 rounded-lg overflow-hidden [&_td]:break-words [&_th]:break-words">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    {[
+                                        "اللون",
+                                        "المسطرة",
+                                        "المادة",
+                                        "الطبخة",
+                                        "العرض",
+                                        "الطول",
+                                        "السماكة",
+                                        "الوجهة",
+                                        "الملاحظات"
+                                    ].map((header) => (
+                                        <th key={header} className="p-2 text-center text-xs font-semibold text-gray-600">{header}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="border-t">
+                                    <td className="p-2 text-center text-sm">{selectedMovement.color?.color_name || "-"}</td>
+                                    <td className="p-2 text-center text-sm">{selectedMovement.color?.ruler?.ruler_name || "-"}</td>
+                                    <td className="p-2 text-center text-sm">{selectedMovement.color?.ruler?.material?.material_name || pvcMaterial?.material_name || "PVC"}</td>
+                                    <td className="p-2 text-center text-sm">{selectedMovement.batch?.batch_number || "-"}</td>
+                                    <td className="p-2 text-center text-sm">{selectedMovement.width || FIXED_WIDTH}</td>
+                                    <td className="p-2 text-center text-sm">{selectedMovement.length || "-"}</td>
+                                    <td className="p-2 text-center text-sm">{selectedMovement.thickness || "-"}</td>
+                                    <td className="p-2 text-center text-sm">{formatDestination(selectedMovement.destination)}</td>
+                                    <td className="p-2 text-center text-sm">{selectedMovement.notes || "-"}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </StyledDialog>
 
             <StyledDialog
@@ -2043,7 +2079,7 @@ export default function WarehouseKeeper() {
                     مخرج؟
                     <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
                         <div className="text-xs text-red-600 font-medium">
-                            ⚠️ سيتم حذف جميع المخرجات المحددة دفعة واحدة
+                            ⚠️ سيتم حذف جميع المخرجات المحددة طبخة واحدة
                         </div>
                         <div className="mt-2 text-xs text-gray-600">
                             العناصر التي سيتم حذفها: #{Array.from(selectedMovements).join(', #')}

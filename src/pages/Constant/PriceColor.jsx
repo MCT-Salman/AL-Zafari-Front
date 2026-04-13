@@ -165,15 +165,15 @@ export default function PriceColor() {
   // Handle open create modal
   const handleOpenCreate = () => {
     setFormError("");
-    setFormData({
-      material_id: formData.material_id || "",
-      ruler_id: formData.ruler_id || "",
+    setFormData((prevFormData) => ({
+      material_id: prevFormData.material_id || "",
+      ruler_id: prevFormData.ruler_id || "",
       color_id: "",
-      type_item: "Machine",
-      price_color_By: formData.price_color_By || "isByMeter22",
+      type_item: prevFormData.material_id ? "Machine" : "",
+      price_color_By: prevFormData.material_id ? (prevFormData.price_color_By || "isByMeter22") : "",
       price_per_meter: "",
       notes: "",
-    });
+    }));
     openCreateModal();
   };
 
@@ -204,12 +204,21 @@ export default function PriceColor() {
       color?.id
     )?.toString() || "";
 
+    const materialName = (
+      priceColor.material_name ||
+      ruler?.material?.material_name ||
+      ""
+    ).toString().toLowerCase();
+    const isPvcMaterial = materialName.includes("pvc");
+
     setFormData({
       material_id: materialId,
       ruler_id: rulerId,
       color_id: colorId,
       type_item: priceColor.type_item || "Machine",
-      price_color_By: priceColor.price_color_By === "blanck" ? "isByBlanck" : (priceColor.price_color_By || "isByMeter22"),
+      price_color_By: !isPvcMaterial
+        ? "isByBlanck"
+        : (priceColor.price_color_By === "blanck" ? "isByBlanck" : (priceColor.price_color_By || "isByMeter22")),
       price_per_meter: priceColor.price_per_meter !== undefined ? priceColor.price_per_meter.toString() : "",
       notes: priceColor.notes || "",
     });
@@ -264,12 +273,16 @@ export default function PriceColor() {
 
   // Handle material change - load rulers for the selected material
   const handleMaterialChange = (materialId) => {
-    setFormData({
-      ...formData,
+    const material = materials.find((m) => m.material_id?.toString() === materialId?.toString());
+    const isPvcMaterial = material?.material_name?.toLowerCase().includes("pvc");
+
+    setFormData((prevFormData) => ({
+      ...prevFormData,
       material_id: materialId,
       ruler_id: "",
       color_id: "",
-    });
+      price_color_By: isPvcMaterial ? "isByMeter22" : "isByBlanck",
+    }));
     loadRulersByMaterial(materialId);
   };
   const getColorNameResolved = (priceColor) => {
@@ -317,18 +330,16 @@ export default function PriceColor() {
 
   // Dynamic pricing options based on material type
   const dynamicPricingOptions = useMemo(() => {
-    const baseOptions = [
+    if (!isSelectedMaterialPvc) {
+      return [{ value: "isByBlanck", label: "قطعة" }];
+    }
+
+    return [
       { value: "isByMeter22", label: "22 مم" },
       { value: "isByMeter44", label: "44 مم" },
       { value: "isByMeter66", label: "66 مم" },
+      { value: "isByBlanck", label: "قطعة" },
     ];
-    
-    // Add "قطعة" option only if material is not PVC
-    if (!isSelectedMaterialPvc) {
-      baseOptions.push({ value: "isByBlanck", label: "قطعة" });
-    }
-    
-    return baseOptions;
   }, [isSelectedMaterialPvc]);
 
   const getLabel = (options, value) => {

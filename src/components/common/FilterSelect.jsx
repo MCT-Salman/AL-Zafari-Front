@@ -12,6 +12,13 @@ const buildEventLike = (value) => ({
   currentTarget: { value },
 });
 
+const normalizeSelectValue = (value) => {
+  const normalized = toStringValue(value).trim().toLowerCase();
+  if (normalized === "blanck") return "isbyblanck";
+  if (normalized === "cancelled") return "canceled";
+  return normalized;
+};
+
 const FilterSelect = ({
   label = "",
   value = "",
@@ -27,6 +34,7 @@ const FilterSelect = ({
   showSelectedImage = false,
   placeholder = "ابحث أو اختر...",
   showDropdownAbove = false,
+  openOnFocus = true,
 }) => {
   const selectId = useId();
   const wrapperRef = useRef(null);
@@ -35,10 +43,10 @@ const FilterSelect = ({
   const [isOpen, setIsOpen] = useState(false);
   const [internalSearchTerm, setInternalSearchTerm] = useState("");
 
-  const normalizedValue = toStringValue(value);
+  const normalizedValue = normalizeSelectValue(value);
 
   const selectedOption = useMemo(
-    () => options.find((option) => toStringValue(option?.value) === normalizedValue),
+    () => options.find((option) => normalizeSelectValue(option?.value) === normalizedValue),
     [options, normalizedValue]
   );
 
@@ -89,7 +97,9 @@ const FilterSelect = ({
 
   const handleInputFocus = () => {
     if (disabled) return;
-    setIsOpen(true);
+    if (openOnFocus) {
+      setIsOpen(true);
+    }
     if (typeof onInputFocus === "function") onInputFocus();
   };
 
@@ -117,7 +127,7 @@ const FilterSelect = ({
 
   const inputText = isOpen
     ? effectiveSearchTerm
-    : String(selectedOption?.label ?? (normalizedValue ? normalizedValue : ""));
+    : String(selectedOption?.label ?? "");
   const selectedOptionImage =
     showSelectedImage && selectedOption
       ? selectedOption.imageUrl ||

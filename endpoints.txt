@@ -3814,7 +3814,7 @@ export const invoiceApi = {
       const response = await axiosInstance.post(`/invoice/${id}/payment`, paymentData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'حدث خطأ في إضافة الدفعة' };
+      throw error.response?.data || { message: 'حدث خطأ في إضافة طبخة' };
     }
   },
 
@@ -4847,7 +4847,7 @@ Body
 Headers (20)
 {
   "success": true,
-  "message": "تم إضافة الدفعة بنجاح",
+  "message": "تم إضافة طبخة بنجاح",
   "data": {
     "invoice_id": 9,
     "order_id": null,

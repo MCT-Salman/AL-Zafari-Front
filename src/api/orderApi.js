@@ -397,7 +397,8 @@ export const orderApi = {
       [OrderStatus.preparing]: { label: 'قيد التحضير', className: 'bg-blue-100 text-blue-800' },
       'outofwarehouse': { label: 'اخراج من المستودع', className: 'bg-purple-100 text-purple-800' },
       [OrderStatus.completed]: { label: 'مكتمل', className: 'bg-green-100 text-green-800' },
-      [OrderStatus.canceled]: { label: 'ملغي', className: 'bg-red-100 text-red-800' }
+      [OrderStatus.canceled]: { label: 'ملغي', className: 'bg-red-100 text-red-800' },
+      'cancelled': { label: 'ملغي', className: 'bg-red-100 text-red-800' }
     };
     return statusMap[status] || { label: status || 'غير محدد', className: 'bg-gray-100 text-gray-800' };
   },

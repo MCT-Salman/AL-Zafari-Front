@@ -751,7 +751,7 @@ export default function ProductionManager() {
             : batches;
         const base = visibleBatches.map(b => ({
             value: String(b.batch_id),
-            label: b.batch_number || `دفعة ${b.batch_id}`
+            label: b.batch_number || `طبخة ${b.batch_id}`
         }));
         if (!term) return base;
         return base.filter(opt =>

@@ -160,7 +160,7 @@ export default function GluingManager() {
 
     batch_id: "",
 
-    input_length: "",
+    input_length: "50",
 
     type_item: TypeItem.Machine,
 
@@ -215,6 +215,10 @@ export default function GluingManager() {
   const [previewQr, setPreviewQr] = useState(null);
 
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+
+  const [selectedProcess, setSelectedProcess] = useState(null);
+
+  const [showProcessDetails, setShowProcessDetails] = useState(false);
 
   const normalizeDecimal = (value) => String(value ?? "").replace(",", ".");
 
@@ -323,7 +327,7 @@ export default function GluingManager() {
 
       value: String(b.batch_id),
 
-      label: b.batch_number || `دفعة ${b.batch_id}`
+      label: b.batch_number || `طبخة ${b.batch_id}`
 
     }));
 
@@ -709,17 +713,23 @@ export default function GluingManager() {
 
     setActiveOrderItem(item);
 
+    // Get ruler_id from the item's color ruler information
+    const colorInfo = colors.find(c => String(c.color_id) === String(item.color_id));
+    const rulerId = colorInfo?.ruler_id || item.ruler_id || "";
+
     setInputForm((prev) => ({
 
       ...prev,
 
       input_width: item.width ? String(item.width) : "",
 
+      ruler_id: rulerId,
+
       color_id: item.color_id ? String(item.color_id) : "",
 
       batch_id: item.batch_id ? String(item.batch_id) : "",
 
-      input_length: item.length ? String(item.length) : "",
+      input_length: "50",
 
       type_item: item.type_item || TypeItem.Machine,
 
@@ -730,8 +740,6 @@ export default function GluingManager() {
       notes: item.notes || ""
 
     }));
-
-    setIoMode("output");
 
   };
 
@@ -827,30 +835,7 @@ export default function GluingManager() {
 
 
 
-      if (activeOrderItem?.production_order_item_id) {
-
-        await productionApi.updateProductionItemStatus(activeOrderItem.production_order_item_id, ProductionStatus.completed);
-
-        setOrders((prev) =>
-
-          Array.isArray(prev)
-
-            ? prev.map((o) =>
-
-              String(o.production_order_item_id) === String(activeOrderItem.production_order_item_id)
-
-                ? { ...o, status: ProductionStatus.completed }
-
-                : o
-
-            )
-
-            : prev
-
-        );
-
-      }
-
+      
 
 
       // Reset forms
@@ -1045,6 +1030,11 @@ export default function GluingManager() {
 
     }
 
+  };
+
+  const openProcessDetails = (process) => {
+    setSelectedProcess(process);
+    setShowProcessDetails(true);
   };
 
 
@@ -1256,39 +1246,20 @@ export default function GluingManager() {
 
             </div>
 
-            <div className="flex flex-wrap items-center gap-1">
-              <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-                {/* <div className="text-xs opacity-80">اسم المستخدم</div> */}
-                <div className="text-base font-bold">{user?.full_name || user?.username || "-"}</div>
-              </div>
-              <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-                {/* <div className="text-xs opacity-80">الدور</div> */}
-                <div className="text-base font-bold">{ROLE_LABELS[user?.role] || user?.role}</div>
-              </div>
-            </div>
-
             <div className="flex items-center gap-2">
-
+              <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+                <div className="text-base font-bold">{user?.full_name || user?.username || "-"} | {ROLE_LABELS[user?.role] || user?.role}</div>
+              </div>
               <NotificationsBell />
-
               <Button
-
                 size="lg"
-
                 variant="outline"
-
                 onClick={() => setShowLogoutDialog(true)}
-
                 className="px-5 py-3 text-base min-w-[120px] touch-manipulation border-2 bg-white/10 text-white border-white/30 hover:bg-white/20"
-
               >
-
                 <ArrowRight className="w-4 h-4 ml-2 rotate-180" />
-
                 تسجيل الخروج
-
               </Button>
-
             </div>
 
           </div>
@@ -1303,19 +1274,11 @@ export default function GluingManager() {
 
         <div className="flex-shrink-0 text-stone-50">
 
-          <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
+          <div className="flex items-center justify-start gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
 
-            <div className="min-w-0">
+            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
 
-              <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
-
-            </div>
-
-            <div className="h-10 w-px" />
-
-            <div className="min-w-0 text-right">
-
-              <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+              <div className="text-base font-bold">{user?.full_name || user?.username || "-"} | {ROLE_LABELS[user?.role] || user?.role}</div>
 
             </div>
 
@@ -1391,7 +1354,7 @@ export default function GluingManager() {
 
                       <div>
 
-                        <Label>العرض</Label>
+                        <Label className={`mb-2`}>العرض</Label>
 
                         <div className="grid grid-cols-2 gap-2 mt-2">
 
@@ -1437,7 +1400,7 @@ export default function GluingManager() {
 
                       <div>
 
-                        <Label>المسطرة</Label>
+                        <Label className={`mb-2`}>المسطرة</Label>
 
                         <FilterSelect 
 
@@ -1455,7 +1418,7 @@ export default function GluingManager() {
 
                       <div>
 
-                        <Label>اللون</Label>
+                        <Label className={`mb-2`}>اللون</Label>
 
                         <FilterSelect 
 
@@ -1475,7 +1438,7 @@ export default function GluingManager() {
 
                       <div>
 
-                        <Label>الطبخة</Label>
+                        <Label className={`mb-2`}>الطبخة</Label>
 
                         <FilterSelect value={inputForm.batch_id} onChange={(e) => setInputForm(prev => ({ ...prev, batch_id: e.target.value }))} options={batchOptions} placeholder="اختر الطبخة" />
 
@@ -1483,15 +1446,15 @@ export default function GluingManager() {
 
                       <div>
 
-                        <Label>الكمية</Label>
+                        <Label className={`mb-2`}>الكمية</Label>
 
-                        <Input value={inputForm.input_length} onFocus={() => setCurrentInput("input_length")} readOnly className={`text-center py-6 ${currentInput === "input_length" ? "ring-2 ring-blue-500" : ""}`} placeholder="0" />
+                        <Input value={inputForm.input_length} onChange={(e) => setInputForm(prev => ({ ...prev, input_length: e.target.value }))} onFocus={() => setCurrentInput("input_length")} className={`text-center py-6 ${currentInput === "input_length" ? "ring-2 ring-blue-500" : ""}`} placeholder="50" />
 
                       </div>
 
                       <div className="col-span-2">
 
-                        <Label>ملاحظات</Label>
+                        <Label className={`mb-2`}>ملاحظات</Label>
 
                         <Input value={inputForm.notes} onChange={(e) => setInputForm(prev => ({ ...prev, notes: e.target.value }))} placeholder="ملاحظات إضافية" />
 
@@ -1571,7 +1534,7 @@ export default function GluingManager() {
 
                   <div>
 
-                    <Label>طول الإخراج</Label>
+                    <Label className={`mb-2`}>طول الإخراج</Label>
 
                     <Input
 
@@ -1593,7 +1556,7 @@ export default function GluingManager() {
 
                   <div>
 
-                    <Label>ملاحظات</Label>
+                    <Label className={`mb-2`}>ملاحظات</Label>
 
                     <Input value={outputForm.notes} onChange={(e) => setOutputForm(prev => ({ ...prev, notes: e.target.value }))} placeholder="ملاحظات الإخراج" />
 
@@ -1851,6 +1814,8 @@ export default function GluingManager() {
                               <div className="flex items-center justify-center gap-1">
 
                                 <button onClick={() => printQr(qrUrl, `QR - تغرية #${proc.process_id}`, qrFooter)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-violet-700 hover:bg-violet-50" title="طباعة QR"><Printer className="w-4 h-4" /></button>
+
+                                <button onClick={() => openProcessDetails(proc)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50" title="عرض التفاصيل"><Eye className="w-4 h-4" /></button>
 
                                 <button
 
@@ -2348,7 +2313,7 @@ export default function GluingManager() {
 
             <div className="text-xs text-red-600 font-medium">
 
-              ⚠️ سيتم حذف جميع العمليات المحددة دفعة واحدة
+              ⚠️ سيتم حذف جميع العمليات المحددة طبخة واحدة
 
             </div>
 
@@ -2371,6 +2336,70 @@ export default function GluingManager() {
       </StyledDialog>
 
 
+
+      {/* Process Details Dialog */}
+      <StyledDialog
+        isOpen={showProcessDetails}
+        onOpenChange={(open) => {
+          setShowProcessDetails(open);
+          if (!open) setSelectedProcess(null);
+        }}
+        title={`تفاصيل التغرية ${selectedProcess?.process_id ? `#${selectedProcess.process_id}` : ""}`}
+        contentClassName="max-w-3xl w-full"
+        onCancel={() => setShowProcessDetails(false)}
+        onConfirm={() => setShowProcessDetails(false)}
+        confirmLabel="إغلاق"
+        showCancel={false}
+      >
+        {selectedProcess && (
+          <div className="overflow-x-auto text-sm">
+            <table className="w-full table-auto border-collapse border border-gray-200 rounded-lg overflow-hidden [&_td]:break-words [&_th]:break-words">
+              <thead className="bg-gray-100">
+                <tr>
+                  {[
+                    "اللون",
+                    "كود اللون",
+                    "العرض",
+                    "الكمية المدخلة",
+                    "الكمية المخرجة",
+                    "النوع",
+                    "الطبخة",
+                    "المصدر",
+                    "الوجهة",
+                    "الهدر",
+                    "المستخدم",
+                    "التوقيت",
+                    "الملاحظات"
+                  ].map((header) => (
+                    <th key={header} className="p-2 text-center text-xs font-semibold text-gray-600">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t">
+                  <td className="p-2 text-center text-sm">
+                    {selectedProcess.color?.color_name || colors.find(c => String(c.color_id) === String(selectedProcess.color_id))?.color_name || "-"}
+                  </td>
+                  <td className="p-2 text-center text-sm">
+                    {selectedProcess.color?.color_code || colors.find(c => String(c.color_id) === String(selectedProcess.color_id))?.color_code || "-"}
+                  </td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.input_width || "-"}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.input_length || "-"}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.output_length || "-"}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.type_item === "Presser" ? "كوي" : "مكنة"}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.batch?.batch_number || batches.find(b => String(b.batch_id) === String(selectedProcess.batch_id))?.batch_number || "-"}</td>
+                  <td className="p-2 text-center text-sm">{formatDestination(selectedProcess.source)}</td>
+                  <td className="p-2 text-center text-sm">{formatDestination(selectedProcess.destination)}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.waste || "-"}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.user?.full_name || selectedProcess.user?.username || "-"}</td>
+                  <td className="p-2 text-center text-sm">{formatDate(selectedProcess.created_at)}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.notes || "-"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </StyledDialog>
 
       {/* Logout confirmation dialog */}
 

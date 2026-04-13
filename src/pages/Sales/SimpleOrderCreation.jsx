@@ -455,6 +455,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                 return "مكتمل";
 
             case OrderStatus.canceled:
+            case "cancelled":
 
                 return "ملغي";
 
@@ -3097,7 +3098,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
             : baseBatches;
         let base = visibleBatches.map(b => ({
             value: String(b.batch_id),
-            label: b.batch_number || "دفعة " + b.batch_id
+            label: b.batch_number || "طبخة " + b.batch_id
         }));
 
         // Filter by search term
@@ -3113,7 +3114,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
             if (selectedBatch && !base.find(opt => opt.value === String(formData.batch_id))) {
                 base.push({
                     value: String(selectedBatch.batch_id),
-                    label: selectedBatch.batch_number || "دفعة " + selectedBatch.batch_id
+                    label: selectedBatch.batch_number || "طبخة " + selectedBatch.batch_id
                 });
             }
         }
@@ -3170,7 +3171,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
         const base = formData.material_id ? baseBatches.filter(b => String(b.material_id) === String(formData.material_id)) : baseBatches;
         return base.map(b => ({
             value: String(b.batch_id),
-            label: b.batch_number || "دفعة " + b.batch_id
+            label: b.batch_number || "طبخة " + b.batch_id
         }));
 
     }, [batches, formData.material_id]);
@@ -3200,7 +3201,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
             { label: "العرض", value: item.width ?? "-" },
             { label: "السماكة", value: item.thickness ?? "-" },
             { label: "الكمية", value: item.quantity ?? "-" },
-            { label: "دفعة", value: batch?.batch_number || item.batch_number || "-" },
+            { label: "الطبخة", value: batch?.batch_number || item.batch_number || "-" },
             { label: "ملاحظات", value: item.notes || "-" },
         ];
 
@@ -6274,6 +6275,8 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                                                         placeholder="اختر الحالة..."
 
                                                         className="w-full"
+
+                                                        openOnFocus={false}
 
                                                     />
 

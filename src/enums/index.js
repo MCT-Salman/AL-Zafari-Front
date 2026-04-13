@@ -92,6 +92,7 @@ export const ConstantTypeLabels = {
 export const OrderStatus = {
   pending: 'pending',
   preparing: 'preparing',
+  outofwarehouse: 'outofwarehouse',
   canceled: 'canceled',
   completed: 'completed',
 };

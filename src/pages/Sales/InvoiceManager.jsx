@@ -725,7 +725,7 @@ export default function InvoiceManager() {
             : batches;
         return base.map(b => ({
             value: String(b.batch_id),
-            label: b.batch_number || `دفعة ${b.batch_id}`
+            label: b.batch_number || `طبخة ${b.batch_id}`
         }));
     }, [batches, formData.material_id]);
 
@@ -1231,7 +1231,7 @@ export default function InvoiceManager() {
             });
 
             if (response.success) {
-                toast.success("تم إضافة الدفعة بنجاح");
+                toast.success("تم إضافة الطبخة بنجاح");
                 setShowPaymentDialog(false);
                 setSelectedInvoiceForPayment(null);
                 setPaymentAmount("");
@@ -1241,7 +1241,7 @@ export default function InvoiceManager() {
             }
         } catch (error) {
             // Extract error message from various possible error formats
-            let errorMessage = "فشل في إضافة الدفعة";
+            let errorMessage = "فشل في إضافة الطبخة";
             if (error.message) {
                 errorMessage = error.message;
             } else if (error.details && typeof error.details === 'string') {
@@ -1676,7 +1676,7 @@ export default function InvoiceManager() {
                                                 {activeField === "quantity" ? "الكمية" :
                                                     activeField === "paid_amount" ? "المبلغ المدفوع" :
                                                         activeField === "discount" ? "قيمة الخصم" :
-                                                            activeField === "paymentAmount" ? "مبلغ الدفعة" :
+                                                            activeField === "paymentAmount" ? "مبلغ الطبخة" :
                                                                 activeField === "notes" ? "الملاحظات" :
                                                                     activeField === "width" ? "العرض" : "القيمة"}
                                             </div>
@@ -3027,7 +3027,7 @@ export default function InvoiceManager() {
                                                                     setShowPaymentDialog(true);
                                                                 }}
                                                                 className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg"
-                                                                title="إضافة دفعة"
+                                                                title="إضافة طبخة"
                                                                 disabled={remaining <= 0}
                                                             >
                                                                 <Plus className="w-4 h-4" />
@@ -3064,12 +3064,12 @@ export default function InvoiceManager() {
                             )}
                         </div>
 
-                        {/* نافذة إضافة دفعة */}
+                        {/* نافذة إضافة طبخة */}
                         {selectedInvoiceForPayment && (
                             <StyledDialog
                                 isOpen={showPaymentDialog}
                                 onOpenChange={setShowPaymentDialog}
-                                title="إضافة دفعة جديدة"
+                                title="إضافة طبخة جديدة"
                                 onCancel={() => {
                                     setShowPaymentDialog(false);
                                     setSelectedInvoiceForPayment(null);
@@ -3093,7 +3093,7 @@ export default function InvoiceManager() {
                                     </div>
 
                                     <div>
-                                        <Label className="font-bold text-sm mb-1 block">مبلغ الدفعة</Label>
+                                        <Label className="font-bold text-sm mb-1 block">مبلغ الطبخة</Label>
                                         <div className="flex items-center gap-2">
                                             <Input
                                                 type="number"
@@ -3111,10 +3111,10 @@ export default function InvoiceManager() {
                                         </div>
                                     </div>
 
-                                    {/* لوحة الأرقام لنافذة الدفعة */}
+                                    {/* لوحة الأرقام لنافذة الطبخة */}
                                     <div className="bg-gray-100 rounded-lg p-2 space-y-2">
                                         <div className="bg-white rounded-lg py-2 px-3">
-                                            <div className="text-xs text-gray-500 mb-0.5">مبلغ الدفعة</div>
+                                            <div className="text-xs text-gray-500 mb-0.5">مبلغ الطبخة</div>
                                             <div className="text-2xl font-mono font-bold text-gray-800 text-center">
                                                 {paymentAmount || "0"}
                                             </div>

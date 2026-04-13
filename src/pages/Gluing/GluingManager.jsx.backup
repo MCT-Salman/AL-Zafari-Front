@@ -324,7 +324,7 @@ export default function GluingManager() {
 
       value: String(b.batch_id),
 
-      label: b.batch_number || `دفعة ${b.batch_id}`
+      label: b.batch_number || `طبخة ${b.batch_id}`
 
     }));
 
@@ -437,7 +437,7 @@ return batches.map(b => ({
 
 value: String(b.batch_id),
 
-label: b.batch_number || `دفعة ${b.batch_id}`
+label: b.batch_number || `طبخة ${b.batch_id}`
 
 }));
 
@@ -2350,7 +2350,7 @@ socket.on("order:new", handleNotification);
 
             <div className="text-xs text-red-600 font-medium">
 
-              ⚠️ سيتم حذف جميع العمليات المحددة دفعة واحدة
+              ⚠️ سيتم حذف جميع العمليات المحددة طبخة واحدة
 
             </div>
 

@@ -116,6 +116,8 @@ export default function CuttingManager() {
   const [pendingCompleteItem, setPendingCompleteItem] = useState(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [selectedProcess, setSelectedProcess] = useState(null);
+  const [showProcessDetails, setShowProcessDetails] = useState(false);
 
   const normalizeDecimal = (value) => String(value ?? "").replace(",", ".");
   const toNumber = (value) => {
@@ -207,7 +209,7 @@ export default function CuttingManager() {
   const batchOptions = useMemo(() => {
     return batches.map(b => ({
       value: String(b.batch_id),
-      label: b.batch_number || `دفعة ${b.batch_id}`
+      label: b.batch_number || `طبخة ${b.batch_id}`
     }));
   }, [batches]);
 
@@ -567,10 +569,7 @@ export default function CuttingManager() {
       loadProcesses();
       loadOrders();
 
-      if (activeOrderItem?.production_order_item_id) {
-        await productionApi.updateProductionItemStatus(activeOrderItem.production_order_item_id, ProductionStatus.completed);
-      }
-
+      
       // Reset forms
       setInputForm({
         input_width: "",
@@ -699,6 +698,11 @@ export default function CuttingManager() {
     if (!order?.production_order_item_id) return;
     setPendingCompleteItem(order);
     setShowCompleteDialog(true);
+  };
+
+  const openProcessDetails = (process) => {
+    setSelectedProcess(process);
+    setShowProcessDetails(true);
   };
 
   const handleCompleteOrderItem = async () => {
@@ -842,17 +846,10 @@ export default function CuttingManager() {
             <Package className="w-7 h-7" />
             <div><h1 className="text-2xl font-bold">إدارة القص</h1><p className="text-sm opacity-90">لوحة عمليات القص</p></div>
           </div>
-          <div className="flex flex-wrap items-center gap-1">
-            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-              {/* <div className="text-xs opacity-80">اسم المستخدم</div> */}
-              <div className="text-base font-bold">{user?.full_name || user?.username || "-"}</div>
-            </div>
-            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
-              {/* <div className="text-xs opacity-80">الدور</div> */}
-              <div className="text-base font-bold">{ROLE_LABELS[user?.role] || user?.role}</div>
-            </div>
-          </div>
           <div className="flex items-center gap-2">
+            <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+              <div className="text-base font-bold">{user?.full_name || user?.username || "-"} | {ROLE_LABELS[user?.role] || user?.role}</div>
+            </div>
             <NotificationsBell />
             <Button size="lg" variant="outline" onClick={() => setShowLogoutDialog(true)} className="px-5 py-3 text-base min-w-[120px] border-2 bg-white/10 text-white border-white/30 hover:bg-white/20">
               <ArrowRight className="w-4 h-4 ml-2 rotate-180" />تسجيل الخروج
@@ -864,13 +861,9 @@ export default function CuttingManager() {
 
       {!showHeader && (
       <div className="flex-shrink-0 text-stone-50">
-        <div className="flex items-center justify-between gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-bold text-secondary-s">{user?.full_name || user?.username || "-"}</div>
-          </div>
-          <div className="h-10 w-px" />
-          <div className="min-w-0 text-right">
-            <div className="truncate text-sm font-bold text-secondary-s">{ROLE_LABELS[user?.role] || user?.role}</div>
+        <div className="flex items-center justify-start gap-1 border-secondary-f border-b-2 bg-primary-f px-4 py-0 shadow-sm backdrop-blur">
+          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-right backdrop-blur-sm">
+            <div className="text-base font-bold">{user?.full_name || user?.username || "-"} | {ROLE_LABELS[user?.role] || user?.role}</div>
           </div>
         </div>
       </div>
@@ -941,7 +934,7 @@ export default function CuttingManager() {
                 {inputMode === "manual" && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label>العرض</Label>
+                      <Label className={`mb-2`}>العرض</Label>
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         {["22", "44"].map((width) => (
                           <button
@@ -964,7 +957,7 @@ export default function CuttingManager() {
                       </div>
                     </div>
                     <div>
-                      <Label>المسطرة</Label>
+                      <Label className={`mb-2`}>المسطرة</Label>
                       <FilterSelect
                         value={inputForm.ruler_id}
                         onChange={(e) => setInputForm(prev => ({ ...prev, ruler_id: e.target.value, color_id: "" }))}
@@ -975,7 +968,7 @@ export default function CuttingManager() {
                       />
                     </div>
                     <div>
-                      <Label>اللون</Label>
+                      <Label className={`mb-2`}>اللون</Label>
                       <FilterSelect
                         value={inputForm.color_id}
                         onChange={(e) => setInputForm(prev => ({ ...prev, color_id: e.target.value }))}
@@ -987,7 +980,7 @@ export default function CuttingManager() {
                       />
                     </div>
                     <div>
-                      <Label>الطبخة</Label>
+                      <Label className={`mb-2`}>الطبخة</Label>
                       <FilterSelect
                         value={inputForm.batch_id}
                         onChange={(e) => setInputForm(prev => ({ ...prev, batch_id: e.target.value }))}
@@ -999,7 +992,7 @@ export default function CuttingManager() {
                       />
                     </div>
                     <div>
-                      <Label>الكمية</Label>
+                      <Label className={`mb-2`}>الكمية</Label>
                       <Input
                         value={inputForm.input_length}
                         onChange={(e) => setInputForm(prev => ({ ...prev, input_length: e.target.value }))}
@@ -1009,7 +1002,7 @@ export default function CuttingManager() {
                       />
                     </div>
                     <div>
-                      <Label>السماكة</Label>
+                      <Label className={`mb-2`}>السماكة</Label>
                       <Input
                         value={inputForm.thickness}
                         onChange={(e) => setInputForm(prev => ({ ...prev, thickness: e.target.value }))}
@@ -1019,7 +1012,7 @@ export default function CuttingManager() {
                       />
                     </div>
                     <div >
-                      <Label>ملاحظات</Label>
+                      <Label className={`mb-2`}>ملاحظات</Label>
                       <Input
                         value={inputForm.notes}
                         onChange={(e) => setInputForm(prev => ({ ...prev, notes: e.target.value }))}
@@ -1075,7 +1068,7 @@ export default function CuttingManager() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label>الكمية المخرج</Label>
+                    <Label className={`mb-2`}>الكمية المخرج</Label>
                     {outputItems.map((item) => (
                       <div key={item.id} className="flex gap-2 items-center">
                         <Input
@@ -1122,7 +1115,7 @@ export default function CuttingManager() {
                 </div>
 
                 <div>
-                  <Label>ملاحظات</Label>
+                  <Label className={`mb-2`}>ملاحظات</Label>
                   <Input
                     value={outputForm.notes}
                     onChange={(e) => setOutputForm(prev => ({ ...prev, notes: e.target.value }))}
@@ -1313,6 +1306,9 @@ export default function CuttingManager() {
                                 >
                                   <Printer className="w-4 h-4" />
                                 </button>
+                                <button onClick={() => openProcessDetails(proc)} className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-blue-600 hover:bg-blue-50" title="عرض التفاصيل">
+                                  <Eye className="w-4 h-4" />
+                                </button>
                                 <button
                                   onClick={() => requestDeleteProcess(proc)}
                                   className="flex h-8 w-8 items-center justify-center rounded-lg p-1.5 text-red-600 hover:bg-red-50"
@@ -1362,6 +1358,68 @@ export default function CuttingManager() {
           </Card>
         </div>
       </div>
+
+      {/* Process Details Dialog */}
+      <StyledDialog
+        isOpen={showProcessDetails}
+        onOpenChange={(open) => {
+          setShowProcessDetails(open);
+          if (!open) setSelectedProcess(null);
+        }}
+        title={`تفاصيل القص ${selectedProcess?.process_id ? `#${selectedProcess.process_id}` : ""}`}
+        contentClassName="max-w-3xl w-full"
+        onCancel={() => setShowProcessDetails(false)}
+        onConfirm={() => setShowProcessDetails(false)}
+        confirmLabel="إغلاق"
+        showCancel={false}
+      >
+        {selectedProcess && (
+          <div className="overflow-x-auto text-sm">
+            <table className="w-full table-auto border-collapse border border-gray-200 rounded-lg overflow-hidden [&_td]:break-words [&_th]:break-words">
+              <thead className="bg-gray-100">
+                <tr>
+                  {[
+                    "اللون",
+                    "كود اللون",
+                    "العرض",
+                    "الكمية المدخلة",
+                    "الكمية المخرجة",
+                    "النوع",
+                    "الطبخة",
+                    "المصدر",
+                    "الوجهة",
+                    "المستخدم",
+                    "التوقيت",
+                    "الملاحظات"
+                  ].map((header) => (
+                    <th key={header} className="p-2 text-center text-xs font-semibold text-gray-600">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t">
+                  <td className="p-2 text-center text-sm">
+                    {selectedProcess.color?.color_name || colors.find(c => String(c.color_id) === String(selectedProcess.color_id))?.color_name || "-"}
+                  </td>
+                  <td className="p-2 text-center text-sm">
+                    {selectedProcess.color?.color_code || colors.find(c => String(c.color_id) === String(selectedProcess.color_id))?.color_code || "-"}
+                  </td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.input_width || "-"}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.input_length || "-"}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.output_length || "-"}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.type_item === "Presser" ? "كوي" : "مكنة"}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.batch?.batch_number || batches.find(b => String(b.batch_id) === String(selectedProcess.batch_id))?.batch_number || "-"}</td>
+                  <td className="p-2 text-center text-sm">{formatDestination(selectedProcess.source)}</td>
+                  <td className="p-2 text-center text-sm">{formatDestination(selectedProcess.destination)}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.user?.full_name || selectedProcess.user?.username || "-"}</td>
+                  <td className="p-2 text-center text-sm">{formatDate(selectedProcess.created_at)}</td>
+                  <td className="p-2 text-center text-sm">{selectedProcess.notes || "-"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </StyledDialog>
 
       <StyledDialog
         isOpen={showLogoutDialog}
@@ -1633,7 +1691,7 @@ export default function CuttingManager() {
           عملية قص؟
           <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
             <div className="text-xs text-red-600 font-medium">
-              ⚠️ سيتم حذف جميع العمليات المحددة دفعة واحدة
+              ⚠️ سيتم حذف جميع العمليات المحددة طبخة واحدة
             </div>
             <div className="mt-2 text-xs text-gray-600">
               العناصر التي سيتم حذفها: #{Array.from(selectedProcesses).join(', #')}

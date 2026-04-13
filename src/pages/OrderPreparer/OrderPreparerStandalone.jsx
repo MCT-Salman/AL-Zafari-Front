@@ -856,7 +856,7 @@ export default function OrderPreparerStandalone() {
                                     />
                                 </div>
                                 <div>
-                                    <Label>الدفعة</Label>
+                                    <Label>الطبخة</Label>
                                     <FilterSelect
                                         value={formData.batch_id}
                                         onChange={(value) => handleFieldChange("batch_id", value)}
@@ -864,7 +864,7 @@ export default function OrderPreparerStandalone() {
                                             value: String(b.batch_id),
                                             label: b.batch_number
                                         }))}
-                                        placeholder="اختر الدفعة"
+                                        placeholder="اختر الطبخة"
                                     />
                                 </div>
                             </div>

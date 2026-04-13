@@ -3197,7 +3197,7 @@ export default function OrderPreparer() {
             : baseBatches;
         let base = visibleBatches.map(b => ({
             value: String(b.batch_id),
-            label: b.batch_number || "دفعة " + b.batch_id
+            label: b.batch_number || "طبخة " + b.batch_id
         }));
 
         // Filter by search term
@@ -3213,7 +3213,7 @@ export default function OrderPreparer() {
             if (selectedBatch && !base.find(opt => opt.value === String(formData.batch_id))) {
                 base.push({
                     value: String(selectedBatch.batch_id),
-                    label: selectedBatch.batch_number || "دفعة " + selectedBatch.batch_id
+                    label: selectedBatch.batch_number || "طبخة " + selectedBatch.batch_id
                 });
             }
         }
@@ -3326,7 +3326,7 @@ export default function OrderPreparer() {
         const base = formData.material_id ? baseBatches.filter(b => String(b.material_id) === String(formData.material_id)) : baseBatches;
         return base.map(b => ({
             value: String(b.batch_id),
-            label: b.batch_number || "دفعة " + b.batch_id
+            label: b.batch_number || "طبخة " + b.batch_id
         }));
 
     }, [batches, formData.material_id]);
@@ -3356,7 +3356,7 @@ export default function OrderPreparer() {
             { label: "العرض", value: item.width ?? "-" },
             { label: "السماكة", value: item.thickness ?? "-" },
             { label: "الكمية", value: item.quantity ?? "-" },
-            { label: "دفعة", value: batch?.batch_number || item.batch_number || "-" },
+            { label: "الطبخة", value: batch?.batch_number || item.batch_number || "-" },
             { label: "ملاحظات", value: item.notes || "-" },
         ];
 
@@ -7264,7 +7264,7 @@ export default function OrderPreparer() {
                                                         <th className="p-2 text-right">العرض</th>
                                                         <th className="p-2 text-right">السماكة</th>
                                                         <th className="p-2 text-right">الكمية</th>
-                                                        <th className="p-2 text-right">الدفعة</th>
+                                                        <th className="p-2 text-right">الطبخة</th>
                                                         {isOrderPreparer && (
                                                             <th className="p-2 text-center">QR</th>
                                                         )}

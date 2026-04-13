@@ -727,7 +727,7 @@ export default function OrderPreparationPage() {
                                         onChange={(value) => handleFieldChange("batch_id", value)}
                                         options={filteredBatches.map(b => ({
                                             value: String(b.batch_id),
-                                            label: b.batch_number || `دفعة ${b.batch_id}`
+                                            label: b.batch_number || `طبخة ${b.batch_id}`
                                         }))}
                                         placeholder="اختر الطبخة"
                                         disabled={!formData.color_id}

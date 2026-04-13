@@ -168,7 +168,7 @@ export const invoiceApi = {
       const response = await axiosInstance.post(`/invoice/${id}/payment`, paymentData);
       return response.data;
     } catch (error) {
-      throw handleApiError(error, 'حدث خطأ في إضافة الدفعة');
+      throw handleApiError(error, 'حدث خطأ في إضافة الطبخة');
     }
   },
 

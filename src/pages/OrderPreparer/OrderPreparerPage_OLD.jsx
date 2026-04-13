@@ -898,7 +898,7 @@ export default function OrderPreparerPage() {
 
                                 {/* Batch Selection */}
                                 <div>
-                                    <Label className="block text-sm font-medium mb-2">الدفعة</Label>
+                                    <Label className="block text-sm font-medium mb-2">الطبخة</Label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {filteredBatches.map(batch => (
                                             <button
