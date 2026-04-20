@@ -469,7 +469,7 @@ export default function InvoiceManager() {
                 toast.success("تم إنشاء الزبون بنجاح");
                 setCustomers(prev => [...prev, createdCustomer]);
                 setSelectedCustomer(createdCustomer);
-                loadCustomerBalance(createdCustomer.customer_id);
+                setCustomerBalance(Number(createdCustomer.balance || 0));
                 setCustomerOption("existing");
                 setNewCustomer({
                     name: "",
@@ -2139,11 +2139,8 @@ export default function InvoiceManager() {
                                                     onChange={(e) => {
                                                         const customer = customers.find(c => String(c.customer_id) === e.target.value);
                                                         setSelectedCustomer(customer || null);
-                                                        if (customer) {
-                                                            loadCustomerBalance(customer.customer_id);
-                                                        } else {
-                                                            setCustomerBalance(0);
-                                                        }
+                                                        // Use balance directly from customer API response
+                                                        setCustomerBalance(customer ? Number(customer.balance || 0) : 0);
                                                     }}
                                                     options={customerOptions}
                                                     placeholder="اختر الزبون..."
@@ -2163,11 +2160,7 @@ export default function InvoiceManager() {
                                                     <div className="flex justify-between items-center">
                                                         <span className="text-blue-700">الذمة المتبقية:</span>
                                                         <span className={`font-bold ${customerBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                            {loadingCustomerBalance ? (
-                                                                <span className="text-gray-500">جاري التحميل...</span>
-                                                            ) : (
-                                                                invoiceApi.formatCurrency(customerBalance)
-                                                            )}
+                                                            {invoiceApi.formatCurrency(customerBalance)}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -2433,9 +2426,9 @@ export default function InvoiceManager() {
                                             discount: String(discountValue),
                                             discount_type: "fixed"
                                         }));
-                                        // Load customer balance when opening preview for manual invoices
+                                        // Use balance directly from customer object for manual invoices
                                         if (selectedCustomer && !selectedOrder) {
-                                            loadCustomerBalance(selectedCustomer.customer_id);
+                                            setCustomerBalance(Number(selectedCustomer.balance || 0));
                                         }
                                         setShowPreview(true);
                                         setShowPaymentPopup(false);
@@ -2469,11 +2462,7 @@ export default function InvoiceManager() {
                                                         <div className="flex justify-between items-center">
                                                             <span className="text-blue-700 font-medium">الذمة المتبقية:</span>
                                                             <span className={`font-bold ${customerBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                                {loadingCustomerBalance ? (
-                                                                    <span className="text-gray-500">جاري التحميل...</span>
-                                                                ) : (
-                                                                    invoiceApi.formatCurrency(customerBalance)
-                                                                )}
+                                                                {invoiceApi.formatCurrency(customerBalance)}
                                                             </span>
                                                         </div>
                                                     </div>

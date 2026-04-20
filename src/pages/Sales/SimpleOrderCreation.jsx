@@ -22,7 +22,7 @@ import ResultsCounter from "../../components/common/ResultsCounter";
 import RowsPerPageSelector from "../../components/common/RowsPerPageSelector";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
-import { ShoppingCart, Plus, History, Trash2, Eye, RotateCcw, Check, Users, EyeOff, Home, LogOut, X, AlertCircle,  Edit, Save, Download, ChevronLeft, ChevronRight, UserPlus, User, UserX, FileText, Palette, Printer } from "lucide-react";
+import { ShoppingCart, Plus, History, Trash2, Eye, RotateCcw, Check, Users, EyeOff, Home, LogOut, X, AlertCircle,  Edit, Save, Download, ChevronLeft, ChevronRight, UserPlus, User, UserX, FileText, Palette, Printer, QrCode } from "lucide-react";
 import LoadingState from "../../components/common/LoadingState";
 import { getApiData } from "../../utils/api";
 import toast from "react-hot-toast";
@@ -2497,6 +2497,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
             setEditingOrderId(getOrderId(details));
 
             setViewMode("create");
+            setSearchParams({ tab: "create" });
 
 
 
@@ -3314,6 +3315,12 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
                                 }`}
                         >
                             الشركات المكافئة
+                        </button>
+                        <button
+                            onClick={() => navigate("/order-preparer")}
+                            className="px-4 py-2 text-sm font-semibold rounded-lg border transition-all bg-white/10 text-white border-white/30 hover:bg-white/20"
+                        >
+                            تجهيز طلب مبيعات
                         </button>
                     </>
                 )}
@@ -5378,21 +5385,25 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             <tr>
 
-                                                                <th className="p-2 text-right border-b">المادة</th>
+                                                                <th className="p-2 text-center border-b w-10">#</th>
 
-                                                                <th className="p-2 text-center border-b">العرض</th>
+                                                                <th className="p-2 text-right border-b">المادة</th>
 
                                                                 <th className="p-2 text-right border-b">اللون</th>
 
+                                                                <th className="p-2 text-center border-b">الكمية</th>
+
                                                                 <th className="p-2 text-center border-b">النوع</th>
 
-                                                                <th className="p-2 text-center border-b">الكمية</th>
+                                                                <th className="p-2 text-center border-b">الأبعاد</th>
+
+                                                                <th className="p-2 text-center border-b">الطبخة</th>
 
                                                                 <th className="p-2 text-right border-b">المسطرة</th>
 
-                                                                <th class2="p-2 text-center border-b">السماكة</th>
+                                                                <th className="p-2 text-right border-b">ملاحظات</th>
 
-                                                                <th className="p-2 text-center border-b">الطبخة</th>
+                                                                <th className="p-2 text-center border-b w-16">QR</th>
 
                                                             </tr>
 
@@ -5400,29 +5411,45 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         <tbody>
 
-                                                            {orderItems.map(item => (
+                                                            {orderItems.map((item, index) => (
 
                                                                 <tr key={item.id} className="border-b">
 
-                                                                    <td className="p-2">{item.material_name}</td>
+                                                                    <td className="p-2 text-center font-bold">{index + 1}</td>
 
-                                                                    <td className="p-2 text-center">{item.width || "-"}</td>
+                                                                    <td className="p-2">{item.material_name}</td>
 
                                                                     <td className="p-2">{item.color_name}</td>
 
-                                                                    <td className="p-2 text-center">
-
-                                                                        {formatTypeItem(item.type_item)}
-
-                                                                    </td>
-
                                                                     <td className="p-2 text-center font-bold">{item.quantity} {getItemQuantityUnit(item)}</td>
+
+                                                                    <td className="p-2 text-center">{formatTypeItem(item.type_item)}</td>
+
+                                                                    <td className="p-2 text-center">{item.width || "-"} × {item.thickness || "0.6"}</td>
+
+                                                                    <td className="p-2 text-center">{item.batch_number || "-"}</td>
 
                                                                     <td className="p-2">{item.ruler_name}</td>
 
-                                                                    <td className="p-2 text-center">{item.thickness || "0.6"}</td>
+                                                                    <td className="p-2 text-sm max-w-[100px] truncate" title={item.notes}>{item.notes || "-"}</td>
 
-                                                                    <td className="p-2 text-center">{item.batch_number || "-"}</td>
+                                                                    <td className="p-2 text-center">
+
+                                                                        <button
+
+                                                                            onClick={() => openQrGenDialog(item)}
+
+                                                                            className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
+
+                                                                            title="عرض QR"
+
+                                                                        >
+
+                                                                            <QrCode className="w-4 h-4" />
+
+                                                                        </button>
+
+                                                                    </td>
 
                                                                 </tr>
 
@@ -5590,21 +5617,23 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         <th className="p-1 text-right border-b w-[50px]">المادة</th>
 
-                                                        <th className="p-1 text-center border-b w-[55px]">العرض</th>
-
                                                         <th className="p-1 text-right border-b w-[50px]">اللون</th>
 
-                                                        <th className="p-1 text-center border-b w-[45px]">النوع</th>
+                                                        <th className="p-1 text-center border-b w-[55px]">العرض</th>
 
                                                         <th className="p-1 text-center border-b w-[55px]">الكمية</th>
+
+                                                        <th className="p-1 text-center border-b w-[45px]">النوع</th>
 
                                                         <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
 
                                                         <th className="p-1 text-center border-b w-[70px]">السماكة</th>
 
-                                                        <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
+                                                        <th className="p-1 text-center border-b w-[95px]">الطبخة</th>
 
                                                         <th className="p-1 text-center border-b w-[80px]">الإجراءات</th>
+
+                                                        <th className="p-1 text-right border-b w-[80px]">الملاحظات</th>
 
                                                     </tr>
 
@@ -5632,12 +5661,6 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             </td>
 
-                                                            <td className="p-1 text-center text-sm">
-
-                                                                {item.width || "-"}
-
-                                                            </td>
-
                                                             <td className="p-1 break-words text-sm font-mono" title={item.color_code}>
 
                                                                 {item.color_code}
@@ -5646,13 +5669,19 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             <td className="p-1 text-center text-sm">
 
-                                                                {formatTypeItem(item.type_item)}
+                                                                {item.width || "-"}
 
                                                             </td>
 
                                                             <td className="p-1 text-center font-bold text-sm">
 
                                                                 {item.quantity} {getItemQuantityUnit(item)}
+
+                                                            </td>
+
+                                                            <td className="p-1 text-center text-sm">
+
+                                                                {formatTypeItem(item.type_item)}
 
                                                             </td>
 
@@ -5712,6 +5741,12 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                             </td>
 
+                                                            <td className="p-1 break-words text-sm max-w-[80px]" title={item.notes}>
+
+                                                                {item.notes || "-"}
+
+                                                            </td>
+
                                                         </tr>
 
                                                     ))}
@@ -5720,7 +5755,7 @@ export default function SimpleOrderCreation({ variant = "orders" }) {
 
                                                         <tr>
 
-                                                            <td colSpan="8" className="p-8 text-center text-primary-f">
+                                                            <td colSpan="10" className="p-8 text-center text-primary-f">
 
                                                                 <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
 

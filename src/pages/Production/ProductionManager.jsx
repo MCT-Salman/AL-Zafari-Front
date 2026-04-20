@@ -83,6 +83,8 @@ export default function ProductionManager() {
     const [showOrderDetails, setShowOrderDetails] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [selectedOrderItems, setSelectedOrderItems] = useState([]);
+    const [savingOrderDetails, setSavingOrderDetails] = useState(false);
+    const [orderDetailsDraft, setOrderDetailsDraft] = useState({ status: "", notes: "" });
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const tableContainerRef = useRef(null);
     const notificationDedupRef = useRef(new Map());
@@ -146,6 +148,8 @@ export default function ProductionManager() {
     const [showPreparerOrderDetails, setShowPreparerOrderDetails] = useState(false);
     const [selectedPreparerOrder, setSelectedPreparerOrder] = useState(null);
     const [loadingPreparerDetails, setLoadingPreparerDetails] = useState(false);
+    const [savingPreparerOrder, setSavingPreparerOrder] = useState(false);
+    const [preparerOrderDraft, setPreparerOrderDraft] = useState({ status: "", notes: "" });
 
     const { exportToExcel: exportProductionToExcel, loading: exportingProduction } = useExport({
         sheetName: "طلبات_الإنتاج",
@@ -438,8 +442,8 @@ export default function ProductionManager() {
         try {
             setLoadingPreparerOrders(true);
             const response = await salesApi.getSalesOrders();
-            const data = getApiData(response, []) || [];
-            const orders = Array.isArray(data) ? data : (Array.isArray(data?.orders) ? data.orders : []);
+            const data = getApiData(response, { orders: [], total: 0 });
+            const orders = Array.isArray(data?.orders) ? data.orders : (Array.isArray(data) ? data : []);
             setPreparerOrders(orders);
         } catch (error) {
             toast.error("فشل في تحميل طلبات  انتاج");
@@ -552,8 +556,36 @@ export default function ProductionManager() {
 
     const handleViewOrder = async (order) => {
         setSelectedOrder(order);
+        setOrderDetailsDraft({
+            status: order?.status || "pending",
+            notes: order?.notes || ""
+        });
         await loadOrderItems(order.production_order_id);
         setShowOrderDetails(true);
+    };
+
+    const handleSaveOrderDetails = async () => {
+        const orderId = selectedOrder?.production_order_id;
+        if (!orderId) {
+            toast.error("رقم الطلب غير موجود");
+            return;
+        }
+
+        try {
+            setSavingOrderDetails(true);
+            await productionApi.updateProductionOrder(orderId, {
+                notes: orderDetailsDraft.notes,
+                status: orderDetailsDraft.status
+            });
+
+            toast.success("تم تحديث الطلب");
+            setSelectedOrder((prev) => (prev ? { ...prev, status: orderDetailsDraft.status, notes: orderDetailsDraft.notes } : prev));
+            await loadProductionOrders();
+        } catch (error) {
+            toast.error("فشل في تحديث الطلب");
+        } finally {
+            setSavingOrderDetails(false);
+        }
     };
 
     const handleViewPreparerOrder = async (order) => {
@@ -561,13 +593,100 @@ export default function ProductionManager() {
             setLoadingPreparerDetails(true);
             const orderId = getPreparerOrderId(order);
             const response = orderId ? await salesApi.getSalesOrderById(orderId) : null;
-            const details = response?.data || response?.data?.data || response?.data?.order || response?.data || order;
+            const details = getApiData(response, null) || order;
             setSelectedPreparerOrder(details);
+            setPreparerOrderDraft({
+                status: details?.status || "pending",
+                notes: details?.notes || ""
+            });
             setShowPreparerOrderDetails(true);
         } catch (error) {
             toast.error("فشل في جلب تفاصيل  طلب انتاج");
         } finally {
             setLoadingPreparerDetails(false);
+        }
+    };
+
+    const handleSavePreparerOrderStatus = async () => {
+        const orderId = getPreparerOrderId(selectedPreparerOrder);
+        if (!orderId) {
+            toast.error("رقم الطلب غير موجود");
+            return;
+        }
+
+        const items = Array.isArray(selectedPreparerOrder?.items) ? selectedPreparerOrder.items : [];
+        if (items.length === 0) {
+            toast.error("لا توجد عناصر داخل الطلب");
+            return;
+        }
+
+        const normalize = (v) => String(v ?? "").trim().toLowerCase();
+        const resolveColorId = (item) => {
+            const direct = item?.color_id ?? item?.color?.color_id;
+            if (direct) return direct;
+            const code = normalize(item?.color_code ?? item?.color?.color_code);
+            if (!code) return "";
+            const match = (Array.isArray(colors) ? colors : []).find((c) => normalize(c?.color_code) === code);
+            return match?.color_id || "";
+        };
+        const resolveBatchId = (item) => {
+            const direct = item?.batch_id ?? item?.batch?.batch_id;
+            if (direct) return direct;
+            const num = normalize(item?.batch_number ?? item?.batch?.batch_number);
+            if (!num) return "";
+            const match = (Array.isArray(batches) ? batches : []).find((b) => normalize(b?.batch_number) === num);
+            return match?.batch_id || "";
+        };
+
+        const payloadItems = items.map((item) => {
+            const colorId = resolveColorId(item);
+            const batchId = resolveBatchId(item);
+
+            const width = item?.width;
+            const length = item?.length;
+            const thickness = item?.thickness;
+
+            return {
+                type_item: item?.type_item,
+                color_id: colorId,
+                batch_id: batchId,
+                width: width,
+                length: length,
+                thickness: thickness,
+                notes: item?.notes || ""
+            };
+        });
+
+        const firstInvalidIndex = payloadItems.findIndex((it) => !it.type_item || !it.color_id || !it.batch_id || it.width === undefined || it.length === undefined || it.thickness === undefined);
+        if (firstInvalidIndex !== -1) {
+            const it = payloadItems[firstInvalidIndex];
+            const missing = [];
+            if (!it.type_item) missing.push("type_item");
+            if (!it.color_id) missing.push("color_id");
+            if (!it.batch_id) missing.push("batch_id");
+            if (it.width === undefined) missing.push("width");
+            if (it.length === undefined) missing.push("length");
+            if (it.thickness === undefined) missing.push("thickness");
+
+            toast.error(`بيانات الطلب غير مكتملة لتحديثه: ${missing.join(" / ")}`);
+            return;
+        }
+
+        try {
+            setSavingPreparerOrder(true);
+            await salesApi.updateSalesOrder(orderId, {
+                status: preparerOrderDraft.status,
+                notes: preparerOrderDraft.notes,
+                items: payloadItems
+            });
+
+            toast.success("تم تحديث حالة الطلب");
+            setSelectedPreparerOrder((prev) => (prev ? { ...prev, status: preparerOrderDraft.status, notes: preparerOrderDraft.notes } : prev));
+            await loadPreparerOrders();
+        } catch (error) {
+            toast.error("فشل في تحديث حالة الطلب");
+        } finally {
+            setSavingPreparerOrder(false);
         }
     };
 
@@ -2258,6 +2377,43 @@ export default function ProductionManager() {
                             </div>
                         </div>
 
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="bg-white border rounded-lg p-3">
+                                <Label className="text-xs text-gray-500">تغيير الحالة</Label>
+                                <select
+                                    className="mt-1 w-full h-10 border rounded-md px-2 text-sm"
+                                    value={orderDetailsDraft.status}
+                                    onChange={(e) => setOrderDetailsDraft((prev) => ({ ...prev, status: e.target.value }))}
+                                    disabled={savingOrderDetails}
+                                >
+                                    <option value="pending">قيد الانتظار</option>
+                                    <option value="preparing">قيد التحضير</option>
+                                    <option value="completed">مكتمل</option>
+                                    <option value="canceled">ملغي</option>
+                                </select>
+                            </div>
+
+                            <div className="bg-white border rounded-lg p-3 md:col-span-2">
+                                <Label className="text-xs text-gray-500">ملاحظات</Label>
+                                <Input
+                                    className="mt-1"
+                                    value={orderDetailsDraft.notes}
+                                    onChange={(e) => setOrderDetailsDraft((prev) => ({ ...prev, notes: e.target.value }))}
+                                    disabled={savingOrderDetails}
+                                />
+                                <div className="mt-2 flex justify-end">
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSaveOrderDetails}
+                                        disabled={savingOrderDetails}
+                                        className="bg-primary-f hover:bg-primary-f/90"
+                                    >
+                                        {savingOrderDetails ? "جاري الحفظ..." : "حفظ"}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+
                         {selectedOrderItems.length > 0 && (
                             <div>
                                 <h4 className="font-bold text-sm mb-2">عناصر الإنتاج</h4>
@@ -2351,6 +2507,44 @@ export default function ProductionManager() {
                                             </span>
                                         );
                                     })()}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="bg-white border rounded-lg p-3">
+                                <Label className="text-xs text-gray-500">تغيير الحالة</Label>
+                                <select
+                                    className="mt-1 w-full h-10 border rounded-md px-2 text-sm"
+                                    value={preparerOrderDraft.status}
+                                    onChange={(e) => setPreparerOrderDraft((prev) => ({ ...prev, status: e.target.value }))}
+                                    disabled={savingPreparerOrder}
+                                >
+                                    <option value="pending">قيد الانتظار</option>
+                                    <option value="preparing">قيد التحضير</option>
+                                    <option value="outofwarehouse">اخراج من المستودع</option>
+                                    <option value="completed">مكتمل</option>
+                                    <option value="canceled">ملغي</option>
+                                </select>
+                            </div>
+
+                            <div className="bg-white border rounded-lg p-3 md:col-span-2">
+                                <Label className="text-xs text-gray-500">ملاحظات</Label>
+                                <Input
+                                    className="mt-1"
+                                    value={preparerOrderDraft.notes}
+                                    onChange={(e) => setPreparerOrderDraft((prev) => ({ ...prev, notes: e.target.value }))}
+                                    disabled={savingPreparerOrder}
+                                />
+                                <div className="mt-2 flex justify-end">
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSavePreparerOrderStatus}
+                                        disabled={savingPreparerOrder}
+                                        className="bg-primary-f hover:bg-primary-f/90"
+                                    >
+                                        {savingPreparerOrder ? "جاري الحفظ..." : "حفظ"}
+                                    </Button>
                                 </div>
                             </div>
                         </div>
