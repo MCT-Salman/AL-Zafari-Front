@@ -416,11 +416,13 @@ export default function ProductionManager() {
                                 type_item: firstItem.type_item || '-',
                                 thickness: firstItem.thickness || '-',
                                 width: firstItem.width || '-',
+                                length: firstItem.length || '-',
                                 batch_number: firstItem.batch?.batch_number || firstItem.batch_number || firstItem.batch_id || '-',
                                 material_name: firstItem.color?.ruler?.material?.material_name || '-',
                                 ruler_type: firstItem.color?.ruler?.ruler_name || '-'
                             };
                         }
+
                         return order;
                     } catch (error) {
                         console.error(`Error loading items for order ${order.production_order_id}:`, error);
@@ -431,7 +433,6 @@ export default function ProductionManager() {
 
             setProductionOrders(ordersWithDetails);
         } catch (error) {
-            // console.error("Error loading production orders:", error);
             toast.error("فشل في تحميل طلبات الإنتاج");
         } finally {
             setLoadingOrders(false);
@@ -1767,12 +1768,13 @@ export default function ProductionManager() {
                                     <table className="min-w-[520px] w-full table-fixed border-collapse">
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
+                                                <th className="p-1 text-center border-b w-20">اللون</th>
                                                 <th className="p-1 text-center border-b w-20">العرض</th>
                                                 <th className="p-1 text-center border-b w-20">الكمية</th>
                                                 <th className="p-1 text-center border-b w-20">أنواع الإنتاج</th>
-                                                <th className="p-1 text-center border-b w-20">اللون</th>
                                                 <th className="p-1 text-center border-b w-20">المصدر</th>
                                                 <th className="p-1 text-center border-b w-20">الوجهة</th>
+                                                <th className="p-1 text-center border-b w-24">الملاحظات</th>
                                                 <th className="p-1 text-center border-b w-20">الإجراءات</th>
                                             </tr>
                                         </thead>
@@ -1783,6 +1785,7 @@ export default function ProductionManager() {
                                                     className="border-b hover:bg-gray-50 cursor-pointer transition-colors"
                                                     onClick={() => handleEditItem(item)}
                                                 >
+                                                    <td className="p-1 text-center text-sm font-mono">{colors.find(c => String(c.color_id) === String(item.color_id || formData.color_id))?.color_code || '-'}</td>
                                                     <td className="p-1 text-center text-sm">{item.width}</td>
                                                     <td className="p-1 text-center text-sm">{item.length}</td>
                                                     <td className="p-1 text-center text-xs">
@@ -1797,7 +1800,6 @@ export default function ProductionManager() {
                                                             })}
                                                         </div>
                                                     </td>
-                                                    <td className="p-1 text-center text-sm font-mono">{colors.find(c => String(c.color_id) === String(item.color_id || formData.color_id))?.color_code || '-'}</td>
                                                     <td className="p-1 text-center text-sm">
                                                         {(() => {
                                                             const isItemWarehouse = item.production_types?.includes(ProductionType.warehouse);
@@ -1820,6 +1822,9 @@ export default function ProductionManager() {
                                                             }
                                                         })()}
                                                     </td>
+                                                    <td className="p-1 text-center text-sm" title={item.notes}>
+                                                        {item.notes || "-"}
+                                                    </td>
                                                     <td className="p-1 text-center">
                                                         <button
                                                             onClick={(e) => {
@@ -1836,7 +1841,7 @@ export default function ProductionManager() {
                                             ))}
                                             {productionItems.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="6" className="p-8 text-center text-gray-400">
+                                                    <td colSpan="8" className="p-8 text-center text-gray-400">
                                                         <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                         لا توجد عناصر مضافة
                                                     </td>
@@ -1994,24 +1999,25 @@ export default function ProductionManager() {
                                     <thead className="bg-gray-100 sticky top-0 z-20">
                                         <tr>
                                             <th className="p-2 text-right border-b w-20">#</th>
-                                            <th className="p-2 text-right border-b w-32">التاريخ</th>
-                                            <th className="p-2 text-right border-b w-32">المنشئ</th>
                                             <th className="p-2 text-right border-b w-32">اللون</th>
                                             <th className="p-2 text-center border-b w-24">العرض</th>
+                                            <th className="p-2 text-center border-b w-24">الكمية</th>
                                             <th className="p-2 text-center border-b w-24">النوع</th>
                                             <th className="p-2 text-center border-b w-24">السماكة</th>
                                             <th className="p-2 text-center border-b w-32">رقم الطبخة</th>
                                             <th className="p-2 text-center border-b w-24">الحالة</th>
+                                            <th className="p-2 text-right border-b w-32">المستخدم</th>
+                                            <th className="p-2 text-right border-b w-32">التاريخ</th>
                                             <th className="p-2 text-center border-b w-32">ملاحظات</th>
                                             <th className="p-2 text-center border-b w-32">الإجراءات</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {loadingOrders ? (
-                                            <tr><td colSpan="11" className="p-6"><LoadingState /></td></tr>
+                                            <tr><td colSpan="12" className="p-6"><LoadingState /></td></tr>
                                         ) : filteredProductionOrders.length === 0 ? (
                                             <tr>
-                                                <td colSpan="11" className="p-8 text-center text-gray-400">
+                                                <td colSpan="12" className="p-8 text-center text-gray-400">
                                                     <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                     لا توجد طلبات إنتاج
                                                 </td>
@@ -2022,10 +2028,9 @@ export default function ProductionManager() {
                                                 return (
                                                     <tr key={order.production_order_id} className="border-b hover:bg-gray-50">
                                                         <td className="p-2 font-medium text-sm">#{startIndex + index + 1}</td>
-                                                        <td className="p-2 text-sm">{productionApi.getFormattedDate(order.created_at)}</td>
-                                                        <td className="p-2 text-sm">{productionApi.formatIssuedBy(order.issued_by)}</td>
                                                         <td className="p-2 text-sm">{order.color_name} ({order.color_code})</td>
                                                         <td className="p-2 text-center text-sm">{order.width}</td>
+                                                        <td className="p-2 text-center text-sm">{order.length}</td>
                                                         <td className="p-2 text-center text-sm">
                                                             {formatTypeItem(order.type_item)}
                                                         </td>
@@ -2036,6 +2041,8 @@ export default function ProductionManager() {
                                                                 {statusBadge.label}
                                                             </span>
                                                         </td>
+                                                        <td className="p-2 text-sm">{productionApi.formatIssuedBy(order.issued_by)}</td>
+                                                        <td className="p-2 text-sm">{productionApi.getFormattedDate(order.created_at)}</td>
                                                         <td className="p-2 text-center max-w-[150px] truncate text-sm" title={order.notes}>
                                                             {order.notes || '-'}
                                                         </td>
@@ -2334,7 +2341,7 @@ export default function ProductionManager() {
             >
                 {selectedOrder && (
                     <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-2">
+                        {/* <div className="grid grid-cols-2 gap-2">
                             <div className="bg-gray-50 p-2 rounded-lg">
                                 <div className="text-xs text-gray-500">تاريخ الإنشاء</div>
                                 <div className="font-bold text-sm">
@@ -2375,7 +2382,7 @@ export default function ProductionManager() {
                                     </span>
                                 </div>
                             </div>
-                        </div>
+                        </div> */}
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div className="bg-white border rounded-lg p-3">
@@ -2424,7 +2431,7 @@ export default function ProductionManager() {
                                                 <th className="p-2 text-center">العرض</th>
                                                 <th className="p-2 text-center">الكمية</th>
                                                 <th className="p-2 text-center">رقم الطبخة</th>
-                                                <th className="p-2 text-center">النوع</th>
+                                                <th className="p-2 text-center">نوع عملية الطلب</th>
                                                 <th className="p-2 text-center">المصدر</th>
                                                 <th className="p-2 text-center">الوجهة</th>
                                                 {/* <th className="p-2 text-center">المرحلة التالية</th> */}
@@ -2560,7 +2567,7 @@ export default function ProductionManager() {
                                         <th className="p-2 text-center border-b">السماكة</th>
                                         <th className="p-2 text-center border-b">الكمية</th>
                                         <th className="p-2 text-center border-b">الطبخة</th>
-                                        <th className="p-2 text-center border-b">النوع</th>
+                                        <th className="p-2 text-center border-b">نوع عملية الطلب</th>
                                     </tr>
                                 </thead>
                                 <tbody>

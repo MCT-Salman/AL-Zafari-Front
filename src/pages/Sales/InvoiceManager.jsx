@@ -2698,17 +2698,18 @@ export default function InvoiceManager() {
                                         <thead className="bg-gray-100 sticky top-0 z-10">
                                             <tr>
                                                 <th className="p-1 text-right border-b w-[50px]">المادة</th>
-                                                <th className="p-1 text-center border-b w-[55px]">العرض</th>
                                                 <th className="p-1 text-right border-b w-[50px]">اللون</th>
-                                                <th className="p-1 text-center border-b w-[45px]">النوع</th>
+                                                <th className="p-1 text-center border-b w-[55px]">العرض</th>
                                                 <th className="p-1 text-center border-b w-[55px]">الكمية</th>
-                                                <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
+                                                <th className="p-1 text-center border-b w-[45px]">النوع</th>
                                                 <th className="p-1 text-center border-b w-[70px]">السماكة</th>
-                                                <th className="p-1 text-center border-b w-[95px]">رقم الطبخة</th>
+                                                <th className="p-1 text-center border-b w-[95px]">الطبخة</th>
+                                                <th className="p-1 text-right border-b w-[80px]">المسطرة</th>
                                                 <th className="p-1 text-center border-b w-[80px]">سعر الوحدة</th>
                                                 <th className="p-1 text-center border-b w-[80px]">الإجمالي</th>
                                                 <th className="p-1 text-center border-b w-[80px]">الخصم</th>
-                                                <th className="p-1 text-center border-b w-[190px]">بعد الخصم</th>
+                                                <th className="p-1 text-center border-b w-[100px]">بعد الخصم</th>
+                                                <th className="p-1 text-center border-b w-[80px]">الملاحظات</th>
                                                 <th className="p-1 text-center border-b w-[80px]">الإجراءات</th>
                                             </tr>
                                         </thead>
@@ -2728,26 +2729,26 @@ export default function InvoiceManager() {
                                                     <td className="p-1 break-words text-sm" title={item.material_name}>
                                                         {item.material_name}
                                                     </td>
-                                                    <td className="p-1 text-center text-sm">
-                                                        {item.width || "-"}
-                                                    </td>
                                                     <td className="p-1 break-words text-sm font-mono" title={item.color_code}>
                                                         {item.color_code}
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
-                                                        {formatTypeItem(item.type_item)}
+                                                        {item.width || "-"}
                                                     </td>
                                                     <td className="p-1 text-center font-bold text-sm">
                                                         {item.quantity} م
                                                     </td>
-                                                    <td className="p-1 break-words text-sm" title={item.ruler_name}>
-                                                        {item.ruler_name}
+                                                    <td className="p-1 text-center text-sm">
+                                                        {formatTypeItem(item.type_item)}
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
                                                         {item.thickness || "0.6"} مم
                                                     </td>
                                                     <td className="p-1 text-center text-sm" title={item.batch_number}>
                                                         {item.batch_number || "-"}
+                                                    </td>
+                                                    <td className="p-1 break-words text-sm" title={item.ruler_name}>
+                                                        {item.ruler_name}
                                                     </td>
                                                     <td className="p-1 text-center text-sm">
                                                         <span className="flex flex-col items-center gap-0.5">
@@ -2804,6 +2805,9 @@ export default function InvoiceManager() {
                                                             invoiceApi.formatCurrency(afterDiscount)
                                                         )}
                                                     </td>
+                                                    <td className="p-1 text-center text-sm" title={item.notes}>
+                                                        {item.notes || "-"}
+                                                    </td>
                                                     <td className="p-1 text-center">
                                                         <div className="flex items-center justify-center gap-1">
                                                             {editingItemId === item.id && (
@@ -2829,7 +2833,7 @@ export default function InvoiceManager() {
                                             ))}
                                             {orderItems.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="13" className="p-8 text-center text-primary-f">
+                                                    <td colSpan="14" className="p-8 text-center text-primary-f">
                                                         <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                                         <span className="text-sm">لا توجد عناصر مضافة</span>
                                                         <p className="text-xs mt-1">اضغط على العناصر في اليمين لإضافتها</p>

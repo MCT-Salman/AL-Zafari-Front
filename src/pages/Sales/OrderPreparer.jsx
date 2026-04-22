@@ -3559,47 +3559,46 @@ export default function OrderPreparer() {
                                                 <table className="w-full text-sm overflow-y-auto">
                                                     <thead className="bg-gray-100 sticky top-0 z-10">
                                                         <tr>
+                                                            <th className="p-2 text-center border-b">الرقم</th>
                                                             <th className="p-2 text-right border-b">المادة</th>
-                                                            <th className="p-2 text-center border-b">العرض</th>
                                                             <th className="p-2 text-right border-b">اللون</th>
-                                                            <th className="p-2 text-center border-b">النوع</th>
+                                                            <th className="p-2 text-center border-b">العرض</th>
                                                             <th className="p-2 text-center border-b">الكمية</th>
-                                                            <th className="p-2 text-right border-b">المسطرة</th>
+                                                            <th className="p-2 text-center border-b">النوع</th>
                                                             <th className="p-2 text-center border-b">السماكة</th>
                                                             <th className="p-2 text-center border-b">الطبخة</th>
+                                                            <th className="p-2 text-center border-b">الحالة</th>
+                                                            <th className="p-2 text-right border-b">المسطرة</th>
+                                                            <th className="p-2 text-right border-b">الملاحظات</th>
                                                             <th className="p-2 text-center border-b">الإجراءات</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         {paginatedProductionHistoryOrders.map((order, index) => (
                                                             <tr key={order.sales_order_item_id || order.id} className="border-b hover:bg-gray-50">
+                                                                <td className="p-2 text-center font-medium">{productionHistoryStartIndex + index + 1}</td>
                                                                 <td className="p-2 font-medium">{order.material_name || "-"}</td>
+                                                                <td className="p-2">{order.color_code || "-"} </td>
                                                                 <td className="p-2 text-center">{order.width || "-"}</td>
-                                                                <td className="p-2">
-                                                                    <div className="flex items-center justify-center gap-1">
-                                                                        <div
-                                                                            className="w-4 h-4 rounded border border-gray-300"
-                                                                            style={{ backgroundColor: order.color_code }}
-                                                                        />
-                                                                        <span className="text-xs">{order.color_code || "-"}</span>
-                                                                    </div>
-                                                                </td>
+                                                                <td className="p-2 text-center font-bold">{order.quantity} م</td>
                                                                 <td className="p-2 text-center">
                                                                     {formatTypeItem(order.type_item)}
                                                                 </td>
-                                                                <td className="p-2 text-center font-bold">{order.quantity} م</td>
-                                                                <td className="p-2">{order.ruler_name || "-"}</td>
                                                                 <td className="p-2 text-center">{order.thickness || "-"}</td>
                                                                 <td className="p-2 text-center">{order.batch_number || "-"}</td>
                                                                 <td className="p-2 text-center">
+                                                                    {order.status ? (
+                                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(order.status).className}`}>
+                                                                            {getStatusBadge(order.status).label}
+                                                                        </span>
+                                                                    ) : (
+                                                                        "-"
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-2">{order.ruler_name || "-"}</td>
+                                                                <td className="p-2" title={order.notes}>{order.notes || "-"}</td>
+                                                                <td className="p-2 text-center">
                                                                     <div className="flex items-center justify-center gap-2">
-                                                                        <button
-                                                                            onClick={() => openQrGenDialog(order)}
-                                                                            className="text-blue-600 hover:text-blue-800 text-sm"
-                                                                            title="توليد QR"
-                                                                        >
-                                                                            <QrCode className="w-4 h-4" />
-                                                                        </button>
                                                                         <button
                                                                             onClick={() => handleViewProductionOrderDetails(order)}
                                                                             className="text-green-600 hover:text-green-800 text-sm"
@@ -3607,6 +3606,13 @@ export default function OrderPreparer() {
                                                                         >
                                                                             <Eye className="w-4 h-4" />
                                                                         </button>
+                                                                    <button
+                                                                        onClick={() => openQrGenDialog(order)}
+                                                                        className="text-blue-600 hover:text-blue-800 text-sm"
+                                                                        title="توليد QR"
+                                                                    >
+                                                                        <QrCode className="w-4 h-4" />
+                                                                    </button>
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -4424,23 +4430,23 @@ export default function OrderPreparer() {
 
                                                                 <tr>
 
-                                                                    <th className="p-2 text-right border-b">المادة</th>
+                                                                    <th className="p-2 text-right border-b">اللون</th>
 
                                                                     <th className="p-2 text-center border-b">العرض</th>
 
-                                                                    <th className="p-2 text-right border-b">اللون</th>
-
-                                                                    <th className="p-2 text-center border-b">النوع</th>
-
                                                                     <th className="p-2 text-center border-b">الكمية</th>
 
-                                                                    <th className="p-2 text-right border-b">المسطرة</th>
+                                                                    <th className="p-2 text-center border-b">النوع</th>
 
                                                                     <th className="p-2 text-center border-b">السماكة</th>
 
                                                                     <th className="p-2 text-center border-b">الطبخة</th>
 
-                                                                    <th className="p-2 text-center border-b">إجراء</th>
+                                                                    <th className="p-2 text-right border-b">المسطرة</th>
+
+                                                                    <th className="p-2 text-right border-b">الملاحظات</th>
+
+                                                                    <th className="p-2 text-center border-b">الإجراءات</th>
 
                                                                 </tr>
 
@@ -4452,10 +4458,6 @@ export default function OrderPreparer() {
 
                                                                     <tr key={order.id} className="border-b hover:bg-gray-50">
 
-                                                                        <td className="p-2 font-medium">{order.material_name}</td>
-
-                                                                        <td className="p-2 text-center">{order.width || "-"}</td>
-
                                                                         <td className="p-2">
 
                                                                             <div className="flex items-center justify-center gap-1">
@@ -4466,19 +4468,27 @@ export default function OrderPreparer() {
 
                                                                         </td>
 
+                                                                        <td className="p-2 text-center">{order.width || "-"}</td>
+
+                                                                        <td className="p-2 text-center font-bold">{order.quantity} م</td>
+
                                                                         <td className="p-2 text-center">
 
                                                                             {formatTypeItem(order.type_item)}
 
                                                                         </td>
 
-                                                                        <td className="p-2 text-center font-bold">{order.quantity} م</td>
-
-                                                                        <td className="p-2">{order.ruler_name || "-"}</td>
-
                                                                         <td className="p-2 text-center">{order.thickness || "0.6"}</td>
 
                                                                         <td className="p-2 text-center">{order.batch_number || "-"}</td>
+
+                                                                        <td className="p-2">{order.ruler_name || "-"}</td>
+
+                                                                        <td className="p-2" title={order.notes}>
+
+                                                                            {order.notes || "-"}
+
+                                                                        </td>
 
                                                                         <td className="p-2 text-center">
 
@@ -7257,19 +7267,17 @@ export default function OrderPreparer() {
                                                 <thead className="bg-gray-50 sticky top-0 z-10">
                                                     <tr>
                                                         <th className="p-2 text-right">#</th>
-                                                        <th className="p-2 text-right">المادة</th>
-                                                        <th className="p-2 text-right">المسطرة</th>
                                                         <th className="p-2 text-right">اللون</th>
-                                                        <th className="p-2 text-right">الكود</th>
                                                         <th className="p-2 text-right">العرض</th>
-                                                        <th className="p-2 text-right">السماكة</th>
                                                         <th className="p-2 text-right">الكمية</th>
+                                                        <th className="p-2 text-right">السماكة</th>
                                                         <th className="p-2 text-right">الطبخة</th>
+                                                        {/* <th className="p-2 text-center">طباعة</th> */}
+                                                        <th className="p-2 text-center">المسطرة</th>
+                                                        <th className="p-2 text-center">ملاحظات</th>
                                                         {isOrderPreparer && (
                                                             <th className="p-2 text-center">QR</th>
                                                         )}
-                                                        {/* <th className="p-2 text-center">طباعة</th> */}
-                                                        <th className="p-2 text-center">ملاحظات</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -7288,32 +7296,17 @@ export default function OrderPreparer() {
                                                         return (
                                                             <tr key={localItem.id} className="border-t">
                                                                 <td className="p-3 text-right font-bold">{index + 1}</td>
-                                                                <td className="p-3 text-right">{localItem.material_name}</td>
-                                                                <td className="p-3 text-right">{localItem.ruler_name}</td>
                                                                 <td className="p-3 text-right">
                                                                     <span className="inline-block px-2 py-1 rounded text-primary-f text-xs font-medium" style={{ backgroundColor: localItem.color_code || 'var(--color-primary)' }}>
                                                                         {localItem.color_name}
                                                                     </span>
-                                                                </td>
-                                                                <td className="p-3 text-right">
-                                                                    <span className="font-mono text-xs text-primary-f font-medium">{localItem.color_code || "-"}</span>
+                                                                    <span className="font-mono text-xs text-primary-f font-medium mr-2">({localItem.color_code || "-"})</span>
                                                                 </td>
                                                                 <td className="p-3 text-right">{localItem.width ?? "-"}</td>
-                                                                <td className="p-3 text-right">{localItem.thickness ?? "-"}</td>
                                                                 <td className="p-3 text-right font-bold">{localItem.quantity}</td>
+                                                                <td className="p-3 text-right">{localItem.thickness ?? "-"}</td>
                                                                 <td className="p-3 text-right">{localItem.batch_number || "-"}</td>
-                                                                {isOrderPreparer && (
-                                                                    <td className="p-3 text-center">
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() => openQrGenDialog(localItem)}
-                                                                            className="h-8 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
-                                                                        >
-                                                                            توليد QR
-                                                                        </Button>
-                                                                    </td>
-                                                                )}
+                                                                <td className="p-3 text-right">{localItem.ruler_name}</td>
                                                                 {/* <td className="p-3 text-center">
                                                                 <Button
                                                                     size="sm"
@@ -7328,6 +7321,18 @@ export default function OrderPreparer() {
                                                                 <td className="p-3 text-center max-w-[150px] truncate" title={item.notes}>
                                                                     {item.notes || '-'}
                                                                 </td>
+                                                                {isOrderPreparer && (
+                                                                    <td className="p-3 text-center">
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() => openQrGenDialog(localItem)}
+                                                                            className="h-8 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                                                                        >
+                                                                            توليد QR
+                                                                        </Button>
+                                                                    </td>
+                                                                )}
                                                             </tr>
                                                         );
                                                     })}

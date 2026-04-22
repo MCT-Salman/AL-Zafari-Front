@@ -468,16 +468,17 @@ export default function ProductionRecords({ embedded = false }) {
                                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">#</th>
                                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">رقم الطلب</th>
                                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">اللون</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الطبخة</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">النوع</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">السماكة</th>
                                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">العرض</th>
                                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الكمية</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">نوع عملية الطلب</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">السماكة</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الطبخة</th>
                                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">المصدر</th>
                                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الوجهة</th>
                                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الحالة</th>
                                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">التاريخ</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">إجراءات</th>
+                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">ملاحظات</th>
+                                {/* <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">الإجراءات</th> */}
                             </tr>
                         </thead>
                         <tbody>
@@ -491,11 +492,11 @@ export default function ProductionRecords({ embedded = false }) {
                                             <span className="text-gray-500">({item.color?.color_code || '-'})</span>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-sm">{item.batch?.batch_number || '-'}</td>
-                                    <td className="px-4 py-3 text-sm">{formatType(item.type)}</td>
-                                    <td className="px-4 py-3 text-sm">{item.thickness || '-'}</td>
                                     <td className="px-4 py-3 text-sm">{item.width || '-'}</td>
                                     <td className="px-4 py-3 text-sm">{item.length || '-'}</td>
+                                    <td className="px-4 py-3 text-sm">{formatType(item.type)}</td>
+                                    <td className="px-4 py-3 text-sm">{item.thickness || '-'}</td>
+                                    <td className="px-4 py-3 text-sm">{item.batch?.batch_number || '-'}</td>
                                     <td className="px-4 py-3 text-sm">{formatSource(item.source)}</td>
                                     <td className="px-4 py-3 text-sm">{formatDestination(item.destination)}</td>
                                     <td className="px-4 py-3 text-sm">
@@ -504,7 +505,10 @@ export default function ProductionRecords({ embedded = false }) {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-sm">{formatDate(item.created_at)}</td>
-                                    <td className="px-4 py-3 text-sm">
+                                    <td className="px-4 py-3 text-sm" title={item.notes}>
+                                        {item.notes || "-"}
+                                    </td>
+                                    {/* <td className="px-4 py-3 text-sm">
                                         <div className="flex items-center gap-1">
                                             <Button
                                                 size="sm"
@@ -515,7 +519,7 @@ export default function ProductionRecords({ embedded = false }) {
                                                 <Eye className="w-4 h-4" />
                                             </Button>
                                         </div>
-                                    </td>
+                                    </td> */}
                                 </tr>
                             ))}
                         </tbody>
@@ -776,7 +780,7 @@ export default function ProductionRecords({ embedded = false }) {
                 isOpen={showItemDetails}
                 onOpenChange={setShowItemDetails}
                 title="تفاصيل عنصر الإنتاج"
-                className="max-w-4xl"
+                className="max-w-7xl"
                 showFooter={false}
             >
                 {selectedItem && (
@@ -796,142 +800,63 @@ export default function ProductionRecords({ embedded = false }) {
                             </div>
                         </div>
 
-                        {/* Main Information Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {/* Basic Information */}
-                            <div className="space-y-4">
-                                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                    <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                        <Package className="w-4 h-4 text-blue-600" />
-                                        المعلومات الأساسية
-                                    </h4>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">رقم العنصر</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.production_order_item_id || '-'}</div>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">رقم الطلب</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.production_order_id || '-'}</div>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">النوع</Label>
-                                            <div className="text-sm font-medium text-gray-900">{formatType(selectedItem.type)}</div>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">نوع العنصر</Label>
-                                            <div className="text-sm font-medium text-gray-900">{formatTypeItem(selectedItem.type_item) || '-'}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Material Information */}
-                            <div className="space-y-4">
-                                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                    <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                        <Droplet className="w-4 h-4 text-green-600" />
-                                        معلومات المادة
-                                    </h4>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">اللون</Label>
-                                            <div className="flex items-center gap-2">
-                                                {/* <div className="w-4 h-4 rounded border border-gray-300"
-                                                    style={{ backgroundColor: selectedItem.color?.color_code ? `#${selectedItem.color.color_code}` : '#f3f4f6' }}>
-
-                                                    </div> */}
-                                                <div>
-                                                    <div className="text-sm font-medium text-gray-900">{selectedItem.color?.color_name || '-'}</div>
-                                                    <div className="text-xs text-gray-500">({selectedItem.color?.color_code || '-'})</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">الطبخة</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.batch?.batch_number || '-'}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Dimensions */}
-                            <div className="space-y-4">
-                                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                    <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                        <Settings className="w-4 h-4 text-purple-600" />
-                                        الأبعاد
-                                    </h4>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">السماكة</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.thickness || '-'} مم</div>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">العرض</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.width || '-'} مم</div>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs font-medium text-gray-500">الكمية</Label>
-                                            <div className="text-sm font-medium text-gray-900">{selectedItem.length || '-'} م</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Flow Information */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                    <Layers className="w-4 h-4 text-orange-600" />
-                                    تدفق العمل
-                                </h4>
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="text-xs font-medium text-gray-500">المصدر</Label>
-                                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm font-medium">
-                                            {formatSource(selectedItem.source)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <Label className="text-xs font-medium text-gray-500">الوجهة</Label>
-                                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm font-medium">
-                                            {formatDestination(selectedItem.destination)}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                    <History className="w-4 h-4 text-indigo-600" />
-                                    معلومات إضافية
-                                </h4>
-                                <div className="space-y-3">
-                                    <div>
-                                        <Label className="text-xs font-medium text-gray-500">تاريخ الإنشاء</Label>
-                                        <div className="text-sm font-medium text-gray-900">{formatDate(selectedItem.created_at)}</div>
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs font-medium text-gray-500">حالة الطلب</Label>
-                                        <div className="text-sm font-medium text-gray-900">
-                                            {selectedItem.productionOrder?.status ? getStatusBadge(selectedItem.productionOrder.status).label : '-'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Notes Section */}
-                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-                            <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4 text-yellow-600" />
-                                ملاحظات
-                            </h4>
-                            <div className="text-sm text-gray-700 bg-white rounded p-3 border border-gray-200 min-h-[60px]">
-                                {selectedItem.notes || 'لا توجد ملاحظات'}
-                            </div>
+                        <div className="border rounded-lg">
+                            <table className="w-full text-xs border-collapse table-fixed" style={{ direction: "rtl" }}>
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th className="p-2 text-center border-b w-[70px]">الرقم</th>
+                                        <th className="p-2 text-center border-b w-[80px]">رقم الطلب</th>
+                                        <th className="p-2 text-center border-b w-[140px]">اللون</th>
+                                        <th className="p-2 text-center border-b w-[70px]">العرض</th>
+                                        <th className="p-2 text-center border-b w-[70px]">الكمية</th>
+                                        <th className="p-2 text-center border-b w-[120px]">النوع</th>
+                                        <th className="p-2 text-center border-b w-[70px]">السماكة</th>
+                                        <th className="p-2 text-center border-b w-[90px]">الطبخة</th>
+                                        <th className="p-2 text-center border-b w-[95px]">المصدر</th>
+                                        <th className="p-2 text-center border-b w-[95px]">الوجهة</th>
+                                        <th className="p-2 text-center border-b w-[95px]">الحالة</th>
+                                        <th className="p-2 text-center border-b w-[110px]">التاريخ</th>
+                                        <th className="p-2 text-center border-b">ملاحظات</th>
+                                        <th className="p-2 text-center border-b w-[90px]">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr className="border-t">
+                                        <td className="p-2 text-center break-words">{selectedItem.production_order_item_id || "-"}</td>
+                                        <td className="p-2 text-center break-words">{selectedItem.production_order_id || "-"}</td>
+                                        <td className="p-2 text-center break-words">
+                                            {selectedItem.color?.color_name || "-"}
+                                            {selectedItem.color?.color_code ? ` (${selectedItem.color.color_code})` : ""}
+                                        </td>
+                                        <td className="p-2 text-center break-words">{selectedItem.width ?? "-"}</td>
+                                        <td className="p-2 text-center break-words">{selectedItem.length ?? "-"}</td>
+                                        <td className="p-2 text-center break-words">{formatType(selectedItem.type)}</td>
+                                        <td className="p-2 text-center break-words">{selectedItem.thickness ?? "-"}</td>
+                                        <td className="p-2 text-center break-words">{selectedItem.batch?.batch_number || "-"}</td>
+                                        <td className="p-2 text-center break-words">{formatSource(selectedItem.source)}</td>
+                                        <td className="p-2 text-center break-words">{formatDestination(selectedItem.destination)}</td>
+                                        <td className="p-2 text-center">
+                                            <span className={`px-2 py-1 rounded-lg text-xs ${getStatusBadge(selectedItem.status).className}`}>
+                                                {getStatusBadge(selectedItem.status).label}
+                                            </span>
+                                        </td>
+                                        <td className="p-2 text-center break-words">{formatDate(selectedItem.created_at)}</td>
+                                        <td className="p-2 text-center break-words" title={selectedItem.notes}>
+                                            {selectedItem.notes || "-"}
+                                        </td>
+                                        <td className="p-2 text-center">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setShowItemDetails(false)}
+                                                className="h-8"
+                                            >
+                                                إغلاق
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}
